@@ -9,12 +9,12 @@ Start by reading [README.md](README.md) and [AGENTS.md](AGENTS.md). Issue tracki
 ```
 ├── pyproject.toml          # uv-managed; core dep = rich; dev = ruff + pytest
 ├── install.sh              # user-facing bootstrap (curl | bash)
-├── src/project_init/       # wizard CLI (stub until PI-3)
+├── src/project_init/       # wizard CLI + scaffold engine
 ├── templates/
 │   ├── base/               # always copied into target projects
 │   ├── obsidian/           # overlay for both Obsidian-* presets
 │   ├── lightrag/           # overlay for Obsidian+LightRAG preset
-│   └── presets/            # yaml preset definitions
+│   └── presets/            # toml preset definitions
 └── tests/
 ```
 

@@ -17,10 +17,10 @@ Proposed state of the Linear "Project Init" project after the 2026-04-23 scope p
 |---|---|---|---|
 | PI-1 | Repo restructure for scaffolder scope | High | Done (2026-04-23 initial commit) |
 | PI-2 | Template base — `.claude/` layout | High | Done (2026-04-23) |
-| PI-3 | Interactive wizard (`project-init` CLI) | High | Todo |
+| PI-3 | Interactive wizard (`project-init` CLI) | High | Done (2026-04-23) |
 | PI-4 | `install.sh` bootstrap + user-level slash command | High | Done (2026-04-23) |
 | PI-5 | Obsidian-only preset (vault skeleton + session-end hook) | High | Done (2026-04-23) |
-| PI-6 | Obsidian + LightRAG preset | Medium | In progress (overlay done; wizard wiring pending) |
+| PI-6 | Obsidian + LightRAG preset | Medium | In progress (overlay done; wizard wired; needs e2e test) |
 | PI-7 | MCP suggestion menu in wizard | Medium | Todo |
 | PI-8 | Memory bootstrap (seeded `MEMORY.md`, conventions doc) | Medium | Done (2026-04-23) |
 | PI-9 | Cross-agent compatibility (AGENTS.md for Cursor/Aider/…) | Low | Done (2026-04-23) |

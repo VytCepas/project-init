@@ -77,18 +77,18 @@ rm -rf ~/.local/share/project-init ~/.claude/commands/project-init.md
 project-init/
 ├── pyproject.toml            # uv-managed, rich-only runtime dep, ruff-only dev
 ├── install.sh                # bootstrap one-liner
-├── src/project_init/         # wizard CLI (PI-3 pending)
+├── src/project_init/         # wizard CLI + scaffold engine
 ├── templates/
 │   ├── base/                 # always copied
 │   ├── obsidian/             # Obsidian-only + Obsidian+LightRAG overlay
 │   ├── lightrag/             # LightRAG overlay
-│   └── presets/              # yaml preset definitions
+│   └── presets/              # toml preset definitions
 └── tests/
 ```
 
 ## Status
 
-Templates (PI-2) and install script (PI-4) are in. Interactive wizard (PI-3) is a stub — track progress in Linear.
+Wizard (PI-3), templates (PI-2), and install script (PI-4) are done. MCP suggestion menu (PI-7) is next. Track progress in Linear, project "Project Init".
 
 ## License
 

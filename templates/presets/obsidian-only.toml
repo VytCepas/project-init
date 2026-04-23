@@ -1,0 +1,14 @@
+# Preset: Obsidian-only memory stack
+# For small projects. Plain markdown vault, no vector/graph indexing.
+
+name = "obsidian-only"
+description = "Obsidian vault only — human-authored docs, no AI index."
+
+layers = ["base", "obsidian"]
+
+[vars]
+memory_stack = "obsidian-only"
+
+[scaffolded_project_dependencies.python]
+core = []
+dev = ["ruff"]
