@@ -1,0 +1,21 @@
+# LightRAG configuration for {{project_name}}.
+# Used by .claude/scripts/ingest_sessions.py and .claude/scripts/query_memory.py.
+
+working_dir: .claude/memory/.lightrag
+
+llm:
+  provider: anthropic
+  model: claude-sonnet-4-6
+
+embedding:
+  provider: anthropic
+  # Claude does not expose embeddings; fall back to local or swap provider here.
+  # See https://github.com/hkuds/lightrag for supported backends.
+
+chunk:
+  size: 1200
+  overlap: 100
+
+sources:
+  - .claude/vault
+  - .claude/memory

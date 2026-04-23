@@ -1,0 +1,22 @@
+# project-init: record of choices made at init time.
+# Safe to hand-edit; re-running `project-init` will reconcile with this file.
+
+project:
+  name: {{project_name}}
+  description: {{project_description}}
+  created: {{created_date}}
+  project_init_version: {{project_init_version}}
+
+language: {{language}}            # python | node | go | none
+
+memory:
+  stack: {{memory_stack}}         # obsidian-only | obsidian-lightrag
+  vault_path: .claude/vault
+  memory_path: .claude/memory
+
+mcps:
+  installed: {{installed_mcps_yaml}}
+
+tooling:
+  python_linter: {{python_linter}}  # ruff | none
+  test_framework: {{test_framework}} # pytest | none

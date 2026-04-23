@@ -1,0 +1,58 @@
+# Project: {{project_name}}
+
+> {{project_description}}
+
+Scaffolded with [project-init](https://github.com/VytCepas/project-init) on {{created_date}}.
+
+## Setup captured at init
+
+- **Language/runtime**: {{language}}
+- **Memory stack**: {{memory_stack}}
+- **Installed MCPs**: {{installed_mcps}}
+
+See [`config.yaml`](config.yaml) for the full record.
+
+## Workflow
+
+1. **Start of session** — agents should read [`memory/MEMORY.md`](memory/MEMORY.md) first, then glance at [`vault/`](vault/) for recent design/decision notes.
+2. **During work** — append to memory when you learn something reusable (see [`memory/README.md`](memory/README.md) for the convention). Large docs go in [`vault/`](vault/), small facts in [`memory/`](memory/).
+3. **End of session** — the `session-end` hook appends a session log to [`vault/sessions/`](vault/sessions/){{#if lightrag}}, and the memory ingester updates the LightRAG index{{/if}}.
+
+## Conventions
+
+- **Deterministic first** — hooks and scripts in [`hooks/`](hooks/) and [`scripts/`](scripts/) prefer bash/python. LLM calls only for generative steps.
+- **One folder for agentic infra** — everything lives under `.claude/`. Root only has `CLAUDE.md` / `AGENTS.md` redirects.
+- **Markdown is canonical** — vault notes and memory files are plain markdown so they stay portable across agents.
+
+{{#if python}}
+## Python environment
+
+This project uses [`uv`](https://docs.astral.sh/uv/).
+
+```bash
+uv sync                 # install deps
+uv run <command>        # run in the project venv
+uv run ruff check .     # lint
+uv run ruff format .    # format
+uv run pytest           # tests
+```
+{{/if}}
+
+{{#if lightrag}}
+## LightRAG memory
+
+Agent memory is indexed by [LightRAG](https://github.com/hkuds/lightrag), backed by the working directory at [`memory/.lightrag/`](memory/.lightrag/) (gitignored).
+
+- Ingest session logs and vault notes: `./scripts/ingest_sessions.py`
+- Query memory: `./scripts/query_memory.py "<question>"`
+
+Both scripts are deterministic wrappers around LightRAG — the LLM is only invoked inside LightRAG itself for entity extraction and synthesis.
+{{/if}}
+
+## Adding new MCPs later
+
+Edit [`config.yaml`](config.yaml) and run the corresponding `claude mcp add …` command. See [`scripts/mcp-manage.sh`](scripts/mcp-manage.sh) for convenience wrappers.
+
+## Reset or re-init
+
+Re-run `/project-init` (or `project-init` from shell) in this project to re-select options. It will not overwrite existing memory or vault content.
