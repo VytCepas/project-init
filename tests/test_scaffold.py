@@ -28,6 +28,7 @@ def _make_variables(**overrides: str) -> dict[str, str]:
         "test_framework": "pytest",
         "python": "true",
         "lightrag": "",
+        "obsidian": "true",
     }
     defaults.update(overrides)
     return defaults
@@ -95,6 +96,37 @@ class TestScaffoldObsidianOnly:
         hook = self.target / ".claude" / "hooks" / "session-end.sh"
         assert hook.is_file()
 
+    def test_slash_commands_created(self):
+        cmds = self.target / ".claude" / "commands"
+        assert (cmds / "status.md").is_file()
+        assert (cmds / "review.md").is_file()
+        assert (cmds / "save-memory.md").is_file()
+        assert (cmds / "plan.md").is_file()
+
+    def test_agents_created(self):
+        agents = self.target / ".claude" / "agents"
+        assert (agents / "reviewer.md").is_file()
+        assert (agents / "researcher.md").is_file()
+
+    def test_skill_created(self):
+        skill = self.target / ".claude" / "skills" / "session-summary" / "SKILL.md"
+        assert skill.is_file()
+        content = skill.read_text()
+        assert "session-summary" in content
+
+    def test_post_edit_lint_hook(self):
+        hook = self.target / ".claude" / "hooks" / "post-edit-lint.sh"
+        assert hook.is_file()
+        assert hook.stat().st_mode & 0o111  # executable
+
+    def test_settings_json_has_hooks(self):
+        import json
+
+        settings = self.target / ".claude" / "settings.json"
+        assert settings.is_file()
+        data = json.loads(settings.read_text())
+        assert "hooks" in data
+
     def test_no_lightrag_files(self):
         assert not (self.target / ".claude" / "scripts" / "ingest_sessions.py").exists()
         assert not (self.target / ".claude" / "scripts" / "query_memory.py").exists()
@@ -129,6 +161,13 @@ class TestScaffoldLightRAG:
     def test_lightrag_conditional_included(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
         assert "LightRAG" in content
+
+    def test_settings_json_has_stop_hook(self):
+        import json
+
+        settings = self.target / ".claude" / "settings.json"
+        data = json.loads(settings.read_text())
+        assert "Stop" in data["hooks"]
 
     def test_more_files_than_obsidian_only(self):
         preset_small = load_preset("obsidian-only")

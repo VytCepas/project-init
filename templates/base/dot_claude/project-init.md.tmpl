@@ -18,6 +18,25 @@ See [`config.yaml`](config.yaml) for the full record.
 2. **During work** — append to memory when you learn something reusable (see [`memory/README.md`](memory/README.md) for the convention). Large docs go in [`vault/`](vault/), small facts in [`memory/`](memory/).
 3. **End of session** — the `session-end` hook appends a session log to [`vault/sessions/`](vault/sessions/){{#if lightrag}}, and the memory ingester updates the LightRAG index{{/if}}.
 
+## Commands, skills, and agents
+
+**Slash commands** (`.claude/commands/`):
+- `/status` — project status: git state, recent commits, memory, open TODOs
+- `/review [target]` — code review of staged changes, a commit range, or a file
+- `/save-memory <fact>` — save a reusable fact to memory
+- `/plan <task>` — create an implementation plan before coding
+
+**Skills** (`.claude/skills/`):
+- `session-summary` — summarize the session and save to vault
+
+**Subagents** (`.claude/agents/`):
+- `reviewer` — code review specialist (sonnet, focused on bugs + security)
+- `researcher` — codebase explorer (sonnet, traces dependencies and architecture)
+
+**Hooks** (`.claude/hooks/`, wired via `settings.json`):
+- `post-edit-lint.sh` — auto-lints files after Edit/Write (ruff for Python, eslint for JS/TS)
+{{#if obsidian}}- `session-end.sh` — appends a session log to `vault/sessions/` on Stop{{/if}}
+
 ## Conventions
 
 - **Deterministic first** — hooks and scripts in [`hooks/`](hooks/) and [`scripts/`](scripts/) prefer bash/python. LLM calls only for generative steps.

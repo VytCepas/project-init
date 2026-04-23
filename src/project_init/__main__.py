@@ -132,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
 
     is_python = language == "python"
     is_lightrag = "lightrag" in preset.get("name", "")
+    has_obsidian = "obsidian" in preset.get("layers", [])
 
     variables: dict[str, str] = {
         "project_name": project_name,
@@ -147,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         # Conditional block flags (truthy/falsy strings).
         "python": "true" if is_python else "",
         "lightrag": "true" if is_lightrag else "",
+        "obsidian": "true" if has_obsidian else "",
     }
 
     created = scaffold(target, preset, variables)
