@@ -53,16 +53,16 @@ ensure_repo() {
 # 3. slash command
 ensure_slash_command() {
     mkdir -p "$COMMANDS_DIR"
-    cat >"$COMMANDS_DIR/project-init.md" <<'CMD'
+    cat >"$COMMANDS_DIR/project-init.md" <<CMD
 ---
 description: Scaffold agentic-dev infrastructure (.claude/) into the current project
 ---
 
 Run the project-init wizard inside the current working directory:
 
-!bash -lc 'cd "$CLAUDE_PROJECT_DIR" && uvx --from "$HOME/.local/share/project-init" project-init'
+!bash -lc 'cd "\$CLAUDE_PROJECT_DIR" && uvx --from "$INSTALL_DIR" project-init'
 
-After it finishes, read `.claude/project-init.md` to confirm the selected options.
+After it finishes, read \`.claude/project-init.md\` to confirm the selected options.
 CMD
     say "installed slash command -> $COMMANDS_DIR/project-init.md"
 }
