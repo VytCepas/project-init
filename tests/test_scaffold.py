@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -396,3 +397,135 @@ class TestLightRAGScripts:
         result = subprocess.run([sys.executable, str(script)], env=env, capture_output=True)
         assert result.returncode == 0
         assert b"no markdown found" in result.stdout
+
+
+def _run_secret_guard(script: Path, payload: dict) -> dict | None:
+    """Run secret-guard.py with a JSON payload; return parsed stdout or None."""
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"secret-guard exited {result.returncode}: {result.stderr}"
+    return json.loads(result.stdout) if result.stdout.strip() else None
+
+
+class TestSecretGuard:
+    """Verify secret-guard.py blocks real secrets and allows clean content."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = tmp_target
+        preset = load_preset("obsidian-only")
+        scaffold(tmp_target, preset, _make_variables())
+
+    @property
+    def _script(self) -> Path:
+        return self.target / ".claude" / "hooks" / "secret-guard.py"
+
+    def test_script_exists(self):
+        assert self._script.is_file()
+
+    def test_script_has_valid_syntax(self):
+        import ast
+        ast.parse(self._script.read_text())
+
+    def test_settings_json_wires_secret_guard(self):
+        data = json.loads((self.target / ".claude" / "settings.json").read_text())
+        pre = data["hooks"].get("PreToolUse", [])
+        matchers = [g["matcher"] for g in pre]
+        assert any("Write" in m for m in matchers)
+
+    def test_blocks_anthropic_api_key_in_write(self):
+        fake_key = "sk-ant-api03-" + "A" * 95
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": "/tmp/config.py", "content": f'api_key = "{fake_key}"'},
+        })
+        assert out is not None and out["decision"] == "block"
+        assert "Anthropic" in out["reason"]
+
+    def test_blocks_openai_api_key_in_edit(self):
+        fake_key = "sk-proj-" + "B" * 48
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "/tmp/settings.py", "new_string": f"KEY = '{fake_key}'"},
+        })
+        assert out is not None and out["decision"] == "block"
+
+    def test_blocks_aws_key_in_bash(self):
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Bash",
+            "tool_input": {"command": "export AWS_ACCESS_KEY_ID=AKIAZXBCDE12345678AB"},
+        })
+        assert out is not None and out["decision"] == "block"
+        assert "AWS" in out["reason"]
+
+    def test_blocks_private_key_material(self):
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "/tmp/key.pem",
+                "content": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----",
+            },
+        })
+        assert out is not None and out["decision"] == "block"
+
+    def test_blocks_ssn(self):
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": "/tmp/data.py", "content": "ssn = '123-45-6789'"},
+        })
+        assert out is not None and out["decision"] == "block"
+        assert "Social Security" in out["reason"]
+
+    def test_allows_clean_python_file(self):
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": "/tmp/hello.py", "content": "def hello():\n    return 'world'\n"},
+        })
+        assert out is None
+
+    def test_allows_env_variable_reference(self):
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "/tmp/config.py",
+                "content": "import os\napi_key = os.environ['ANTHROPIC_API_KEY']\n",
+            },
+        })
+        assert out is None
+
+    def test_allows_env_example_file(self):
+        fake_key = "sk-ant-api03-" + "A" * 95
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "/project/.env.example",
+                "content": f"ANTHROPIC_API_KEY={fake_key}\n",
+            },
+        })
+        assert out is None
+
+    def test_allows_obvious_placeholder(self):
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "/tmp/readme.md",
+                "content": "Set ANTHROPIC_API_KEY=your_key_here in your .env file.\n",
+            },
+        })
+        assert out is None
+
+    def test_blocks_github_pat(self):
+        fake_token = "ghp_" + "C" * 36
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {"file_path": "/tmp/ci.py", "content": f"token = '{fake_token}'"},
+        })
+        assert out is not None and out["decision"] == "block"
+
+    def test_claude_md_has_no_secrets_rule(self):
+        content = (self.target / "CLAUDE.md").read_text()
+        assert "secret" in content.lower() or "hardcode" in content.lower()
