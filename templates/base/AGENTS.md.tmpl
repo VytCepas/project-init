@@ -68,9 +68,11 @@ Three conventions keep Linear and GitHub in sync automatically once the GitHub i
 
 | Thing | Format | Effect |
 |---|---|---|
-| Branch | `{{linear_issue_prefix}}-<N>-<slug>` | Linear auto-links the branch |
+| Branch | `<username>/{{linear_issue_prefix}}-<N>-<slug>` — **copy from Linear** | Copying triggers "Started" status + self-assign |
 | Commit | `{{linear_issue_prefix}}-N: <what and why>` | Linear links the commit |
 | PR title + body | `{{linear_issue_prefix}}-N: <title>` + `Fixes {{linear_issue_prefix}}-N` in body | Moves issue to Done on merge |
+
+**Always get the branch name from Linear's "Copy git branch" button.** That action fires the "move to Started" and "assign to self" automations. Manually typed branch names do not trigger them. For agents: if no branch name is supplied, construct it as `<linear-username>/{{linear_issue_prefix}}-<N>-<title-slug>` (lowercase, hyphens only).
 
 {{/if}}
 ## Deterministic-first principle

@@ -30,8 +30,10 @@ Three conventions keep Linear and GitHub in sync automatically once the GitHub i
 
 | Thing | Format | Effect |
 |---|---|---|
-| Branch name | `pi-<N>-<slug>` | Linear auto-links the branch to the issue |
-| Commit message | `PI-N: <what and why>` | Linear links the commit to the issue |
-| PR title + body | `PI-N: <title>` + `Fixes PI-N` in body | Moves the issue to Done on merge |
+| Branch | `<username>/pi-<N>-<slug>` — **copy from Linear** | Copying triggers "Started" status + self-assign |
+| Commit | `PI-N: <what and why>` | Linear links the commit to the issue |
+| PR title + body | `PI-N: <title>` + `Fixes PI-N` in body | Moves issue to Done on merge |
+
+**Always get the branch name from Linear's "Copy git branch" button.** That action fires two automations: the issue moves to Started, and if unassigned it is assigned to you. Manually typed branch names do not trigger them. For agents: if no branch name is supplied, construct it as `<linear-username>/pi-<N>-<title-slug>` (lowercase, hyphens only).
 
 The PR template at `.github/pull_request_template.md` pre-fills the `Fixes` line.

@@ -22,9 +22,13 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 
 ## Linear ↔ GitHub
 
-- **Branch names** — use `pi-<N>-<short-slug>` (e.g. `pi-19-idempotent-rerun`). Linear auto-links any branch containing the issue ID.
-- **Commit messages** — open with the issue ID: `PI-N: <what and why>`. Linear picks this up and links the commit to the issue.
-- **PR titles** — include the issue ID: `PI-N: <title>`. The PR template includes a `Fixes PI-N` line which auto-closes the Linear issue on merge.
+| Thing | Format | Effect |
+|---|---|---|
+| Branch | `<username>/pi-<N>-<slug>` — **copy from Linear** | Copying triggers "Started" status + self-assign |
+| Commit | `PI-N: <what and why>` | Linear links the commit to the issue |
+| PR title + body | `PI-N: <title>` + `Fixes PI-N` in body | Moves issue to Done on merge |
+
+**Always get the branch name from Linear's "Copy git branch" button** — that action is what fires the "move to Started" and "assign to self" automations. Manually typed branch names that happen to match the format do not trigger them. For agents: if no branch name is provided, construct it as `<linear-username>/pi-<N>-<title-slug>` (lowercase, hyphens only).
 
 ## Conventions for agents working on this repo
 
