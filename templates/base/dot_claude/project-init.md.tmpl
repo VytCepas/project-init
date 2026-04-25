@@ -121,10 +121,6 @@ Agent memory is indexed by [LightRAG](https://github.com/hkuds/lightrag), backed
 Both scripts are deterministic wrappers around LightRAG — the LLM is only invoked inside LightRAG itself for entity extraction and synthesis.
 {{/if}}
 
-## Adding new MCPs later
-
-Edit [`config.yaml`](config.yaml) and run the corresponding `claude mcp add …` command. See [`scripts/mcp-manage.sh`](scripts/mcp-manage.sh) for convenience wrappers.
-
 ## Reset or re-init
 
 Re-run `/project-init` (or `project-init` from shell) in this project to re-select options. It will not overwrite existing memory or vault content.
