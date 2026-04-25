@@ -143,14 +143,31 @@ def _resolve_mcps_non_interactive(
     db_arg: str,
     browser_arg: bool,
 ) -> list[dict]:
-    """Parse non-interactive MCP flags into a flat list of selected MCPs."""
+    """Parse non-interactive MCP flags into a flat list of selected MCPs.
+
+    Raises ValueError on unknown MCP IDs — silently ignoring them hides typos.
+    """
     catalog_by_id = {m["id"]: m for m in MCP_CATALOG}
     selected: list[dict] = []
+    seen: set[str] = set()
+    unknown: list[str] = []
 
     for raw_id in mcps_arg.split(","):
         mcp_id = raw_id.strip().lower()
-        if mcp_id and mcp_id in catalog_by_id:
-            selected.append(catalog_by_id[mcp_id])
+        if not mcp_id:
+            continue
+        if mcp_id not in catalog_by_id:
+            unknown.append(mcp_id)
+            continue
+        if mcp_id in seen:
+            continue
+        selected.append(catalog_by_id[mcp_id])
+        seen.add(mcp_id)
+
+    if unknown:
+        valid = ", ".join(catalog_by_id.keys())
+        msg = f"unknown MCP id(s): {', '.join(unknown)}. Valid: {valid}"
+        raise ValueError(msg)
 
     if db_arg and db_arg != "none" and db_arg in DB_CATALOG:
         selected.append(DB_CATALOG[db_arg])
@@ -222,20 +239,25 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     target = Path(args.target).resolve()
-    target.mkdir(parents=True, exist_ok=True)
 
-    # Select preset.
+    # Select preset BEFORE creating the target directory — a typo'd --preset
+    # should fail without leaving an empty dir behind.
     presets = list_presets()
     if not presets:
         sys.stderr.write("error: no presets found in templates/presets/\n")
         return 1
 
     if args.preset:
-        preset = load_preset(args.preset)
+        try:
+            preset = load_preset(args.preset)
+        except ValueError as e:
+            parser.error(str(e))
     elif args.non_interactive:
         preset = presets[0]
     else:
         preset = _choose_preset_interactive(presets)
+
+    target.mkdir(parents=True, exist_ok=True)
 
     # Gather variables.
     default_name = target.name
@@ -243,9 +265,12 @@ def main(argv: list[str] | None = None) -> int:
         project_name = args.name
         project_description = args.description
         language = args.language or "none"
-        selected_mcps = _resolve_mcps_non_interactive(
-            args.mcps, args.db, args.browser
-        )
+        try:
+            selected_mcps = _resolve_mcps_non_interactive(
+                args.mcps, args.db, args.browser
+            )
+        except ValueError as e:
+            parser.error(str(e))
     else:
         project_name = _prompt("Project name", default=default_name)
         project_description = _prompt("Description", default="")

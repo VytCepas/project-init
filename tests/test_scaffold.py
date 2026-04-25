@@ -697,22 +697,75 @@ class TestMCPsNonInteractive:
         config = (target / ".claude" / "config.yaml").read_text()
         assert "installed: []" in config
 
-    def test_unknown_mcp_id_is_ignored(self, tmp_path: Path):
+    def test_unknown_mcp_id_is_rejected(self, tmp_path: Path):
+        """Silently ignoring typos hides real bugs — unknown IDs must error out."""
         from project_init.__main__ import main
         target = tmp_path / "p"
-        rc = main([
-            str(target), "--non-interactive",
-            "--preset", "obsidian-only",
-            "--name", "bad-mcp-test",
-            "--description", "test",
-            "--language", "python",
-            "--mcps", "linear,nonexistent,github",
-        ])
-        assert rc == 0
-        config = (target / ".claude" / "config.yaml").read_text()
-        assert "linear" in config
-        assert "github" in config
-        assert "nonexistent" not in config
+        with pytest.raises(SystemExit):
+            main([
+                str(target), "--non-interactive",
+                "--preset", "obsidian-only",
+                "--name", "bad-mcp-test",
+                "--description", "test",
+                "--language", "python",
+                "--mcps", "linear,nonexistent,github",
+            ])
+
+    def test_unknown_preset_does_not_create_target_dir(self, tmp_path: Path):
+        """A typo in --preset must fail BEFORE the target directory is created."""
+        from project_init.__main__ import main
+        target = tmp_path / "should-not-exist"
+        with pytest.raises(SystemExit):
+            main([
+                str(target), "--non-interactive",
+                "--preset", "definitely-not-a-real-preset",
+                "--name", "x",
+                "--description", "x",
+            ])
+        assert not target.exists(), (
+            f"target dir {target} was created despite invalid preset"
+        )
+
+
+class TestScaffoldIntegrity:
+    """Catch unrendered placeholders and other template-level rendering bugs."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold_both(self, tmp_path: Path):
+        self.targets: list[Path] = []
+        for preset_name, lightrag_flag in [
+            ("obsidian-only", ""),
+            ("obsidian-lightrag", "true"),
+        ]:
+            target = tmp_path / preset_name
+            preset = load_preset(preset_name)
+            variables = _make_variables(
+                memory_stack=preset_name,
+                lightrag=lightrag_flag,
+            )
+            scaffold(target, preset, variables)
+            self.targets.append(target)
+
+    def test_no_unrendered_handlebars_placeholders(self):
+        """{{var}} or {{#if var}} surviving means a template wasn't named .tmpl
+        or a variable wasn't wired up in __main__.py."""
+        import re
+        placeholder_re = re.compile(r"\{\{[^}]+\}\}")
+        offenders: list[str] = []
+        for target in self.targets:
+            for f in target.rglob("*"):
+                if not f.is_file():
+                    continue
+                try:
+                    text = f.read_text(encoding="utf-8")
+                except (UnicodeDecodeError, OSError):
+                    continue
+                for match in placeholder_re.finditer(text):
+                    offenders.append(f"{f.relative_to(target)}: {match.group()}")
+        assert not offenders, (
+            "Unrendered placeholders survived scaffolding:\n  "
+            + "\n  ".join(offenders)
+        )
 
 
 class TestNodeTemplate:
