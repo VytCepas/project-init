@@ -21,6 +21,27 @@ def _lightrag_available() -> bool:
         return False
 
 
+def _find_uv() -> str | None:
+    """Locate the `uv` binary. `uv run pytest` strips uv from PATH, so check
+    common install locations as a fallback."""
+    import shutil as _shutil
+    found = _shutil.which("uv")
+    if found:
+        return found
+    for candidate in [
+        Path.home() / ".local" / "bin" / "uv",
+        Path("/usr/local/bin/uv"),
+    ]:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def _has_uv_and_can_build() -> bool:
+    """True if `uv build` is plausibly available — gates the wheel smoke test."""
+    return _find_uv() is not None
+
+
 @pytest.fixture
 def tmp_target(tmp_path: Path) -> Path:
     return tmp_path / "project"
@@ -980,6 +1001,95 @@ class TestNodeTemplate:
             content = (self.target / ".claude" / "hooks" / hook).read_text()
             assert "node_modules/.bin/eslint" not in content
             assert "bunx eslint" in content
+
+
+@pytest.mark.skipif(
+    not _has_uv_and_can_build(),
+    reason="uv build / venv unavailable in this environment",
+)
+class TestInstalledWheel:
+    """PI-18: build the wheel, install it in a fresh venv, run project-init.
+
+    Catches packaging bugs that the source-checkout test suite cannot:
+    missing force-include, lost executable bits on hook templates, etc.
+    """
+
+    def test_wheel_install_and_scaffold(self, tmp_path: Path):
+        repo_root = Path(__file__).resolve().parent.parent
+        build_dir = tmp_path / "build"
+        venv_dir = tmp_path / "venv"
+        scaffold_target = tmp_path / "scaffolded"
+        uv_bin = _find_uv()
+        assert uv_bin, "uv not found despite passing _has_uv_and_can_build"
+
+        # Build wheel into a temp dir.
+        result = subprocess.run(
+            [uv_bin, "build", "--wheel", "-o", str(build_dir)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            pytest.skip(f"uv build failed: {result.stderr}")
+
+        wheels = list(build_dir.glob("*.whl"))
+        assert wheels, "no wheel produced"
+
+        # Create a venv and install the wheel.
+        venv_result = subprocess.run(
+            [sys.executable, "-m", "venv", str(venv_dir)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if venv_result.returncode != 0:
+            pytest.skip(f"venv unavailable in this environment: {venv_result.stderr}")
+        venv_pip = venv_dir / "bin" / "pip"
+        venv_bin = venv_dir / "bin" / "project-init"
+        if not venv_pip.exists():  # Windows fallback
+            venv_pip = venv_dir / "Scripts" / "pip.exe"
+            venv_bin = venv_dir / "Scripts" / "project-init.exe"
+        subprocess.run(
+            [str(venv_pip), "install", "--quiet", str(wheels[0])],
+            check=True,
+            timeout=120,
+        )
+
+        # Scaffold using the installed binary, with --strict.
+        result = subprocess.run(
+            [
+                str(venv_bin), str(scaffold_target),
+                "--non-interactive",
+                "--preset", "obsidian-only",
+                "--name", "wheel-smoke",
+                "--description", "test",
+                "--language", "python",
+                "--strict",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, (
+            f"installed binary failed:\nSTDOUT: {result.stdout}\n"
+            f"STDERR: {result.stderr}"
+        )
+
+        # Essentials present.
+        assert (scaffold_target / ".claude" / "config.yaml").is_file()
+        assert (scaffold_target / "CLAUDE.md").is_file()
+        # Hooks kept executable bit through wheel packaging.
+        for hook in [
+            "post-edit-lint.sh",
+            "pre-commit-gate.sh",
+            "bash-safety-guard.sh",
+        ]:
+            hook_path = scaffold_target / ".claude" / "hooks" / hook
+            assert hook_path.is_file()
+            assert hook_path.stat().st_mode & 0o111, (
+                f"{hook} lost executable bit"
+            )
 
 
 class TestTemplateIdentifiers:
