@@ -22,21 +22,20 @@ print(ti.get('file_path') or ti.get('filePath') or '')
 [ -z "$FILE" ] && exit 0
 [ ! -f "$FILE" ] && exit 0
 
-# Use uv-managed ruff when this repo is a uv project; otherwise fall back to bare ruff.
-if [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; then
-    RUFF=(uv run ruff)
-else
-    RUFF=(ruff)
-fi
-
 ERRORS=""
 
 case "$FILE" in
     *.py)
-        if command -v "${RUFF[0]}" &>/dev/null; then
-            "${RUFF[@]}" check --fix --quiet "$FILE" 2>/dev/null || true
-            "${RUFF[@]}" format --quiet "$FILE" 2>/dev/null || true
-            ERRORS=$("${RUFF[@]}" check --quiet "$FILE" 2>&1 || true)
+        # Prefer 'uv run ruff' inside a uv-managed project so the hook uses
+        # the same ruff the project itself uses; fall back to a system ruff.
+        if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
+            uv run ruff check --fix --quiet "$FILE" 2>/dev/null || true
+            uv run ruff format --quiet "$FILE" 2>/dev/null || true
+            ERRORS=$(uv run ruff check --quiet "$FILE" 2>&1 || true)
+        elif command -v ruff &>/dev/null; then
+            ruff check --fix --quiet "$FILE" 2>/dev/null || true
+            ruff format --quiet "$FILE" 2>/dev/null || true
+            ERRORS=$(ruff check --quiet "$FILE" 2>&1 || true)
         fi
         ;;
     *.js|*.ts|*.jsx|*.tsx)

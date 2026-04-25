@@ -25,22 +25,27 @@ esac
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 ERRORS=""
 
-# Use uv-managed ruff when this repo is a uv project; otherwise fall back to bare ruff.
-if [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; then
-    RUFF=(uv run ruff)
-else
-    RUFF=(ruff)
-fi
-
-# Lint and auto-fix staged Python files
+# Lint and auto-fix staged Python files. Prefer 'uv run ruff' inside a
+# uv-managed project so the hook uses the same ruff the project itself uses;
+# fall back to a system ruff binary.
 STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
-if [ -n "$STAGED_PY" ] && command -v "${RUFF[0]}" &>/dev/null; then
-    # shellcheck disable=SC2086
-    "${RUFF[@]}" check --fix --quiet $STAGED_PY 2>/dev/null || true
-    # shellcheck disable=SC2086
-    "${RUFF[@]}" format --quiet $STAGED_PY 2>/dev/null || true
-    # shellcheck disable=SC2086
-    LINT_OUT=$("${RUFF[@]}" check --quiet $STAGED_PY 2>&1 || true)
+if [ -n "$STAGED_PY" ]; then
+    LINT_OUT=""
+    if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
+        # shellcheck disable=SC2086
+        uv run ruff check --fix --quiet $STAGED_PY 2>/dev/null || true
+        # shellcheck disable=SC2086
+        uv run ruff format --quiet $STAGED_PY 2>/dev/null || true
+        # shellcheck disable=SC2086
+        LINT_OUT=$(uv run ruff check --quiet $STAGED_PY 2>&1 || true)
+    elif command -v ruff &>/dev/null; then
+        # shellcheck disable=SC2086
+        ruff check --fix --quiet $STAGED_PY 2>/dev/null || true
+        # shellcheck disable=SC2086
+        ruff format --quiet $STAGED_PY 2>/dev/null || true
+        # shellcheck disable=SC2086
+        LINT_OUT=$(ruff check --quiet $STAGED_PY 2>&1 || true)
+    fi
     if [ -n "$LINT_OUT" ]; then
         ERRORS="${ERRORS}Python lint errors:\n${LINT_OUT}\n"
     fi
