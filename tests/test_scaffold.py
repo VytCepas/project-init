@@ -138,6 +138,62 @@ class TestScaffoldObsidianOnly:
         data = json.loads(settings.read_text())
         assert "hooks" in data
 
+    def test_settings_json_has_pretooluse_bash(self):
+        import json
+
+        data = json.loads((self.target / ".claude" / "settings.json").read_text())
+        matchers = [g["matcher"] for g in data["hooks"].get("PreToolUse", [])]
+        assert any("Bash" in m for m in matchers)
+
+    def test_settings_json_post_edit_includes_multiedit(self):
+        import json
+
+        data = json.loads((self.target / ".claude" / "settings.json").read_text())
+        matchers = [g["matcher"] for g in data["hooks"].get("PostToolUse", [])]
+        assert any("MultiEdit" in m for m in matchers)
+
+    def test_pre_commit_gate_hook_exists(self):
+        hook = self.target / ".claude" / "hooks" / "pre-commit-gate.sh"
+        assert hook.is_file()
+        assert hook.stat().st_mode & 0o111
+
+    def test_bash_safety_guard_hook_exists(self):
+        hook = self.target / ".claude" / "hooks" / "bash-safety-guard.sh"
+        assert hook.is_file()
+        assert hook.stat().st_mode & 0o111
+
+    def test_post_edit_lint_outputs_additional_context(self):
+        content = (self.target / ".claude" / "hooks" / "post-edit-lint.sh").read_text()
+        assert "additionalContext" in content
+        assert "ruff format" in content
+
+    def test_start_task_skill_exists(self):
+        skill = self.target / ".claude" / "skills" / "start-task" / "SKILL.md"
+        assert skill.is_file()
+        assert "Linear" in skill.read_text()
+
+    def test_plan_command_is_tdd_first(self):
+        plan = self.target / ".claude" / "commands" / "plan.md"
+        content = plan.read_text()
+        assert "acceptance test" in content.lower()
+        assert "red" in content.lower()
+
+    def test_project_init_md_has_tdd_instruction(self):
+        content = (self.target / ".claude" / "project-init.md").read_text()
+        assert "test" in content.lower() and "first" in content.lower()
+
+    def test_project_init_md_has_linear_instruction(self):
+        content = (self.target / ".claude" / "project-init.md").read_text()
+        assert "Linear" in content
+
+    def test_project_init_md_has_coding_standards(self):
+        content = (self.target / ".claude" / "project-init.md").read_text()
+        assert "premature abstraction" in content.lower() or "no premature" in content.lower()
+
+    def test_claude_md_has_tdd_rule(self):
+        content = (self.target / "CLAUDE.md").read_text()
+        assert "TDD" in content or "test" in content.lower()
+
     def test_no_lightrag_files(self):
         assert not (self.target / ".claude" / "scripts" / "ingest_sessions.py").exists()
         assert not (self.target / ".claude" / "scripts" / "query_memory.py").exists()

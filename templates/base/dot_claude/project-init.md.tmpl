@@ -24,18 +24,57 @@ See [`config.yaml`](config.yaml) for the full record.
 - `/status` — project status: git state, recent commits, memory, open TODOs
 - `/review [target]` — code review of staged changes, a commit range, or a file
 - `/save-memory <fact>` — save a reusable fact to memory
-- `/plan <task>` — create an implementation plan before coding
+- `/plan <task>` — write acceptance tests first, then implementation plan (TDD)
 
 **Skills** (`.claude/skills/`):
 - `session-summary` — summarize the session and save to vault
+- `start-task` — create a Linear issue before starting non-trivial work
 
 **Subagents** (`.claude/agents/`):
 - `reviewer` — code review specialist (sonnet, focused on bugs + security)
 - `researcher` — codebase explorer (sonnet, traces dependencies and architecture)
 
 **Hooks** (`.claude/hooks/`, wired via `settings.json`):
-- `post-edit-lint.sh` — auto-lints files after Edit/Write (ruff for Python, eslint for JS/TS)
+- `bash-safety-guard.sh` — blocks destructive shell commands (rm -rf /, force push to main, DROP TABLE, etc.) before they run
+- `pre-commit-gate.sh` — intercepts `git commit`, auto-fixes staged files, blocks commit if lint errors remain
+- `post-edit-lint.sh` — auto-lints and formats files after Edit/Write/MultiEdit; injects errors into context so they get fixed in the same turn
 {{#if obsidian}}- `session-end.sh` — appends a session log to `vault/sessions/` on Stop{{/if}}
+
+## Coding standards
+
+- **No comments** unless the WHY is non-obvious (a hidden constraint, a workaround for a specific bug). Never describe what the code does.
+- **No premature abstractions** — three similar lines is better than an abstraction. Extract only when the pattern is stable.
+- **No impossible error handling** — trust internal code and framework guarantees. Validate only at system boundaries (user input, external APIs).
+- **No backwards-compatibility shims** — if something is removed, delete it completely.
+- **Prefer editing existing files** over creating new ones.
+- **Always lint before marking a task done** — `{{python_linter}} check .` must pass before closing a task.
+
+## Test-driven development
+
+**Write tests first.** Before implementing any function or feature, write the test that the implementation must pass. Tests define the contract; implementation fulfils it.
+
+Workflow:
+1. Use `/plan <task>` — it produces acceptance tests (red) before the implementation plan
+2. Commit the failing tests
+3. Implement until all tests pass (green)
+4. Lint and clean up
+
+{{#if python}}
+Test conventions:
+- One assertion per test
+- Name: `test_<unit>_<scenario>` (e.g. `test_scaffold_renames_dot_prefix`)
+- Run: `uv run pytest`
+- A test that touches external services (DB, external API) must use a real instance, not a mock
+{{/if}}
+
+## Linear task tracking
+
+Before starting any non-trivial task:
+1. Check whether a Linear issue already exists
+2. If not, run `/start-task` to create one
+3. Reference the issue ID in commit messages
+
+> Every piece of meaningful work should be traceable to a Linear issue.
 
 ## Conventions
 
