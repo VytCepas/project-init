@@ -7,11 +7,14 @@ set -euo pipefail
 
 INPUT=$(cat)
 
-if command -v jq &>/dev/null; then
-    CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
-else
-    exit 0
-fi
+CMD=$(printf '%s' "$INPUT" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+print((d.get('tool_input', {}) or {}).get('command', '') or '')
+" 2>/dev/null || true)
 
 # Only intercept git commit commands
 case "$CMD" in
@@ -22,15 +25,22 @@ esac
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 ERRORS=""
 
+# Use uv-managed ruff when this repo is a uv project; otherwise fall back to bare ruff.
+if [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; then
+    RUFF=(uv run ruff)
+else
+    RUFF=(ruff)
+fi
+
 # Lint and auto-fix staged Python files
 STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
-if [ -n "$STAGED_PY" ] && command -v ruff &>/dev/null; then
+if [ -n "$STAGED_PY" ] && command -v "${RUFF[0]}" &>/dev/null; then
     # shellcheck disable=SC2086
-    ruff check --fix --quiet $STAGED_PY 2>/dev/null || true
+    "${RUFF[@]}" check --fix --quiet $STAGED_PY 2>/dev/null || true
     # shellcheck disable=SC2086
-    ruff format --quiet $STAGED_PY 2>/dev/null || true
+    "${RUFF[@]}" format --quiet $STAGED_PY 2>/dev/null || true
     # shellcheck disable=SC2086
-    LINT_OUT=$(ruff check --quiet $STAGED_PY 2>&1 || true)
+    LINT_OUT=$("${RUFF[@]}" check --quiet $STAGED_PY 2>&1 || true)
     if [ -n "$LINT_OUT" ]; then
         ERRORS="${ERRORS}Python lint errors:\n${LINT_OUT}\n"
     fi

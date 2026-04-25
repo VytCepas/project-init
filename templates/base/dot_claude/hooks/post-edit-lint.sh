@@ -9,23 +9,34 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 INPUT=$(cat)
 
-if command -v jq &>/dev/null; then
-    FILE=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.filePath // empty' 2>/dev/null)
-else
-    exit 0
-fi
+FILE=$(printf '%s' "$INPUT" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+ti = d.get('tool_input', {}) or {}
+print(ti.get('file_path') or ti.get('filePath') or '')
+" 2>/dev/null || true)
 
 [ -z "$FILE" ] && exit 0
 [ ! -f "$FILE" ] && exit 0
+
+# Use uv-managed ruff when this repo is a uv project; otherwise fall back to bare ruff.
+if [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; then
+    RUFF=(uv run ruff)
+else
+    RUFF=(ruff)
+fi
 
 ERRORS=""
 
 case "$FILE" in
     *.py)
-        if command -v ruff &>/dev/null; then
-            ruff check --fix --quiet "$FILE" 2>/dev/null || true
-            ruff format --quiet "$FILE" 2>/dev/null || true
-            ERRORS=$(ruff check --quiet "$FILE" 2>&1 || true)
+        if command -v "${RUFF[0]}" &>/dev/null; then
+            "${RUFF[@]}" check --fix --quiet "$FILE" 2>/dev/null || true
+            "${RUFF[@]}" format --quiet "$FILE" 2>/dev/null || true
+            ERRORS=$("${RUFF[@]}" check --quiet "$FILE" 2>&1 || true)
         fi
         ;;
     *.js|*.ts|*.jsx|*.tsx)
