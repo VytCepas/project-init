@@ -8,9 +8,13 @@ llm:
   model: claude-sonnet-4-6
 
 embedding:
-  provider: anthropic
-  # Claude does not expose embeddings; fall back to local or swap provider here.
-  # See https://github.com/hkuds/lightrag for supported backends.
+  # Anthropic does not expose embedding APIs.
+  # Default: openai (text-embedding-3-small) — requires OPENAI_API_KEY.
+  # Alternative: ollama (nomic-embed-text) — set EMBEDDING_PROVIDER=ollama and
+  #   update the embedding_func in the scripts; no cloud key needed.
+  # See https://github.com/hkuds/lightrag for all supported backends.
+  provider: openai
+  model: text-embedding-3-small
 
 chunk:
   size: 1200

@@ -18,6 +18,8 @@ from pathlib import Path
 try:
     from lightrag import LightRAG, QueryParam
     from lightrag.llm.anthropic import anthropic_complete
+    from lightrag.llm.openai import openai_embedding
+    from lightrag.utils import EmbeddingFunc
 except ImportError:
     sys.stderr.write(
         "lightrag-hku not installed. Run: uv pip install lightrag-hku\n"
@@ -48,10 +50,21 @@ def main() -> int:
     if not os.environ.get("ANTHROPIC_API_KEY"):
         sys.stderr.write("ANTHROPIC_API_KEY not set\n")
         return 2
+    if not os.environ.get("OPENAI_API_KEY"):
+        sys.stderr.write(
+            "OPENAI_API_KEY not set — needed for embeddings.\n"
+            "Set it, or swap the embedding_func in this script for an Ollama-based one.\n"
+        )
+        return 2
 
     rag = LightRAG(
         working_dir=str(WORKING_DIR),
         llm_model_func=anthropic_complete,
+        embedding_func=EmbeddingFunc(
+            embedding_dim=1536,
+            max_token_size=8192,
+            func=openai_embedding,
+        ),
     )
 
     answer = rag.query(args.question, param=QueryParam(mode=args.mode))
