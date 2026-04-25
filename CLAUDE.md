@@ -27,6 +27,8 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 - **uv everywhere** — `uv run …`, never `pip install` or `python -m venv`.
 - **ruff only** — no black / isort / mypy.
 - **Templates are tested by scaffolding into a temp dir** — any change to `templates/` should have a corresponding test that runs the wizard with a preset and diffs the output.
+- **No duplicate tests** — before writing a new test, scan `tests/` for existing coverage of the same behaviour. If a happy-path case already exists, skip restating it and write edge-case / error-path tests instead (bad inputs, boundary values, missing files, conflicting flags, etc.).
+- **Type-annotate everything** — all function signatures and class attributes must carry type hints using stdlib `typing` and built-in generics (`list[str]`, `dict[str, Path]`, etc.). Pydantic is excluded (would add a runtime dep); use `dataclasses` + annotations for structured data. Any JavaScript added to templates must be TypeScript with `"strict": true` in `tsconfig.json`.
 
 ## What this repo does NOT include
 
