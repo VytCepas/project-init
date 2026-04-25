@@ -95,7 +95,7 @@ def _scan(text: str, source: str) -> list[str]:
             surrounding = text[max(0, match.start() - 40) : match.end() + 40]
             if _PLACEHOLDER_RE.search(surrounding):
                 continue
-            findings.append(f"{label} (matched: {match.group()[:40]}{'…' if len(match.group()) > 40 else ''})")
+            findings.append(f"{label} (matched: [REDACTED])")
     return findings
 
 
