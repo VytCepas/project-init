@@ -22,6 +22,16 @@ When adding or changing a template, add a test under `tests/` that runs the scaf
 
 Before adding any test, scan `tests/` to check whether the behaviour is already covered. If a happy-path case exists, do not restate it — write edge-case and error-path tests instead (invalid inputs, boundary values, missing files, conflicting CLI flags, permission errors, etc.). Duplicate tests waste CI time and obscure real coverage gaps.
 
-## Linear
+## Linear ↔ GitHub
 
-Work is tracked in the Linear project "Project Init" at <https://linear.app/vytautas-project/project/project-init-467fe1178d8a/overview>. Issue IDs in commit messages should reference the ticket (e.g. `PI-2:`).
+Work is tracked in the Linear project "Project Init" at <https://linear.app/vytautas-project/project/project-init-467fe1178d8a/overview>.
+
+Three conventions keep Linear and GitHub in sync automatically once the GitHub integration is enabled:
+
+| Thing | Format | Effect |
+|---|---|---|
+| Branch name | `pi-<N>-<slug>` | Linear auto-links the branch to the issue |
+| Commit message | `PI-N: <what and why>` | Linear links the commit to the issue |
+| PR title + body | `PI-N: <title>` + `Fixes PI-N` in body | Moves the issue to Done on merge |
+
+The PR template at `.github/pull_request_template.md` pre-fills the `Fixes` line.

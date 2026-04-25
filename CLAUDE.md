@@ -20,6 +20,12 @@ Start by reading [README.md](README.md) and [AGENTS.md](AGENTS.md). Issue tracki
 
 Template naming convention: directories stored as `dot_claude/`, `dot_gitignore` etc. The scaffolder renames them to `.claude/`, `.gitignore` on copy. This keeps templates visible in GitHub and avoids this repo being auto-loaded as a Claude Code config for itself.
 
+## Linear ↔ GitHub
+
+- **Branch names** — use `pi-<N>-<short-slug>` (e.g. `pi-19-idempotent-rerun`). Linear auto-links any branch containing the issue ID.
+- **Commit messages** — open with the issue ID: `PI-N: <what and why>`. Linear picks this up and links the commit to the issue.
+- **PR titles** — include the issue ID: `PI-N: <title>`. The PR template includes a `Fixes PI-N` line which auto-closes the Linear issue on merge.
+
 ## Conventions for agents working on this repo
 
 - **Python only when needed** — the scaffolder must stay small. Don't reach for pyyaml / pydantic / click; `tomllib` and `argparse` cover most needs.
