@@ -7,7 +7,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from project_init import __version__
+from project_init import __repo_url__, __version__
 from project_init.scaffold import list_presets, load_preset, scaffold
 
 
@@ -139,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         "project_description": project_description,
         "created_date": date.today().isoformat(),
         "project_init_version": __version__,
+        "project_init_url": __repo_url__,
         "language": language,
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": "none",

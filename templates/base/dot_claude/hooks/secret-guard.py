@@ -51,10 +51,21 @@ _PII_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     ),
 ]
 
+# Personal filesystem paths: detect the user's actual home directory being
+# hardcoded into project files or commands. Built at import time from $HOME
+# so it catches the exact path without knowing the username in advance.
+def _home_path_patterns() -> list[tuple[re.Pattern[str], str]]:
+    home = os.environ.get("HOME") or os.environ.get("USERPROFILE", "")
+    if not home or len(home) < 4:
+        return []
+    escaped = re.escape(home.rstrip("/\\"))
+    return [(re.compile(escaped + r"[/\\]\S+"), f"Personal home-directory path ({home}/...)")]
+
 ALL_PATTERNS: list[tuple[re.Pattern[str], str]] = (
     _API_KEY_PATTERNS
     + [(_SECRET_ASSIGNMENT, "Hardcoded secret assignment")]
     + _PII_PATTERNS
+    + _home_path_patterns()
 )
 
 # ---------------------------------------------------------------------------

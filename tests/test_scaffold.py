@@ -32,6 +32,7 @@ def _make_variables(**overrides: str) -> dict[str, str]:
         "project_description": "A test project",
         "created_date": "2026-01-01",
         "project_init_version": "0.1.0",
+        "project_init_url": "https://github.com/example/project-init",
         "language": "python",
         "memory_stack": "obsidian-only",
         "installed_mcps": "none",
@@ -529,3 +530,61 @@ class TestSecretGuard:
     def test_claude_md_has_no_secrets_rule(self):
         content = (self.target / "CLAUDE.md").read_text()
         assert "secret" in content.lower() or "hardcode" in content.lower()
+
+    def test_blocks_home_directory_path(self):
+        home = os.environ.get("HOME", "/home/testuser")
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "/tmp/config.yaml",
+                "content": f"venv_path: {home}/projects/myapp/.venv",
+            },
+        })
+        assert out is not None and out["decision"] == "block"
+        assert "home" in out["reason"].lower() or "path" in out["reason"].lower()
+
+    def test_allows_relative_path(self):
+        out = _run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "/tmp/config.yaml",
+                "content": "venv_path: .venv/bin/python",
+            },
+        })
+        assert out is None
+
+
+class TestTemplateIdentifiers:
+    """Verify no hardcoded owner identity leaks into scaffolded files."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = tmp_target
+        preset = load_preset("obsidian-only")
+        scaffold(tmp_target, preset, _make_variables(
+            project_init_url="https://github.com/example/project-init"
+        ))
+
+    def test_agents_md_uses_template_url(self):
+        content = (self.target / "AGENTS.md").read_text()
+        assert "VytCepas" not in content
+        assert "github.com/example/project-init" in content
+
+    def test_claude_md_uses_template_url(self):
+        content = (self.target / "CLAUDE.md").read_text()
+        assert "VytCepas" not in content
+        assert "github.com/example/project-init" in content
+
+    def test_project_init_md_uses_template_url(self):
+        content = (self.target / ".claude" / "project-init.md").read_text()
+        assert "VytCepas" not in content
+        assert "github.com/example/project-init" in content
+
+    def test_no_hardcoded_owner_in_any_template_file(self):
+        for f in self.target.rglob("*"):
+            if f.is_file():
+                try:
+                    text = f.read_text(encoding="utf-8", errors="ignore")
+                    assert "VytCepas" not in text, f"VytCepas found in {f}"
+                except OSError:
+                    pass
