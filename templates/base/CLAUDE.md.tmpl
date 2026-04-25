@@ -21,3 +21,14 @@ All agentic-development infrastructure lives under [`.claude/`](.claude/). Start
 {{#if lint_command}}- **Lint** — `{{lint_command}}` must pass before closing a task. The `pre-commit-gate` hook enforces this on every commit.
 {{/if}}
 - **No secrets in code** — never hardcode API keys, tokens, passwords, or personal data (SSN, card numbers). Use `os.environ['KEY']` or a `.env` file (gitignored). The `secret-guard` hook will block any write that contains a real secret.
+{{#if linear_issue_prefix}}
+## Linear ↔ GitHub
+
+| Thing | Format | Effect |
+|---|---|---|
+| Branch | `{{linear_issue_prefix}}-<N>-<slug>` | Linear auto-links the branch to the issue |
+| Commit | `{{linear_issue_prefix}}-N: <what and why>` | Linear links the commit to the issue |
+| PR title + body | `{{linear_issue_prefix}}-N: <title>` + `Fixes {{linear_issue_prefix}}-N` in body | Moves the issue to Done on merge |
+
+The PR template at `.github/pull_request_template.md` pre-fills the `Fixes` line.
+{{/if}}

@@ -59,6 +59,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Add Playwright browser-automation MCP",
     )
     p.add_argument(
+        "--linear-prefix",
+        default="",
+        metavar="PREFIX",
+        help="Linear issue ID prefix for this team (e.g. ENG, PROJ). "
+             "Enables Linear↔GitHub conventions in templates.",
+    )
+    p.add_argument(
         "--non-interactive",
         action="store_true",
         help="Skip all prompts (requires --preset, --name, --description)",
@@ -275,6 +282,7 @@ def main(argv: list[str] | None = None) -> int:
         project_name = args.name
         project_description = args.description
         language = args.language or "none"
+        linear_issue_prefix = args.linear_prefix.strip().upper()
         try:
             selected_mcps = _resolve_mcps_non_interactive(
                 args.mcps, args.db, args.browser
@@ -287,6 +295,9 @@ def main(argv: list[str] | None = None) -> int:
         language = _prompt("Language (python/node/go/none)", default="none")
         if language not in {"python", "node", "go", "none"}:
             language = "none"
+        linear_issue_prefix = _prompt(
+            "Linear issue prefix (e.g. ENG, PROJ — blank to skip)", default=""
+        ).strip().upper()
 
         # MCP selection — three steps.
         core_mcps = _choose_mcps_interactive(MCP_CATALOG)
@@ -337,6 +348,7 @@ def main(argv: list[str] | None = None) -> int:
         "lint_command": lint_command,
         "format_command": format_command,
         "test_command": test_command,
+        "linear_issue_prefix": linear_issue_prefix,
         # Conditional block flags (truthy/falsy strings).
         "python": "true" if is_python else "",
         "node": "true" if is_node else "",

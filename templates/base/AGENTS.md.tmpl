@@ -61,6 +61,18 @@ See [`.claude/memory/README.md`](.claude/memory/README.md) for the full conventi
 - **Aider**: add to `.aider.conf.yml` → `read: [AGENTS.md, .claude/project-init.md]`
 - **Codex / other**: point the agent at `AGENTS.md` first.
 
+{{#if linear_issue_prefix}}
+## Linear ↔ GitHub
+
+Three conventions keep Linear and GitHub in sync automatically once the GitHub integration is enabled in Linear → Settings → Integrations → GitHub:
+
+| Thing | Format | Effect |
+|---|---|---|
+| Branch | `{{linear_issue_prefix}}-<N>-<slug>` | Linear auto-links the branch |
+| Commit | `{{linear_issue_prefix}}-N: <what and why>` | Linear links the commit |
+| PR title + body | `{{linear_issue_prefix}}-N: <title>` + `Fixes {{linear_issue_prefix}}-N` in body | Moves issue to Done on merge |
+
+{{/if}}
 ## Deterministic-first principle
 
 Hooks and scripts in `.claude/` prefer bash/python over LLM calls. Reserve LLM calls for genuinely generative tasks (summarization, entity extraction, judgment). Everything else — file ops, pattern matching, template rendering, graph traversal — is deterministic code.

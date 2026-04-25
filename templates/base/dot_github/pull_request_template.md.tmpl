@@ -1,0 +1,14 @@
+## Summary
+
+
+{{#if linear_issue_prefix}}
+## Linear issue
+
+Fixes <!-- {{linear_issue_prefix}}-N -->
+
+{{/if}}
+## Test plan
+{{#if test_command}}
+- [ ] `{{test_command}}` passes
+{{/if}}{{#if lint_command}}- [ ] `{{lint_command}}` passes
+{{/if}}

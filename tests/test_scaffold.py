@@ -66,6 +66,7 @@ def _make_variables(**overrides: str) -> dict[str, str]:
         "go": "",
         "lightrag": "",
         "obsidian": "true",
+        "linear_issue_prefix": "",
     }
     defaults.update(overrides)
     return defaults
@@ -1126,3 +1127,74 @@ class TestTemplateIdentifiers:
                     assert "VytCepas" not in text, f"VytCepas found in {f}"
                 except OSError:
                     pass
+
+
+class TestLinearIssuePrefix:
+    """linear_issue_prefix variable — conditional Linear↔GitHub sections."""
+
+    def _scaffold(self, tmp_path: Path, prefix: str) -> Path:
+        target = tmp_path / "proj"
+        preset = load_preset("obsidian-only")
+        scaffold(target, preset, _make_variables(linear_issue_prefix=prefix))
+        return target
+
+    def test_prefix_set_appears_in_claude_md(self, tmp_path: Path):
+        target = self._scaffold(tmp_path, "ENG")
+        content = (target / "CLAUDE.md").read_text()
+        assert "ENG-<N>-<slug>" in content
+        assert "Fixes ENG-N" in content
+
+    def test_prefix_set_appears_in_agents_md(self, tmp_path: Path):
+        target = self._scaffold(tmp_path, "PROJ")
+        content = (target / "AGENTS.md").read_text()
+        assert "PROJ-<N>-<slug>" in content
+        assert "Fixes PROJ-N" in content
+
+    def test_prefix_set_creates_pr_template_with_fixes_line(self, tmp_path: Path):
+        target = self._scaffold(tmp_path, "APP")
+        pr = (target / ".github" / "pull_request_template.md").read_text()
+        assert "Fixes <!-- APP-N -->" in pr
+
+    def test_prefix_empty_omits_linear_section_from_claude_md(self, tmp_path: Path):
+        target = self._scaffold(tmp_path, "")
+        content = (target / "CLAUDE.md").read_text()
+        assert "Linear ↔ GitHub" not in content
+
+    def test_prefix_empty_omits_linear_section_from_agents_md(self, tmp_path: Path):
+        target = self._scaffold(tmp_path, "")
+        content = (target / "AGENTS.md").read_text()
+        assert "Linear ↔ GitHub" not in content
+
+    def test_prefix_empty_pr_template_has_no_fixes_line(self, tmp_path: Path):
+        target = self._scaffold(tmp_path, "")
+        pr = (target / ".github" / "pull_request_template.md").read_text()
+        assert "Fixes" not in pr
+
+    def test_cli_linear_prefix_flag(self, tmp_path: Path):
+        from project_init.__main__ import main
+        target = tmp_path / "p"
+        rc = main([
+            str(target), "--non-interactive",
+            "--preset", "obsidian-only",
+            "--name", "myproject",
+            "--description", "test",
+            "--linear-prefix", "xyz",
+        ])
+        assert rc == 0
+        content = (target / "CLAUDE.md").read_text()
+        assert "XYZ-<N>-<slug>" in content
+
+    def test_cli_linear_prefix_uppercased(self, tmp_path: Path):
+        from project_init.__main__ import main
+        target = tmp_path / "p"
+        rc = main([
+            str(target), "--non-interactive",
+            "--preset", "obsidian-only",
+            "--name", "myproject",
+            "--description", "test",
+            "--linear-prefix", "eng",
+        ])
+        assert rc == 0
+        content = (target / "CLAUDE.md").read_text()
+        assert "ENG-<N>-<slug>" in content
+        assert "eng-" not in content
