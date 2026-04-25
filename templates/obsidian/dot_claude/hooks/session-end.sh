@@ -9,7 +9,7 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 SESSIONS_DIR="$ROOT/.claude/vault/sessions"
 mkdir -p "$SESSIONS_DIR"
 
-STAMP="$(date -u +%Y-%m-%d-%H%M)"
+STAMP="$(date -u +%Y-%m-%dT%H-%M-%S)"
 LOG="$SESSIONS_DIR/$STAMP.md"
 
 {
