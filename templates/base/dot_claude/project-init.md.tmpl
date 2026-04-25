@@ -47,7 +47,8 @@ See [`config.yaml`](config.yaml) for the full record.
 - **No impossible error handling** — trust internal code and framework guarantees. Validate only at system boundaries (user input, external APIs).
 - **No backwards-compatibility shims** — if something is removed, delete it completely.
 - **Prefer editing existing files** over creating new ones.
-- **Always lint before marking a task done** — `{{python_linter}} check .` must pass before closing a task.
+{{#if python}}- **Always lint before marking a task done** — `{{python_linter}} check .` must pass before closing a task.
+{{/if}}
 
 ## Test-driven development
 

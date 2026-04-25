@@ -18,5 +18,6 @@ All agentic-development infrastructure lives under [`.claude/`](.claude/). Start
 
 - **TDD** — write failing tests before any implementation. Use `/plan <task>` to generate acceptance tests first.
 - **Linear** — before starting non-trivial work, create or reference a Linear issue. Use `/start-task` if one does not exist.
-- **Lint** — `{{python_linter}} check .` must pass before closing a task. The `pre-commit-gate` hook enforces this on every commit.
+{{#if python}}- **Lint** — `{{python_linter}} check .` must pass before closing a task. The `pre-commit-gate` hook enforces this on every commit.
+{{/if}}
 - **No secrets in code** — never hardcode API keys, tokens, passwords, or personal data (SSN, card numbers). Use `os.environ['KEY']` or a `.env` file (gitignored). The `secret-guard` hook will block any write that contains a real secret.
