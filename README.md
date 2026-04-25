@@ -88,7 +88,7 @@ project-init/
 
 ## Status
 
-Wizard (PI-3), templates (PI-2), and install script (PI-4) are done. MCP suggestion menu (PI-7) is next. Track progress in Linear, project "Project Init".
+Wizard (PI-3), templates (PI-2), install script (PI-4), and the MCP suggestion menu (PI-7) are done. Public release (PI-10) is next. Track progress in Linear, project "Project Init".
 
 ## License
 

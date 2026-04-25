@@ -30,7 +30,9 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 
 ## What this repo does NOT include
 
-- No LLM calls
+- No LLM calls from the scaffolder itself
 - No long-running service
 - No database (beyond what preset projects may install)
-- No memory ingestion (that's PI-6 and lives inside scaffolded projects, not here)
+- Memory ingestion (PI-6) ships as scripts inside the LightRAG overlay
+  (`templates/lightrag/dot_claude/scripts/`) — they run inside scaffolded
+  projects, not as part of this repo's runtime.
