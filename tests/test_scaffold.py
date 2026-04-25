@@ -40,6 +40,7 @@ def _make_variables(**overrides: str) -> dict[str, str]:
         "python_linter": "ruff",
         "test_framework": "pytest",
         "python": "true",
+        "node": "",
         "lightrag": "",
         "obsidian": "true",
     }
@@ -552,6 +553,206 @@ class TestSecretGuard:
             },
         })
         assert out is None
+
+
+class TestMCPs:
+    """Unit tests for the MCP catalog and formatting helpers."""
+
+    def test_catalog_has_required_keys(self):
+        from project_init.mcps import MCP_CATALOG
+        for m in MCP_CATALOG:
+            assert "id" in m
+            assert "name" in m
+            assert "description" in m
+            assert "command" in m
+
+    def test_catalog_contains_core_mcps(self):
+        from project_init.mcps import MCP_CATALOG
+        ids = {m["id"] for m in MCP_CATALOG}
+        assert {"linear", "github", "context7", "filesystem"} <= ids
+
+    def test_db_catalog_has_postgres_and_sqlite(self):
+        from project_init.mcps import DB_CATALOG
+        assert "postgres" in DB_CATALOG
+        assert "sqlite" in DB_CATALOG
+
+    def test_playwright_mcp_defined(self):
+        from project_init.mcps import PLAYWRIGHT_MCP
+        assert PLAYWRIGHT_MCP["id"] == "playwright"
+        assert "command" in PLAYWRIGHT_MCP
+
+    def test_no_npx_in_any_command(self):
+        from project_init.mcps import DB_CATALOG, MCP_CATALOG, PLAYWRIGHT_MCP
+        all_commands = (
+            [m["command"] for m in MCP_CATALOG]
+            + [m["command"] for m in DB_CATALOG.values()]
+            + [PLAYWRIGHT_MCP["command"]]
+        )
+        for cmd in all_commands:
+            assert "npx" not in cmd, f"npx found in command: {cmd}"
+            assert "npm" not in cmd, f"npm found in command: {cmd}"
+
+    def test_all_commands_use_bunx(self):
+        from project_init.mcps import DB_CATALOG, MCP_CATALOG, PLAYWRIGHT_MCP
+        all_commands = (
+            [m["command"] for m in MCP_CATALOG]
+            + [m["command"] for m in DB_CATALOG.values()]
+            + [PLAYWRIGHT_MCP["command"]]
+        )
+        for cmd in all_commands:
+            assert "bunx" in cmd, f"bunx not found in command: {cmd}"
+
+    def test_format_installed_mcps_empty(self):
+        from project_init.mcps import format_installed_mcps
+        assert format_installed_mcps([]) == "none"
+
+    def test_format_installed_mcps_single(self):
+        from project_init.mcps import MCP_CATALOG, format_installed_mcps
+        linear = next(m for m in MCP_CATALOG if m["id"] == "linear")
+        assert format_installed_mcps([linear]) == "linear"
+
+    def test_format_installed_mcps_multiple(self):
+        from project_init.mcps import MCP_CATALOG, format_installed_mcps
+        subset = [m for m in MCP_CATALOG if m["id"] in {"linear", "github"}]
+        result = format_installed_mcps(subset)
+        assert "linear" in result and "github" in result
+
+    def test_format_installed_mcps_yaml_empty(self):
+        from project_init.mcps import format_installed_mcps_yaml
+        assert format_installed_mcps_yaml([]) == "[]"
+
+    def test_format_installed_mcps_yaml_single(self):
+        from project_init.mcps import MCP_CATALOG, format_installed_mcps_yaml
+        linear = next(m for m in MCP_CATALOG if m["id"] == "linear")
+        assert format_installed_mcps_yaml([linear]) == '["linear"]'
+
+    def test_format_installed_mcps_yaml_multiple(self):
+        from project_init.mcps import MCP_CATALOG, format_installed_mcps_yaml
+        subset = [m for m in MCP_CATALOG if m["id"] in {"linear", "github"}]
+        result = format_installed_mcps_yaml(subset)
+        assert result.startswith("[") and result.endswith("]")
+        assert '"linear"' in result and '"github"' in result
+
+
+class TestMCPsNonInteractive:
+    """Test --mcps / --db / --browser flags via non-interactive CLI."""
+
+    def test_mcps_flag_linear_github(self, tmp_path: Path):
+        from project_init.__main__ import main
+        target = tmp_path / "p"
+        rc = main([
+            str(target), "--non-interactive",
+            "--preset", "obsidian-only",
+            "--name", "mcp-test",
+            "--description", "test",
+            "--language", "python",
+            "--mcps", "linear,github",
+        ])
+        assert rc == 0
+        config = (target / ".claude" / "config.yaml").read_text()
+        assert "linear" in config
+        assert "github" in config
+
+    def test_db_postgres_flag(self, tmp_path: Path):
+        from project_init.__main__ import main
+        target = tmp_path / "p"
+        rc = main([
+            str(target), "--non-interactive",
+            "--preset", "obsidian-only",
+            "--name", "db-test",
+            "--description", "test",
+            "--language", "python",
+            "--db", "postgres",
+        ])
+        assert rc == 0
+        config = (target / ".claude" / "config.yaml").read_text()
+        assert "postgres" in config
+
+    def test_browser_flag_adds_playwright(self, tmp_path: Path):
+        from project_init.__main__ import main
+        target = tmp_path / "p"
+        rc = main([
+            str(target), "--non-interactive",
+            "--preset", "obsidian-only",
+            "--name", "browser-test",
+            "--description", "test",
+            "--language", "python",
+            "--browser",
+        ])
+        assert rc == 0
+        config = (target / ".clone" / "config.yaml") if False else (target / ".claude" / "config.yaml")
+        assert "playwright" in config.read_text()
+
+    def test_no_mcps_gives_none(self, tmp_path: Path):
+        from project_init.__main__ import main
+        target = tmp_path / "p"
+        rc = main([
+            str(target), "--non-interactive",
+            "--preset", "obsidian-only",
+            "--name", "empty-test",
+            "--description", "test",
+            "--language", "python",
+        ])
+        assert rc == 0
+        config = (target / ".claude" / "config.yaml").read_text()
+        assert "installed: []" in config
+
+    def test_unknown_mcp_id_is_ignored(self, tmp_path: Path):
+        from project_init.__main__ import main
+        target = tmp_path / "p"
+        rc = main([
+            str(target), "--non-interactive",
+            "--preset", "obsidian-only",
+            "--name", "bad-mcp-test",
+            "--description", "test",
+            "--language", "python",
+            "--mcps", "linear,nonexistent,github",
+        ])
+        assert rc == 0
+        config = (target / ".claude" / "config.yaml").read_text()
+        assert "linear" in config
+        assert "github" in config
+        assert "nonexistent" not in config
+
+
+class TestNodeTemplate:
+    """Verify Node/bun conditional block renders correctly."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_path: Path):
+        self.target = tmp_path / "node-proj"
+        preset = load_preset("obsidian-only")
+        variables = _make_variables(
+            language="node",
+            python="",
+            node="true",
+            python_linter="none",
+            test_framework="none",
+        )
+        scaffold(self.target, preset, variables)
+
+    def test_node_block_rendered(self):
+        content = (self.target / ".claude" / "project-init.md").read_text()
+        assert "bun install" in content
+        assert "bunx" in content
+
+    def test_python_block_excluded_for_node(self):
+        content = (self.target / ".claude" / "project-init.md").read_text()
+        assert "uv sync" not in content
+
+    def test_no_npm_commands_in_node_template(self):
+        content = (self.target / ".claude" / "project-init.md").read_text()
+        # "npm" may appear in a "don't use npm" note — that's fine.
+        # What must NOT appear are npm invocations as commands.
+        assert "npm install" not in content
+        assert "npm run" not in content
+        assert "npx " not in content
+
+    def test_hooks_use_bunx_not_node_modules(self):
+        for hook in ["post-edit-lint.sh", "pre-commit-gate.sh"]:
+            content = (self.target / ".claude" / "hooks" / hook).read_text()
+            assert "node_modules/.bin/eslint" not in content
+            assert "bunx eslint" in content
 
 
 class TestTemplateIdentifiers:

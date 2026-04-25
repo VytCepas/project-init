@@ -95,6 +95,19 @@ uv run ruff format .    # format
 uv run pytest           # tests
 ```
 {{/if}}
+{{#if node}}
+## Node.js environment
+
+This project uses [`bun`](https://bun.sh). Never use `npm` or `npx`.
+
+```bash
+bun install             # install deps
+bun run <script>        # run a package.json script
+bunx <package>          # run a package binary (replaces npx)
+bun run lint            # lint (if configured in package.json)
+bun test                # tests
+```
+{{/if}}
 
 {{#if lightrag}}
 ## LightRAG memory

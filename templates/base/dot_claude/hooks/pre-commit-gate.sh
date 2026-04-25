@@ -40,12 +40,13 @@ if [ -n "$STAGED_PY" ] && command -v ruff &>/dev/null; then
 fi
 
 # Lint and auto-fix staged JS/TS files
+# Use bunx (bun's package runner) — consistent with project convention (PI-15).
 STAGED_JS=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '\.(js|ts|jsx|tsx)$' || true)
-if [ -n "$STAGED_JS" ] && [ -f "$ROOT/node_modules/.bin/eslint" ]; then
+if [ -n "$STAGED_JS" ] && command -v bunx &>/dev/null; then
     # shellcheck disable=SC2086
-    "$ROOT/node_modules/.bin/eslint" --fix --quiet $STAGED_JS 2>/dev/null || true
+    bunx eslint --fix --quiet $STAGED_JS 2>/dev/null || true
     # shellcheck disable=SC2086
-    LINT_OUT=$("$ROOT/node_modules/.bin/eslint" --quiet $STAGED_JS 2>&1 || true)
+    LINT_OUT=$(bunx eslint --quiet $STAGED_JS 2>&1 || true)
     if [ -n "$LINT_OUT" ]; then
         ERRORS="${ERRORS}JS/TS lint errors:\n${LINT_OUT}\n"
     fi

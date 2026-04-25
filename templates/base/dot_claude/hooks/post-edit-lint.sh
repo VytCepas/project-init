@@ -29,9 +29,10 @@ case "$FILE" in
         fi
         ;;
     *.js|*.ts|*.jsx|*.tsx)
-        if [ -f "$ROOT/node_modules/.bin/eslint" ]; then
-            "$ROOT/node_modules/.bin/eslint" --fix --quiet "$FILE" 2>/dev/null || true
-            ERRORS=$("$ROOT/node_modules/.bin/eslint" --quiet "$FILE" 2>&1 || true)
+        # Use bunx (bun's package runner) — consistent with project convention (PI-15).
+        if command -v bunx &>/dev/null; then
+            bunx eslint --fix --quiet "$FILE" 2>/dev/null || true
+            ERRORS=$(bunx eslint --quiet "$FILE" 2>&1 || true)
         fi
         ;;
 esac
