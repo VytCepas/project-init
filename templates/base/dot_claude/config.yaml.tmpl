@@ -18,5 +18,6 @@ mcps:
   installed: {{installed_mcps_yaml}}
 
 tooling:
-  python_linter: {{python_linter}}  # ruff | none
-  test_framework: {{test_framework}} # pytest | none
+  lint_command: "{{lint_command}}"
+  format_command: "{{format_command}}"
+  test_command: "{{test_command}}"

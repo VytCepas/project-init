@@ -19,11 +19,17 @@ _BLOCK_RE = re.compile(
     r"\{\{#if\s+(\w+)\}\}(.*?)\{\{/if(?:\s+\w+)?\}\}",
     re.DOTALL,
 )
+# Used by strict mode to detect any handlebars-style markers that survived.
+_ANY_PLACEHOLDER_RE = re.compile(r"\{\{[^}]+\}\}")
 
 # Paths under these dirs are never overwritten on re-run (idempotency).
 _PRESERVE_DIRS = {"memory", "vault"}
 # Except READMEs — those are always refreshed.
 _ALWAYS_OVERWRITE = {"README.md"}
+
+
+class TemplateRenderError(Exception):
+    """Raised in strict mode when unrendered placeholders survive scaffolding."""
 
 
 def list_presets() -> list[dict]:
@@ -81,10 +87,17 @@ def scaffold(
     target: Path,
     preset: dict,
     variables: dict[str, str],
+    *,
+    strict: bool = False,
 ) -> list[Path]:
-    """Copy + render template layers into *target*. Return created file paths."""
+    """Copy + render template layers into *target*. Return created file paths.
+
+    When *strict* is True, raise :class:`TemplateRenderError` if any
+    ``{{...}}`` placeholder or unclosed conditional survives rendering.
+    """
     layers: list[str] = preset["layers"]
     created: list[Path] = []
+    rendered_files: list[tuple[Path, str]] = []  # for strict-mode scan
 
     for layer_name in layers:
         layer_dir = _TEMPLATES_DIR / layer_name
@@ -111,7 +124,10 @@ def scaffold(
 
             if is_template:
                 content = src.read_text(encoding="utf-8")
-                dest.write_text(_render(content, variables), encoding="utf-8")
+                rendered = _render(content, variables)
+                dest.write_text(rendered, encoding="utf-8")
+                if strict:
+                    rendered_files.append((rel_path, rendered))
             else:
                 shutil.copy2(src, dest)
 
@@ -120,5 +136,17 @@ def scaffold(
                 dest.chmod(dest.stat().st_mode | 0o111)
 
             created.append(rel_path)
+
+    if strict:
+        offenders: list[str] = []
+        for rel_path, content in rendered_files:
+            for match in _ANY_PLACEHOLDER_RE.finditer(content):
+                offenders.append(f"{rel_path}: {match.group()}")
+        if offenders:
+            msg = (
+                "strict mode: unrendered placeholders survived scaffolding:\n  "
+                + "\n  ".join(offenders)
+            )
+            raise TemplateRenderError(msg)
 
     return created

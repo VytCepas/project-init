@@ -15,7 +15,12 @@ from project_init.mcps import (
     format_installed_mcps,
     format_installed_mcps_yaml,
 )
-from project_init.scaffold import list_presets, load_preset, scaffold
+from project_init.scaffold import (
+    TemplateRenderError,
+    list_presets,
+    load_preset,
+    scaffold,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -57,6 +62,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--non-interactive",
         action="store_true",
         help="Skip all prompts (requires --preset, --name, --description)",
+    )
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail if any {{...}} placeholder survives rendering (PI-17)",
     )
     return p
 
@@ -291,8 +301,28 @@ def main(argv: list[str] | None = None) -> int:
 
     is_python = language == "python"
     is_node = language == "node"
+    is_go = language == "go"
     is_lightrag = "lightrag" in preset.get("name", "")
     has_obsidian = "obsidian" in preset.get("layers", [])
+
+    # Per-language tooling commands (PI-16). Empty string when no convention
+    # applies — templates should wrap usages in {{#if python}}/{{#if node}}/etc.
+    if is_python:
+        lint_command = "uv run ruff check ."
+        format_command = "uv run ruff format ."
+        test_command = "uv run pytest"
+    elif is_node:
+        lint_command = "bun run lint"
+        format_command = "bun run format"
+        test_command = "bun test"
+    elif is_go:
+        lint_command = "golangci-lint run"
+        format_command = "gofmt -w ."
+        test_command = "go test ./..."
+    else:
+        lint_command = ""
+        format_command = ""
+        test_command = ""
 
     variables: dict[str, str] = {
         "project_name": project_name,
@@ -304,16 +334,22 @@ def main(argv: list[str] | None = None) -> int:
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": format_installed_mcps(selected_mcps),
         "installed_mcps_yaml": format_installed_mcps_yaml(selected_mcps),
-        "python_linter": "ruff" if is_python else "none",
-        "test_framework": "pytest" if is_python else "none",
+        "lint_command": lint_command,
+        "format_command": format_command,
+        "test_command": test_command,
         # Conditional block flags (truthy/falsy strings).
         "python": "true" if is_python else "",
         "node": "true" if is_node else "",
+        "go": "true" if is_go else "",
         "lightrag": "true" if is_lightrag else "",
         "obsidian": "true" if has_obsidian else "",
     }
 
-    created = scaffold(target, preset, variables)
+    try:
+        created = scaffold(target, preset, variables, strict=args.strict)
+    except TemplateRenderError as e:
+        sys.stderr.write(f"error: {e}\n")
+        return 2
     _print_summary(target, created, preset["name"])
     _print_mcp_commands(selected_mcps)
     return 0

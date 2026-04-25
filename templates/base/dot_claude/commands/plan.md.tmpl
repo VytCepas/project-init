@@ -47,7 +47,7 @@ Write a numbered step-by-step plan with file paths and approach for each step. E
 
 A checklist that references the acceptance tests. The task is complete when:
 - [ ] All acceptance tests from Phase 2 pass
-- [ ] Linter reports no errors (`{{python_linter}} check .` / eslint)
+- [ ] Linter reports no errors{{#if lint_command}} (`{{lint_command}}`){{/if}}
 - [ ] No new test files left in a failing state
 
 ---
