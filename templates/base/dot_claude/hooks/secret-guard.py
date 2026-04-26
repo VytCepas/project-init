@@ -4,6 +4,10 @@
 PreToolUse hook. Receives tool input JSON on stdin. Outputs
 {"decision": "block", "reason": "..."} if a secret or personal data pattern
 is found in the content being written or the command being run.
+
+NOTE: This is a Python hook invoked via `python3 "path/to/secret-guard.py"` in
+settings.json (not executed directly). Python hooks do not need the executable
+bit (+x); shell hooks (*.sh) do.
 """
 
 from __future__ import annotations

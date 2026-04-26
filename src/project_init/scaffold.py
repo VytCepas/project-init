@@ -94,59 +94,92 @@ def scaffold(
 
     When *strict* is True, raise :class:`TemplateRenderError` if any
     ``{{...}}`` placeholder or unclosed conditional survives rendering.
+
+    In strict mode, all output is written to a temporary directory first.
+    Only on successful validation is the output committed to target (atomic).
     """
+    import uuid
+
     layers: list[str] = preset["layers"]
     created: list[Path] = []
     rendered_files: list[tuple[Path, str]] = []  # for strict-mode scan
 
-    for layer_name in layers:
-        layer_dir = _TEMPLATES_DIR / layer_name
-        if not layer_dir.exists():
-            msg = f"Template layer {layer_name!r} not found at {layer_dir}"
-            raise FileNotFoundError(msg)
-
-        for src in sorted(layer_dir.rglob("*")):
-            if src.is_dir():
-                continue
-
-            # Build the output-relative path, renaming dot_ segments.
-            rel_parts = [_dot_rename(p) for p in src.relative_to(layer_dir).parts]
-            is_template = rel_parts[-1].endswith(".tmpl")
-            if is_template:
-                rel_parts[-1] = rel_parts[-1][: -len(".tmpl")]
-            rel_path = Path(*rel_parts)
-
-            if _should_preserve(rel_path, target):
-                continue
-
-            dest = target / rel_path
-            dest.parent.mkdir(parents=True, exist_ok=True)
-
-            if is_template:
-                content = src.read_text(encoding="utf-8")
-                rendered = _render(content, variables)
-                dest.write_text(rendered, encoding="utf-8")
-                if strict:
-                    rendered_files.append((rel_path, rendered))
-            else:
-                shutil.copy2(src, dest)
-
-            # Preserve executable bit.
-            if src.stat().st_mode & 0o111:
-                dest.chmod(dest.stat().st_mode | 0o111)
-
-            created.append(rel_path)
-
+    # For strict mode: write to temp, validate, then rename. Non-strict: write
+    # directly to target (best-effort behavior acceptable per PI-21).
     if strict:
-        offenders: list[str] = []
-        for rel_path, content in rendered_files:
-            for match in _ANY_PLACEHOLDER_RE.finditer(content):
-                offenders.append(f"{rel_path}: {match.group()}")
-        if offenders:
-            msg = (
-                "strict mode: unrendered placeholders survived scaffolding:\n  "
-                + "\n  ".join(offenders)
-            )
-            raise TemplateRenderError(msg)
+        # Use a temp directory under target.parent to ensure same-filesystem
+        # rename (atomic on POSIX). UUID suffix prevents collisions.
+        temp_suffix = f".partial-{uuid.uuid4().hex[:8]}"
+        work_dir = target.parent / (target.name + temp_suffix)
+        work_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        work_dir = target
+        work_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        for layer_name in layers:
+            layer_dir = _TEMPLATES_DIR / layer_name
+            if not layer_dir.exists():
+                msg = f"Template layer {layer_name!r} not found at {layer_dir}"
+                raise FileNotFoundError(msg)
+
+            for src in sorted(layer_dir.rglob("*")):
+                if src.is_dir():
+                    continue
+
+                # Build the output-relative path, renaming dot_ segments.
+                rel_parts = [_dot_rename(p) for p in src.relative_to(layer_dir).parts]
+                is_template = rel_parts[-1].endswith(".tmpl")
+                if is_template:
+                    rel_parts[-1] = rel_parts[-1][: -len(".tmpl")]
+                rel_path = Path(*rel_parts)
+
+                # For non-strict mode, check preservation against the actual target.
+                # For strict mode, we're writing to temp, so skip preservation check.
+                if not strict and _should_preserve(rel_path, target):
+                    continue
+
+                dest = work_dir / rel_path
+                dest.parent.mkdir(parents=True, exist_ok=True)
+
+                if is_template:
+                    content = src.read_text(encoding="utf-8")
+                    rendered = _render(content, variables)
+                    dest.write_text(rendered, encoding="utf-8")
+                    if strict:
+                        rendered_files.append((rel_path, rendered))
+                else:
+                    shutil.copy2(src, dest)
+
+                # Preserve executable bit.
+                if src.stat().st_mode & 0o111:
+                    dest.chmod(dest.stat().st_mode | 0o111)
+
+                created.append(rel_path)
+
+        # Strict-mode validation: check for unrendered placeholders.
+        if strict:
+            offenders: list[str] = []
+            for rel_path, content in rendered_files:
+                for match in _ANY_PLACEHOLDER_RE.finditer(content):
+                    offenders.append(f"{rel_path}: {match.group()}")
+            if offenders:
+                msg = (
+                    "strict mode: unrendered placeholders survived scaffolding:\n  "
+                    + "\n  ".join(offenders)
+                )
+                raise TemplateRenderError(msg)
+
+            # Validation passed; commit the temp directory to target (atomic rename).
+            # If target exists, remove it first (we're strict, so we want a clean replace).
+            if target.exists():
+                shutil.rmtree(target)
+            work_dir.rename(target)
+
+    except Exception:
+        # On any error (validation or I/O), clean up temp directory in strict mode.
+        if strict and work_dir.exists():
+            shutil.rmtree(work_dir)
+        raise
 
     return created

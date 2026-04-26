@@ -267,6 +267,18 @@ def main(argv: list[str] | None = None) -> int:
     else:
         preset = _choose_preset_interactive(presets)
 
+    # Validate non-interactive args BEFORE creating the target directory.
+    # PI-20: MCP validation must happen before mkdir so an invalid --mcps
+    # flag doesn't leave an empty target directory behind.
+    selected_mcps: list[dict] = []
+    if args.non_interactive:
+        try:
+            selected_mcps = _resolve_mcps_non_interactive(
+                args.mcps, args.db, args.browser
+            )
+        except ValueError as e:
+            parser.error(str(e))
+
     target.mkdir(parents=True, exist_ok=True)
 
     # Gather variables.
@@ -275,12 +287,6 @@ def main(argv: list[str] | None = None) -> int:
         project_name = args.name
         project_description = args.description
         language = args.language or "none"
-        try:
-            selected_mcps = _resolve_mcps_non_interactive(
-                args.mcps, args.db, args.browser
-            )
-        except ValueError as e:
-            parser.error(str(e))
     else:
         project_name = _prompt("Project name", default=default_name)
         project_description = _prompt("Description", default="")

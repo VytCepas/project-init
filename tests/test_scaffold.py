@@ -233,6 +233,37 @@ class TestScaffoldObsidianOnly:
         assert "uv sync" in content
 
 
+class TestHookExecutability:
+    """PI-22: Shell hooks must be executable; Python hooks must not be."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = tmp_target
+        preset = load_preset("obsidian-only")
+        variables = _make_variables()
+        scaffold(tmp_target, preset, variables)
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="executable bits don't work on Windows")
+    def test_shell_hooks_are_executable(self):
+        hooks_dir = self.target / ".claude" / "hooks"
+        for sh in hooks_dir.glob("*.sh"):
+            assert sh.stat().st_mode & 0o111, f"{sh.name} must be executable"
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="executable bits don't work on Windows")
+    def test_python_hooks_are_not_executable(self):
+        hooks_dir = self.target / ".claude" / "hooks"
+        for py in hooks_dir.glob("*.py"):
+            assert not (py.stat().st_mode & 0o111), (
+                f"{py.name} should not be executable (invoked via python3)"
+            )
+
+    def test_hooks_readme_documents_convention(self):
+        readme = self.target / ".claude" / "hooks" / "README.md"
+        content = readme.read_text()
+        assert "executable" in content.lower() or "executable bit" in content.lower()
+        assert ".sh" in content or "Shell" in content
+
+
 class TestScaffoldLightRAG:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
@@ -749,6 +780,23 @@ class TestMCPsNonInteractive:
             f"target dir {target} was created despite invalid preset"
         )
 
+    def test_unknown_mcp_id_does_not_create_target_dir(self, tmp_path: Path):
+        """An invalid MCP id must fail BEFORE the target directory is created. PI-20."""
+        from project_init.__main__ import main
+        target = tmp_path / "should-not-exist"
+        with pytest.raises(SystemExit):
+            main([
+                str(target), "--non-interactive",
+                "--preset", "obsidian-only",
+                "--name", "test",
+                "--description", "test",
+                "--language", "python",
+                "--mcps", "linear,fakeone,github",
+            ])
+        assert not target.exists(), (
+            f"target dir {target} was created despite invalid MCP id"
+        )
+
 
 class TestShellLineEndings:
     """Regression: shell hook scripts must be LF-only.
@@ -850,6 +898,31 @@ class TestStrictMode:
                 scaffold(target, preset_for_fake, variables, strict=True)
             assert "undefined_variable_xyz" in str(excinfo.value)
             assert "stale.md" in str(excinfo.value)
+        finally:
+            sm._TEMPLATES_DIR = original
+
+    def test_strict_atomic_target_untouched_on_error(self, tmp_path: Path):
+        """PI-21: strict mode must leave target untouched on validation error."""
+        from project_init.scaffold import TemplateRenderError
+        target = tmp_path / "p"
+        variables = _make_variables()
+        # Create a broken layer that will fail strict validation.
+        fake_dir = tmp_path / "broken-layer"
+        (fake_dir / "dot_claude").mkdir(parents=True)
+        (fake_dir / "dot_claude" / "bad.md.tmpl").write_text(
+            "# Config\nvalue: {{undefined_var}}"
+        )
+        import project_init.scaffold as sm
+        original = sm._TEMPLATES_DIR
+        sm._TEMPLATES_DIR = fake_dir.parent
+        try:
+            preset_for_fake = {"name": "fake", "layers": ["broken-layer"]}
+            with pytest.raises(TemplateRenderError):
+                scaffold(target, preset_for_fake, variables, strict=True)
+            # Target must not exist (or if it existed before, be untouched).
+            assert not target.exists(), (
+                f"target dir {target} was partially written despite strict mode error"
+            )
         finally:
             sm._TEMPLATES_DIR = original
 
@@ -1030,7 +1103,7 @@ class TestNodeTemplate:
 
 @pytest.mark.skipif(
     not _has_uv_and_can_build(),
-    reason="uv build / venv unavailable in this environment",
+    reason="uv unavailable in this environment (needed for build and venv creation)",
 )
 class TestInstalledWheel:
     """PI-18: build the wheel, install it in a fresh venv, run project-init.
@@ -1061,25 +1134,28 @@ class TestInstalledWheel:
         wheels = list(build_dir.glob("*.whl"))
         assert wheels, "no wheel produced"
 
-        # Create a venv and install the wheel.
+        # Create a venv using uv and install the wheel.
+        # PI-23: uv venv doesn't require python3-venv apt package.
         venv_result = subprocess.run(
-            [sys.executable, "-m", "venv", str(venv_dir)],
+            [uv_bin, "venv", str(venv_dir)],
             capture_output=True,
             text=True,
             timeout=60,
         )
         if venv_result.returncode != 0:
-            pytest.skip(f"venv unavailable in this environment: {venv_result.stderr}")
-        venv_pip = venv_dir / "bin" / "pip"
-        venv_bin = venv_dir / "bin" / "project-init"
-        if not venv_pip.exists():  # Windows fallback
-            venv_pip = venv_dir / "Scripts" / "pip.exe"
-            venv_bin = venv_dir / "Scripts" / "project-init.exe"
+            pytest.skip(f"uv venv failed: {venv_result.stderr}")
+
+        # uv pip install works cross-platform (no manual path detection needed).
         subprocess.run(
-            [str(venv_pip), "install", "--quiet", str(wheels[0])],
+            [uv_bin, "pip", "install", "--python", str(venv_dir), str(wheels[0])],
             check=True,
             timeout=120,
         )
+
+        # Find the installed project-init binary.
+        venv_bin = venv_dir / "bin" / "project-init"
+        if not venv_bin.exists():  # Windows fallback
+            venv_bin = venv_dir / "Scripts" / "project-init.exe"
 
         # Scaffold using the installed binary, with --strict.
         result = subprocess.run(
