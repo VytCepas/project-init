@@ -12,7 +12,7 @@ All agentic-development infrastructure lives under [`.claude/`](.claude/). Start
 - [`.claude/config.yaml`](.claude/config.yaml) — which tools/MCPs this project uses
 - [`AGENTS.md`](AGENTS.md) — layout spec for non-Claude agents (Cursor, Aider, Codex, etc.)
 
-> Scaffolded with [project-init](https://github.com/VytCepas/project-init) on 2026-04-25.
+> Scaffolded with [project-init](https://github.com/VytCepas/project-init) on 2026-04-26.
 
 ## Key rules for agents
 

@@ -4,7 +4,7 @@
 project:
   name: "example-python"
   description: "Example scaffolded Python project"
-  created: 2026-04-25
+  created: 2026-04-26
   project_init_version: 0.1.0
 
 language: python            # python | node | go | none

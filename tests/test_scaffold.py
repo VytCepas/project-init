@@ -750,6 +750,31 @@ class TestMCPsNonInteractive:
         )
 
 
+class TestShellLineEndings:
+    """Regression: shell hook scripts must be LF-only.
+
+    Codex evaluation 2026-04-25 caught templates/base/dot_claude/hooks/
+    bash-safety-guard.sh shipping with CRLF endings, which made
+    `/usr/bin/env: 'bash\\r': No such file or directory` on Unix.
+    """
+
+    def test_no_crlf_in_shell_templates(self):
+        repo_root = Path(__file__).resolve().parent.parent
+        offenders: list[str] = []
+        for sh in repo_root.glob("**/*.sh"):
+            # Skip generated venv / build dirs.
+            if any(part in {".venv", "build", "dist", "node_modules"}
+                   for part in sh.parts):
+                continue
+            data = sh.read_bytes()
+            if b"\r\n" in data:
+                offenders.append(str(sh.relative_to(repo_root)))
+        assert not offenders, (
+            "Shell scripts with CRLF line endings:\n  "
+            + "\n  ".join(offenders)
+        )
+
+
 class TestScaffoldIntegrity:
     """Catch unrendered placeholders and other template-level rendering bugs."""
 

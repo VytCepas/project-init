@@ -2,7 +2,7 @@
 
 > Example scaffolded Python project
 
-Scaffolded with [project-init](https://github.com/VytCepas/project-init) on 2026-04-25.
+Scaffolded with [project-init](https://github.com/VytCepas/project-init) on 2026-04-26.
 
 ## Setup captured at init
 
