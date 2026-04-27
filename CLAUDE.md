@@ -28,6 +28,16 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 - **ruff only** — no black / isort / mypy.
 - **Templates are tested by scaffolding into a temp dir** — any change to `templates/` should have a corresponding test that runs the wizard with a preset and diffs the output.
 
+## CI Optimizations
+
+This repo uses three strategies to reduce CI time and token usage:
+
+1. **Test Parallelization** — Tests run with `pytest -n auto` via pytest-xdist. Cuts test time ~30-50% on multi-core runners.
+2. **Split Heavyweight Tests** — `wheel-smoke` job only runs after `lint-and-test` succeeds, enabling fast feedback.
+3. **Job Dependencies** — Integration/smoke tests are separate jobs that only run when main lint passes, avoiding wasted cycles on failures.
+
+Scaffolded projects get a `ci.yml.tmpl` template with these patterns built in. See the comments in that file for how to customize conditional paths (skip docs-only changes, etc.)
+
 ## What this repo does NOT include
 
 - No LLM calls from the scaffolder itself

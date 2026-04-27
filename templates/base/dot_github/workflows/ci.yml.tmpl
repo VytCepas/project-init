@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Optimization: Only run CI when relevant files change
+  # Uncomment and adjust paths as needed for your project
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Sync dev dependencies
+        run: uv sync --extra dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      # Optimization #1: Run tests in parallel mode
+      # Requires pytest-xdist in dev dependencies
+      # Can reduce test time by 30-50% on multi-core machines
+      - name: Tests (pytest) — parallel
+        run: uv run pytest -n auto --tb=short -q
+
+  # Optimization #2: Split heavyweight tests into separate job
+  # Only run integration/smoke tests after fast lint+unit tests pass
+  # Adjust this job based on your actual integration test needs
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    # Optional: Only run on main branch or when tests change significantly
+    # if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.files[*].name, 'tests/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Sync dev dependencies
+        run: uv sync --extra dev
+
+      # Check if integration tests directory exists before running
+      # This prevents masking real test failures with "No integration tests" message
+      - name: Run integration tests
+        run: |
+          if [ -d tests/integration/ ]; then
+            uv run pytest tests/integration/ -v --tb=short
+          else
+            echo "⚠️  No integration tests directory found (tests/integration/)"
+            echo "Create tests/integration/ when you have integration tests to run"
+          fi
+
+# Optimization #3: Conditional job execution
+# Example configurations for different scenarios (see full details in CLAUDE.md):
+#
+# Path filters: Only run CI when relevant files change
+# Skip tests for docs-only changes: Use GitHub Actions conditional if statements
+# Skip integration tests for PRs from forks: Use event filters
+# See GitHub Actions documentation for complete conditionals syntax
