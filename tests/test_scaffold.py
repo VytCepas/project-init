@@ -218,9 +218,10 @@ class TestScaffoldObsidianOnly:
             path = self.target / ".claude" / "scripts" / name
             assert path.stat().st_mode & 0o111, f"{name} must be executable"
 
-    def test_monitor_pr_sh_is_retired(self):
+    def test_monitor_pr_sh_has_merge_flag(self):
         content = (self.target / ".claude" / "scripts" / "monitor-pr.sh").read_text()
-        assert "retired" in content.lower() or "RETIRED" in content
+        assert "--merge" in content
+        assert "gh pr checks" in content
 
     def test_project_init_md_has_script_commands(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
@@ -1391,8 +1392,8 @@ class TestScaffoldGitHubFiles:
         assert "--merge" in content
         assert "gh pr merge" in content
         assert "gh pr checks" in content
+        assert "--watch" in content
         assert "--delete-branch" in content
-        assert "grep -o '\"conclusion\":\"FAILURE\"' || true" in content
 
     def test_validate_pr_enforces_project_key_title_format(self):
         """PR title must match [PROJECT-123][type] or [nojira][type] format."""
