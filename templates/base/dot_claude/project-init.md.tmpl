@@ -23,8 +23,10 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Command | `/status` | git state, recent commits, open TODOs |
 | Command | `/review` | code review of staged changes or a file |
 | Command | `/plan <task>` | acceptance tests first, then implementation plan |
-| Command | `/request-review` | mark PR ready, move board card, optional agent review |
-| Skill | `start-task` | create issue + branch + draft PR before starting work |
+| Command | `/request-review` | mark PR ready for review, optional agent review |
+| Script | `create-issue.sh <type> "desc"` | create typed issue, prints issue number |
+| Script | `start-issue.sh <n> <type>` | branch + draft PR + arm auto-merge |
+| Script | `promote-review.sh` | mark PR ready (board card moves automatically) |
 | Skill | `session-summary` | summarise session and save to vault |
 | Skill | `add-hook` | add a new deterministic hook |
 | Skill | `add-command` | add a new slash command |
@@ -59,57 +61,79 @@ Test conventions: one assertion per test, name as `test_<unit>_<scenario>`, run 
 
 ## GitHub Projects tracking
 
-Work items are GitHub Issues; the project board is GitHub Projects (kanban with To Do / In Progress / In Review / Done columns). Board cards move automatically via `board-automation.yml`.
+Work items are GitHub Issues; the project board is GitHub Projects (kanban with To Do / In Progress / In Review / Done columns). Board cards move automatically via `board-automation.yml` — **no manual board moves needed**.
 
-### Lifecycle: Issue → branch → draft PR → merge
+### Lifecycle: Issue → branch → draft PR → auto-merge
 
-Every non-trivial task follows this exact sequence:
+Every non-trivial task follows this exact sequence. Run the scripts; the LLM's only job is writing commit messages and fixing CI failures.
 
-| Step | Action | Board column |
-|------|--------|-------------|
-| 1 | Run `/start-task` — creates issue, branch, draft PR | **To Do → In Progress** |
-| 2 | Implement on the branch; commit with `#<issue>` references | In Progress |
-| 3 | Run `/request-review` — marks PR ready, optional reviewer agent | **In Progress → In Review** |
-| 4 | Tests pass on CI; PR merged with `Closes #<issue>` in body | **In Review → Done** |
+| Step | Command | What happens automatically |
+|------|---------|---------------------------|
+| 1. Create issue | `.claude/scripts/create-issue.sh <type> "description"` | Issue created, board card → **To Do** |
+| 2. Start work | `.claude/scripts/start-issue.sh <issue-n> <type>` | Branch + push + draft PR + auto-merge armed, board → **In Progress** |
+| 3. Commit | `git add … && git commit -m "[#n][type] message"` | `commit-msg` hook validates format; `pre-commit-gate` auto-lints |
+| 4. Push | `git push` | CI runs; if it fails a comment is posted on the PR with `gh run view --log-failed` |
+| 5. Mark ready | `.claude/scripts/promote-review.sh` | PR marked ready for review, board → **In Review** |
+| 6. *(automatic)* | — | CI passes → GitHub auto-merges, branch deleted, issue closed, board → **Done** |
+
+Steps 3–4 repeat until the work is complete.
+
+### Auto-merge setup (one-time per repo)
+
+Auto-merge requires two repo settings to be enabled by an admin:
+
+1. **GitHub Settings → General → Allow auto-merge** — tick the checkbox
+2. **Branch protection rule on `main`** — require the CI status checks to pass
+
+Once set, `start-issue.sh` arms it automatically. Without it, merge manually:
+```bash
+gh pr merge <n> --squash --delete-branch
+```
+
+### Commit and PR format
+
+| What | Format | Example |
+|------|--------|---------|
+| Commit message | `[#<n>][<type>] description` | `[#42][feat] Add OAuth login` |
+| PR title | same | `[#42][feat] Add OAuth login` |
+| No-issue PR | `[nojira][<type>] description` | `[nojira][fix] Fix typo` |
+| PR body | must include `Closes #<n>` | triggers auto-close on merge |
+
+Types: `feat` · `fix` · `chore` · `docs` · `test`
 
 ### Rules
 
-- **No direct commits to `main`** — all changes through PRs only. Install git hooks (required on first setup):
+- **No direct commits to `main`** — all changes through PRs. The `pre-push` hook enforces this locally.
+- Install hooks once after cloning:
   ```bash
   .claude/scripts/install-hooks.sh
   ```
-  This installs enforceable conventions: pre-push hook prevents accidental main branch commits.
 - One issue → one branch → one PR.
-- Branch name: `<issue-number>-<kebab-slug>` (e.g. `42-add-auth`).
-- **PR title:** `[#<issue>][<type>] Short description` where type ∈ {feat, fix, chore, docs, test}
-  - For small no-issue PRs: `[nojira][type] Short description` (e.g. `[nojira][fix] Fix typo`)
-- PR body must include `Closes #<issue>` — auto-closes issue and moves board card on merge (skip for nojira PRs).
-- Draft PRs created immediately when work starts — not when it's done.
-- PRs must pass CI (tests + lint) before merging.
 
-### PR Types
+### Handling CI failures
 
-| Type | Use case | Example |
-|---|---|---|
-| `feat` | New feature or enhancement | `[#42][feat] Add OAuth login` |
-| `fix` | Bug fix | `[#99][fix] Handle null pointer` |
-| `chore` | Maintenance, refactor, deps, CI | `[#16][chore] Update dependencies` |
-| `docs` | Documentation-only change | `[#20][docs] Update API guide` |
-| `test` | Test-only change | `[#55][test] Add unit tests` |
+When CI fails, GitHub posts a comment on the PR. Read it, fix the code, push:
+```bash
+gh run view --log-failed   # full failure output
+# fix the code
+git add … && git commit -m "[#n][fix] Fix failing tests"
+git push                   # re-triggers CI
+```
 
 ### Code review (optional)
 
-`/request-review` asks whether to run the `reviewer` agent (~500 extra tokens). Skip for trivial changes; use for anything security-sensitive or architecturally significant.
+Run `/request-review` to also invoke the `reviewer` agent (~500 extra tokens). Skip for trivial changes; use for security-sensitive or architectural changes.
 
 ### Quick reference
 
 ```bash
-gh issue list                    # see open issues (board backlog)
-gh issue create                  # create a new issue (adds to board)
-gh pr list                       # see open PRs
-gh pr view                       # current branch's PR status
-gh pr checks                     # CI status for current PR
-gh project list --owner <owner>  # list GitHub Projects boards
+.claude/scripts/create-issue.sh feat "description"   # new issue → prints issue number
+.claude/scripts/start-issue.sh <n> <type>            # branch + draft PR + arm auto-merge
+.claude/scripts/promote-review.sh                    # mark PR ready for review
+gh pr checks --watch                                 # watch CI interactively
+gh run view --log-failed                             # see what failed
+gh issue list                                        # open issues
+gh pr list                                           # open PRs
 ```
 
 ## Conventions

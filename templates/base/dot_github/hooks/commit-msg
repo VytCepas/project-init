@@ -1,0 +1,40 @@
+#!/bin/bash
+# commit-msg hook: validate commit message format before push.
+# Install: .claude/scripts/install-hooks.sh (runs automatically)
+#
+# Valid formats:
+#   [#42][feat] Add OAuth login
+#   [nojira][fix] Fix typo in README
+#
+# Types: feat  fix  chore  docs  test
+
+MSG=$(cat "$1")
+
+# Allow merge commits, fixups, reverts, and WIP
+if echo "$MSG" | grep -qE '^(Merge|Revert|fixup!|squash!|WIP)'; then
+  exit 0
+fi
+
+# Allow GitHub co-author trailers (multi-line commits)
+FIRST_LINE=$(echo "$MSG" | head -1)
+
+if echo "$FIRST_LINE" | grep -qE '^\[(#[0-9]+|nojira)\]\[(feat|fix|chore|docs|test)\] .+'; then
+  exit 0
+fi
+
+echo "" >&2
+echo "ERROR: commit message format invalid." >&2
+echo "" >&2
+echo "Required: [#<issue>][<type>] Short description" >&2
+echo "      or: [nojira][<type>] Short description" >&2
+echo "" >&2
+echo "Types: feat  fix  chore  docs  test" >&2
+echo "" >&2
+echo "Examples:" >&2
+echo "  [#42][feat] Add OAuth login" >&2
+echo "  [#99][fix] Handle null pointer in auth" >&2
+echo "  [nojira][chore] Bump dev dependency" >&2
+echo "" >&2
+echo "Your message: $FIRST_LINE" >&2
+echo "" >&2
+exit 1
