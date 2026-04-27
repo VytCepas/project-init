@@ -2,7 +2,7 @@
 
 This repo is a **scaffolder**. It produces a `.claude/` layout inside *other* projects. Nothing here runs as a long-lived service.
 
-Start by reading [README.md](README.md) and [AGENTS.md](AGENTS.md). Issue tracking: Linear project "Project Init".
+Start by reading [README.md](README.md) and [AGENTS.md](AGENTS.md). Issue tracking: GitHub Issues (`gh issue list`). See [docs/](docs/) for ADRs and development guides.
 
 ## Layout
 

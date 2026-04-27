@@ -1,10 +1,10 @@
 ---
-description: Create a Linear issue for the current task before starting work
+description: Create a GitHub Issue for the current task before starting work
 argument-hint: "[task title]"
 allowed-tools: Bash Read
 ---
 
-Before starting any non-trivial task, document it as a Linear issue. This keeps work traceable and ensures scope is explicit before implementation begins.
+Before starting any non-trivial task, document it as a GitHub Issue. This keeps work traceable and ensures scope is explicit before implementation begins.
 
 ## Steps
 
@@ -13,24 +13,24 @@ Before starting any non-trivial task, document it as a Linear issue. This keeps 
    - Short description (what changes and why)
    - Acceptance criteria (2–4 bullet points that define "done")
 
-2. **Check for existing issue** — ask: "Does a Linear issue already exist for this? If so, provide the ID and I'll reference it."
+2. **Check for existing issue** — run `gh issue list` and ask: "Does a GitHub Issue already exist for this? If so, provide the number and I'll reference it."
 
-3. **Create the issue** — if no issue exists, use the Linear MCP tool or print the following for the user to run:
+3. **Create the issue** — if no issue exists, create it with:
+   ```bash
+   gh issue create \
+     --title "<title>" \
+     --body "## Description\n<description>\n\n## Acceptance criteria\n- [ ] <criterion 1>\n- [ ] <criterion 2>" \
+     --label "feature"
    ```
-   # Via MCP (if Linear MCP is configured):
-   Use mcp__linear__save_issue with title, description, and state "In Progress"
+   Capture the returned issue URL and extract the issue number.
 
-   # Via CLI fallback:
-   linear issue create --title "<title>" --description "<description>"
+4. **Record the issue number** — save it to `.claude/memory/` so it persists across the session:
    ```
-
-4. **Record the issue ID** — save it to `.claude/memory/` so it persists across the session:
-   ```
-   echo "Current task: <ISSUE-ID> — <title>" >> .claude/memory/current-task.md
+   echo "Current task: #<number> — <title>" >> .claude/memory/current-task.md
    ```
 
 5. **Proceed** — only begin implementation after the issue exists and is recorded.
 
 ## Rule
 
-> Every non-trivial task (more than a 5-minute fix) must have a Linear issue before the first line of implementation code is written.
+> Every non-trivial task (more than a 5-minute fix) must have a GitHub Issue before the first line of implementation code is written.

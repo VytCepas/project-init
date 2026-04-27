@@ -1,0 +1,41 @@
+name: Validate PR
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  pr-title:
+    name: Check PR title format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate title contains issue reference
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if echo "$PR_TITLE" | grep -qE '^\[#[0-9]+\]'; then
+            echo "PR title format OK: $PR_TITLE"
+          else
+            echo "ERROR: PR title must start with [#IssueNumber], got: $PR_TITLE"
+            echo "Example: [#42] Add OAuth login"
+            exit 1
+          fi
+
+  closes-keyword:
+    name: Check for Closes keyword in PR body
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Closes keyword
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if echo "$PR_BODY" | grep -qiE 'closes\s+#[0-9]+'; then
+            echo "Closes keyword found"
+          else
+            echo "ERROR: PR body must include 'Closes #<number>' to auto-close the linked issue"
+            exit 1
+          fi

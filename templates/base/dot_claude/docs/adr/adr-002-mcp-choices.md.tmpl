@@ -1,0 +1,23 @@
+# ADR-002: MCP Choices
+
+**Date:** {{created_date}}
+**Status:** Accepted
+
+## Context
+
+Model Context Protocol (MCP) servers extend Claude Code's toolset. Each server loads its full tool-definition set into the conversation on startup — even tools never used. This adds token overhead proportional to the number of tools.
+
+## Decision
+
+- **GitHub Issues / PRs** — use `gh` CLI (zero token overhead) instead of GitHub MCP (~30 tools)
+- **File access** — use Claude Code built-in Read/Write/Edit/Glob/Grep instead of Filesystem MCP
+- **Issue tracking** — use `gh` CLI instead of Linear MCP (~15 tools)
+- **Library docs** — Context7 MCP if selected (targeted lookups, low overhead)
+
+**Selected at init:** {{installed_mcps}}
+
+## Consequences
+
+- Agents use `gh issue list`, `gh pr create`, etc. for project management
+- No MCP needed for file ops — built-in tools cover all needs
+- Token budget stays lower; more context available for actual work

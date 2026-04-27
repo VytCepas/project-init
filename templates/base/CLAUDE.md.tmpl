@@ -8,7 +8,8 @@ All agentic-development infrastructure lives under [`.claude/`](.claude/). Start
 
 - [`.claude/project-init.md`](.claude/project-init.md) — project workflow, conventions, and how this project was initialized
 - [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) — memory index (read first for context)
-- [`.claude/vault/`](.claude/vault/) — human-authored documentation (Obsidian vault)
+- [`.claude/docs/`](.claude/docs/) — system of record: ADRs and development guides
+- [`.claude/vault/`](.claude/vault/) — human workspace (Obsidian vault, exploratory notes)
 - [`.claude/config.yaml`](.claude/config.yaml) — which tools/MCPs this project uses
 - [`AGENTS.md`](AGENTS.md) — layout spec for non-Claude agents (Cursor, Aider, Codex, etc.)
 
@@ -17,7 +18,7 @@ All agentic-development infrastructure lives under [`.claude/`](.claude/). Start
 ## Key rules for agents
 
 - **TDD** — write failing tests before any implementation. Use `/plan <task>` to generate acceptance tests first.
-- **Linear** — before starting non-trivial work, create or reference a Linear issue. Use `/start-task` if one does not exist.
+- **GitHub Issues** — before starting non-trivial work, create or reference a GitHub Issue. Use `/start-task` if one does not exist.
 {{#if lint_command}}- **Lint** — `{{lint_command}}` must pass before closing a task. The `pre-commit-gate` hook enforces this on every commit.
 {{/if}}
 - **No secrets in code** — never hardcode API keys, tokens, passwords, or personal data (SSN, card numbers). Use `os.environ['KEY']` or a `.env` file (gitignored). The `secret-guard` hook will block any write that contains a real secret.

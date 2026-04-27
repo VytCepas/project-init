@@ -7,19 +7,9 @@ PI-15 (replace npx with bun) is satisfied by construction here.
 from __future__ import annotations
 
 # Core MCPs always offered as a multi-select in the wizard.
+# Linear is intentionally absent — issue tracking uses gh CLI + GitHub Issues (PI-26).
+# GitHub MCP is also absent — gh CLI covers all PR/issue needs with zero token overhead.
 MCP_CATALOG: list[dict] = [
-    {
-        "id": "linear",
-        "name": "Linear",
-        "description": "Issue tracking",
-        "command": "claude mcp add linear bunx @linear/mcp-server",
-    },
-    {
-        "id": "github",
-        "name": "GitHub",
-        "description": "PR and issue management",
-        "command": "claude mcp add github bunx @modelcontextprotocol/server-github",
-    },
     {
         "id": "context7",
         "name": "Context7",

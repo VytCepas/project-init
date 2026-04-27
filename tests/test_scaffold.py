@@ -196,7 +196,17 @@ class TestScaffoldObsidianOnly:
     def test_start_task_skill_exists(self):
         skill = self.target / ".claude" / "skills" / "start-task" / "SKILL.md"
         assert skill.is_file()
-        assert "Linear" in skill.read_text()
+        assert "gh issue" in skill.read_text()
+
+    def test_docs_layer_exists(self):
+        """PI-27: .claude/docs/ scaffold with ADRs and guides."""
+        docs = self.target / ".claude" / "docs"
+        assert (docs / "README.md").is_file()
+        assert (docs / "adr" / "adr-001-memory-stack.md").is_file()
+        assert (docs / "adr" / "adr-002-mcp-choices.md").is_file()
+        assert (docs / "development" / "conventions.md").is_file()
+        assert (docs / "development" / "testing.md").is_file()
+        assert (docs / "guides" / "using-memory.md").is_file()
 
     def test_plan_command_is_tdd_first(self):
         plan = self.target / ".claude" / "commands" / "plan.md"
@@ -208,9 +218,9 @@ class TestScaffoldObsidianOnly:
         content = (self.target / ".claude" / "project-init.md").read_text()
         assert "test" in content.lower() and "first" in content.lower()
 
-    def test_project_init_md_has_linear_instruction(self):
+    def test_project_init_md_has_github_instruction(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
-        assert "Linear" in content
+        assert "GitHub" in content
 
     def test_project_init_md_has_coding_standards(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
@@ -623,7 +633,10 @@ class TestMCPs:
     def test_catalog_contains_core_mcps(self):
         from project_init.mcps import MCP_CATALOG
         ids = {m["id"] for m in MCP_CATALOG}
-        assert {"linear", "github", "context7", "filesystem"} <= ids
+        # Linear and GitHub removed (PI-26): use gh CLI instead of MCPs
+        assert {"context7", "filesystem"} <= ids
+        assert "linear" not in ids
+        assert "github" not in ids
 
     def test_db_catalog_has_postgres_and_sqlite(self):
         from project_init.mcps import DB_CATALOG
@@ -662,14 +675,14 @@ class TestMCPs:
 
     def test_format_installed_mcps_single(self):
         from project_init.mcps import MCP_CATALOG, format_installed_mcps
-        linear = next(m for m in MCP_CATALOG if m["id"] == "linear")
-        assert format_installed_mcps([linear]) == "linear"
+        context7 = next(m for m in MCP_CATALOG if m["id"] == "context7")
+        assert format_installed_mcps([context7]) == "context7"
 
     def test_format_installed_mcps_multiple(self):
         from project_init.mcps import MCP_CATALOG, format_installed_mcps
-        subset = [m for m in MCP_CATALOG if m["id"] in {"linear", "github"}]
+        subset = [m for m in MCP_CATALOG if m["id"] in {"context7", "filesystem"}]
         result = format_installed_mcps(subset)
-        assert "linear" in result and "github" in result
+        assert "context7" in result and "filesystem" in result
 
     def test_format_installed_mcps_yaml_empty(self):
         from project_init.mcps import format_installed_mcps_yaml
@@ -677,21 +690,21 @@ class TestMCPs:
 
     def test_format_installed_mcps_yaml_single(self):
         from project_init.mcps import MCP_CATALOG, format_installed_mcps_yaml
-        linear = next(m for m in MCP_CATALOG if m["id"] == "linear")
-        assert format_installed_mcps_yaml([linear]) == '["linear"]'
+        context7 = next(m for m in MCP_CATALOG if m["id"] == "context7")
+        assert format_installed_mcps_yaml([context7]) == '["context7"]'
 
     def test_format_installed_mcps_yaml_multiple(self):
         from project_init.mcps import MCP_CATALOG, format_installed_mcps_yaml
-        subset = [m for m in MCP_CATALOG if m["id"] in {"linear", "github"}]
+        subset = [m for m in MCP_CATALOG if m["id"] in {"context7", "filesystem"}]
         result = format_installed_mcps_yaml(subset)
         assert result.startswith("[") and result.endswith("]")
-        assert '"linear"' in result and '"github"' in result
+        assert '"context7"' in result and '"filesystem"' in result
 
 
 class TestMCPsNonInteractive:
     """Test --mcps / --db / --browser flags via non-interactive CLI."""
 
-    def test_mcps_flag_linear_github(self, tmp_path: Path):
+    def test_mcps_flag_context7_filesystem(self, tmp_path: Path):
         from project_init.__main__ import main
         target = tmp_path / "p"
         rc = main([
@@ -700,12 +713,12 @@ class TestMCPsNonInteractive:
             "--name", "mcp-test",
             "--description", "test",
             "--language", "python",
-            "--mcps", "linear,github",
+            "--mcps", "context7,filesystem",
         ])
         assert rc == 0
         config = (target / ".claude" / "config.yaml").read_text()
-        assert "linear" in config
-        assert "github" in config
+        assert "context7" in config
+        assert "filesystem" in config
 
     def test_db_postgres_flag(self, tmp_path: Path):
         from project_init.__main__ import main
