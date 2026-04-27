@@ -196,7 +196,17 @@ class TestScaffoldObsidianOnly:
     def test_start_task_skill_exists(self):
         skill = self.target / ".claude" / "skills" / "start-task" / "SKILL.md"
         assert skill.is_file()
-        assert "Linear" in skill.read_text()
+        assert "gh issue" in skill.read_text()
+
+    def test_docs_layer_exists(self):
+        """PI-27: .claude/docs/ scaffold with ADRs and guides."""
+        docs = self.target / ".claude" / "docs"
+        assert (docs / "README.md").is_file()
+        assert (docs / "adr" / "adr-001-memory-stack.md").is_file()
+        assert (docs / "adr" / "adr-002-mcp-choices.md").is_file()
+        assert (docs / "development" / "conventions.md").is_file()
+        assert (docs / "development" / "testing.md").is_file()
+        assert (docs / "guides" / "using-memory.md").is_file()
 
     def test_plan_command_is_tdd_first(self):
         plan = self.target / ".claude" / "commands" / "plan.md"
@@ -208,9 +218,9 @@ class TestScaffoldObsidianOnly:
         content = (self.target / ".claude" / "project-init.md").read_text()
         assert "test" in content.lower() and "first" in content.lower()
 
-    def test_project_init_md_has_linear_instruction(self):
+    def test_project_init_md_has_github_instruction(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
-        assert "Linear" in content
+        assert "GitHub" in content
 
     def test_project_init_md_has_coding_standards(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
@@ -224,13 +234,41 @@ class TestScaffoldObsidianOnly:
         assert not (self.target / ".claude" / "scripts" / "ingest_sessions.py").exists()
         assert not (self.target / ".claude" / "scripts" / "query_memory.py").exists()
 
-    def test_lightrag_conditional_excluded(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
-        assert "LightRAG" not in content
+    def test_lightrag_rule_excluded(self):
+        # LightRAG rule file ships with the lightrag overlay only
+        assert not (self.target / ".claude" / "rules" / "lightrag.md").exists()
 
-    def test_python_conditional_included(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
+    def test_python_rule_file_present(self):
+        rule = self.target / ".claude" / "rules" / "python.md"
+        assert rule.exists()
+        content = rule.read_text()
         assert "uv sync" in content
+        assert "globs" in content
+
+    def test_all_language_rule_files_present(self):
+        rules = self.target / ".claude" / "rules"
+        assert (rules / "python.md").exists()
+        assert (rules / "node.md").exists()
+        assert (rules / "go.md").exists()
+        assert (rules / "hooks.md").exists()
+
+    def test_add_hook_skill_exists(self):
+        skill = self.target / ".claude" / "skills" / "add-hook" / "SKILL.md"
+        assert skill.is_file()
+        content = skill.read_text()
+        assert "settings.json" in content
+        assert "PreToolUse" in content
+
+    def test_add_command_skill_exists(self):
+        skill = self.target / ".claude" / "skills" / "add-command" / "SKILL.md"
+        assert skill.is_file()
+        assert "$ARGUMENTS" in skill.read_text()
+
+    def test_settings_json_has_autocompact(self):
+        import json
+        settings = self.target / ".claude" / "settings.json"
+        data = json.loads(settings.read_text())
+        assert data.get("env", {}).get("CLAUDE_AUTOCOMPACT_PCT_OVERRIDE") == "70"
 
 
 class TestHookExecutability:
@@ -282,9 +320,11 @@ class TestScaffoldLightRAG:
     def test_has_lightrag_config(self):
         assert (self.target / ".claude" / "memory" / "lightrag.yaml").is_file()
 
-    def test_lightrag_conditional_included(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
-        assert "LightRAG" in content
+    def test_lightrag_rule_file_present(self):
+        rule = self.target / ".claude" / "rules" / "lightrag.md"
+        assert rule.exists()
+        content = rule.read_text()
+        assert "ingest_sessions.py" in content
 
     def test_settings_json_has_stop_hook(self):
         import json
@@ -623,7 +663,11 @@ class TestMCPs:
     def test_catalog_contains_core_mcps(self):
         from project_init.mcps import MCP_CATALOG
         ids = {m["id"] for m in MCP_CATALOG}
-        assert {"linear", "github", "context7", "filesystem"} <= ids
+        # Linear, GitHub, Filesystem removed (PI-25/PI-26): CLI alternatives cover all needs
+        assert "context7" in ids
+        assert "linear" not in ids
+        assert "github" not in ids
+        assert "filesystem" not in ids
 
     def test_db_catalog_has_postgres_and_sqlite(self):
         from project_init.mcps import DB_CATALOG
@@ -662,14 +706,14 @@ class TestMCPs:
 
     def test_format_installed_mcps_single(self):
         from project_init.mcps import MCP_CATALOG, format_installed_mcps
-        linear = next(m for m in MCP_CATALOG if m["id"] == "linear")
-        assert format_installed_mcps([linear]) == "linear"
+        context7 = next(m for m in MCP_CATALOG if m["id"] == "context7")
+        assert format_installed_mcps([context7]) == "context7"
 
     def test_format_installed_mcps_multiple(self):
-        from project_init.mcps import MCP_CATALOG, format_installed_mcps
-        subset = [m for m in MCP_CATALOG if m["id"] in {"linear", "github"}]
+        from project_init.mcps import DB_CATALOG, MCP_CATALOG, format_installed_mcps
+        subset = [next(m for m in MCP_CATALOG if m["id"] == "context7"), DB_CATALOG["postgres"]]
         result = format_installed_mcps(subset)
-        assert "linear" in result and "github" in result
+        assert "context7" in result and "postgres" in result
 
     def test_format_installed_mcps_yaml_empty(self):
         from project_init.mcps import format_installed_mcps_yaml
@@ -677,21 +721,21 @@ class TestMCPs:
 
     def test_format_installed_mcps_yaml_single(self):
         from project_init.mcps import MCP_CATALOG, format_installed_mcps_yaml
-        linear = next(m for m in MCP_CATALOG if m["id"] == "linear")
-        assert format_installed_mcps_yaml([linear]) == '["linear"]'
+        context7 = next(m for m in MCP_CATALOG if m["id"] == "context7")
+        assert format_installed_mcps_yaml([context7]) == '["context7"]'
 
     def test_format_installed_mcps_yaml_multiple(self):
-        from project_init.mcps import MCP_CATALOG, format_installed_mcps_yaml
-        subset = [m for m in MCP_CATALOG if m["id"] in {"linear", "github"}]
+        from project_init.mcps import DB_CATALOG, MCP_CATALOG, format_installed_mcps_yaml
+        subset = [next(m for m in MCP_CATALOG if m["id"] == "context7"), DB_CATALOG["postgres"]]
         result = format_installed_mcps_yaml(subset)
         assert result.startswith("[") and result.endswith("]")
-        assert '"linear"' in result and '"github"' in result
+        assert '"context7"' in result and '"postgres"' in result
 
 
 class TestMCPsNonInteractive:
     """Test --mcps / --db / --browser flags via non-interactive CLI."""
 
-    def test_mcps_flag_linear_github(self, tmp_path: Path):
+    def test_mcps_flag_context7(self, tmp_path: Path):
         from project_init.__main__ import main
         target = tmp_path / "p"
         rc = main([
@@ -700,12 +744,11 @@ class TestMCPsNonInteractive:
             "--name", "mcp-test",
             "--description", "test",
             "--language", "python",
-            "--mcps", "linear,github",
+            "--mcps", "context7",
         ])
         assert rc == 0
         config = (target / ".claude" / "config.yaml").read_text()
-        assert "linear" in config
-        assert "github" in config
+        assert "context7" in config
 
     def test_db_postgres_flag(self, tmp_path: Path):
         from project_init.__main__ import main
@@ -1077,12 +1120,20 @@ class TestNodeTemplate:
         )
         scaffold(self.target, preset, variables)
 
-    def test_node_block_rendered(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
+    def test_node_rule_file_present(self):
+        rule = self.target / ".claude" / "rules" / "node.md"
+        assert rule.exists()
+        content = rule.read_text()
         assert "bun install" in content
         assert "bunx" in content
 
-    def test_python_block_excluded_for_node(self):
+    def test_node_rule_has_globs(self):
+        content = (self.target / ".claude" / "rules" / "node.md").read_text()
+        assert "globs" in content
+        assert "package.json" in content
+
+    def test_python_rule_not_contaminated_in_node(self):
+        # python rule file still ships (it's in base), but project-init.md has no uv sync
         content = (self.target / ".claude" / "project-init.md").read_text()
         assert "uv sync" not in content
 

@@ -1,0 +1,33 @@
+name: Feature
+description: New feature or enhancement
+labels: [feature]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: What should this do?
+      placeholder: "Add X / Support Y / Allow Z"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What changes and why
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Bullet list of conditions that define "done"
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+    validations:
+      required: true
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Effort estimate
+      options: [XS, S, M, L, XL]

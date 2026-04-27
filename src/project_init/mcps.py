@@ -7,30 +7,16 @@ PI-15 (replace npx with bun) is satisfied by construction here.
 from __future__ import annotations
 
 # Core MCPs always offered as a multi-select in the wizard.
+# Absent intentionally (PI-25 / PI-26):
+#   linear     — gh CLI + GitHub Issues covers all needs (~15 tools saved)
+#   github     — gh CLI covers PR/issue management (~35 tools saved)
+#   filesystem — Claude Code built-in Read/Write/Edit/Glob/Grep overlap entirely (~10 tools saved)
 MCP_CATALOG: list[dict] = [
-    {
-        "id": "linear",
-        "name": "Linear",
-        "description": "Issue tracking",
-        "command": "claude mcp add linear bunx @linear/mcp-server",
-    },
-    {
-        "id": "github",
-        "name": "GitHub",
-        "description": "PR and issue management",
-        "command": "claude mcp add github bunx @modelcontextprotocol/server-github",
-    },
     {
         "id": "context7",
         "name": "Context7",
         "description": "Live library documentation lookup",
         "command": "claude mcp add context7 bunx @upstash/context7-mcp",
-    },
-    {
-        "id": "filesystem",
-        "name": "Filesystem",
-        "description": "Broad file access across roots",
-        "command": "claude mcp add filesystem bunx @modelcontextprotocol/server-filesystem .",
     },
 ]
 

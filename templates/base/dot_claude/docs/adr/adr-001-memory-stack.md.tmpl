@@ -1,0 +1,33 @@
+# ADR-001: Memory Stack
+
+**Date:** {{created_date}}
+**Status:** Accepted
+
+## Context
+
+{{project_name}} needs a memory system for AI agents to retain context across sessions.
+
+## Decision
+
+{{#if lightrag}}
+Two-layer memory stack:
+
+- **`.claude/vault/`** (Obsidian) — human-authored notes, session logs, exploratory content
+- **`.claude/memory/.lightrag/`** (LightRAG) — vector-indexed agent memory, queryable by AI
+
+LightRAG indexes session logs and vault notes so agents can retrieve relevant context without reading every file.
+{{/if lightrag}}
+{{#if obsidian}}
+Single-layer memory:
+
+- **`.claude/vault/`** (Obsidian) — human-authored notes, session logs, exploratory content
+- **`.claude/memory/`** — flat markdown facts for quick agent recall
+
+Obsidian provides a local app for humans; agents read markdown files directly.
+{{/if obsidian}}
+
+## Consequences
+
+- Session logs written to `vault/sessions/YYYY-MM-DD.md` by `session-end.sh` hook
+- Memory facts indexed in `memory/MEMORY.md` with per-file frontmatter
+- AI agents read `memory/MEMORY.md` at session start, then `docs/adr/` for decisions

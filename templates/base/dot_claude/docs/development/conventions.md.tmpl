@@ -1,0 +1,31 @@
+# Development Conventions
+
+## Code style
+
+{{#if python}}
+- Formatter/linter: `ruff` (`{{lint_command}}`)
+- No type annotations required unless they clarify non-obvious interfaces
+- No docstrings unless the function name is insufficient
+{{/if}}
+{{#if node}}
+- Formatter/linter: configured in `package.json` (`{{lint_command}}`)
+- TypeScript preferred for non-trivial modules
+{{/if}}
+
+## Commit messages
+
+Format: `type: short description (#issue-number)`
+
+Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
+
+Example: `feat: add OAuth login (#42)`
+
+## Pull requests
+
+- Title: `[#IssueNumber] Short description`
+- Body must include `Closes #<number>` for auto-close on merge
+- All tests must pass before merging
+
+## Comments
+
+Only comment when the **why** is non-obvious — a hidden constraint, a workaround for a specific bug, or a counter-intuitive decision. Never describe what the code does.

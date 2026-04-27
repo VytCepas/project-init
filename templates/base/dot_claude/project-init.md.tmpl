@@ -4,123 +4,104 @@
 
 Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 
-## Setup captured at init
-
-- **Language/runtime**: {{language}}
-- **Memory stack**: {{memory_stack}}
-- **Installed MCPs**: {{installed_mcps}}
-
-See [`config.yaml`](config.yaml) for the full record.
+| | |
+|---|---|
+| Language | {{language}} |
+| Memory stack | {{memory_stack}} |
+| MCPs | {{installed_mcps}} |
 
 ## Workflow
 
-1. **Start of session** — agents should read [`memory/MEMORY.md`](memory/MEMORY.md) first, then glance at [`vault/`](vault/) for recent design/decision notes.
-2. **During work** — append to memory when you learn something reusable (see [`memory/README.md`](memory/README.md) for the convention). Large docs go in [`vault/`](vault/), small facts in [`memory/`](memory/).
-3. **End of session** — the `session-end` hook appends a session log to [`vault/sessions/`](vault/sessions/){{#if lightrag}}, and the memory ingester updates the LightRAG index{{/if}}.
+1. **Start of session** — read [`memory/MEMORY.md`](memory/MEMORY.md), then check [`docs/adr/`](docs/adr/) for relevant decisions.
+2. **During work** — permanent decisions → [`docs/adr/`](docs/adr/); exploratory notes → [`vault/`](vault/); reusable facts → [`memory/`](memory/).
+3. **End of session** — `session-end` hook writes a session log to [`vault/sessions/`](vault/sessions/){{#if lightrag}}, LightRAG ingester indexes memory{{/if}}.
 
-## Commands, skills, and agents
+## Tools
 
-**Slash commands** (`.claude/commands/`):
-- `/status` — project status: git state, recent commits, memory, open TODOs
-- `/review [target]` — code review of staged changes, a commit range, or a file
-- `/save-memory <fact>` — save a reusable fact to memory
-- `/plan <task>` — write acceptance tests first, then implementation plan (TDD)
+| Type | Name | Purpose |
+|---|---|---|
+| Command | `/status` | git state, recent commits, open TODOs |
+| Command | `/review` | code review of staged changes or a file |
+| Command | `/plan <task>` | acceptance tests first, then implementation plan |
+| Command | `/request-review` | mark PR ready, move board card, optional agent review |
+| Skill | `start-task` | create issue + branch + draft PR before starting work |
+| Skill | `session-summary` | summarise session and save to vault |
+| Skill | `add-hook` | add a new deterministic hook |
+| Skill | `add-command` | add a new slash command |
+| Agent | `reviewer` | code review specialist |
+| Agent | `researcher` | codebase explorer |
 
-**Skills** (`.claude/skills/`):
-- `session-summary` — summarize the session and save to vault
-- `start-task` — create a Linear issue before starting non-trivial work
+Hooks run automatically via `settings.json`: `bash-safety-guard`, `pre-commit-gate`, `post-edit-lint`{{#if obsidian}}, `session-end`{{/if}}.
 
-**Subagents** (`.claude/agents/`):
-- `reviewer` — code review specialist (sonnet, focused on bugs + security)
-- `researcher` — codebase explorer (sonnet, traces dependencies and architecture)
-
-**Hooks** (`.claude/hooks/`, wired via `settings.json`):
-- `bash-safety-guard.sh` — blocks destructive shell commands (rm -rf /, force push to main, DROP TABLE, etc.) before they run
-- `pre-commit-gate.sh` — intercepts `git commit`, auto-fixes staged files, blocks commit if lint errors remain
-- `post-edit-lint.sh` — auto-lints and formats files after Edit/Write/MultiEdit; injects errors into context so they get fixed in the same turn
-{{#if obsidian}}- `session-end.sh` — appends a session log to `vault/sessions/` on Stop{{/if}}
+**Rules** (`.claude/rules/`): per-filetype conventions loaded automatically by Claude Code when you open a matching file.
 
 ## Coding standards
 
-- **No comments** unless the WHY is non-obvious (a hidden constraint, a workaround for a specific bug). Never describe what the code does.
-- **No premature abstractions** — three similar lines is better than an abstraction. Extract only when the pattern is stable.
-- **No impossible error handling** — trust internal code and framework guarantees. Validate only at system boundaries (user input, external APIs).
-- **No backwards-compatibility shims** — if something is removed, delete it completely.
-- **Prefer editing existing files** over creating new ones.
-{{#if lint_command}}- **Always lint before marking a task done** — `{{lint_command}}` must pass before closing a task.
+- No comments unless the WHY is non-obvious.
+- No premature abstractions — three similar lines before extracting.
+- No error handling for impossible scenarios.
+- No backwards-compatibility shims — delete removed code.
+- Prefer editing existing files over creating new ones.
+{{#if lint_command}}- `{{lint_command}}` must pass before closing a task.
 {{/if}}
 
-## Test-driven development
+## TDD
 
-**Write tests first.** Before implementing any function or feature, write the test that the implementation must pass. Tests define the contract; implementation fulfils it.
+Write failing tests before implementation. Tests define the contract.
 
-Workflow:
-1. Use `/plan <task>` — it produces acceptance tests (red) before the implementation plan
-2. Commit the failing tests
-3. Implement until all tests pass (green)
+1. `/plan <task>` → acceptance tests (red)
+2. Commit failing tests
+3. Implement until green
 4. Lint and clean up
-
 {{#if python}}
-Test conventions:
-- One assertion per test
-- Name: `test_<unit>_<scenario>` (e.g. `test_scaffold_renames_dot_prefix`)
-- Run: `uv run pytest`
-- A test that touches external services (DB, external API) must use a real instance, not a mock
+Test conventions: one assertion per test, name as `test_<unit>_<scenario>`, run with `uv run pytest`. Real DB/API instances — no mocks.
 {{/if}}
 
-## Linear task tracking
+## GitHub task tracking
 
-Before starting any non-trivial task:
-1. Check whether a Linear issue already exists
-2. If not, run `/start-task` to create one
-3. Reference the issue ID in commit messages
+### Lifecycle: Issue → branch → draft PR → merge
 
-> Every piece of meaningful work should be traceable to a Linear issue.
+Every non-trivial task follows this exact sequence:
+
+| Step | Action | Board column |
+|------|--------|-------------|
+| 1 | Run `/start-task` — creates issue, branch, draft PR | **To Do → In Progress** |
+| 2 | Implement on the branch; commit with `#<issue>` references | In Progress |
+| 3 | Run `/request-review` — marks PR ready, optional reviewer agent | **In Progress → In Review** |
+| 4 | Tests pass on CI; PR merged with `Closes #<issue>` in body | **In Review → Done** |
+
+### Rules
+
+- One issue → one branch → one PR. No direct commits to `main`.
+- Branch name: `<issue-number>-<kebab-slug>` (e.g. `42-add-auth`).
+- PR title: `[#<issue>] Short description`.
+- PR body must include `Closes #<issue>` — this auto-closes the issue and moves the board card on merge.
+- Draft PRs are created immediately when work starts — not when it's done.
+- PRs must pass CI (tests + lint) before merging.
+
+### Code review (optional)
+
+`/request-review` asks whether to run the `reviewer` agent (~500 extra tokens). Skip for trivial changes; use for anything security-sensitive or architecturally significant.
+
+### Quick reference
+
+```bash
+gh issue list                    # see what's open
+gh pr list                       # see open PRs
+gh pr view                       # current branch's PR status
+gh pr checks                     # CI status for current PR
+```
 
 ## Conventions
 
-- **Deterministic first** — hooks and scripts in [`hooks/`](hooks/) and [`scripts/`](scripts/) prefer bash/python. LLM calls only for generative steps.
-- **One folder for agentic infra** — everything lives under `.claude/`. Root only has `CLAUDE.md` / `AGENTS.md` redirects.
-- **Markdown is canonical** — vault notes and memory files are plain markdown so they stay portable across agents.
+- Hooks and scripts prefer bash/python. LLM calls only for generative steps.
+- Everything under `.claude/`. Root only has `CLAUDE.md`/`AGENTS.md` redirects.
 
-{{#if python}}
-## Python environment
+## Compact Instructions
 
-This project uses [`uv`](https://docs.astral.sh/uv/).
-
-```bash
-uv sync                 # install deps
-uv run <command>        # run in the project venv
-uv run ruff check .     # lint
-uv run ruff format .    # format
-uv run pytest           # tests
-```
-{{/if}}
-{{#if node}}
-## Node.js environment
-
-This project uses [`bun`](https://bun.sh). Never use `npm` or `npx`.
-
-```bash
-bun install             # install deps
-bun run <script>        # run a package.json script
-bunx <package>          # run a package binary (replaces npx)
-bun run lint            # lint (if configured in package.json)
-bun test                # tests
-```
-{{/if}}
-
-{{#if lightrag}}
-## LightRAG memory
-
-Agent memory is indexed by [LightRAG](https://github.com/hkuds/lightrag), backed by the working directory at [`memory/.lightrag/`](memory/.lightrag/) (gitignored).
-
-- Ingest session logs and vault notes: `./scripts/ingest_sessions.py`
-- Query memory: `./scripts/query_memory.py "<question>"`
-
-Both scripts are deterministic wrappers around LightRAG — the LLM is only invoked inside LightRAG itself for entity extraction and synthesis.
-{{/if}}
-
-## Reset or re-init
-
-Re-run `/project-init` (or `project-init` from shell) in this project to re-select options. It will not overwrite existing memory or vault content.
+When compacting, preserve:
+- GitHub Issue number being worked on
+- Files modified this session
+- Test results (pass/fail count, failing test names)
+- Unresolved errors or lint failures
+- Decisions not yet committed to `docs/adr/`

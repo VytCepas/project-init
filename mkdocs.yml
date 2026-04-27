@@ -1,0 +1,31 @@
+site_name: project-init
+site_url: https://vytcepas.github.io/project-init/
+site_description: Scaffold a production-ready .claude/ layout into any project
+repo_url: https://github.com/VytCepas/project-init
+repo_name: VytCepas/project-init
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - search.suggest
+    - navigation.instant
+    - navigation.sections
+  palette:
+    scheme: slate
+    primary: indigo
+    accent: indigo
+
+nav:
+  - Home: README.md
+  - Architecture Decisions:
+    - Overview: adr/adr-001-scaffolder-design.md
+    - dot_ prefix convention: adr/adr-002-dotglob-template-convention.md
+    - GitHub-native workflow: adr/adr-003-github-native-workflow.md
+    - Obsidian + docs integration: adr/adr-004-obsidian-docs-integration.md
+  - Development:
+    - Template system: development/template-system.md
+    - Testing: development/testing.md
+    - Contributing: development/contributing.md
