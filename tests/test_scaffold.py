@@ -204,6 +204,35 @@ class TestScaffoldObsidianOnly:
         assert skill.is_file()
         assert "gh issue" in skill.read_text()
 
+    def test_create_issue_script_created(self):
+        assert (self.target / ".claude" / "scripts" / "create-issue.sh").is_file()
+
+    def test_start_issue_script_created(self):
+        assert (self.target / ".claude" / "scripts" / "start-issue.sh").is_file()
+
+    def test_promote_review_script_created(self):
+        assert (self.target / ".claude" / "scripts" / "promote-review.sh").is_file()
+
+    def test_lifecycle_scripts_are_executable(self):
+        for name in ("create-issue.sh", "start-issue.sh", "promote-review.sh", "install-hooks.sh"):
+            path = self.target / ".claude" / "scripts" / name
+            assert path.stat().st_mode & 0o111, f"{name} must be executable"
+
+    def test_monitor_pr_sh_is_retired(self):
+        content = (self.target / ".claude" / "scripts" / "monitor-pr.sh").read_text()
+        assert "retired" in content.lower() or "RETIRED" in content
+
+    def test_project_init_md_has_script_commands(self):
+        content = (self.target / ".claude" / "project-init.md").read_text()
+        assert "create-issue.sh" in content
+        assert "start-issue.sh" in content
+        assert "promote-review.sh" in content
+
+    def test_start_task_skill_delegates_to_scripts(self):
+        content = (self.target / ".claude" / "skills" / "start-task" / "SKILL.md").read_text()
+        assert "create-issue.sh" in content
+        assert "start-issue.sh" in content
+
     def test_docs_layer_exists(self):
         """PI-27: .claude/docs/ scaffold with ADRs and guides."""
         docs = self.target / ".claude" / "docs"
@@ -1400,6 +1429,19 @@ class TestScaffoldGitHubFiles:
         assert "refs/heads/main" in content or "refs/heads/master" in content
         assert "ERROR" in content or "not allowed" in content
         assert "<PROJECT-KEY>-<issue-number>-<slug>" in content
+
+    def test_commit_msg_hook_created(self):
+        hook = self.target / ".github" / "hooks" / "commit-msg"
+        assert hook.is_file()
+
+    def test_commit_msg_hook_validates_format(self):
+        content = (self.target / ".github" / "hooks" / "commit-msg").read_text()
+        assert "nojira" in content
+        assert "feat|fix|chore|docs|test" in content
+
+    def test_commit_msg_hook_is_executable(self):
+        hook = self.target / ".github" / "hooks" / "commit-msg"
+        assert hook.stat().st_mode & 0o111, "commit-msg hook must be executable"
 
     def test_gemini_no_unrendered_placeholders(self):
         import re
