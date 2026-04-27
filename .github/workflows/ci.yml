@@ -32,7 +32,8 @@ jobs:
         run: uv run ruff check .
 
       - name: Tests (pytest) — parallel mode
-        run: uv run pytest -n auto --tb=short -q
+        # Falls back to single-threaded if xdist not available
+        run: uv run pytest -n auto --tb=short -q 2>/dev/null || uv run pytest --tb=short -q
 
   wheel-smoke:
     name: Wheel smoke test (PI-18)

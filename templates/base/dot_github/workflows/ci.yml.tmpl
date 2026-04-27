@@ -63,8 +63,16 @@ jobs:
       - name: Sync dev dependencies
         run: uv sync --extra dev
 
+      # Check if integration tests directory exists before running
+      # This prevents masking real test failures with "No integration tests" message
       - name: Run integration tests
-        run: uv run pytest tests/integration/ -v --tb=short 2>/dev/null || echo "No integration tests found"
+        run: |
+          if [ -d tests/integration/ ]; then
+            uv run pytest tests/integration/ -v --tb=short
+          else
+            echo "⚠️  No integration tests directory found (tests/integration/)"
+            echo "Create tests/integration/ when you have integration tests to run"
+          fi
 
 # Optimization #3: Conditional job execution
 # Example configurations for different scenarios (see full details in CLAUDE.md):
