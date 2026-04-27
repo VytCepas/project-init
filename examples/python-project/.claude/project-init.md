@@ -72,12 +72,23 @@ Test conventions:
 
 Work items are GitHub Issues; the project board is GitHub Projects (kanban with To Do / In Progress / In Review / Done columns). Board cards move automatically via `board-automation.yml`.
 
+### Lifecycle: Issue → branch → draft PR → merge
+
 Before starting any non-trivial task:
 1. Run `gh issue list` to check for an existing issue
 2. If none exists, run `/start-task` to create one (also creates the branch and draft PR)
-3. Reference the issue number in commit messages and PR body (`Closes #N`)
+3. PR titles must follow: `[#N][type] description` where type ∈ {feat, fix, chore, docs, test}
+4. For small no-issue PRs: `[nojira][type] description` (e.g. `[nojira][fix] Fix typo`)
+5. PR body must include `Closes #N` — auto-closes issue and moves board card on merge (skip for nojira)
 
 > Every piece of meaningful work should be traceable to a GitHub Issue on the project board.
+
+### Prevent accidental pushes to main
+
+Install the pre-push hook locally to prevent direct commits to main:
+```bash
+cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+```
 
 ## Conventions
 

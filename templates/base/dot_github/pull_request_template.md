@@ -1,3 +1,6 @@
+<!-- PR Title Format: [#IssueNumber][type] description  OR  [nojira][type] description -->
+<!-- Valid types: feat | fix | chore | docs | test -->
+
 ## Summary
 
 Closes #<!-- issue number -->

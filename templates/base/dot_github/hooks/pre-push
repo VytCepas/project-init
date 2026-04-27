@@ -1,0 +1,22 @@
+#!/bin/bash
+# Pre-push hook: prevent direct commits to main/master branches
+# Install: cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+
+set -e
+
+while read local_ref local_sha remote_ref remote_sha; do
+  # Check if pushing to main or master
+  if [[ "$remote_ref" == "refs/heads/main" || "$remote_ref" == "refs/heads/master" ]]; then
+    echo "❌ ERROR: Direct push to main/master is not allowed"
+    echo ""
+    echo "To contribute:"
+    echo "  1. Create a new branch: git checkout -b <branch-name>"
+    echo "  2. Make your changes and push: git push origin <branch-name>"
+    echo "  3. Open a PR on GitHub"
+    echo ""
+    echo "For more details, see .claude/project-init.md"
+    exit 1
+  fi
+done
+
+exit 0

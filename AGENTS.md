@@ -19,4 +19,10 @@ When adding or changing a template, add a test under `tests/` that runs the scaf
 
 ## Issue & project tracking
 
-Work is tracked in **GitHub Projects** (board) backed by **GitHub Issues** (tickets). Use `gh issue list` to see open work. Issue numbers in commit messages and PR titles (e.g. `#12`) automatically move cards on the project board via `board-automation.yml`.
+Work is tracked in **GitHub Projects** (board) backed by **GitHub Issues** (tickets). Use `gh issue list` to see open work.
+
+**PR title format:** `[#IssueNumber][type] description` where type ∈ {feat, fix, chore, docs, test}  
+**No-issue PRs:** `[nojira][type] description` for trivial changes  
+**PR body:** must include `Closes #<number>` to auto-link issue and move board card on merge
+
+Cards auto-move via `board-automation.yml` when issues open, PRs move to review, or PRs merge.

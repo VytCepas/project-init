@@ -38,10 +38,30 @@ Example: `42-add-auth-middleware`
 ### PR rules
 
 - Created as **draft** immediately when work starts (not when it's done).
-- Title format: `[#<issue>] Short description`
-- Body must include `Closes #<issue>` to auto-close the issue and trigger the board move on merge.
+- Title format: `[#<issue>][<type>] Short description` or `[nojira][<type>] Short description`
+- Valid types: `feat` (feature), `fix` (bugfix), `chore` (maintenance/refactor), `docs` (doc-only), `test` (test-only)
+- Body must include `Closes #<issue>` to auto-close the issue and trigger the board move on merge (skip for `[nojira]` PRs)
 - One issue → one branch → one PR. Stacked PRs allowed only for dependency chains, never for convenience.
-- No direct commits to `main` or `master`.
+- **No direct commits to `main` or `master`** — all changes must go through a PR. Use the pre-push hook to enforce locally.
+
+### PR Types
+
+| Type | Use case | Example |
+|---|---|---|
+| `feat` | New feature or enhancement | `[#42][feat] Add OAuth login` |
+| `fix` | Bug fix | `[#99][fix] Handle null pointer` |
+| `chore` | Maintenance, refactor, deps, CI | `[#16][chore] Remove Linear remnants` |
+| `docs` | Documentation-only change | `[#20][docs] Update API guide` |
+| `test` | Test-only change | `[#55][test] Add auth unit tests` |
+
+### No-issue PRs (nojira)
+
+For small, trivial changes (typos, quick fixes) that don't warrant a full issue:
+```
+[nojira][fix] Typo in README
+[nojira][chore] Bump dev dependency
+```
+These PRs **skip the Closes keyword check** since there's no linked issue.
 
 ### CI enforcement
 

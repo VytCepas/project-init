@@ -10,12 +10,15 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 1. **Clarify scope** — if $ARGUMENTS is empty or vague, ask the user for:
    - Task title (one line, imperative: "Add X", "Fix Y", "Refactor Z")
+   - Work type (feat, fix, chore, docs, or test)
    - Short description (what changes and why)
    - Acceptance criteria (2–4 bullet points that define "done")
 
 2. **Check for existing issue** — run `gh issue list` and ask: "Does a GitHub Issue already exist for this? If so, provide the number."
 
 3. **Create the issue** — if none exists:
+   - Map type to label: feat→feature, fix→bug, chore→chore, docs→docs, test→test
+   - Create with `gh issue create`:
    ```bash
    gh issue create \
      --title "<title>" \
@@ -25,7 +28,7 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
    ## Acceptance criteria
    - [ ] <criterion 1>
    - [ ] <criterion 2>" \
-     --label "feature"
+     --label "<mapped-label>"
    ```
    Capture the issue number from the returned URL (last path segment).
 
@@ -42,10 +45,10 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
    git push -u origin <branch-name>
    ```
 
-6. **Create a draft PR**:
+6. **Create a draft PR** with type in title:
    ```bash
    gh pr create \
-     --title "[#<issue-number>] <title>" \
+     --title "[#<issue-number>][<type>] <title>" \
      --body "$(cat <<'EOF'
    ## Summary
 
@@ -63,6 +66,7 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
    )" \
      --draft
    ```
+   Valid types: feat, fix, chore, docs, test
 
 7. **Record the issue number** for this session:
    ```bash
@@ -71,6 +75,9 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 8. **Proceed** — only begin implementation after the issue, branch, and draft PR exist.
 
-## Rule
+## Rules
 
 > Every non-trivial task must have: a GitHub Issue, a dedicated branch, and a draft PR — all created before the first line of implementation code is written.
+
+> PR titles must follow the format: `[#IssueNumber][type] Short description` or `[nojira][type] Short description`
+> Valid types: `feat`, `fix`, `chore`, `docs`, `test`

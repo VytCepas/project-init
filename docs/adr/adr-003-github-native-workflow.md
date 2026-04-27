@@ -16,8 +16,8 @@ Issues were tracked in Linear alongside GitHub Issues and PRs, requiring two sys
 - `board-automation.yml` workflow automates card movement triggered by issue/PR lifecycle events.
 - **No Linear MCP** in `MCP_CATALOG` (removed in PI-26)
 - **No GitHub MCP** — `gh` CLI covers all needs with zero token overhead
-- PR title format: `[#IssueNumber] Short description`
-- PR body must include `Closes #<number>` for auto-close on merge and board card movement
+- PR title format: `[#IssueNumber][type] Short description` where type ∈ {feat, fix, chore, docs, test}
+- PR body must include `Closes #<number>` for auto-close on merge and board card movement (skip for `[nojira]` PRs)
 
 ## Consequences
 
