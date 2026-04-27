@@ -5,7 +5,7 @@ Full agent rules are in [AGENTS.md](../AGENTS.md) and repo conventions in [CLAUD
 ## Quick reference (Copilot Workspace / inline chat)
 
 ### Issue & project tracking
-- Tracking system: **GitHub Projects** (board) + **GitHub Issues** (tickets) — replaces Linear
+- Tracking system: **GitHub Projects** (board) + **GitHub Issues** (tickets)
 - Create issues: `gh issue create` — pick the right template (bug / feature / chore)
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
 - PR titles must start with `[#N]`, e.g. `[#42] Add OAuth login`
