@@ -1,6 +1,7 @@
 #!/bin/bash
 # Wait for all CI checks on a PR to complete, then optionally merge.
-# Only prints failures or the final pass/fail line — no per-refresh noise.
+# Only prints failures or the final pass line — no per-refresh noise.
+# Requires: gh, python3 (stdlib only — no jq dependency).
 #
 # Usage:
 #   .claude/scripts/monitor-pr.sh <pr-number> [--merge]
@@ -26,24 +27,36 @@ if [ -n "$MODE" ] && [ "$MODE" != "--merge" ]; then
   exit 2
 fi
 
+_py() { python3 -c "$1"; }
+
 # Poll until all checks are no longer pending/in_progress.
 # Only emit output on completion or failure — suppress refresh noise.
 while true; do
-  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || true
+  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
 
-  PENDING=$(echo "$CHECKS" | jq -r '[.[] | select(.state == "PENDING" or .state == "IN_PROGRESS")] | length')
-  FAILED=$(echo "$CHECKS"  | jq -r '[.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')
-
+  PENDING=$(_py "
+import json, sys
+data = json.loads('''$CHECKS''')
+print(sum(1 for c in data if c.get('state') in ('PENDING', 'IN_PROGRESS')))
+")
   if [ "$PENDING" -eq 0 ]; then
     break
   fi
   sleep 10
 done
 
-if [ "$FAILED" -gt 0 ]; then
+FAILED=$(_py "
+import json, sys
+data = json.loads('''$CHECKS''')
+bad = [c for c in data if c.get('conclusion') in ('FAILURE', 'CANCELLED', 'TIMED_OUT')]
+for c in bad:
+    print(f\"  {c['name']}: {c['conclusion']}\")
+sys.exit(len(bad))
+" 2>&1) || FAIL_CODE=$?
+
+if [ "${FAIL_CODE:-0}" -gt 0 ]; then
   echo "CI failed on PR #$PR_NUMBER — failed checks:"
-  echo "$CHECKS" | jq -r '.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT") | "  \(.name): \(.conclusion)"'
-  echo ""
+  echo "$FAILED"
   echo "Fix the issues, commit, push, then re-run this script."
   exit 1
 fi
