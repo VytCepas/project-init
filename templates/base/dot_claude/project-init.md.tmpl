@@ -74,12 +74,27 @@ Every non-trivial task follows this exact sequence:
 
 ### Rules
 
-- One issue → one branch → one PR. No direct commits to `main`.
+- **No direct commits to `main`** — all changes through PRs only. Install the pre-push hook locally:
+  ```bash
+  cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+  ```
+- One issue → one branch → one PR.
 - Branch name: `<issue-number>-<kebab-slug>` (e.g. `42-add-auth`).
-- PR title: `[#<issue>] Short description`.
-- PR body must include `Closes #<issue>` — this auto-closes the issue and moves the board card on merge.
-- Draft PRs are created immediately when work starts — not when it's done.
+- **PR title:** `[#<issue>][<type>] Short description` where type ∈ {feat, fix, chore, docs, test}
+  - For small no-issue PRs: `[nojira][type] Short description` (e.g. `[nojira][fix] Fix typo`)
+- PR body must include `Closes #<issue>` — auto-closes issue and moves board card on merge (skip for nojira PRs).
+- Draft PRs created immediately when work starts — not when it's done.
 - PRs must pass CI (tests + lint) before merging.
+
+### PR Types
+
+| Type | Use case | Example |
+|---|---|---|
+| `feat` | New feature or enhancement | `[#42][feat] Add OAuth login` |
+| `fix` | Bug fix | `[#99][fix] Handle null pointer` |
+| `chore` | Maintenance, refactor, deps, CI | `[#16][chore] Update dependencies` |
+| `docs` | Documentation-only change | `[#20][docs] Update API guide` |
+| `test` | Test-only change | `[#55][test] Add unit tests` |
 
 ### Code review (optional)
 

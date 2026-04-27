@@ -1324,8 +1324,13 @@ class TestScaffoldGitHubFiles:
         assert "AGENTS.md" in content
 
     def test_validate_pr_enforces_title_format(self):
+        """PR title must match [#N][type] or [nojira][type] format."""
         content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
-        assert "[#" in content or r"\[#" in content
+        # Check for the new regex pattern with type validation
+        assert "(feat|fix|chore|docs|test)" in content
+        assert "nojira" in content
+        # Ensure old format is not present (should have been updated)
+        assert r"grep -qE '^\[#[0-9]+\]'" not in content
 
     def test_issue_templates_have_required_fields(self):
         for name in ("bug.yml", "feature.yml", "chore.yml"):
@@ -1335,6 +1340,22 @@ class TestScaffoldGitHubFiles:
 
     def test_no_dot_github_dir_remaining(self):
         assert not (self.target / "dot_github").exists()
+
+    def test_validate_pr_accepts_nojira_prs(self):
+        """PRs without issues can use [nojira][type] format."""
+        content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
+        # Check for nojira skip logic in closes-keyword job
+        assert "nojira" in content
+        assert "skipping Closes keyword check" in content
+
+    def test_pre_push_hook_created(self):
+        """Pre-push hook prevents direct commits to main/master."""
+        hook_path = self.target / ".github" / "hooks" / "pre-push"
+        assert hook_path.is_file()
+        content = hook_path.read_text()
+        # Verify the hook prevents pushing to main
+        assert "refs/heads/main" in content or "refs/heads/master" in content
+        assert "ERROR" in content or "not allowed" in content
 
     def test_gemini_no_unrendered_placeholders(self):
         import re

@@ -13,15 +13,19 @@ jobs:
     name: Check PR title format
     runs-on: ubuntu-latest
     steps:
-      - name: Validate title contains issue reference
+      - name: Validate title format with type
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if echo "$PR_TITLE" | grep -qE '^\[#[0-9]+\]'; then
+          if echo "$PR_TITLE" | grep -qE '^\[(#[0-9]+|nojira)\]\[(feat|fix|chore|docs|test)\]'; then
             echo "PR title format OK: $PR_TITLE"
           else
-            echo "ERROR: PR title must start with [#IssueNumber], got: $PR_TITLE"
-            echo "Example: [#42] Add OAuth login"
+            echo "ERROR: PR title must match format: [#IssueNumber][type] or [nojira][type]"
+            echo "Valid types: feat, fix, chore, docs, test"
+            echo "Examples:"
+            echo "  [#42][feat] Add OAuth login"
+            echo "  [#99][fix] Handle null pointer in auth"
+            echo "  [nojira][fix] Fix typo in README"
             exit 1
           fi
 
@@ -31,8 +35,15 @@ jobs:
     steps:
       - name: Validate Closes keyword
         env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
+          # Skip Closes check for nojira PRs (no linked issue)
+          if echo "$PR_TITLE" | grep -qE '^\[nojira\]'; then
+            echo "nojira PR — skipping Closes keyword check"
+            exit 0
+          fi
+          # For issue PRs, require Closes keyword
           if echo "$PR_BODY" | grep -qiE 'closes\s+#[0-9]+'; then
             echo "Closes keyword found"
           else
