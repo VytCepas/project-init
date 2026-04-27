@@ -19,8 +19,9 @@ _BLOCK_RE = re.compile(
     r"\{\{#if\s+(\w+)\}\}(.*?)\{\{/if(?:\s+\w+)?\}\}",
     re.DOTALL,
 )
-# Used by strict mode to detect any handlebars-style markers that survived.
-_ANY_PLACEHOLDER_RE = re.compile(r"\{\{[^}]+\}\}")
+# Used by strict mode to detect unrendered handlebars-style markers.
+# The (?<!\$) negative lookbehind exempts GitHub Actions expressions (${{ ... }}).
+_ANY_PLACEHOLDER_RE = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
 
 # Paths under these dirs are never overwritten on re-run (idempotency).
 _PRESERVE_DIRS = {"memory", "vault"}

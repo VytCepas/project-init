@@ -10,91 +10,26 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 1. **Clarify scope** — if $ARGUMENTS is empty or vague, ask the user for:
    - Task title (one line, imperative: "Add X", "Fix Y", "Refactor Z")
-   - Work type (feat, fix, chore, docs, or test)
-   - Short description (what changes and why)
-   - Acceptance criteria (2–4 bullet points that define "done")
+   - Work type: `feat` / `fix` / `chore` / `docs` / `test`
 
-2. **Check for existing issue** — run `gh issue list` and ask: "Does a GitHub Issue already exist for this? If so, provide the number."
+2. **Check for existing issue** — run `gh issue list` and ask: "Does a GitHub Issue already exist for this? If so, provide the number and skip to step 4."
 
-3. **Create the issue** — if none exists:
-   - Map type to label: feat→feature, fix→bug, chore→chore, docs→docs, test→test
-   - Create with `gh issue create`:
+3. **Create the issue**:
    ```bash
-   gh issue create \
-     --title "<title>" \
-     --body "## Description
-   <description>
-
-   ## Acceptance criteria
-   - [ ] <criterion 1>
-   - [ ] <criterion 2>" \
-     --label "<mapped-label>"
-   ```
-   Capture the issue number from the returned URL (last path segment).
-
-4. **Create a branch** named after the issue:
-   ```bash
-   git checkout -b <issue-number>-<slug>
-   # e.g. 42-add-auth-middleware
-   ```
-   Branch naming: `<issue-number>-<kebab-case-title>` (max 50 chars total).
-
-5. **Push an initial empty commit** — GitHub requires at least one commit ahead of base before a PR can be opened:
-   ```bash
-   git commit --allow-empty -m "WIP: start #<issue-number> — <title>"
-   git push -u origin <branch-name>
+   ISSUE_NUMBER=$(.claude/scripts/create-issue.sh <type> "<title>")
+   echo "Created issue #$ISSUE_NUMBER"
    ```
 
-6. **Create a draft PR** with type in title:
+4. **Start work** — create the branch, push, open draft PR, arm auto-merge:
    ```bash
-   gh pr create \
-     --title "[#<issue-number>][<type>] <title>" \
-     --body "$(cat <<'EOF'
-   ## Summary
-
-   Closes #<issue-number>
-
-   ## Changes
-
-   _To be filled in as work progresses._
-
-   ## Test plan
-
-   - [ ] Tests pass (`<test_command>`)
-   - [ ] Lint passes (`<lint_command>`)
-   EOF
-   )" \
-     --draft
+   .claude/scripts/start-issue.sh <issue-number> <type>
    ```
-   Valid types: feat, fix, chore, docs, test
+   This derives the branch name from the issue title, pushes it, opens a draft PR with the correct `[#n][type]` title and `Closes #n` body, and arms auto-merge if the repo supports it.
 
-7. **Move the board card to In Progress** — if a GitHub Project board exists:
-   ```bash
-   # Fetch project ID (the GraphQL node ID, not the numeric number)
-   PROJECT_NUM=<number>   # from gh project list --owner <repo-owner>
-   PROJECT_ID=$(gh project list --owner <repo-owner> --format json \
-     | jq -r ".projects[] | select(.number == $PROJECT_NUM) | .id")
-   ITEM_ID=$(gh project item-list $PROJECT_NUM --owner <repo-owner> --format json \
-     | jq -r ".items[] | select(.content.number == <issue-number>) | .id")
-   STATUS_FIELD_ID=$(gh project field-list $PROJECT_NUM --owner <repo-owner> --format json \
-     | jq -r '.fields[] | select(.name == "Status") | .id')
-   IN_PROGRESS_OPTION=$(gh project field-list $PROJECT_NUM --owner <repo-owner> --format json \
-     | jq -r '.fields[] | select(.name == "Status") | .options[] | select(.name == "In Progress") | .id')
-   gh project item-edit --id $ITEM_ID --field-id $STATUS_FIELD_ID \
-     --project-id $PROJECT_ID --single-select-option-id $IN_PROGRESS_OPTION
-   ```
-   Skip silently if no project board is configured.
-
-8. **Record the issue number** for this session:
-   ```bash
-   echo "Current task: #<number> — <title>" > .claude/memory/current-task.md
-   ```
-
-9. **Proceed** — only begin implementation after the issue, branch, and draft PR exist.
+5. **Proceed** — only begin implementation after the scripts have run successfully.
 
 ## Rules
 
-> Every non-trivial task must have: a GitHub Issue, a dedicated branch, and a draft PR — all created before the first line of implementation code is written.
-
-> PR titles must follow the format: `[#IssueNumber][type] Short description` or `[nojira][type] Short description`
-> Valid types: `feat`, `fix`, `chore`, `docs`, `test`
+- Every non-trivial task must have a GitHub Issue, a branch, and a draft PR — all before the first line of implementation code.
+- One issue → one branch → one PR.
+- `board-automation.yml` moves the board card to **In Progress** automatically when the PR is opened. No manual board move needed.
