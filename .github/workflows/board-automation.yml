@@ -1,0 +1,159 @@
+name: Board automation
+
+# Moves GitHub Project board cards based on issue and PR lifecycle events.
+#
+# Requirements:
+#   - PROJECT_TOKEN secret: a PAT with 'project' scope (GITHUB_TOKEN lacks this for user projects)
+#   - PROJECT_NUMBER variable (or hardcoded below): the numeric project board number
+#
+# Column transitions:
+#   issue opened          → To Do
+#   PR opened (draft)     → In Progress  (linked issue, via "Closes #N" in body)
+#   PR ready_for_review   → In Review    (linked issue)
+#   PR merged             → Done         (linked issue)
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, ready_for_review, closed]
+
+permissions:
+  contents: read
+
+jobs:
+  board-move:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      OWNER: ${{ github.repository_owner }}
+      PROJECT_NUMBER: 2   # update if your project number differs
+
+    steps:
+      - name: Determine target status
+        id: status
+        run: |
+          EVENT="${{ github.event_name }}"
+          ACTION="${{ github.event.action }}"
+
+          if [[ "$EVENT" == "issues" && "$ACTION" == "opened" ]]; then
+            echo "status=To Do" >> $GITHUB_OUTPUT
+            echo "item_type=issue" >> $GITHUB_OUTPUT
+
+          elif [[ "$EVENT" == "pull_request" && "$ACTION" == "opened" ]]; then
+            echo "status=In Progress" >> $GITHUB_OUTPUT
+            echo "item_type=pr" >> $GITHUB_OUTPUT
+
+          elif [[ "$EVENT" == "pull_request" && "$ACTION" == "ready_for_review" ]]; then
+            echo "status=In Review" >> $GITHUB_OUTPUT
+            echo "item_type=pr" >> $GITHUB_OUTPUT
+
+          elif [[ "$EVENT" == "pull_request" && "$ACTION" == "closed" && "${{ github.event.pull_request.merged }}" == "true" ]]; then
+            echo "status=Done" >> $GITHUB_OUTPUT
+            echo "item_type=pr" >> $GITHUB_OUTPUT
+
+          else
+            echo "status=skip" >> $GITHUB_OUTPUT
+            echo "item_type=skip" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Resolve issue number
+        id: issue
+        if: steps.status.outputs.status != 'skip'
+        env:
+          ITEM_TYPE: ${{ steps.status.outputs.item_type }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [[ "$ITEM_TYPE" == "issue" ]]; then
+            echo "number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          else
+            # Extract linked issue from PR body ("Closes #N", "Fixes #N", "Resolves #N")
+            ISSUE_NUM=$(echo "$PR_BODY" | grep -oiP '(closes|fixes|resolves)\s+#\K[0-9]+' | head -1)
+            if [[ -z "$ISSUE_NUM" ]]; then
+              echo "No linked issue found in PR body — skipping board move" >&2
+              echo "number=" >> $GITHUB_OUTPUT
+            else
+              echo "number=$ISSUE_NUM" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Move card on board
+        if: steps.status.outputs.status != 'skip' && steps.issue.outputs.number != ''
+        env:
+          ISSUE_NUM: ${{ steps.issue.outputs.number }}
+          TARGET_STATUS: ${{ steps.status.outputs.status }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+
+          # Fetch project metadata
+          PROJECT_DATA=$(gh api graphql -f query='
+            query($owner: String!, $number: Int!) {
+              user(login: $owner) {
+                projectV2(number: $number) {
+                  id
+                  field(name: "Status") {
+                    ... on ProjectV2SingleSelectField {
+                      id
+                      options { id name }
+                    }
+                  }
+                  items(first: 100) {
+                    nodes {
+                      id
+                      content {
+                        ... on Issue { number }
+                      }
+                    }
+                  }
+                }
+              }
+            }' -f owner="$OWNER" -F number=$PROJECT_NUMBER)
+
+          PROJECT_ID=$(echo "$PROJECT_DATA" | jq -r '.data.user.projectV2.id')
+          FIELD_ID=$(echo "$PROJECT_DATA" | jq -r '.data.user.projectV2.field.id')
+          OPTION_ID=$(echo "$PROJECT_DATA" | jq -r --arg s "$TARGET_STATUS" \
+            '.data.user.projectV2.field.options[] | select(.name == $s) | .id')
+          ITEM_ID=$(echo "$PROJECT_DATA" | jq -r --argjson n $ISSUE_NUM \
+            '.data.user.projectV2.items.nodes[] | select(.content.number == $n) | .id')
+
+          if [[ -z "$ITEM_ID" ]]; then
+            echo "Issue #$ISSUE_NUM not found on board — adding it first"
+            # Get issue node ID
+            ISSUE_NODE_ID=$(gh api graphql -f query='
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $number) { id }
+                }
+              }' -f owner="$OWNER" -f repo="$REPO_NAME" \
+                 -F number=$ISSUE_NUM | jq -r '.data.repository.issue.id')
+
+            ITEM_ID=$(gh api graphql -f query='
+              mutation($project: ID!, $content: ID!) {
+                addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
+                  item { id }
+                }
+              }' -f project="$PROJECT_ID" -f content="$ISSUE_NODE_ID" \
+              | jq -r '.data.addProjectV2ItemById.item.id')
+          fi
+
+          if [[ -z "$ITEM_ID" || -z "$OPTION_ID" ]]; then
+            echo "Could not resolve item ($ITEM_ID) or option ($OPTION_ID) — skipping" >&2
+            exit 0
+          fi
+
+          gh api graphql -f query='
+            mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $project
+                itemId: $item
+                fieldId: $field
+                value: { singleSelectOptionId: $option }
+              }) { projectV2Item { id } }
+            }' \
+            -f project="$PROJECT_ID" \
+            -f item="$ITEM_ID" \
+            -f field="$FIELD_ID" \
+            -f option="$OPTION_ID"
+
+          echo "Moved issue #$ISSUE_NUM to '$TARGET_STATUS' on project board"
