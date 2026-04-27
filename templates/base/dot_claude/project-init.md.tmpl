@@ -74,10 +74,11 @@ Every non-trivial task follows this exact sequence:
 
 ### Rules
 
-- **No direct commits to `main`** — all changes through PRs only. Install the pre-push hook locally:
+- **No direct commits to `main`** — all changes through PRs only. Install git hooks (required on first setup):
   ```bash
-  cp .github/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+  .claude/scripts/install-hooks.sh
   ```
+  This installs enforceable conventions: pre-push hook prevents accidental main branch commits.
 - One issue → one branch → one PR.
 - Branch name: `<issue-number>-<kebab-slug>` (e.g. `42-add-auth`).
 - **PR title:** `[#<issue>][<type>] Short description` where type ∈ {feat, fix, chore, docs, test}
