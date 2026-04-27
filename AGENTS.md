@@ -4,17 +4,6 @@ For agents working on the **project-init** codebase itself (not projects it scaf
 
 See [CLAUDE.md](CLAUDE.md) for repo-specific conventions and [README.md](README.md) for what this project does.
 
-## Branch and PR workflow
-
-**Never push directly to `main`.** Every task — no matter how small — must follow this flow:
-
-1. Create a feature branch: `git checkout -b pi-<N>-short-description`
-2. Open a **draft PR** immediately (use `create_pull_request` with `draft: true`).
-3. Do the work and push commits to that branch.
-4. Mark the PR ready for review when done; the human merges.
-
-This keeps every change reviewable, reversible, and linked to a Linear ticket.
-
 ## Rules of the road
 
 - Core runtime dep is `rich`. Stdlib (`tomllib`, `argparse`, `pathlib`, `subprocess`, `string.Template`) covers the rest. Don't add deps without a specific justification.

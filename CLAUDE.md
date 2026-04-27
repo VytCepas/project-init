@@ -22,7 +22,6 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 
 ## Conventions for agents working on this repo
 
-- **Always use a feature branch + PR** — never push directly to `main`. Open a draft PR immediately when starting a task (`create_pull_request` with `draft: true`). Name branches `pi-<N>-short-description`.
 - **Python only when needed** — the scaffolder must stay small. Don't reach for pyyaml / pydantic / click; `tomllib` and `argparse` cover most needs.
 - **Deterministic** — copy/render logic is pure file ops; never call an LLM from the scaffolder itself.
 - **uv everywhere** — `uv run …`, never `pip install` or `python -m venv`.
