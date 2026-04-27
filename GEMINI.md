@@ -5,7 +5,7 @@ See [AGENTS.md](AGENTS.md) for full agent workflow rules and [CLAUDE.md](CLAUDE.
 ## Quick reference
 
 ### Issue & project tracking
-- Tracking system: **GitHub Projects** (board) + **GitHub Issues** (tickets) — replaces Linear
+- Tracking system: **GitHub Projects** (board) + **GitHub Issues** (tickets)
 - Create issues: `gh issue create` — pick the right template (bug / feature / chore)
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
 - PR titles must follow: `[#N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[#42][feat] Add OAuth login`
