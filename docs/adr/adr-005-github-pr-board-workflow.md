@@ -30,14 +30,14 @@ Each step maps to a GitHub Projects board column:
 | In Review | `/request-review` run — PR marked ready-for-review |
 | Done | PR merged with `Closes #<n>` in body |
 
-### Branch naming
+### Ticket, branch, and PR naming
 
-Use a dedicated branch for each issue. Keep branch names short and descriptive; the enforced public format is the PR title, not the branch name.
+Use the Project Init key `PI-<issue-number>` in issue titles, branch names, and PR titles. Keep branch names short and descriptive after the key.
 
 ### PR rules
 
 - Created as **draft** immediately when work starts (not when it's done).
-- Title format: `[#<issue>][<type>] Short description` or `[nojira][<type>] Short description`
+- Title format: `[PI-<issue>][<type>] Short description` or `[nojira][<type>] Short description`
 - Valid types: `feat` (feature), `fix` (bugfix), `chore` (maintenance/refactor), `docs` (doc-only), `test` (test-only)
 - Body must include `Closes #<issue>` to auto-close the issue and trigger the board move on merge (skip for `[nojira]` PRs)
 - One issue → one branch → one PR. Stacked PRs allowed only for dependency chains, never for convenience.
@@ -47,11 +47,11 @@ Use a dedicated branch for each issue. Keep branch names short and descriptive; 
 
 | Type | Use case | Example |
 |---|---|---|
-| `feat` | New feature or enhancement | `[#42][feat] Add OAuth login` |
-| `fix` | Bug fix | `[#99][fix] Handle null pointer` |
-| `chore` | Maintenance, refactor, deps, CI | `[#16][chore] Remove Linear remnants` |
-| `docs` | Documentation-only change | `[#20][docs] Update API guide` |
-| `test` | Test-only change | `[#55][test] Add auth unit tests` |
+| `feat` | New feature or enhancement | `[PI-42][feat] Add OAuth login` |
+| `fix` | Bug fix | `[PI-99][fix] Handle null pointer` |
+| `chore` | Maintenance, refactor, deps, CI | `[PI-16][chore] Remove Linear remnants` |
+| `docs` | Documentation-only change | `[PI-20][docs] Update API guide` |
+| `test` | Test-only change | `[PI-55][test] Add auth unit tests` |
 
 ### No-issue PRs (nojira)
 

@@ -27,7 +27,8 @@ Work is tracked in **GitHub Projects** (board) backed by **GitHub Issues** (tick
 
 For GitHub Issues, PR titles, PR bodies, and board behavior, read [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
-**PR title format:** `[#IssueNumber][type] description` where type ∈ {feat, fix, chore, docs, test}  
+**Issue/branch/PR key format:** `PI-<issue-number>` for this repo (Project Init).  
+**PR title format:** `[PI-IssueNumber][type] description` where type ∈ {feat, fix, chore, docs, test}  
 **No-issue PRs:** `[nojira][type] description` for trivial changes  
 **PR body:** must include `Closes #<number>` to auto-link issue and move board card on merge
 

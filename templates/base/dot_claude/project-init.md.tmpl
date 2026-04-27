@@ -68,7 +68,7 @@ Every non-trivial task follows this exact sequence:
 | Step | Action | Board column |
 |------|--------|-------------|
 | 1 | Run `/start-task` — creates issue, branch, draft PR | **To Do → In Progress** |
-| 2 | Implement on the branch; commit with `#<issue>` references | In Progress |
+| 2 | Implement on the branch; use `<PROJECT-KEY>-<issue>` in human names and `#<issue>` where GitHub linking is needed | In Progress |
 | 3 | Run `/request-review` — marks PR ready, optional reviewer agent | **In Progress → In Review** |
 | 4 | Tests pass on CI; PR merged with `Closes #<issue>` in body | **In Review → Done** |
 
@@ -80,23 +80,24 @@ Every non-trivial task follows this exact sequence:
   ```
   This installs enforceable conventions: pre-push hook prevents accidental main branch commits.
 - One issue → one branch → one PR.
-- Use a dedicated branch for each issue.
-- **PR title:** `[#N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[#42][feat] Add OAuth login`
+- Use a dedicated branch for each issue; include the project key, e.g. `PI-42-add-auth`.
+- Issue, branch, and PR names use a project key: `<PROJECT-KEY>-<issue-number>`, e.g. `PI-42`.
+- **PR title:** `[PROJECT-123][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[PI-42][feat] Add OAuth login`
   - For small no-issue PRs: `[nojira][type] description` (e.g. `[nojira][fix] Fix typo`)
-- PR body must include `Closes #N` — auto-closes issue and moves board card on merge (skip for nojira PRs).
+- PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card on merge (skip for nojira PRs).
 - Draft PRs created immediately when work starts — not when it's done.
 - PRs must pass CI (tests + lint) before merging.
-- When asked to push or finish a PR, keep going until the lifecycle is complete: push, wait for CI, inspect review comments, fix actionable feedback, push again, repeat until checks and comments are clean, then merge if the user requested completion.
+- When asked to push or finish a PR, keep going until the lifecycle is complete: push, run `.claude/scripts/monitor-pr.sh <pr-number> --merge`, inspect any failed checks or review comments it reports, fix actionable feedback, push again, and rerun the script until it merges cleanly.
 
 ### PR Types
 
 | Type | Use case | Example |
 |---|---|---|
-| `feat` | New feature or enhancement | `[#42][feat] Add OAuth login` |
-| `fix` | Bug fix | `[#99][fix] Handle null pointer` |
-| `chore` | Maintenance, refactor, deps, CI | `[#16][chore] Update dependencies` |
-| `docs` | Documentation-only change | `[#20][docs] Update API guide` |
-| `test` | Test-only change | `[#55][test] Add unit tests` |
+| `feat` | New feature or enhancement | `[PI-42][feat] Add OAuth login` |
+| `fix` | Bug fix | `[PI-99][fix] Handle null pointer` |
+| `chore` | Maintenance, refactor, deps, CI | `[PI-16][chore] Update dependencies` |
+| `docs` | Documentation-only change | `[PI-20][docs] Update API guide` |
+| `test` | Test-only change | `[PI-55][test] Add unit tests` |
 
 ### Code review (optional)
 

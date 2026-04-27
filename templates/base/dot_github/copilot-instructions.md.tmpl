@@ -7,12 +7,13 @@ Full agent rules: [AGENTS.md](../AGENTS.md) | Project conventions: [CLAUDE.md](.
 - Tracking system: **GitHub Projects** (kanban board) + **GitHub Issues** (tickets)
 - Create issues: `gh issue create` — use the right template (bug / feature / chore)
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
-- Use a dedicated branch for each issue; no direct commits to `main`
-- PR titles must follow: `[#N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[#42][feat] Add OAuth login`
+- Use a dedicated branch for each issue; include the project key, e.g. `PI-42-add-auth`; no direct commits to `main`
+- Issue, branch, and PR names use a project key: `<PROJECT-KEY>-<issue-number>`, e.g. `PI-42`
+- PR titles must follow: `[PROJECT-123][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[PI-42][feat] Add OAuth login`
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
-- PR body must include `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
+- PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
 - Draft PRs are opened immediately when work starts, not when done
-- When asked to push/finish a PR, continue autonomously: push, wait for checks, inspect review comments, fix actionable feedback, push again, repeat until clean, then merge if the user requested completion.
+- When asked to push/finish a PR, continue autonomously: push, run `.claude/scripts/monitor-pr.sh <pr-number> --merge`, inspect any failed checks or review comments it reports, fix actionable feedback, push again, and rerun the script until it merges cleanly.
 - No direct commits to `main`
 
 ## Key rules
