@@ -17,6 +17,6 @@ See [CLAUDE.md](CLAUDE.md) for repo-specific conventions and [README.md](README.
 
 When adding or changing a template, add a test under `tests/` that runs the scaffolder with the relevant preset into a temp dir and diffs the output against an expected tree. Tests must run offline.
 
-## Issue tracking
+## Issue & project tracking
 
-Work is tracked in **GitHub Issues**. Use `gh issue list` to see open work. Issue IDs in commit messages and PR titles should reference the GitHub issue number (e.g. `#12`).
+Work is tracked in **GitHub Projects** (board) backed by **GitHub Issues** (tickets). Use `gh issue list` to see open work. Issue numbers in commit messages and PR titles (e.g. `#12`) automatically move cards on the project board via `board-automation.yml`.

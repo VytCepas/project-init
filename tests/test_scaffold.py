@@ -805,7 +805,7 @@ class TestMCPsNonInteractive:
                 "--name", "bad-mcp-test",
                 "--description", "test",
                 "--language", "python",
-                "--mcps", "linear,nonexistent,github",
+                "--mcps", "nonexistent,anotherunknown",
             ])
 
     def test_unknown_preset_does_not_create_target_dir(self, tmp_path: Path):
@@ -834,7 +834,7 @@ class TestMCPsNonInteractive:
                 "--name", "test",
                 "--description", "test",
                 "--language", "python",
-                "--mcps", "linear,fakeone,github",
+                "--mcps", "fakeone,anotherunknown",
             ])
         assert not target.exists(), (
             f"target dir {target} was created despite invalid MCP id"
@@ -1279,3 +1279,66 @@ class TestTemplateIdentifiers:
                     assert "VytCepas" not in text, f"VytCepas found in {f}"
                 except OSError:
                     pass
+
+
+class TestScaffoldGitHubFiles:
+    """Verify .github/ and agent-instruction files are scaffolded correctly."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = tmp_target
+        preset = load_preset("obsidian-only")
+        variables = _make_variables()
+        scaffold(tmp_target, preset, variables)
+
+    def test_issue_template_bug_created(self):
+        assert (self.target / ".github" / "ISSUE_TEMPLATE" / "bug.yml").is_file()
+
+    def test_issue_template_feature_created(self):
+        assert (self.target / ".github" / "ISSUE_TEMPLATE" / "feature.yml").is_file()
+
+    def test_issue_template_chore_created(self):
+        assert (self.target / ".github" / "ISSUE_TEMPLATE" / "chore.yml").is_file()
+
+    def test_validate_pr_workflow_created(self):
+        assert (self.target / ".github" / "workflows" / "validate-pr.yml").is_file()
+
+    def test_board_automation_workflow_created(self):
+        assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
+
+    def test_pull_request_template_created(self):
+        assert (self.target / ".github" / "pull_request_template.md").is_file()
+
+    def test_copilot_instructions_created(self):
+        f = self.target / ".github" / "copilot-instructions.md"
+        assert f.is_file()
+        content = f.read_text()
+        assert "GitHub Projects" in content
+        assert "AGENTS.md" in content
+
+    def test_gemini_md_created(self):
+        f = self.target / "GEMINI.md"
+        assert f.is_file()
+        content = f.read_text()
+        assert "GitHub Projects" in content
+        assert "AGENTS.md" in content
+
+    def test_validate_pr_enforces_title_format(self):
+        content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
+        assert "[#" in content or r"\[#" in content
+
+    def test_issue_templates_have_required_fields(self):
+        for name in ("bug.yml", "feature.yml", "chore.yml"):
+            content = (self.target / ".github" / "ISSUE_TEMPLATE" / name).read_text()
+            assert "name:" in content
+            assert "labels:" in content
+
+    def test_no_dot_github_dir_remaining(self):
+        assert not (self.target / "dot_github").exists()
+
+    def test_gemini_no_unrendered_placeholders(self):
+        import re
+        placeholder_re = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
+        text = (self.target / "GEMINI.md").read_text()
+        matches = placeholder_re.findall(text)
+        assert not matches, f"Unrendered placeholders in GEMINI.md: {matches}"

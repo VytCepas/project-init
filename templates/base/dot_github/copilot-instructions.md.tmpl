@@ -1,0 +1,22 @@
+# GitHub Copilot Instructions — {{project_name}}
+
+Full agent rules: [AGENTS.md](../AGENTS.md) | Project conventions: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-init.md](../.claude/project-init.md)
+
+## Issue & project tracking
+
+- Tracking system: **GitHub Projects** (kanban board) + **GitHub Issues** (tickets)
+- Create issues: `gh issue create` — use the right template (bug / feature / chore)
+- Board cards move automatically via `board-automation.yml` — no manual updates needed
+- Branch name: `<issue-number>-<kebab-slug>` (e.g. `42-add-auth`)
+- PR title must start with `[#N]`, e.g. `[#42] Add OAuth login`
+- PR body must include `Closes #N` — auto-closes issue and moves board card to Done on merge
+- Draft PRs are opened immediately when work starts, not when done
+- No direct commits to `main`
+
+## Key rules
+
+- Write failing tests before implementation (TDD)
+- No secrets in code — use `os.environ` or `.env` (gitignored)
+{{#if lint_command}}- `{{lint_command}}` must pass before closing a task
+{{/if}}- Prefer deterministic bash/python over LLM calls for hooks and scripts
+- Permanent decisions → `.claude/docs/adr/`; exploratory notes → `.claude/vault/`; reusable facts → `.claude/memory/`

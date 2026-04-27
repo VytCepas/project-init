@@ -15,7 +15,7 @@ memory:
   memory_path: .claude/memory
 
 mcps:
-  installed: ["linear", "github", "context7"]
+  installed: ["context7"]
 
 tooling:
   lint_command: "uv run ruff check ."

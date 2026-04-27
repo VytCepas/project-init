@@ -1,0 +1,26 @@
+# Gemini Agent Instructions — {{project_name}}
+
+See [AGENTS.md](AGENTS.md) for full agent rules and layout spec, and [CLAUDE.md](CLAUDE.md) for project conventions.
+
+## Quick reference
+
+### Orientation
+1. Read [`.claude/project-init.md`](.claude/project-init.md) — workflow and coding standards
+2. Read [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) — prior context index
+3. Check open issues: `gh issue list`
+
+### Issue & project tracking
+- Tracking system: **GitHub Projects** (kanban board) + **GitHub Issues** (tickets)
+- Create issues: `gh issue create` — use the right template (bug / feature / chore)
+- Board cards move automatically via `board-automation.yml` — no manual updates needed
+- Branch name: `<issue-number>-<kebab-slug>` (e.g. `42-add-auth`)
+- PR title: `[#<issue>] Short description`
+- PR body must include `Closes #<issue>` — auto-closes issue and moves board card to Done on merge
+- Draft PRs are opened immediately when work starts, not when done
+
+### Key rules
+- One issue → one branch → one PR. No direct commits to `main`.
+- Write failing tests before implementation (TDD).
+- No secrets in code — use `os.environ` or `.env` (gitignored).
+{{#if lint_command}}- `{{lint_command}}` must pass before closing a task.
+{{/if}}- Prefer deterministic bash/python over LLM calls for hooks and scripts.

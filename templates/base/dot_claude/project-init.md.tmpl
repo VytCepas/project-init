@@ -57,7 +57,9 @@ Write failing tests before implementation. Tests define the contract.
 Test conventions: one assertion per test, name as `test_<unit>_<scenario>`, run with `uv run pytest`. Real DB/API instances — no mocks.
 {{/if}}
 
-## GitHub task tracking
+## GitHub Projects tracking
+
+Work items are GitHub Issues; the project board is GitHub Projects (kanban with To Do / In Progress / In Review / Done columns). Board cards move automatically via `board-automation.yml`.
 
 ### Lifecycle: Issue → branch → draft PR → merge
 
@@ -86,10 +88,12 @@ Every non-trivial task follows this exact sequence:
 ### Quick reference
 
 ```bash
-gh issue list                    # see what's open
+gh issue list                    # see open issues (board backlog)
+gh issue create                  # create a new issue (adds to board)
 gh pr list                       # see open PRs
 gh pr view                       # current branch's PR status
 gh pr checks                     # CI status for current PR
+gh project list --owner <owner>  # list GitHub Projects boards
 ```
 
 ## Conventions
