@@ -36,7 +36,13 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
    ```
    Branch naming: `<issue-number>-<kebab-case-title>` (max 50 chars total).
 
-5. **Create a draft PR** immediately — before any code:
+5. **Push an initial empty commit** — GitHub requires at least one commit ahead of base before a PR can be opened:
+   ```bash
+   git commit --allow-empty -m "WIP: start #<issue-number> — <title>"
+   git push -u origin <branch-name>
+   ```
+
+6. **Create a draft PR**:
    ```bash
    gh pr create \
      --title "[#<issue-number>] <title>" \
@@ -58,21 +64,29 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
      --draft
    ```
 
-6. **Move the board card to In Progress** — if a GitHub Project board exists:
+7. **Move the board card to In Progress** — if a GitHub Project board exists:
    ```bash
-   # Get the project number first
-   gh project list --owner <repo-owner> 2>/dev/null | head -5
-   # Then move the issue (if project number is known):
-   # gh project item-edit ... (see /request-review for full board move example)
+   # Fetch project ID (the GraphQL node ID, not the numeric number)
+   PROJECT_NUM=<number>   # from gh project list --owner <repo-owner>
+   PROJECT_ID=$(gh project list --owner <repo-owner> --format json \
+     | jq -r ".projects[] | select(.number == $PROJECT_NUM) | .id")
+   ITEM_ID=$(gh project item-list $PROJECT_NUM --owner <repo-owner> --format json \
+     | jq -r ".items[] | select(.content.number == <issue-number>) | .id")
+   STATUS_FIELD_ID=$(gh project field-list $PROJECT_NUM --owner <repo-owner> --format json \
+     | jq -r '.fields[] | select(.name == "Status") | .id')
+   IN_PROGRESS_OPTION=$(gh project field-list $PROJECT_NUM --owner <repo-owner> --format json \
+     | jq -r '.fields[] | select(.name == "Status") | .options[] | select(.name == "In Progress") | .id')
+   gh project item-edit --id $ITEM_ID --field-id $STATUS_FIELD_ID \
+     --project-id $PROJECT_ID --single-select-option-id $IN_PROGRESS_OPTION
    ```
    Skip silently if no project board is configured.
 
-7. **Record the issue number** for this session:
+8. **Record the issue number** for this session:
    ```bash
    echo "Current task: #<number> — <title>" > .claude/memory/current-task.md
    ```
 
-8. **Proceed** — only begin implementation after the issue, branch, and draft PR exist.
+9. **Proceed** — only begin implementation after the issue, branch, and draft PR exist.
 
 ## Rule
 

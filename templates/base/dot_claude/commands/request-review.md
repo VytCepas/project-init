@@ -22,13 +22,11 @@ Promote the current draft PR to "ready for review", move the GitHub Projects boa
 
 4. **Move board card to In Review** — if a GitHub Project board is configured:
    ```bash
-   # Find the project and item IDs, then update status field to "In Review"
-   # The project number is stored in .claude/config.yaml (github_project_number)
-   # or can be discovered via:
-   gh project list --owner <repo-owner> 2>/dev/null
-   ```
-   If the project number is known as PROJECT_NUM:
-   ```bash
+   # PROJECT_NUM is the numeric project number (from gh project list --owner <repo-owner>)
+   # PROJECT_ID is the GraphQL node ID — required by item-edit --project-id
+   PROJECT_NUM=<number>
+   PROJECT_ID=$(gh project list --owner <repo-owner> --format json \
+     | jq -r ".projects[] | select(.number == $PROJECT_NUM) | .id")
    ITEM_ID=$(gh project item-list $PROJECT_NUM --owner <repo-owner> --format json \
      | jq -r ".items[] | select(.content.number == <issue-number>) | .id")
    STATUS_FIELD_ID=$(gh project field-list $PROJECT_NUM --owner <repo-owner> --format json \
@@ -36,7 +34,7 @@ Promote the current draft PR to "ready for review", move the GitHub Projects boa
    IN_REVIEW_OPTION=$(gh project field-list $PROJECT_NUM --owner <repo-owner> --format json \
      | jq -r '.fields[] | select(.name == "Status") | .options[] | select(.name == "In Review") | .id')
    gh project item-edit --id $ITEM_ID --field-id $STATUS_FIELD_ID \
-     --project-id $PROJECT_NUM --single-select-option-id $IN_REVIEW_OPTION
+     --project-id $PROJECT_ID --single-select-option-id $IN_REVIEW_OPTION
    ```
    Skip silently if no project board is configured.
 
