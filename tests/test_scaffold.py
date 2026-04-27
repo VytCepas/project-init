@@ -116,6 +116,12 @@ class TestScaffoldObsidianOnly:
     def test_creates_gitignore(self):
         assert (self.target / ".gitignore").is_file()
 
+    def test_gitignore_excludes_local_agent_state(self):
+        content = (self.target / ".gitignore").read_text()
+        assert ".codex" in content
+        assert ".claude/scheduled_tasks.lock" in content
+        assert ".claude/settings.local.json" in content
+
     def test_dot_rename_applied(self):
         # dot_claude/ should become .claude/, no dot_claude/ should exist.
         assert not (self.target / "dot_claude").exists()
@@ -1306,6 +1312,24 @@ class TestScaffoldGitHubFiles:
     def test_board_automation_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
 
+    def test_workflow_runners_are_pinned(self):
+        workflows = self.target / ".github" / "workflows"
+        for name in ("ci.yml", "validate-pr.yml", "board-automation.yml"):
+            content = (workflows / name).read_text()
+            assert "runs-on: ubuntu-24.04" in content
+            assert "runs-on: ubuntu-latest" not in content
+
+    def test_ci_template_pins_uv_version(self):
+        content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert 'version: "0.11.7"' in content
+
+    def test_ci_template_uses_node24_action_versions(self):
+        content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "actions/checkout@v6" in content
+        assert "astral-sh/setup-uv@v8.1.0" in content
+        assert "actions/checkout@v4" not in content
+        assert "astral-sh/setup-uv@v3" not in content
+
     def test_pull_request_template_created(self):
         assert (self.target / ".github" / "pull_request_template.md").is_file()
 
@@ -1315,6 +1339,10 @@ class TestScaffoldGitHubFiles:
         content = f.read_text()
         assert "GitHub Projects" in content
         assert "AGENTS.md" in content
+        assert "[#N][type] description" in content
+        assert "PR title must start with" not in content
+        assert "wait for checks" in content
+        assert "fix actionable feedback" in content
 
     def test_gemini_md_created(self):
         f = self.target / "GEMINI.md"
@@ -1322,6 +1350,17 @@ class TestScaffoldGitHubFiles:
         content = f.read_text()
         assert "GitHub Projects" in content
         assert "AGENTS.md" in content
+        assert "[#N][type] description" in content
+        assert "wait for checks" in content
+
+    def test_monitor_pr_can_merge_when_clean(self):
+        script = self.target / ".claude" / "scripts" / "monitor-pr.sh"
+        assert script.is_file()
+        content = script.read_text()
+        assert "--merge" in content
+        assert "gh pr merge" in content
+        assert "gh pr checks" in content
+        assert "--delete-branch" in content
 
     def test_validate_pr_enforces_title_format(self):
         """PR title must match [#N][type] or [nojira][type] format."""

@@ -26,5 +26,6 @@ venv/
 *.log
 logs/
 
-# uv
-uv.lock
+# Local agent runtime state
+.claude/
+.codex

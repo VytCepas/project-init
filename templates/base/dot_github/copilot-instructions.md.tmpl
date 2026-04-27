@@ -7,10 +7,12 @@ Full agent rules: [AGENTS.md](../AGENTS.md) | Project conventions: [CLAUDE.md](.
 - Tracking system: **GitHub Projects** (kanban board) + **GitHub Issues** (tickets)
 - Create issues: `gh issue create` — use the right template (bug / feature / chore)
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
-- Branch name: `<issue-number>-<kebab-slug>` (e.g. `42-add-auth`)
-- PR title must start with `[#N]`, e.g. `[#42] Add OAuth login`
-- PR body must include `Closes #N` — auto-closes issue and moves board card to Done on merge
+- Use a dedicated branch for each issue; no direct commits to `main`
+- PR titles must follow: `[#N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[#42][feat] Add OAuth login`
+- For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
+- PR body must include `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
 - Draft PRs are opened immediately when work starts, not when done
+- When asked to push/finish a PR, continue autonomously: push, wait for checks, inspect review comments, fix actionable feedback, push again, repeat until clean, then merge if the user requested completion.
 - No direct commits to `main`
 
 ## Key rules

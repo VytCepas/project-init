@@ -80,12 +80,13 @@ Every non-trivial task follows this exact sequence:
   ```
   This installs enforceable conventions: pre-push hook prevents accidental main branch commits.
 - One issue → one branch → one PR.
-- Branch name: `<issue-number>-<kebab-slug>` (e.g. `42-add-auth`).
-- **PR title:** `[#<issue>][<type>] Short description` where type ∈ {feat, fix, chore, docs, test}
-  - For small no-issue PRs: `[nojira][type] Short description` (e.g. `[nojira][fix] Fix typo`)
-- PR body must include `Closes #<issue>` — auto-closes issue and moves board card on merge (skip for nojira PRs).
+- Use a dedicated branch for each issue.
+- **PR title:** `[#N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[#42][feat] Add OAuth login`
+  - For small no-issue PRs: `[nojira][type] description` (e.g. `[nojira][fix] Fix typo`)
+- PR body must include `Closes #N` — auto-closes issue and moves board card on merge (skip for nojira PRs).
 - Draft PRs created immediately when work starts — not when it's done.
 - PRs must pass CI (tests + lint) before merging.
+- When asked to push or finish a PR, keep going until the lifecycle is complete: push, wait for CI, inspect review comments, fix actionable feedback, push again, repeat until checks and comments are clean, then merge if the user requested completion.
 
 ### PR Types
 
@@ -109,6 +110,7 @@ gh issue create                  # create a new issue (adds to board)
 gh pr list                       # see open PRs
 gh pr view                       # current branch's PR status
 gh pr checks                     # CI status for current PR
+.claude/scripts/monitor-pr.sh <n> --merge  # wait for checks/review and merge when clean
 gh project list --owner <owner>  # list GitHub Projects boards
 ```
 

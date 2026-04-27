@@ -28,4 +28,5 @@ nav:
   - Development:
     - Template system: development/template-system.md
     - Testing: development/testing.md
+    - Build reproducibility: development/build-reproducibility.md
     - Contributing: development/contributing.md

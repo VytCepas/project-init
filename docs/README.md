@@ -12,7 +12,7 @@ Architecture decisions, development guides, and references for contributors and 
 
 ## Agent instruction
 
-Before starting any task, check the relevant ADR. The template system, preset anatomy, and MCP choices all have documented decisions here. Reading them first prevents relitigating settled decisions.
+For active agent workflow rules, start with `AGENTS.md`. Use `CLAUDE.md` for repo conventions and `.github/copilot-instructions.md` for GitHub Issues, PR titles, PR bodies, and board behavior.
 
 ## Adding an ADR
 

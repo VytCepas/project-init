@@ -11,6 +11,7 @@ Full agent rules are in [AGENTS.md](../AGENTS.md) and repo conventions in [CLAUD
 - PR titles must follow: `[#N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[#42][feat] Add OAuth login`
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
 - PR body must include `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
+- When asked to push/finish a PR, continue autonomously: push, wait for checks, inspect review comments, fix actionable feedback, push again, repeat until clean, then merge if the user requested completion.
 
 ### Python tooling
 - `uv run …` for all Python ops — never `pip install` or `python -m venv`
