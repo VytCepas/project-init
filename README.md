@@ -10,8 +10,8 @@ Inside any target project:
 
 ```
 <your-project>/
-├── CLAUDE.md          # thin redirect into .claude/
-├── AGENTS.md          # layout spec for non-Claude agents (Cursor, Aider, …)
+├── CLAUDE.md          # canonical agent instructions; points into .claude/
+├── AGENTS.md          # thin redirect to CLAUDE.md for non-Claude agents
 └── .claude/
     ├── project-init.md      # workflow + conventions
     ├── config.yaml          # record of options chosen at init
@@ -28,7 +28,7 @@ Principles:
 - **One folder, `.claude/`**, for everything agentic. Project root stays clean.
 - **Obsidian vault for humans, LightRAG (optional) for agents** — separated on disk.
 - **Deterministic-first** — hooks and scripts are bash/python. LLM calls only where generative.
-- **Model-agnostic** — `AGENTS.md` documents the layout for non-Claude agents.
+- **Model-agnostic** — `AGENTS.md` and `GEMINI.md` redirect non-Claude agents to the canonical `CLAUDE.md` instructions.
 - **`bun` and `uv` only** — no `npm`/`npx`/`pip`/`venv` anywhere in scaffolded projects.
 
 ## Install (one-time)
@@ -88,7 +88,7 @@ project-init /path/to/my-project --non-interactive \
   --language python --mcps context7
 ```
 
-The test suite validates this command works correctly — see `TestREADMEExampleCommand` in `tests/test_scaffold.py`.
+The test suite validates this command works correctly — see `TestREADMEExampleCommand` in `tests/test_readme_examples.py`.
 
 ## Update
 
@@ -138,7 +138,7 @@ project-init/
 │   ├── lightrag/             # LightRAG overlay
 │   └── presets/              # toml preset definitions
 ├── examples/                 # sample scaffolded outputs
-└── tests/                    # pytest suite (>100 tests)
+└── tests/                    # focused pytest modules by behavior area
 ```
 
 ## Status

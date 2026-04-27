@@ -1,14 +1,14 @@
 # GitHub Copilot Instructions — {{project_name}}
 
-Full agent rules: [AGENTS.md](../AGENTS.md) | Project conventions: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-init.md](../.claude/project-init.md)
+Canonical agent rules: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-init.md](../.claude/project-init.md)
 
 ## Issue & project tracking
 
 - Tracking system: **GitHub Projects** (kanban board) + **GitHub Issues** (tickets)
 - Create issues: `gh issue create` — use the right template (bug / feature / chore)
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
-- Use a dedicated branch for each issue; include the project key, e.g. `PI-42-add-auth`; no direct commits to `main`
-- Issue, branch, and PR names use a project key: `<PROJECT-KEY>-<issue-number>`, e.g. `PI-42`
+- Use a dedicated branch for each issue; format it as `<issue_type>/<project_abbr>-<issue_number>-<slug>`, e.g. `feat/PI-42-add-auth`; no direct commits to `main`
+- Issue and PR names use a project key: `<PROJECT-KEY>-<issue-number>`, e.g. `PI-42`
 - PR titles must follow: `[PROJECT-123][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[PI-42][feat] Add OAuth login`
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
 - PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)

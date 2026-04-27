@@ -71,7 +71,7 @@ Every non-trivial task follows this exact sequence. Run the scripts; the LLM's o
 | Step | Command | What happens automatically |
 |------|---------|---------------------------|
 | 1. Create issue | `.claude/scripts/create-issue.sh <type> "description"` | Issue created, board card → **To Do** |
-| 2. Start work | `.claude/scripts/start-issue.sh <issue-n> <type>` | Branch (`<type>/<n>-<slug>`) + push + draft PR + auto-merge armed, board → **In Progress** |
+| 2. Start work | `.claude/scripts/start-issue.sh <issue-n> <type>` | Branch (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) + push + draft PR + auto-merge armed, board → **In Progress** |
 | 3. Commit | `git add … && git commit -m "[#n][type] message"` | `commit-msg` hook validates format; `pre-commit-gate` auto-lints |
 | 4. Push | `git push` | CI runs; if it fails a comment is posted on the PR with `gh run view --log-failed` |
 | 5. Mark ready | `.claude/scripts/promote-review.sh` | PR marked ready for review, board → **In Review** |
@@ -96,7 +96,7 @@ Without it, `monitor-pr.sh --merge` still works (it merges explicitly after CI p
 | PR title | same | `[#42][feat] Add OAuth login` |
 | No-issue PR | `[nojira][<type>] description` | `[nojira][fix] Fix typo` |
 | PR body | must include `Closes #<n>` | triggers auto-close on merge |
-| Branch | `<type>/<n>-<slug>` | `feat/42-add-oauth-login` |
+| Branch | `<issue_type>/<project_abbr>-<issue_number>-<slug>` | `feat/PI-42-add-oauth-login` |
 
 Types: `feat` · `fix` · `chore` · `docs` · `test`
 
@@ -141,7 +141,8 @@ gh pr list                                            # open PRs
 ## Conventions
 
 - Hooks and scripts prefer bash/python. LLM calls only for generative steps.
-- Everything under `.claude/`. Root only has `CLAUDE.md`/`AGENTS.md` redirects.
+- `CLAUDE.md` is the canonical root instruction file. `AGENTS.md` and `GEMINI.md` are redirects to it.
+- Everything else lives under `.claude/`.
 
 ## Compact Instructions
 
