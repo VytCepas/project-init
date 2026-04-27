@@ -23,8 +23,8 @@ for attempt in {1..5}; do
   pr_json=$(gh pr view "$PR_NUMBER" --json state,mergeStateStatus,reviewDecision,statusCheckRollup 2>/dev/null || echo '{"state":"unknown"}')
 
   # Parse with simple grep/sed (no jq or python needed)
-  merge_status=$(echo "$pr_json" | grep -o '"mergeStateStatus":"[^"]*"' | cut -d'"' -f4)
-  review=$(echo "$pr_json" | grep -o '"reviewDecision":"[^"]*"' | cut -d'"' -f4)
+  merge_status=$(echo "$pr_json" | grep -oP '"mergeStateStatus":"\K[^"]*' || echo "")
+  review=$(echo "$pr_json" | grep -oP '"reviewDecision":"\K[^"]*' || echo "")
   checks_failed=$(echo "$pr_json" | grep -o '"conclusion":"FAILURE"' | wc -l)
 
   # Default values if not found
