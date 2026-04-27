@@ -234,13 +234,41 @@ class TestScaffoldObsidianOnly:
         assert not (self.target / ".claude" / "scripts" / "ingest_sessions.py").exists()
         assert not (self.target / ".claude" / "scripts" / "query_memory.py").exists()
 
-    def test_lightrag_conditional_excluded(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
-        assert "LightRAG" not in content
+    def test_lightrag_rule_excluded(self):
+        # LightRAG rule file ships with the lightrag overlay only
+        assert not (self.target / ".claude" / "rules" / "lightrag.md").exists()
 
-    def test_python_conditional_included(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
+    def test_python_rule_file_present(self):
+        rule = self.target / ".claude" / "rules" / "python.md"
+        assert rule.exists()
+        content = rule.read_text()
         assert "uv sync" in content
+        assert "globs" in content
+
+    def test_all_language_rule_files_present(self):
+        rules = self.target / ".claude" / "rules"
+        assert (rules / "python.md").exists()
+        assert (rules / "node.md").exists()
+        assert (rules / "go.md").exists()
+        assert (rules / "hooks.md").exists()
+
+    def test_add_hook_skill_exists(self):
+        skill = self.target / ".claude" / "skills" / "add-hook" / "SKILL.md"
+        assert skill.is_file()
+        content = skill.read_text()
+        assert "settings.json" in content
+        assert "PreToolUse" in content
+
+    def test_add_command_skill_exists(self):
+        skill = self.target / ".claude" / "skills" / "add-command" / "SKILL.md"
+        assert skill.is_file()
+        assert "$ARGUMENTS" in skill.read_text()
+
+    def test_settings_json_has_autocompact(self):
+        import json
+        settings = self.target / ".claude" / "settings.json"
+        data = json.loads(settings.read_text())
+        assert data.get("env", {}).get("CLAUDE_AUTOCOMPACT_PCT_OVERRIDE") == "70"
 
 
 class TestHookExecutability:
@@ -292,9 +320,11 @@ class TestScaffoldLightRAG:
     def test_has_lightrag_config(self):
         assert (self.target / ".claude" / "memory" / "lightrag.yaml").is_file()
 
-    def test_lightrag_conditional_included(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
-        assert "LightRAG" in content
+    def test_lightrag_rule_file_present(self):
+        rule = self.target / ".claude" / "rules" / "lightrag.md"
+        assert rule.exists()
+        content = rule.read_text()
+        assert "ingest_sessions.py" in content
 
     def test_settings_json_has_stop_hook(self):
         import json
@@ -1090,12 +1120,20 @@ class TestNodeTemplate:
         )
         scaffold(self.target, preset, variables)
 
-    def test_node_block_rendered(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
+    def test_node_rule_file_present(self):
+        rule = self.target / ".claude" / "rules" / "node.md"
+        assert rule.exists()
+        content = rule.read_text()
         assert "bun install" in content
         assert "bunx" in content
 
-    def test_python_block_excluded_for_node(self):
+    def test_node_rule_has_globs(self):
+        content = (self.target / ".claude" / "rules" / "node.md").read_text()
+        assert "globs" in content
+        assert "package.json" in content
+
+    def test_python_rule_not_contaminated_in_node(self):
+        # python rule file still ships (it's in base), but project-init.md has no uv sync
         content = (self.target / ".claude" / "project-init.md").read_text()
         assert "uv sync" not in content
 

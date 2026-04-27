@@ -25,10 +25,14 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Command | `/plan <task>` | acceptance tests first, then implementation plan |
 | Skill | `start-task` | create a GitHub Issue before starting work |
 | Skill | `session-summary` | summarise session and save to vault |
+| Skill | `add-hook` | add a new deterministic hook |
+| Skill | `add-command` | add a new slash command |
 | Agent | `reviewer` | code review specialist |
 | Agent | `researcher` | codebase explorer |
 
 Hooks run automatically via `settings.json`: `bash-safety-guard`, `pre-commit-gate`, `post-edit-lint`{{#if obsidian}}, `session-end`{{/if}}.
+
+**Rules** (`.claude/rules/`): per-filetype conventions loaded automatically by Claude Code when you open a matching file.
 
 ## Coding standards
 
@@ -62,29 +66,6 @@ Test conventions: one assertion per test, name as `test_<unit>_<scenario>`, run 
 
 - Hooks and scripts prefer bash/python. LLM calls only for generative steps.
 - Everything under `.claude/`. Root only has `CLAUDE.md`/`AGENTS.md` redirects.
-{{#if python}}
-## Python
-
-```bash
-uv sync && uv run ruff check . && uv run pytest
-```
-{{/if}}
-{{#if node}}
-## Node.js
-
-```bash
-bun install && bun run lint && bun test
-# Use bunx instead of npx; never use npm
-```
-{{/if}}
-{{#if lightrag}}
-## LightRAG memory
-
-```bash
-./scripts/ingest_sessions.py   # index session logs + vault notes
-./scripts/query_memory.py "<question>"
-```
-{{/if}}
 
 ## Compact Instructions
 
