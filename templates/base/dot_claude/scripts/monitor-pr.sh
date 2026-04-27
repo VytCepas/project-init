@@ -27,37 +27,39 @@ if [ -n "$MODE" ] && [ "$MODE" != "--merge" ]; then
   exit 2
 fi
 
-_py() { python3 -c "$1"; }
-
 # Poll until all checks are no longer pending/in_progress.
-# Only emit output on completion or failure — suppress refresh noise.
-while true; do
-  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
-
-  PENDING=$(_py "
+# Pipe JSON via stdin to avoid quote-escaping issues in inline Python.
+_count_pending() {
+  echo "$1" | python3 -c "
 import json, sys
-data = json.loads('''$CHECKS''')
+data = json.load(sys.stdin)
 print(sum(1 for c in data if c.get('state') in ('PENDING', 'IN_PROGRESS')))
-")
-  if [ "$PENDING" -eq 0 ]; then
-    break
-  fi
-  sleep 10
-done
+"
+}
 
-FAILED=$(_py "
+_print_failures() {
+  echo "$1" | python3 -c "
 import json, sys
-data = json.loads('''$CHECKS''')
+data = json.load(sys.stdin)
 bad = [c for c in data if c.get('conclusion') in ('FAILURE', 'CANCELLED', 'TIMED_OUT')]
 for c in bad:
     print(f\"  {c['name']}: {c['conclusion']}\")
 sys.exit(len(bad))
-" 2>&1) || FAIL_CODE=$?
+"
+}
 
-if [ "${FAIL_CODE:-0}" -gt 0 ]; then
-  echo "CI failed on PR #$PR_NUMBER — failed checks:"
-  echo "$FAILED"
-  echo "Fix the issues, commit, push, then re-run this script."
+while true; do
+  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
+  PENDING=$(_count_pending "$CHECKS")
+  [ "$PENDING" -eq 0 ] && break
+  sleep 10
+done
+
+FAIL_CODE=0
+_print_failures "$CHECKS" || FAIL_CODE=$?
+
+if [ "$FAIL_CODE" -gt 0 ]; then
+  echo "CI failed on PR #$PR_NUMBER — fix the issues, commit, push, then re-run this script."
   exit 1
 fi
 
