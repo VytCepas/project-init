@@ -60,12 +60,15 @@ jobs:
       - name: Resolve issue number
         id: issue
         if: steps.status.outputs.status != 'skip'
+        env:
+          ITEM_TYPE: ${{ steps.status.outputs.item_type }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          if [[ "${{ steps.status.outputs.item_type }}" == "issue" ]]; then
-            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          if [[ "$ITEM_TYPE" == "issue" ]]; then
+            echo "number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
           else
             # Extract linked issue from PR body ("Closes #N", "Fixes #N", "Resolves #N")
-            PR_BODY="${{ github.event.pull_request.body }}"
             ISSUE_NUM=$(echo "$PR_BODY" | grep -oiP '(closes|fixes|resolves)\s+#\K[0-9]+' | head -1)
             if [[ -z "$ISSUE_NUM" ]]; then
               echo "No linked issue found in PR body — skipping board move" >&2
@@ -77,9 +80,11 @@ jobs:
 
       - name: Move card on board
         if: steps.status.outputs.status != 'skip' && steps.issue.outputs.number != ''
+        env:
+          ISSUE_NUM: ${{ steps.issue.outputs.number }}
+          TARGET_STATUS: ${{ steps.status.outputs.status }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          ISSUE_NUM="${{ steps.issue.outputs.number }}"
-          TARGET_STATUS="${{ steps.status.outputs.status }}"
 
           # Fetch project metadata
           PROJECT_DATA=$(gh api graphql -f query='
@@ -120,7 +125,7 @@ jobs:
                 repository(owner: $owner, name: $repo) {
                   issue(number: $number) { id }
                 }
-              }' -f owner="$OWNER" -f repo="${{ github.event.repository.name }}" \
+              }' -f owner="$OWNER" -f repo="$REPO_NAME" \
                  -F number=$ISSUE_NUM | jq -r '.data.repository.issue.id')
 
             ITEM_ID=$(gh api graphql -f query='
