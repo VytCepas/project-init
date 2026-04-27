@@ -49,6 +49,27 @@ Re-running the wizard does not overwrite files in `memory/` or `vault/` (user co
 
 `--strict` raises `TemplateRenderError` if any `{{...}}` placeholder survives rendering. Used in CI smoke tests to catch missing variables.
 
+## Current template variables
+
+| Variable | Source | Example |
+|---|---|---|
+| `project_name` | Wizard prompt | `my-project` |
+| `project_description` | Wizard prompt | `A REST API` |
+| `created_date` | Auto | `2026-04-27` |
+| `project_init_url` | Package constant | `https://github.com/VytCepas/project-init` |
+| `language` | Wizard prompt | `python` |
+| `memory_stack` | Preset `vars.memory_stack` | `obsidian-only` |
+| `installed_mcps` | Selected MCPs (formatted) | `context7` |
+| `installed_mcps_yaml` | Selected MCPs (YAML list) | `["context7"]` |
+| `lint_command` | Derived from language | `uv run ruff check .` |
+| `format_command` | Derived from language | `uv run ruff format .` |
+| `test_command` | Derived from language | `uv run pytest` |
+| `python` | `"true"` if python, else `""` | conditional flag |
+| `node` | `"true"` if node, else `""` | conditional flag |
+| `go` | `"true"` if go, else `""` | conditional flag |
+| `lightrag` | `"true"` if lightrag preset, else `""` | conditional flag |
+| `obsidian` | `"true"` if obsidian layer, else `""` | conditional flag |
+
 ## Adding a new template variable
 
 1. Add the variable to the wizard prompts in `__main__.py`

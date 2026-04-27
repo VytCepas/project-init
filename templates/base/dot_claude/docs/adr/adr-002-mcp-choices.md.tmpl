@@ -9,15 +9,24 @@ Model Context Protocol (MCP) servers extend Claude Code's toolset. Each server l
 
 ## Decision
 
-- **GitHub Issues / PRs** — use `gh` CLI (zero token overhead) instead of GitHub MCP (~30 tools)
-- **File access** — use Claude Code built-in Read/Write/Edit/Glob/Grep instead of Filesystem MCP
-- **Issue tracking** — use `gh` CLI instead of Linear MCP (~15 tools)
-- **Library docs** — Context7 MCP if selected (targeted lookups, low overhead)
+Three MCPs are intentionally absent to reduce token overhead:
+
+| MCP | Tokens saved | Replacement |
+|---|---|---|
+| GitHub MCP (~35 tools) | ~2000 tokens | `gh` CLI built-in |
+| Linear MCP (~15 tools) | ~800 tokens | `gh` CLI + GitHub Issues |
+| Filesystem MCP (~10 tools) | ~500 tokens | Claude Code built-in Read/Write/Edit/Glob/Grep |
 
 **Selected at init:** {{installed_mcps}}
+
+Retained MCPs:
+- **Context7** — targeted library doc lookups; no CLI equivalent
+- **Playwright** — browser automation; no CLI equivalent
+- **Postgres / SQLite** — direct DB access; no CLI equivalent
 
 ## Consequences
 
 - Agents use `gh issue list`, `gh pr create`, etc. for project management
-- No MCP needed for file ops — built-in tools cover all needs
-- Token budget stays lower; more context available for actual work
+- File ops use Claude Code built-ins — no MCP config needed
+- Token budget stays ~3300 tokens lower per session; more context for actual work
+- `MCP_CATALOG` in project-init contains only context7 (and optional DB/browser)

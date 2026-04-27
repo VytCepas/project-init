@@ -6,11 +6,10 @@
 
 All agentic-development infrastructure lives under [`.claude/`](.claude/). Start there:
 
-- [`.claude/project-init.md`](.claude/project-init.md) — project workflow, conventions, and how this project was initialized
+- [`.claude/project-init.md`](.claude/project-init.md) — workflow, conventions, task tracking
 - [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) — memory index (read first for context)
 - [`.claude/docs/`](.claude/docs/) — system of record: ADRs and development guides
-- [`.claude/vault/`](.claude/vault/) — human workspace (Obsidian vault, exploratory notes)
-- [`.claude/config.yaml`](.claude/config.yaml) — which tools/MCPs this project uses
+- [`.claude/vault/`](.claude/vault/) — human workspace (exploratory notes)
 - [`AGENTS.md`](AGENTS.md) — layout spec for non-Claude agents (Cursor, Aider, Codex, etc.)
 
 > Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
@@ -20,5 +19,13 @@ All agentic-development infrastructure lives under [`.claude/`](.claude/). Start
 - **TDD** — write failing tests before any implementation. Use `/plan <task>` to generate acceptance tests first.
 - **GitHub Issues** — before starting non-trivial work, create or reference a GitHub Issue. Use `/start-task` if one does not exist.
 {{#if lint_command}}- **Lint** — `{{lint_command}}` must pass before closing a task. The `pre-commit-gate` hook enforces this on every commit.
-{{/if}}
-- **No secrets in code** — never hardcode API keys, tokens, passwords, or personal data (SSN, card numbers). Use `os.environ['KEY']` or a `.env` file (gitignored). The `secret-guard` hook will block any write that contains a real secret.
+{{/if}}- **No secrets in code** — never hardcode API keys, tokens, or personal data. Use `os.environ['KEY']` or a `.env` file (gitignored).
+
+## Compact Instructions
+
+When compacting this conversation, preserve:
+- The GitHub Issue number being worked on (e.g. `#42`)
+- Files modified in this session (list by path)
+- Test results: pass/fail count and any failing test names
+- Unresolved errors or lint failures
+- Any decisions made that aren't yet committed to `docs/adr/`
