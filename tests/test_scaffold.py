@@ -887,7 +887,8 @@ class TestScaffoldIntegrity:
         """{{var}} or {{#if var}} surviving means a template wasn't named .tmpl
         or a variable wasn't wired up in __main__.py."""
         import re
-        placeholder_re = re.compile(r"\{\{[^}]+\}\}")
+        # Match {{...}} but not ${{...}} (GitHub Actions expression syntax)
+        placeholder_re = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
         offenders: list[str] = []
         for preset_name, lightrag_flag in [
             ("obsidian-only", ""),
