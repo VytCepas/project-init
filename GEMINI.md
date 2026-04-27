@@ -10,9 +10,10 @@ Source of truth: [.github/copilot-instructions.md](.github/copilot-instructions.
 - Tracking system: **GitHub Projects** (board) + **GitHub Issues** (tickets)
 - Create issues: `gh issue create` — pick the right template (bug / feature / chore)
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
-- PR titles must follow: `[#N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[#42][feat] Add OAuth login`
+- Issue, branch, and PR names use the Project Init key: `PI-<issue-number>`, e.g. `PI-42`
+- PR titles must follow: `[PI-N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[PI-42][feat] Add OAuth login`
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
-- PR body must include `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
+- PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
 
 ### Python tooling
 - `uv run …` for all Python ops — never `pip install` or `python -m venv`

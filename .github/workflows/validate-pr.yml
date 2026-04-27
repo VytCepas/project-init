@@ -17,14 +17,14 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if echo "$PR_TITLE" | grep -qE '^\[(#[0-9]+|nojira)\]\[(feat|fix|chore|docs|test)\]'; then
+          if echo "$PR_TITLE" | grep -qE '^\[(PI-[0-9]+|nojira)\]\[(feat|fix|chore|docs|test)\]'; then
             echo "PR title format OK: $PR_TITLE"
           else
-            echo "ERROR: PR title must match format: [#IssueNumber][type] or [nojira][type]"
+            echo "ERROR: PR title must match format: [PI-IssueNumber][type] or [nojira][type]"
             echo "Valid types: feat, fix, chore, docs, test"
             echo "Examples:"
-            echo "  [#42][feat] Add OAuth login"
-            echo "  [#99][fix] Handle null pointer in auth"
+            echo "  [PI-42][feat] Add OAuth login"
+            echo "  [PI-99][fix] Handle null pointer in auth"
             echo "  [nojira][fix] Fix typo in README"
             exit 1
           fi

@@ -33,9 +33,9 @@ for attempt in {1..5}; do
   # Parse with simple grep/sed (no jq or python needed)
   merge_status=$(echo "$pr_json" | grep -oP '"mergeStateStatus":"\K[^"]*' || echo "")
   review=$(echo "$pr_json" | grep -oP '"reviewDecision":"\K[^"]*' || echo "")
-  checks_failed=$(echo "$pr_json" | grep -o '"conclusion":"FAILURE"' | wc -l)
-  checks_pending=$(echo "$pr_json" | grep -o '"status":"\(IN_PROGRESS\|QUEUED\|PENDING\)"' | wc -l)
-  comment_count=$(echo "$pr_json" | grep -o '"author":' | wc -l)
+  checks_failed=$(echo "$pr_json" | { grep -o '"conclusion":"FAILURE"' || true; } | wc -l)
+  checks_pending=$(echo "$pr_json" | { grep -o '"status":"\(IN_PROGRESS\|QUEUED\|PENDING\)"' || true; } | wc -l)
+  comment_count=$(echo "$pr_json" | { grep -o '"author":' || true; } | wc -l)
 
   # Default values if not found
   merge_status="${merge_status:-UNKNOWN}"

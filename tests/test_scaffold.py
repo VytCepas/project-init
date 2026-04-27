@@ -1339,9 +1339,10 @@ class TestScaffoldGitHubFiles:
         content = f.read_text()
         assert "GitHub Projects" in content
         assert "AGENTS.md" in content
-        assert "[#N][type] description" in content
+        assert "[PROJECT-123][type] description" in content
+        assert "[#N][type] description" not in content
         assert "PR title must start with" not in content
-        assert "wait for checks" in content
+        assert ".claude/scripts/monitor-pr.sh <pr-number> --merge" in content
         assert "fix actionable feedback" in content
 
     def test_gemini_md_created(self):
@@ -1350,8 +1351,9 @@ class TestScaffoldGitHubFiles:
         content = f.read_text()
         assert "GitHub Projects" in content
         assert "AGENTS.md" in content
-        assert "[#N][type] description" in content
-        assert "wait for checks" in content
+        assert "[PROJECT-123][type] description" in content
+        assert "[#N][type] description" not in content
+        assert ".claude/scripts/monitor-pr.sh <pr-number> --merge" in content
 
     def test_monitor_pr_can_merge_when_clean(self):
         script = self.target / ".claude" / "scripts" / "monitor-pr.sh"
@@ -1361,11 +1363,13 @@ class TestScaffoldGitHubFiles:
         assert "gh pr merge" in content
         assert "gh pr checks" in content
         assert "--delete-branch" in content
+        assert "grep -o '\"conclusion\":\"FAILURE\"' || true" in content
 
-    def test_validate_pr_enforces_title_format(self):
-        """PR title must match [#N][type] or [nojira][type] format."""
+    def test_validate_pr_enforces_project_key_title_format(self):
+        """PR title must match [PROJECT-123][type] or [nojira][type] format."""
         content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
         # Check for the new regex pattern with type validation
+        assert "[A-Z][A-Z0-9]{1,9}-[0-9]+" in content
         assert "(feat|fix|chore|docs|test)" in content
         assert "nojira" in content
         # Ensure old format is not present (should have been updated)
@@ -1395,6 +1399,7 @@ class TestScaffoldGitHubFiles:
         # Verify the hook prevents pushing to main
         assert "refs/heads/main" in content or "refs/heads/master" in content
         assert "ERROR" in content or "not allowed" in content
+        assert "<PROJECT-KEY>-<issue-number>-<slug>" in content
 
     def test_gemini_no_unrendered_placeholders(self):
         import re
@@ -1402,6 +1407,14 @@ class TestScaffoldGitHubFiles:
         text = (self.target / "GEMINI.md").read_text()
         matches = placeholder_re.findall(text)
         assert not matches, f"Unrendered placeholders in GEMINI.md: {matches}"
+
+
+def test_project_validate_pr_workflow_uses_pi_key():
+    content = (
+        Path(__file__).resolve().parent.parent / ".github" / "workflows" / "validate-pr.yml"
+    ).read_text()
+    assert "PI-[0-9]+" in content
+    assert "[PI-IssueNumber][type]" in content
 
 
 class TestREADMEExampleCommand:
