@@ -45,7 +45,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--mcps",
         default="",
-        help="Comma-separated MCP IDs from the core catalog (e.g. linear,github)",
+        help="Comma-separated MCP IDs from the core catalog (e.g. context7)",
     )
     p.add_argument(
         "--db",

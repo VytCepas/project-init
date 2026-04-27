@@ -633,10 +633,11 @@ class TestMCPs:
     def test_catalog_contains_core_mcps(self):
         from project_init.mcps import MCP_CATALOG
         ids = {m["id"] for m in MCP_CATALOG}
-        # Linear and GitHub removed (PI-26): use gh CLI instead of MCPs
-        assert {"context7", "filesystem"} <= ids
+        # Linear, GitHub, Filesystem removed (PI-25/PI-26): CLI alternatives cover all needs
+        assert "context7" in ids
         assert "linear" not in ids
         assert "github" not in ids
+        assert "filesystem" not in ids
 
     def test_db_catalog_has_postgres_and_sqlite(self):
         from project_init.mcps import DB_CATALOG
@@ -679,10 +680,10 @@ class TestMCPs:
         assert format_installed_mcps([context7]) == "context7"
 
     def test_format_installed_mcps_multiple(self):
-        from project_init.mcps import MCP_CATALOG, format_installed_mcps
-        subset = [m for m in MCP_CATALOG if m["id"] in {"context7", "filesystem"}]
+        from project_init.mcps import DB_CATALOG, MCP_CATALOG, format_installed_mcps
+        subset = [next(m for m in MCP_CATALOG if m["id"] == "context7"), DB_CATALOG["postgres"]]
         result = format_installed_mcps(subset)
-        assert "context7" in result and "filesystem" in result
+        assert "context7" in result and "postgres" in result
 
     def test_format_installed_mcps_yaml_empty(self):
         from project_init.mcps import format_installed_mcps_yaml
@@ -694,17 +695,17 @@ class TestMCPs:
         assert format_installed_mcps_yaml([context7]) == '["context7"]'
 
     def test_format_installed_mcps_yaml_multiple(self):
-        from project_init.mcps import MCP_CATALOG, format_installed_mcps_yaml
-        subset = [m for m in MCP_CATALOG if m["id"] in {"context7", "filesystem"}]
+        from project_init.mcps import DB_CATALOG, MCP_CATALOG, format_installed_mcps_yaml
+        subset = [next(m for m in MCP_CATALOG if m["id"] == "context7"), DB_CATALOG["postgres"]]
         result = format_installed_mcps_yaml(subset)
         assert result.startswith("[") and result.endswith("]")
-        assert '"context7"' in result and '"filesystem"' in result
+        assert '"context7"' in result and '"postgres"' in result
 
 
 class TestMCPsNonInteractive:
     """Test --mcps / --db / --browser flags via non-interactive CLI."""
 
-    def test_mcps_flag_context7_filesystem(self, tmp_path: Path):
+    def test_mcps_flag_context7(self, tmp_path: Path):
         from project_init.__main__ import main
         target = tmp_path / "p"
         rc = main([
@@ -713,12 +714,11 @@ class TestMCPsNonInteractive:
             "--name", "mcp-test",
             "--description", "test",
             "--language", "python",
-            "--mcps", "context7,filesystem",
+            "--mcps", "context7",
         ])
         assert rc == 0
         config = (target / ".claude" / "config.yaml").read_text()
         assert "context7" in config
-        assert "filesystem" in config
 
     def test_db_postgres_flag(self, tmp_path: Path):
         from project_init.__main__ import main
