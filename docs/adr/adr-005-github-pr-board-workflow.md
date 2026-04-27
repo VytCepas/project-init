@@ -1,0 +1,73 @@
+# ADR-005: GitHub PR and board lifecycle workflow
+
+**Date:** 2026-04-27
+**Status:** Accepted
+
+## Context
+
+Projects scaffolded by project-init previously had partial GitHub workflow guidance: issues were created via `start-task`, but there was no standard for branch naming, PR creation timing, board column transitions, or when/how to request code review. This caused inconsistency across projects — some created PRs at the end, some committed directly to main, and code review was ad-hoc.
+
+The goals of this ADR are to:
+1. Define a single canonical lifecycle every project follows.
+2. Make the happy path fast (automated by `/start-task` and `/request-review`).
+3. Keep code review optional to control token cost.
+
+## Decision
+
+### Lifecycle
+
+```
+Issue created → branch created → draft PR created → work → PR ready → CI passes → merged
+```
+
+Each step maps to a GitHub Projects board column:
+
+| Board column | Trigger |
+|---|---|
+| Backlog | Issues not yet scheduled |
+| To Do | Issue exists, work not started |
+| In Progress | `/start-task` run — branch + draft PR created |
+| In Review | `/request-review` run — PR marked ready-for-review |
+| Done | PR merged with `Closes #<n>` in body |
+
+### Branch naming
+
+`<issue-number>-<kebab-case-title>` — max 50 characters total.  
+Example: `42-add-auth-middleware`
+
+### PR rules
+
+- Created as **draft** immediately when work starts (not when it's done).
+- Title format: `[#<issue>] Short description`
+- Body must include `Closes #<issue>` to auto-close the issue and trigger the board move on merge.
+- One issue → one branch → one PR. Stacked PRs allowed only for dependency chains, never for convenience.
+- No direct commits to `main` or `master`.
+
+### CI enforcement
+
+PRs must pass all CI checks before merge. The base scaffold ships a CI workflow (`.github/workflows/ci.yml`) that runs tests and lint. Branch protection rules should be enabled on the default branch to enforce this.
+
+### Code review
+
+Code review by the `reviewer` agent is **optional** and triggered only via `/request-review`. The command explicitly asks the user before running the agent to surface the token cost. Use it for:
+- Security-sensitive changes (auth, secrets, input validation)
+- Architectural changes (new abstractions, schema changes)
+- Any PR the author is uncertain about
+
+Skip for: typo fixes, dependency bumps, doc-only changes.
+
+### GitHub Projects board
+
+A project board named after the repository should be created once per repo. Column automations:
+- Issue opened → **To Do**
+- PR opened → linked issue moves to **In Progress**
+- PR merged → linked issue moves to **Done** (via `Closes #n`)
+
+## Consequences
+
+- All projects scaffolded after this ADR follow the same lifecycle.
+- `start-task` skill updated to create branch + draft PR automatically.
+- `/request-review` command added to base scaffold.
+- `.github/pull_request_template.md` added to base scaffold.
+- `project-init.md.tmpl` updated with lifecycle table and rules.
+- Agents working on scaffolded projects have unambiguous instructions — no guessing when to create PRs or how to name branches.

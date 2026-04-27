@@ -17,6 +17,6 @@ See [CLAUDE.md](CLAUDE.md) for repo-specific conventions and [README.md](README.
 
 When adding or changing a template, add a test under `tests/` that runs the scaffolder with the relevant preset into a temp dir and diffs the output against an expected tree. Tests must run offline.
 
-## Linear
+## Issue tracking
 
-Work is tracked in the Linear project "Project Init" at <https://linear.app/vytautas-project/project/project-init-467fe1178d8a/overview>. Issue IDs in commit messages should reference the ticket (e.g. `PI-2:`).
+Work is tracked in **GitHub Issues**. Use `gh issue list` to see open work. Issue IDs in commit messages and PR titles should reference the GitHub issue number (e.g. `#12`).

@@ -23,7 +23,8 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Command | `/status` | git state, recent commits, open TODOs |
 | Command | `/review` | code review of staged changes or a file |
 | Command | `/plan <task>` | acceptance tests first, then implementation plan |
-| Skill | `start-task` | create a GitHub Issue before starting work |
+| Command | `/request-review` | mark PR ready, move board card, optional agent review |
+| Skill | `start-task` | create issue + branch + draft PR before starting work |
 | Skill | `session-summary` | summarise session and save to vault |
 | Skill | `add-hook` | add a new deterministic hook |
 | Skill | `add-command` | add a new slash command |
@@ -58,9 +59,38 @@ Test conventions: one assertion per test, name as `test_<unit>_<scenario>`, run 
 
 ## GitHub task tracking
 
-1. Check existing issues: `gh issue list`
-2. If none, run `/start-task` to create one
-3. Reference issue number in commit messages (`#123`) and PR title (`[#123] description`)
+### Lifecycle: Issue → branch → draft PR → merge
+
+Every non-trivial task follows this exact sequence:
+
+| Step | Action | Board column |
+|------|--------|-------------|
+| 1 | Run `/start-task` — creates issue, branch, draft PR | **To Do → In Progress** |
+| 2 | Implement on the branch; commit with `#<issue>` references | In Progress |
+| 3 | Run `/request-review` — marks PR ready, optional reviewer agent | **In Progress → In Review** |
+| 4 | Tests pass on CI; PR merged with `Closes #<issue>` in body | **In Review → Done** |
+
+### Rules
+
+- One issue → one branch → one PR. No direct commits to `main`.
+- Branch name: `<issue-number>-<kebab-slug>` (e.g. `42-add-auth`).
+- PR title: `[#<issue>] Short description`.
+- PR body must include `Closes #<issue>` — this auto-closes the issue and moves the board card on merge.
+- Draft PRs are created immediately when work starts — not when it's done.
+- PRs must pass CI (tests + lint) before merging.
+
+### Code review (optional)
+
+`/request-review` asks whether to run the `reviewer` agent (~500 extra tokens). Skip for trivial changes; use for anything security-sensitive or architecturally significant.
+
+### Quick reference
+
+```bash
+gh issue list                    # see what's open
+gh pr list                       # see open PRs
+gh pr view                       # current branch's PR status
+gh pr checks                     # CI status for current PR
+```
 
 ## Conventions
 
