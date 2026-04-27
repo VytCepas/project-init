@@ -23,7 +23,7 @@ type: user | feedback | project | reference
 | `user` | About the human (role, preferences, expertise). |
 | `feedback` | Rules/corrections the user has given. Include **Why** and **How to apply**. |
 | `project` | Current-state facts about the project (deadlines, decisions, stakeholders). Include **Why** and **How to apply**. |
-| `reference` | Pointers to external systems (Linear projects, dashboards, channels). |
+| `reference` | Pointers to external systems (dashboards, channels, external docs). |
 
 ### What NOT to save
 

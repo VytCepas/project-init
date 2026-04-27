@@ -61,7 +61,7 @@ project-init ./my-app \
   --name my-app \
   --description "an app" \
   --language python \
-  --mcps linear,github,context7 \
+  --mcps context7 \
   --db postgres \
   --browser \
   --strict
@@ -72,7 +72,7 @@ The wizard asks:
 - Project name / description
 - Language (Python/Node/Go/none) — drives `lint_command`, `format_command`, `test_command`
 - Memory stack — Obsidian-only or Obsidian + LightRAG
-- Core MCPs (Linear, GitHub, Context7, Filesystem)
+- Core MCPs (Context7)
 - Database MCP — none / Postgres / SQLite
 - Browser automation — Playwright (yes/no)
 
@@ -85,7 +85,7 @@ See [`examples/python-project/`](examples/python-project/) for a full scaffolded
 ```bash
 project-init ./examples/python-project --non-interactive \
   --preset obsidian-only --name example --description "example python project" \
-  --language python --mcps linear,github
+  --language python --mcps context7
 ```
 
 ## Update
@@ -141,7 +141,7 @@ project-init/
 
 ## Status
 
-All milestones (PI-1 through PI-18) are shipped. v0.1.0 released. Track future work in Linear, project "Project Init".
+All milestones (PI-1 through PI-18) are shipped. v0.1.0 released. Track future work in [GitHub Issues](https://github.com/VytCepas/project-init/issues).
 
 ## License
 

@@ -1,0 +1,15 @@
+name: Chore
+description: Maintenance, refactor, dependency update, or CI change
+labels: [chore]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs doing?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why now?
+      description: What breaks or degrades if this is skipped?

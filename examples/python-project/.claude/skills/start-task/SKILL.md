@@ -1,10 +1,10 @@
 ---
-description: Create a Linear issue for the current task before starting work
+description: Create a GitHub Issue + branch + draft PR before starting work
 argument-hint: "[task title]"
 allowed-tools: Bash Read
 ---
 
-Before starting any non-trivial task, document it as a Linear issue. This keeps work traceable and ensures scope is explicit before implementation begins.
+Before starting any non-trivial task, create a GitHub Issue, a dedicated branch, and a draft PR. This keeps work traceable and every PR maps to exactly one issue.
 
 ## Steps
 
@@ -13,24 +13,64 @@ Before starting any non-trivial task, document it as a Linear issue. This keeps 
    - Short description (what changes and why)
    - Acceptance criteria (2–4 bullet points that define "done")
 
-2. **Check for existing issue** — ask: "Does a Linear issue already exist for this? If so, provide the ID and I'll reference it."
+2. **Check for existing issue** — run `gh issue list` and ask: "Does a GitHub Issue already exist for this? If so, provide the number."
 
-3. **Create the issue** — if no issue exists, use the Linear MCP tool or print the following for the user to run:
-   ```
-   # Via MCP (if Linear MCP is configured):
-   Use mcp__linear__save_issue with title, description, and state "In Progress"
+3. **Create the issue** — if none exists:
+   ```bash
+   gh issue create \
+     --title "<title>" \
+     --body "## Description
+   <description>
 
-   # Via CLI fallback:
-   linear issue create --title "<title>" --description "<description>"
+   ## Acceptance criteria
+   - [ ] <criterion 1>
+   - [ ] <criterion 2>" \
+     --label "feature"
+   ```
+   Capture the issue number from the returned URL (last path segment).
+
+4. **Create a branch** named after the issue:
+   ```bash
+   git checkout -b <issue-number>-<slug>
+   # e.g. 42-add-auth-middleware
+   ```
+   Branch naming: `<issue-number>-<kebab-case-title>` (max 50 chars total).
+
+5. **Push an initial empty commit** — GitHub requires at least one commit ahead of base before a PR can be opened:
+   ```bash
+   git commit --allow-empty -m "WIP: start #<issue-number> — <title>"
+   git push -u origin <branch-name>
    ```
 
-4. **Record the issue ID** — save it to `.claude/memory/` so it persists across the session:
-   ```
-   echo "Current task: <ISSUE-ID> — <title>" >> .claude/memory/current-task.md
+6. **Create a draft PR**:
+   ```bash
+   gh pr create \
+     --title "[#<issue-number>] <title>" \
+     --body "$(cat <<'EOF'
+   ## Summary
+
+   Closes #<issue-number>
+
+   ## Changes
+
+   _To be filled in as work progresses._
+
+   ## Test plan
+
+   - [ ] Tests pass (uv run pytest)
+   - [ ] Lint passes (uv run ruff check .)
+   EOF
+   )" \
+     --draft
    ```
 
-5. **Proceed** — only begin implementation after the issue exists and is recorded.
+7. **Record the issue number** for this session:
+   ```bash
+   echo "Current task: #<number> — <title>" > .claude/memory/current-task.md
+   ```
+
+8. **Proceed** — only begin implementation after the issue, branch, and draft PR exist.
 
 ## Rule
 
-> Every non-trivial task (more than a 5-minute fix) must have a Linear issue before the first line of implementation code is written.
+> Every non-trivial task must have: a GitHub Issue, a dedicated branch, and a draft PR — all created before the first line of implementation code is written.

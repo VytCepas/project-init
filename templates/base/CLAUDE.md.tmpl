@@ -17,7 +17,7 @@ All agentic-development infrastructure lives under [`.claude/`](.claude/). Start
 ## Key rules for agents
 
 - **TDD** — write failing tests before any implementation. Use `/plan <task>` to generate acceptance tests first.
-- **GitHub Issues** — before starting non-trivial work, create or reference a GitHub Issue. Use `/start-task` if one does not exist.
+- **GitHub Projects** — work is tracked on the GitHub Projects board (kanban) backed by GitHub Issues. Before starting non-trivial work, create or reference an issue. Use `/start-task` if one does not exist.
 {{#if lint_command}}- **Lint** — `{{lint_command}}` must pass before closing a task. The `pre-commit-gate` hook enforces this on every commit.
 {{/if}}- **No secrets in code** — never hardcode API keys, tokens, or personal data. Use `os.environ['KEY']` or a `.env` file (gitignored).
 

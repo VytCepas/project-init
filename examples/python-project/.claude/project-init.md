@@ -8,7 +8,7 @@ Scaffolded with [project-init](https://github.com/VytCepas/project-init) on 2026
 
 - **Language/runtime**: python
 - **Memory stack**: obsidian-only
-- **Installed MCPs**: linear, github, context7
+- **Installed MCPs**: context7
 
 See [`config.yaml`](config.yaml) for the full record.
 
@@ -28,7 +28,7 @@ See [`config.yaml`](config.yaml) for the full record.
 
 **Skills** (`.claude/skills/`):
 - `session-summary` — summarize the session and save to vault
-- `start-task` — create a Linear issue before starting non-trivial work
+- `start-task` — create a GitHub Issue, branch, and draft PR before starting work
 
 **Subagents** (`.claude/agents/`):
 - `reviewer` — code review specialist (sonnet, focused on bugs + security)
@@ -68,14 +68,16 @@ Test conventions:
 - A test that touches external services (DB, external API) must use a real instance, not a mock
 
 
-## Linear task tracking
+## GitHub Projects tracking
+
+Work items are GitHub Issues; the project board is GitHub Projects (kanban with To Do / In Progress / In Review / Done columns). Board cards move automatically via `board-automation.yml`.
 
 Before starting any non-trivial task:
-1. Check whether a Linear issue already exists
-2. If not, run `/start-task` to create one
-3. Reference the issue ID in commit messages
+1. Run `gh issue list` to check for an existing issue
+2. If none exists, run `/start-task` to create one (also creates the branch and draft PR)
+3. Reference the issue number in commit messages and PR body (`Closes #N`)
 
-> Every piece of meaningful work should be traceable to a Linear issue.
+> Every piece of meaningful work should be traceable to a GitHub Issue on the project board.
 
 ## Conventions
 
