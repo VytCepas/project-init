@@ -225,6 +225,7 @@ class TestScaffoldObsidianOnly:
         content = (self.target / ".claude" / "scripts" / "monitor-pr.sh").read_text()
         assert "--merge" in content
         assert "gh pr checks" in content
+        assert "--json" in content  # suppresses per-refresh noise; only prints failures
 
     def test_push_branch_sh_verifies_remote_sha(self):
         content = (self.target / ".claude" / "scripts" / "push-branch.sh").read_text()
@@ -1401,7 +1402,7 @@ class TestScaffoldGitHubFiles:
         assert "--merge" in content
         assert "gh pr merge" in content
         assert "gh pr checks" in content
-        assert "--watch" in content
+        assert "--json" in content  # uses json polling, not --watch, to suppress noise
         assert "--delete-branch" in content
 
     def test_validate_pr_enforces_project_key_title_format(self):

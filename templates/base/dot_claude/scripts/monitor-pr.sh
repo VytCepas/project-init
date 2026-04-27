@@ -1,6 +1,6 @@
 #!/bin/bash
 # Wait for all CI checks on a PR to complete, then optionally merge.
-# Uses gh pr checks --watch (blocking, no polling loop) instead of manual sleep/retry.
+# Only prints failures or the final pass/fail line — no per-refresh noise.
 #
 # Usage:
 #   .claude/scripts/monitor-pr.sh <pr-number> [--merge]
@@ -26,41 +26,40 @@ if [ -n "$MODE" ] && [ "$MODE" != "--merge" ]; then
   exit 2
 fi
 
-echo "Waiting for CI checks on PR #$PR_NUMBER..."
-echo "(Use Ctrl+C to stop watching — the PR stays open)"
-echo ""
+# Poll until all checks are no longer pending/in_progress.
+# Only emit output on completion or failure — suppress refresh noise.
+while true; do
+  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || true
 
-# gh pr checks --watch blocks until all checks finish.
-# Exit 0 = all passed. Non-zero = at least one failed.
-if gh pr checks "$PR_NUMBER" --watch --fail-fast; then
-  PR_URL=$(gh pr view "$PR_NUMBER" --json url -q '.url')
+  PENDING=$(echo "$CHECKS" | jq -r '[.[] | select(.state == "PENDING" or .state == "IN_PROGRESS")] | length')
+  FAILED=$(echo "$CHECKS"  | jq -r '[.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')
 
-  # Check review decision
-  REVIEW=$(gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""')
-  if [ "$REVIEW" = "CHANGES_REQUESTED" ]; then
-    echo ""
-    echo "Changes requested on PR #$PR_NUMBER. Address review comments before merging."
-    echo "  gh pr view $PR_NUMBER --comments"
-    exit 1
+  if [ "$PENDING" -eq 0 ]; then
+    break
   fi
+  sleep 10
+done
 
-  echo ""
-  echo "PR #$PR_NUMBER ready: $PR_URL"
-
-  if [ "$MODE" = "--merge" ]; then
-    echo "Merging..."
-    gh pr merge "$PR_NUMBER" --squash --delete-branch
-    echo "Merged PR #$PR_NUMBER"
-  else
-    echo "To merge: gh pr merge $PR_NUMBER --squash --delete-branch"
-  fi
-  exit 0
-else
-  echo ""
-  echo "CI failed on PR #$PR_NUMBER. Showing failures:"
-  echo ""
-  gh run view --log-failed 2>/dev/null || gh pr checks "$PR_NUMBER"
+if [ "$FAILED" -gt 0 ]; then
+  echo "CI failed on PR #$PR_NUMBER — failed checks:"
+  echo "$CHECKS" | jq -r '.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT") | "  \(.name): \(.conclusion)"'
   echo ""
   echo "Fix the issues, commit, push, then re-run this script."
   exit 1
+fi
+
+PR_URL=$(gh pr view "$PR_NUMBER" --json url -q '.url')
+REVIEW=$(gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""')
+
+if [ "$REVIEW" = "CHANGES_REQUESTED" ]; then
+  echo "Changes requested on PR #$PR_NUMBER — address review comments before merging."
+  echo "  gh pr view $PR_NUMBER --comments"
+  exit 1
+fi
+
+echo "PR #$PR_NUMBER passed: $PR_URL"
+
+if [ "$MODE" = "--merge" ]; then
+  gh pr merge "$PR_NUMBER" --squash --delete-branch --yes 2>&1 | grep -v "^$"
+  echo "Merged PR #$PR_NUMBER"
 fi
