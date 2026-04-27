@@ -12,7 +12,7 @@ set -euo pipefail
 
 BRANCH="${1:-$(git rev-parse --abbrev-ref HEAD)}"
 MAX_RETRIES="${2:-3}"
-EXPECTED_SHA=$(git rev-parse HEAD)
+EXPECTED_SHA=$(git rev-parse "$BRANCH")
 
 _remote_has_sha() {
   git ls-remote --exit-code origin "refs/heads/$BRANCH" 2>/dev/null \
