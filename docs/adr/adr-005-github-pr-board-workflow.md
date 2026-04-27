@@ -32,8 +32,7 @@ Each step maps to a GitHub Projects board column:
 
 ### Branch naming
 
-`<issue-number>-<kebab-case-title>` — max 50 characters total.  
-Example: `42-add-auth-middleware`
+Use a dedicated branch for each issue. Keep branch names short and descriptive; the enforced public format is the PR title, not the branch name.
 
 ### PR rules
 

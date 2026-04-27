@@ -2,7 +2,7 @@
 
 This repo is a **scaffolder**. It produces a `.claude/` layout inside *other* projects. Nothing here runs as a long-lived service.
 
-Start by reading [README.md](README.md) and [AGENTS.md](AGENTS.md). Issue tracking: GitHub Issues (`gh issue list`). See [docs/](docs/) for ADRs and development guides.
+Start by reading [AGENTS.md](AGENTS.md), then use [README.md](README.md) for user-facing behavior and [.github/copilot-instructions.md](.github/copilot-instructions.md) for GitHub Issues, PR titles, PR bodies, and board behavior.
 
 ## Layout
 
@@ -43,6 +43,6 @@ Scaffolded projects get a `ci.yml.tmpl` template with these patterns built in. S
 - No LLM calls from the scaffolder itself
 - No long-running service
 - No database (beyond what preset projects may install)
-- Memory ingestion (PI-6) ships as scripts inside the LightRAG overlay
+- Memory ingestion ships as scripts inside the LightRAG overlay
   (`templates/lightrag/dot_claude/scripts/`) — they run inside scaffolded
   projects, not as part of this repo's runtime.

@@ -2,7 +2,11 @@
 
 For agents working on the **project-init** codebase itself (not projects it scaffolds).
 
-See [CLAUDE.md](CLAUDE.md) for repo-specific conventions and [README.md](README.md) for what this project does.
+Read these first:
+
+- [README.md](README.md) — what this project does and how users run it.
+- [CLAUDE.md](CLAUDE.md) — repo-specific conventions and implementation notes.
+- [.github/copilot-instructions.md](.github/copilot-instructions.md) — GitHub Issues, PR titles, PR bodies, and board behavior.
 
 ## Rules of the road
 
@@ -20,6 +24,8 @@ When adding or changing a template, add a test under `tests/` that runs the scaf
 ## Issue & project tracking
 
 Work is tracked in **GitHub Projects** (board) backed by **GitHub Issues** (tickets). Use `gh issue list` to see open work.
+
+For GitHub Issues, PR titles, PR bodies, and board behavior, read [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
 **PR title format:** `[#IssueNumber][type] description` where type ∈ {feat, fix, chore, docs, test}  
 **No-issue PRs:** `[nojira][type] description` for trivial changes  

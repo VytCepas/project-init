@@ -11,16 +11,16 @@ uv sync --extra dev
 ## Workflow
 
 1. `gh issue list` — pick or create an issue
-2. Create a branch: `git checkout -b feat/short-description`
+2. Create a branch for the issue work
 3. Write failing tests first (TDD)
 4. Implement until tests pass
 5. `uv run ruff check . && uv run ruff format .` — lint and format
 6. `uv run pytest` — all tests pass
-7. `gh pr create --title "[#N] Short description" --body "Closes #N\n\n..."`
+7. Open a PR following `.github/copilot-instructions.md`
 
 ## PR checklist
 
-- [ ] Title: `[#IssueNumber] Short description`
+- [ ] Title: `[#IssueNumber][type] description`
 - [ ] Body includes `Closes #<number>`
 - [ ] New template files have a corresponding test
 - [ ] No unrendered `{{...}}` placeholders in template output

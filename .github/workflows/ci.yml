@@ -14,17 +14,18 @@ jobs:
     name: Lint and test
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v8.1.0
         with:
+          version: "0.11.7"
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
+          cache-dependency-glob: "uv.lock"
           python-version: "3.12"
 
       - name: Sync dev dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --locked
 
       - name: Lint (ruff)
         run: uv run ruff check .
@@ -34,17 +35,18 @@ jobs:
         run: uv run pytest -n auto --tb=short -q 2>/dev/null || uv run pytest --tb=short -q
 
   wheel-smoke:
-    name: Wheel smoke test (PI-18)
+    name: Wheel smoke test
     runs-on: ubuntu-24.04
     needs: lint-and-test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v8.1.0
         with:
+          version: "0.11.7"
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
+          cache-dependency-glob: "uv.lock"
           python-version: "3.12"
 
       - name: Build wheel
@@ -53,10 +55,10 @@ jobs:
       - name: Install wheel into a fresh venv and run scaffolder
         run: |
           set -euo pipefail
-          python -m venv /tmp/smoke-venv
+          uv venv /tmp/smoke-venv
           # shellcheck disable=SC1091
           source /tmp/smoke-venv/bin/activate
-          pip install --quiet dist/*.whl
+          uv pip install --quiet dist/*.whl
           mkdir -p /tmp/smoke-target
           project-init /tmp/smoke-target \
             --non-interactive \
@@ -76,4 +78,4 @@ jobs:
           test -x /tmp/smoke-target/.claude/hooks/bash-safety-guard.sh
           # Verify no surviving {{...}} placeholders (--strict already guarantees this)
           ! grep -rn '{{[a-z_]*}}' /tmp/smoke-target || (echo "Unrendered placeholders found"; exit 1)
-          echo "OK — wheel smoke test passed"
+          echo "OK - wheel smoke test passed"

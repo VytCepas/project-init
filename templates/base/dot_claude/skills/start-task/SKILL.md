@@ -32,12 +32,11 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
    ```
    Capture the issue number from the returned URL (last path segment).
 
-4. **Create a branch** named after the issue:
+4. **Create a dedicated branch** for the issue:
    ```bash
-   git checkout -b <issue-number>-<slug>
-   # e.g. 42-add-auth-middleware
+   git checkout -b <short-branch-name>
    ```
-   Branch naming: `<issue-number>-<kebab-case-title>` (max 50 chars total).
+   Keep the branch name short and descriptive; PR title format is defined separately below.
 
 5. **Push an initial empty commit** — GitHub requires at least one commit ahead of base before a PR can be opened:
    ```bash
@@ -96,5 +95,5 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 > Every non-trivial task must have: a GitHub Issue, a dedicated branch, and a draft PR — all created before the first line of implementation code is written.
 
-> PR titles must follow the format: `[#IssueNumber][type] Short description` or `[nojira][type] Short description`
+> PR titles must follow the format: `[#N][type] description` or `[nojira][type] description`
 > Valid types: `feat`, `fix`, `chore`, `docs`, `test`

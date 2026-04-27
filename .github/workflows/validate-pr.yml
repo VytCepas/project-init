@@ -11,7 +11,7 @@ permissions:
 jobs:
   pr-title:
     name: Check PR title format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Validate title format with type
         env:
@@ -31,7 +31,7 @@ jobs:
 
   closes-keyword:
     name: Check for Closes keyword in PR body
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Validate Closes keyword
         env:

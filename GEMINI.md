@@ -1,10 +1,12 @@
 # Gemini Agent Instructions
 
-See [AGENTS.md](AGENTS.md) for full agent workflow rules and [CLAUDE.md](CLAUDE.md) for repo conventions.
+Read [AGENTS.md](AGENTS.md) first. It points to [CLAUDE.md](CLAUDE.md) for repo conventions, [README.md](README.md) for user-facing behavior, and [.github/copilot-instructions.md](.github/copilot-instructions.md) for GitHub Issues, PR titles, PR bodies, and board behavior.
 
 ## Quick reference
 
 ### Issue & project tracking
+Source of truth: [.github/copilot-instructions.md](.github/copilot-instructions.md).
+
 - Tracking system: **GitHub Projects** (board) + **GitHub Issues** (tickets)
 - Create issues: `gh issue create` — pick the right template (bug / feature / chore)
 - Board cards move automatically via `board-automation.yml` — no manual updates needed

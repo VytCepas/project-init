@@ -22,6 +22,9 @@ dev = [
     "pytest>=8.0",
     "pytest-xdist>=3.0",
 ]
+docs = [
+    "mkdocs-material>=9.7.6",
+]
 
 [project.scripts]
 project-init = "project_init.__main__:main"
