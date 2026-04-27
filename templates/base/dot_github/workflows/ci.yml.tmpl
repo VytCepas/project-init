@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   lint-and-test:
@@ -37,6 +38,28 @@ jobs:
       # Can reduce test time by 30-50% on multi-core machines
       - name: Tests (pytest) — parallel
         run: uv run pytest -n auto --tb=short -q
+
+      - name: Post failure summary
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          FAILED_STEPS=$(cat <<'SUMMARY'
+          Lint or tests failed in this run. Check the details and fix before re-pushing.
+          SUMMARY
+          )
+          gh pr comment "$PR_NUMBER" --body "## CI failed
+
+          **Run:** $RUN_URL
+
+          To see what failed:
+          \`\`\`bash
+          gh run view --log-failed
+          \`\`\`
+
+          Fix the issues, then \`git push\` to re-trigger CI."
 
   # Optimization #2: Split heavyweight tests into separate job
   # Only run integration/smoke tests after fast lint+unit tests pass
