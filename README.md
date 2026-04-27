@@ -78,15 +78,17 @@ The wizard asks:
 
 Your answers are recorded in `.claude/config.yaml`. Re-run any time — it reconciles, never overwrites memory or vault notes.
 
-## Example output
+## Example command
 
-See [`examples/python-project/`](examples/python-project/) for a full scaffolded `.claude/` produced by:
+Run this to scaffold an Obsidian-only project with Context7 MCP:
 
 ```bash
-project-init ./examples/python-project --non-interactive \
+project-init /path/to/my-project --non-interactive \
   --preset obsidian-only --name example --description "example python project" \
   --language python --mcps context7
 ```
+
+The test suite validates this command works correctly — see `TestREADMEExampleCommand` in `tests/test_scaffold.py`.
 
 ## Update
 

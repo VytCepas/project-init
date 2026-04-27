@@ -1363,3 +1363,43 @@ class TestScaffoldGitHubFiles:
         text = (self.target / "GEMINI.md").read_text()
         matches = placeholder_re.findall(text)
         assert not matches, f"Unrendered placeholders in GEMINI.md: {matches}"
+
+
+class TestREADMEExampleCommand:
+    """Validate that the example command in README.md actually works.
+
+    This test ensures the exact command shown in README produces valid output.
+    If this test passes, the static examples/ folder is redundant and can be removed.
+    See issue #24: examples/ should be kept in sync via test, not manually.
+    """
+
+    def test_readme_example_command_scaffolds_obsidian_only(self, tmp_path: Path):
+        """Run the exact command shown in README.md and verify it produces valid output."""
+        target = tmp_path / "example-from-readme"
+
+        # This is the exact command from README.md's "Example output" section:
+        # project-init ./examples/python-project --non-interactive \
+        #   --preset obsidian-only --name example --description "example python project" \
+        #   --language python --mcps context7
+
+        preset = load_preset("obsidian-only")
+        variables = _make_variables(
+            project_name="example",
+            project_description="example python project",
+            language="python",
+            memory_stack="obsidian-only",
+            installed_mcps="context7",
+            installed_mcps_yaml="[\n  name: context7\n  url: https://context7.com\n]",
+        )
+        scaffold(target, preset, variables, strict=True)
+
+        # Verify essential files exist (same checks as wheel smoke test)
+        assert (target / ".claude" / "config.yaml").is_file()
+        assert (target / ".claude" / "project-init.md").is_file()
+        assert (target / "CLAUDE.md").is_file()
+        assert (target / "AGENTS.md").is_file()
+
+        # Verify hook executable bits
+        assert (target / ".claude" / "hooks" / "post-edit-lint.sh").is_file()
+        assert (target / ".claude" / "hooks" / "pre-commit-gate.sh").is_file()
+        assert (target / ".claude" / "hooks" / "bash-safety-guard.sh").is_file()
