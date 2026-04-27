@@ -77,8 +77,8 @@ else
   git checkout -b "$BRANCH"
 fi
 
-# --- Push and set upstream ---
-git push -u origin "$BRANCH"
+# --- Push and set upstream (retry + remote-SHA verification) ---
+.claude/scripts/push-branch.sh "$BRANCH"
 
 # --- Resolve project key (e.g. "PI" → "[PI-42]", fallback to "[#42]") ---
 # Set PROJECT_KEY env var, or add `project_key: PI` to .claude/config.yaml

@@ -13,7 +13,9 @@ Full agent rules: [AGENTS.md](../AGENTS.md) | Project conventions: [CLAUDE.md](.
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
 - PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
 - Draft PRs are opened immediately when work starts, not when done
-- When asked to push/finish a PR, continue autonomously: push, run `.claude/scripts/monitor-pr.sh <pr-number> --merge`, inspect any failed checks or review comments it reports, fix actionable feedback, push again, and rerun the script until it merges cleanly.
+- When asked to push/finish a PR, continue autonomously: run `.claude/scripts/push-branch.sh` (retries on transient 5xx, verifies remote SHA), then `.claude/scripts/monitor-pr.sh <pr-number> --merge`. Inspect any failed checks or review comments, fix actionable feedback, push again, rerun the monitor script until it merges cleanly.
+- Never use bare `git push` for branch publishing — always use `.claude/scripts/push-branch.sh` so transient GitHub errors don't silently fail.
+- After pushing, check for automated review comments: `gh api repos/{owner}/{repo}/pulls/{pr}/comments --jq '.[] | {id, user: .user.login, path, line, body}'`. Reply to inline comments via `gh api -X POST repos/{owner}/{repo}/pulls/{pr}/comments/{id}/replies -F body="..."` (use `-F`, not `-f`).
 - No direct commits to `main`
 
 ## Key rules

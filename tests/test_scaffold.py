@@ -213,8 +213,11 @@ class TestScaffoldObsidianOnly:
     def test_promote_review_script_created(self):
         assert (self.target / ".claude" / "scripts" / "promote-review.sh").is_file()
 
+    def test_push_branch_script_created(self):
+        assert (self.target / ".claude" / "scripts" / "push-branch.sh").is_file()
+
     def test_lifecycle_scripts_are_executable(self):
-        for name in ("create-issue.sh", "start-issue.sh", "promote-review.sh", "install-hooks.sh"):
+        for name in ("create-issue.sh", "start-issue.sh", "promote-review.sh", "install-hooks.sh", "push-branch.sh"):
             path = self.target / ".claude" / "scripts" / name
             assert path.stat().st_mode & 0o111, f"{name} must be executable"
 
@@ -222,6 +225,13 @@ class TestScaffoldObsidianOnly:
         content = (self.target / ".claude" / "scripts" / "monitor-pr.sh").read_text()
         assert "--merge" in content
         assert "gh pr checks" in content
+        assert "--json" in content  # suppresses per-refresh noise; only prints failures
+
+    def test_push_branch_sh_verifies_remote_sha(self):
+        content = (self.target / ".claude" / "scripts" / "push-branch.sh").read_text()
+        assert "git ls-remote" in content
+        assert "EXPECTED_SHA" in content
+        assert "MAX_RETRIES" in content
 
     def test_project_init_md_has_script_commands(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
@@ -1392,7 +1402,7 @@ class TestScaffoldGitHubFiles:
         assert "--merge" in content
         assert "gh pr merge" in content
         assert "gh pr checks" in content
-        assert "--watch" in content
+        assert "--json" in content  # uses json polling, not --watch, to suppress noise
         assert "--delete-branch" in content
 
     def test_validate_pr_enforces_project_key_title_format(self):

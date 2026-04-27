@@ -12,7 +12,8 @@ Full agent rules are in [AGENTS.md](../AGENTS.md) and repo conventions in [CLAUD
 - PR titles must follow: `[PI-N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[PI-42][feat] Add OAuth login`
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
 - PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
-- When asked to push/finish a PR, continue autonomously: push, run `.claude/scripts/monitor-pr.sh <pr-number> --merge`, inspect any failed checks or review comments it reports, fix actionable feedback, push again, and rerun the script until it merges cleanly.
+- When asked to push/finish a PR, continue autonomously: run `.claude/scripts/push-branch.sh` (handles transient 5xx by verifying remote SHA), then `.claude/scripts/monitor-pr.sh <pr-number> --merge`, inspect any failed checks or review comments it reports, fix actionable feedback, push again, and rerun the monitor script until it merges cleanly.
+- Never use bare `git push` for branch publishing — always use `.claude/scripts/push-branch.sh` so transient GitHub errors don't silently fail or cause confusing "Everything up-to-date" retries.
 
 ### Python tooling
 - `uv run …` for all Python ops — never `pip install` or `python -m venv`

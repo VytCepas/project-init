@@ -6,3 +6,4 @@ Helper scripts invoked by the user, by hooks, or by agents via the Bash tool. Pr
 
 - **`install-hooks.sh`** — Symlink or copy git hooks from `.github/hooks/` to `.git/hooks/`
 - **`monitor-pr.sh`** — Monitor a PR for test completion and review status (1-min checks, max 5 retries)
+- **`push-branch.sh`** — Push current branch with retry and remote-SHA verification (handles transient 5xx errors)
