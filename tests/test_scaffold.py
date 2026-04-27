@@ -1439,6 +1439,7 @@ class TestScaffoldGitHubFiles:
         content = (self.target / ".github" / "hooks" / "commit-msg").read_text()
         assert "nojira" in content
         assert "feat|fix|chore|docs|test" in content
+        assert "[A-Z]" in content  # accepts any project key (PI-, APP-, etc.)
 
     def test_commit_msg_hook_is_executable(self):
         hook = self.target / ".github" / "hooks" / "commit-msg"
@@ -1452,12 +1453,14 @@ class TestScaffoldGitHubFiles:
         assert not matches, f"Unrendered placeholders in GEMINI.md: {matches}"
 
 
-def test_project_validate_pr_workflow_uses_pi_key():
+def test_project_validate_pr_workflow_accepts_project_keys():
+    """The live validate-pr.yml must accept any project key (PI-, APP-, etc.) not just PI-."""
     content = (
         Path(__file__).resolve().parent.parent / ".github" / "workflows" / "validate-pr.yml"
     ).read_text()
-    assert "PI-[0-9]+" in content
-    assert "[PI-IssueNumber][type]" in content
+    assert "[A-Z]" in content  # generic project key pattern
+    assert "nojira" in content
+    assert "feat|fix|chore|docs|test" in content
 
 
 class TestREADMEExampleCommand:

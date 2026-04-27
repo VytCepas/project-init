@@ -80,8 +80,19 @@ fi
 # --- Push and set upstream ---
 git push -u origin "$BRANCH"
 
+# --- Resolve project key (e.g. "PI" → "[PI-42]", fallback to "[#42]") ---
+# Set PROJECT_KEY env var, or add `project_key: PI` to .claude/config.yaml
+if [ -z "${PROJECT_KEY:-}" ]; then
+  PROJECT_KEY=$(grep -oP '(?<=project_key: ).*' .claude/config.yaml 2>/dev/null | tr -d '[:space:]"' || true)
+fi
+if [ -n "${PROJECT_KEY:-}" ]; then
+  ISSUE_REF="${PROJECT_KEY}-${ISSUE_NUMBER}"
+else
+  ISSUE_REF="#${ISSUE_NUMBER}"
+fi
+
 # --- Open draft PR ---
-PR_TITLE="[#${ISSUE_NUMBER}][${TYPE}] ${CLEAN_TITLE}"
+PR_TITLE="[${ISSUE_REF}][${TYPE}] ${CLEAN_TITLE}"
 PR_BODY="Closes #${ISSUE_NUMBER}"
 
 echo "Creating draft PR..."
