@@ -50,18 +50,19 @@ if [ -z "$ISSUE_TITLE" ]; then
   exit 1
 fi
 
-# --- Derive branch name: <n>-<kebab-slug>, max 50 chars total ---
-# Strip leading [type] prefix if present (e.g. "[feat] Add OAuth" → "Add OAuth")
+# --- Derive branch name: <type>/<n>-<kebab-slug>, max 60 chars total ---
+# Matches convention: feat/32-add-oauth-login, fix/99-null-pointer
+# Strip leading [type] prefix from issue title if present (e.g. "[feat] Add OAuth" → "Add OAuth")
 CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[^]]*\] *//')
 SLUG=$(echo "$CLEAN_TITLE" \
   | tr '[:upper:]' '[:lower:]' \
   | tr -cs 'a-z0-9' '-' \
   | sed 's/^-//;s/-$//')
 PREFIX="${ISSUE_NUMBER}-"
-MAX_SLUG=$(( 50 - ${#PREFIX} ))
+MAX_SLUG=$(( 60 - ${#TYPE} - 1 - ${#PREFIX} ))  # -1 for the /
 SLUG="${SLUG:0:$MAX_SLUG}"
 SLUG="${SLUG%-}"   # trim trailing dash if truncated mid-word
-BRANCH="${PREFIX}${SLUG}"
+BRANCH="${TYPE}/${PREFIX}${SLUG}"
 
 echo "Branch: $BRANCH"
 
