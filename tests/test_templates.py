@@ -181,6 +181,7 @@ class TestScaffoldGitHubFiles:
         assert "gh pr checks" in content
         assert "--json" in content  # uses json polling, not --watch, to suppress noise
         assert "--delete-branch" in content
+        assert 'grep -v "^$" || true' in content
 
     def test_finish_pr_wraps_push_ready_monitor_flow(self):
         script = self.target / ".claude" / "scripts" / "finish-pr.sh"
