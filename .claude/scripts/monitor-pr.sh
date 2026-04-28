@@ -116,7 +116,10 @@ while { [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UN
   sleep 15
   REVIEW_ELAPSED=$((REVIEW_ELAPSED + 15))
   REVIEW_DECISION=$(_get_review_decision)
-  echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
+  # Print a status line once per minute to avoid noise
+  if [ $((REVIEW_ELAPSED % 60)) -eq 0 ]; then
+    echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
+  fi
   # Refresh CHECKS too so late-arriving CI failures are caught
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
 done
