@@ -26,6 +26,7 @@ venv/
 *.log
 logs/
 
-# Local agent runtime state
-.claude/
+# Local agent runtime state — .claude/skills/ is tracked (committed)
+.claude/*
+!.claude/skills
 .codex
