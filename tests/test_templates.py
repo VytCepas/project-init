@@ -182,6 +182,16 @@ class TestScaffoldGitHubFiles:
         assert "--json" in content  # uses json polling, not --watch, to suppress noise
         assert "--delete-branch" in content
 
+    def test_finish_pr_wraps_push_ready_monitor_flow(self):
+        script = self.target / ".claude" / "scripts" / "finish-pr.sh"
+        assert script.is_file()
+        assert script.stat().st_mode & 0o111, "finish-pr.sh must be executable"
+        content = script.read_text()
+        assert "push-branch.sh" in content
+        assert "promote-review.sh" in content
+        assert "monitor-pr.sh" in content
+        assert "--review-cycle" in content
+
     def test_validate_pr_enforces_project_key_title_format(self):
         """PR title must match [PROJECT-123][type] or [nojira][type] format."""
         content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()

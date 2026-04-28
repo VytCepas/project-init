@@ -15,6 +15,7 @@ Canonical agent rules: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-in
 - Draft PRs are opened immediately when work starts, not when done
 - When asked to push/finish a PR, continue autonomously using the review cycle protocol below.
 - Never use bare `git push` for branch publishing — always use `.claude/scripts/push-branch.sh` so transient GitHub errors don't silently fail.
+- Prefer `.claude/scripts/finish-pr.sh <pr-number>` when the user asks to finish a PR; it pushes, marks ready, runs `monitor-pr.sh --merge`, and preserves the review-cycle behavior.
 - No direct commits to `main`
 
 ### Review cycle protocol (max 2 rounds, then admin merge)
