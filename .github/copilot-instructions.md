@@ -4,6 +4,13 @@ Full agent rules and repo conventions are in [CLAUDE.md](../CLAUDE.md). [AGENTS.
 
 Read this file before any GitHub issue, branch, push, PR, review, CI, or merge work. These workflow rules are mandatory, not optional background context.
 
+## For Copilot code review
+
+- **Always read the current file state** before suggesting changes. Your training data may be outdated; the actual code in this PR is authoritative.
+- **Do not suggest patterns that contradict what is already in the file.** Read the full function/file context before commenting.
+- **Flag stale suggestions yourself** — if the issue you spotted is already handled elsewhere in the diff, say so rather than flagging it as an open problem.
+- Reference `.claude/skills/INDEX.md` for the list of available skills if you need to suggest workflow improvements.
+
 ## Quick reference (Copilot Workspace / inline chat)
 
 ### Issue & project tracking
