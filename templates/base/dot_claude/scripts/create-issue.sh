@@ -11,17 +11,6 @@
 
 set -euo pipefail
 
-# ---------------------------------------------------------------------------
-# Project config — read from .claude/config.yaml when present.
-# project_key: if set (e.g. "PI"), the issue title becomes [PI][feat] description.
-# ---------------------------------------------------------------------------
-PROJECT_KEY=""
-if [ -f ".claude/config.yaml" ]; then
-  PROJECT_KEY=$(grep -m1 'project_key:' .claude/config.yaml \
-    | sed 's/.*project_key:[[:space:]]*//' \
-    | tr -d '"'"'"'[:space:]')
-fi
-
 VALID_TYPES="feat fix chore docs test"
 VALID_PRIORITIES="high medium low"
 VALID_SIZES="XS S M L XL"
@@ -48,11 +37,6 @@ Options:
   --milestone NAME                Set milestone by name
   --body-file FILE                Append extra markdown body content
   -h, --help                      Show this help
-
-Project key:
-  If .claude/config.yaml has a non-empty project_key, the title becomes
-  [KEY][type] description (e.g. [PI][feat] Add OAuth login). This makes issues
-  identifiable when viewed from a cross-repo GitHub Project board.
 
 Sub-issues:
   --parent links the new issue as a native GitHub sub-issue of the given parent.
@@ -252,11 +236,7 @@ case "$TYPE" in
   test)  TYPE_LABEL="test" ;;
 esac
 
-if [ -n "$PROJECT_KEY" ]; then
-  TITLE="[$PROJECT_KEY][$TYPE] $DESCRIPTION"
-else
-  TITLE="[$TYPE] $DESCRIPTION"
-fi
+TITLE="$DESCRIPTION"
 
 BODY_PATH=$(mktemp)
 trap 'rm -f "$BODY_PATH"' EXIT
