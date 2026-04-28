@@ -26,7 +26,8 @@ venv/
 *.log
 logs/
 
-# Local agent runtime state — .claude/skills/ is tracked (committed)
+# Local agent runtime state — skills/ and hooks/ are tracked (committed)
 .claude/*
 !.claude/skills
+!.claude/hooks
 .codex
