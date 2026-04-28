@@ -108,10 +108,14 @@ done
 REVIEW_TIMEOUT=600
 REVIEW_ELAPSED=0
 REVIEW_DECISION=$(_get_review_decision)
+if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
+  echo "Waiting for reviewer (up to ${REVIEW_TIMEOUT}s) — reviewDecision: REVIEW_REQUIRED"
+fi
 while [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] && [ "$REVIEW_ELAPSED" -lt "$REVIEW_TIMEOUT" ]; do
   sleep 15
   REVIEW_ELAPSED=$((REVIEW_ELAPSED + 15))
   REVIEW_DECISION=$(_get_review_decision)
+  echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
   # Refresh CHECKS too so late-arriving CI failures are caught
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
 done
