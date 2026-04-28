@@ -6,7 +6,8 @@ project:
   description: "{{project_description}}"
   created: {{created_date}}
   project_init_version: {{project_init_version}}
-  project_key: ""   # e.g. "PI" -> branches use feat/PI-42-slug and PR titles use [PI-42][feat]; blank derives from repo name
+  project_key: ""          # e.g. "PI" → branches use feat/PI-42-slug, PR titles use [PI-42][feat], issue titles use [PI][feat]
+  github_project_number: 1 # numeric GitHub Project V2 board number (used by board-automation.yml and create-issue.sh)
 
 language: {{language}}            # python | node | go | none
 

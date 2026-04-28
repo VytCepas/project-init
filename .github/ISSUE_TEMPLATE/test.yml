@@ -21,3 +21,20 @@ body:
     attributes:
       label: Suggested approach
       placeholder: "Unit test, scaffold-output diff, CLI test, workflow validation..."
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: [high, medium, low, unset]
+      default: 3
+  - type: input
+    id: area
+    attributes:
+      label: Area / component
+      placeholder: "e.g. scaffold, templates, scripts, ci"
+  - type: input
+    id: parent
+    attributes:
+      label: Parent issue
+      description: Use #N (same repo) or owner/repo#N (cross-repo).
+      placeholder: "#42 or VytCepas/other-repo#7"
