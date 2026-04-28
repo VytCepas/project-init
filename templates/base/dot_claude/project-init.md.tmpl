@@ -25,6 +25,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Command | `/plan <task>` | acceptance tests first, then implementation plan |
 | Command | `/request-review` | mark PR ready for review, optional agent review |
 | Script | `create-issue.sh <type> "desc"` | create typed issue, prints issue number |
+| Script | `setup-github.sh [branch]` | configure branch protection and review governance |
 | Script | `start-issue.sh <n> <type>` | branch + draft PR |
 | Script | `promote-review.sh` | mark PR ready (board card moves automatically) |
 | Script | `monitor-pr.sh <n> [--merge]` | wait for CI; --merge squash-merges when clean |
@@ -34,7 +35,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Agent | `reviewer` | code review specialist |
 | Agent | `researcher` | codebase explorer |
 
-Hooks run automatically via `settings.json`: `bash-safety-guard`, `pre-commit-gate`, `post-edit-lint`{{#if obsidian}}, `session-end`{{/if}}.
+Hooks run automatically via `settings.json`: `bash-safety-guard`, `github-command-guard`, `workflow-state-reminder`, `pre-commit-gate`, `post-edit-lint`{{#if obsidian}}, `session-end`{{/if}}.
 
 **Rules** (`.claude/rules/`): per-filetype conventions loaded automatically by Claude Code when you open a matching file.
 
@@ -70,7 +71,7 @@ Every non-trivial task follows this exact sequence. Run the scripts; the LLM's o
 
 | Step | Command | What happens automatically |
 |------|---------|---------------------------|
-| 1. Create issue | `.claude/scripts/create-issue.sh <type> "description"` | Issue created, board card → **To Do** |
+| 1. Create issue | `.claude/scripts/create-issue.sh <type> "description" --priority <priority> --area "<area>" --size <size> --acceptance "<criterion>"` | Issue created with metadata, board card → **To Do** |
 | 2. Start work | `.claude/scripts/start-issue.sh <issue-n> <type>` | Branch (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) + push + draft PR, board → **In Progress** |
 | 3. Commit | `git add … && git commit -m "[#n][type] message"` | `commit-msg` hook validates format; `pre-commit-gate` auto-lints |
 | 4. Push | `git push` | CI runs; if it fails a comment is posted on the PR with `gh run view --log-failed` |
@@ -87,6 +88,14 @@ Automated completion via `monitor-pr.sh --merge` works after checks pass. GitHub
 2. **Branch protection rule on `main`** — require CI status checks to pass
 
 Without GitHub-native auto-merge, `monitor-pr.sh --merge` still works by merging explicitly after CI passes.
+
+Run the scaffolded setup helper after creating the repository:
+
+```bash
+.claude/scripts/setup-github.sh
+```
+
+It attempts to configure branch protection, required checks, conversation resolution, and Copilot code review. If GitHub does not expose a setting through the API or your token lacks permission, it prints the manual setup step.
 
 ### Commit and PR format
 
@@ -129,8 +138,9 @@ Run `/request-review` to also invoke the `reviewer` agent (~500 extra tokens). S
 ### Quick reference
 
 ```bash
-.claude/scripts/create-issue.sh <type> "description"  # new issue → prints issue number
+.claude/scripts/create-issue.sh <type> "description" --priority high --area docs --size S --acceptance "Done when ..."  # new issue → prints issue number
 .claude/scripts/start-issue.sh <n> <type>             # branch + draft PR
+.claude/scripts/setup-github.sh                       # one-time branch protection/review setup
 .claude/scripts/promote-review.sh                     # mark PR ready for review
 .claude/scripts/monitor-pr.sh <n> --merge             # wait for CI, merge when clean
 gh run view --log-failed                              # see what CI failed

@@ -4,7 +4,7 @@ Load the relevant skill file when the trigger applies. Do not load all skills at
 
 | When you need to... | Load this skill |
 |---|---|
-| Create a GitHub Issue | `.claude/skills/create-issue/SKILL.md` (if present) or use `create-issue.sh` |
+| Create a GitHub Issue | `.claude/skills/create-issue/SKILL.md` |
 | Start a new task (branch + draft PR) | `.claude/skills/start-task/SKILL.md` |
 | Push, review, or merge a PR | `.claude/skills/github-workflow/SKILL.md` (if present) or follow `.github/copilot-instructions.md` |
 | Summarize the session | `.claude/skills/session-summary/SKILL.md` |

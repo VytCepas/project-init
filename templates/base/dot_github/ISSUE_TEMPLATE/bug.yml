@@ -2,6 +2,27 @@ name: Bug
 description: Something is broken
 labels: [bug]
 body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: [high, medium, low]
+    validations:
+      required: true
+  - type: input
+    id: area
+    attributes:
+      label: Area
+      placeholder: frontend, backend, docs, devops, product
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options: [XS, S, M, L, XL]
+    validations:
+      required: true
   - type: textarea
     id: description
     attributes:
@@ -29,3 +50,35 @@ body:
     attributes:
       label: Environment
       placeholder: "OS, runtime version, dependency versions"
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Related issues, PRs, ADRs, docs, designs, logs, or external links.
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Blocked-by, parent, or follow-up relationships.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: ready
+    attributes:
+      label: Definition of Ready
+      placeholder: What must be true before implementation starts?
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of Done
+      placeholder: What must be true before this can close?
+    validations:
+      required: true

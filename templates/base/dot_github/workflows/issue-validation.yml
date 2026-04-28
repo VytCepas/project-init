@@ -1,0 +1,67 @@
+name: Validate issue metadata
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  issues: write
+
+jobs:
+  validate-issue:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate required planning metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          LABELS_JSON: ${{ toJson(github.event.issue.labels) }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+
+          require_text() {
+            local name="$1"
+            local pattern="$2"
+            if ! printf '%s\n' "$ISSUE_BODY" | grep -qiE "$pattern"; then
+              missing+=("$name")
+            fi
+          }
+
+          require_label_prefix() {
+            local name="$1"
+            local prefix="$2"
+            if ! printf '%s\n' "$LABELS_JSON" | grep -q "\"name\":\"$prefix"; then
+              missing+=("$name")
+            fi
+          }
+
+          require_text "Priority" 'Priority'
+          require_text "Area" 'Area'
+          require_text "Size" 'Size'
+          require_text "References" 'References'
+          require_text "Dependencies" 'Dependencies'
+          require_text "Acceptance criteria" 'Acceptance criteria'
+          require_text "Definition of Ready" 'Definition of Ready'
+          require_text "Definition of Done" 'Definition of Done'
+          require_label_prefix "type label" ""
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            gh issue edit "$ISSUE_NUMBER" --add-label "status:needs-info" || true
+            {
+              echo "This issue is missing required planning metadata:"
+              echo
+              for item in "${missing[@]}"; do
+                echo "- $item"
+              done
+              echo
+              echo "Update the issue body or labels, then the status:needs-info label will be removed automatically."
+            } > /tmp/issue-validation-comment.md
+            gh issue comment "$ISSUE_NUMBER" --body-file /tmp/issue-validation-comment.md
+            exit 1
+          fi
+
+          gh issue edit "$ISSUE_NUMBER" --remove-label "status:needs-info" || true
+          echo "Issue metadata is complete."

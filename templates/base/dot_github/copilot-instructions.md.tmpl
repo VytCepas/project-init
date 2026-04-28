@@ -5,7 +5,7 @@ Canonical agent rules: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-in
 ## Issue & project tracking
 
 - Tracking system: **GitHub Projects** (kanban board) + **GitHub Issues** (tickets)
-- Create issues: `gh issue create` — use the right template (bug / feature / chore / docs / test)
+- Create issues: load `.claude/skills/create-issue/SKILL.md` and use `.claude/scripts/create-issue.sh`; it handles metadata gathering, priority labels, and acceptance criteria
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
 - Use a dedicated branch for each issue; format it as `<issue_type>/<project_abbr>-<issue_number>-<slug>`, e.g. `feat/PI-42-add-auth`; no direct commits to `main`
 - Issue and PR names use a project key: `<PROJECT-KEY>-<issue-number>`, e.g. `PI-42`
