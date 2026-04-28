@@ -17,7 +17,7 @@ Read this file before any GitHub issue, branch, push, PR, review, CI, or merge w
 - PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
 - When asked to push/finish a PR, continue autonomously: run `.claude/scripts/push-branch.sh` (handles transient 5xx by verifying remote SHA), then `.claude/scripts/monitor-pr.sh <pr-number> --merge`, inspect any failed checks or review comments it reports, fix actionable feedback, push again, and rerun the monitor script until it merges cleanly.
 - Never use bare `git push` for branch publishing — always use `.claude/scripts/push-branch.sh` so transient GitHub errors don't silently fail or cause confusing "Everything up-to-date" retries.
-- In this project-init source repo, root `.claude/scripts/` may not exist because those scripts are scaffolded templates. If a `.claude/scripts/<name>` command is unavailable, run the matching source template with `bash templates/base/dot_claude/scripts/<name>` and preserve the same behavior.
+- In this project-init source repo, root `.claude/scripts/` may not exist because those scripts are scaffolded-project artifacts. Do not run files under `templates/` as this repo's operational automation. If a `.claude/scripts/<name>` command is unavailable, use equivalent `git` / `gh` commands directly while preserving the same lifecycle behavior.
 
 ### Python tooling
 - `uv run …` for all Python ops — never `pip install` or `python -m venv`
