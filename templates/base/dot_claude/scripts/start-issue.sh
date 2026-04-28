@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start work on a GitHub issue: create branch, push, open draft PR, arm auto-merge.
+# Start work on a GitHub issue: create branch, push, and open a draft PR.
 #
 # Usage:
 #   .claude/scripts/start-issue.sh <issue-number> <type>
@@ -42,6 +42,42 @@ if ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+# --- Resolve project key / abbreviation ---
+# Set PROJECT_KEY env var, add `project_key: PI` to .claude/config.yaml,
+# or let the script derive one from the repository directory name.
+derive_project_key() {
+  if [ -n "${PROJECT_KEY:-}" ]; then
+    echo "$PROJECT_KEY"
+    return
+  fi
+
+  local configured=""
+  configured=$(grep '^[[:space:]]*project_key:' .claude/config.yaml 2>/dev/null \
+    | head -n 1 \
+    | cut -d: -f2- \
+    | sed 's/#.*$//' \
+    | tr -d '[:space:]"' \
+    | tr -d "'" || true)
+  if [ -n "$configured" ]; then
+    echo "$configured"
+    return
+  fi
+
+  local repo_name=""
+  repo_name=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+  echo "$repo_name" \
+    | tr '[:lower:]' '[:upper:]' \
+    | tr -cs 'A-Z0-9' '\n' \
+    | awk 'NF { printf substr($0, 1, 1) }' \
+    | cut -c1-10
+}
+
+PROJECT_KEY=$(derive_project_key)
+PROJECT_KEY=$(echo "$PROJECT_KEY" | tr '[:lower:]' '[:upper:]' | tr -cd 'A-Z0-9')
+if [ -z "$PROJECT_KEY" ]; then
+  PROJECT_KEY="PROJ"
+fi
+
 # --- Fetch issue title ---
 echo "Fetching issue #$ISSUE_NUMBER..."
 ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title -q '.title' 2>/dev/null)
@@ -50,16 +86,21 @@ if [ -z "$ISSUE_TITLE" ]; then
   exit 1
 fi
 
-# --- Derive branch name: <type>/<n>-<kebab-slug>, max 60 chars total ---
-# Matches convention: feat/32-add-oauth-login, fix/99-null-pointer
-# Strip leading [type] prefix from issue title if present (e.g. "[feat] Add OAuth" → "Add OAuth")
+ISSUE_REF="${PROJECT_KEY}-${ISSUE_NUMBER}"
+
+# --- Derive branch name: <issue_type>/<project_abbr>-<issue_number>-<kebab-slug>, max 80 chars total ---
+# Matches convention: feat/PI-42-add-oauth-login, fix/API-99-null-pointer
+# Strip leading [type] prefix from issue title if present (e.g. "[feat] Add OAuth" -> "Add OAuth")
 CLEAN_TITLE=$(echo "$ISSUE_TITLE" | sed 's/^\[[^]]*\] *//')
 SLUG=$(echo "$CLEAN_TITLE" \
   | tr '[:upper:]' '[:lower:]' \
   | tr -cs 'a-z0-9' '-' \
   | sed 's/^-//;s/-$//')
-PREFIX="${ISSUE_NUMBER}-"
-MAX_SLUG=$(( 60 - ${#TYPE} - 1 - ${#PREFIX} ))  # -1 for the /
+PREFIX="${ISSUE_REF}-"
+MAX_SLUG=$(( 80 - ${#TYPE} - 1 - ${#PREFIX} ))  # -1 for the /
+if [ "$MAX_SLUG" -lt 12 ]; then
+  MAX_SLUG=12
+fi
 SLUG="${SLUG:0:$MAX_SLUG}"
 SLUG="${SLUG%-}"   # trim trailing dash if truncated mid-word
 BRANCH="${TYPE}/${PREFIX}${SLUG}"
@@ -71,7 +112,7 @@ CURRENT=$(git branch --show-current)
 if [ "$CURRENT" = "$BRANCH" ]; then
   echo "Already on branch $BRANCH"
 elif git show-ref --verify --quiet "refs/heads/$BRANCH"; then
-  echo "Branch $BRANCH already exists — switching"
+  echo "Branch $BRANCH already exists - switching"
   git checkout "$BRANCH"
 else
   git checkout -b "$BRANCH"
@@ -79,17 +120,6 @@ fi
 
 # --- Push and set upstream (retry + remote-SHA verification) ---
 .claude/scripts/push-branch.sh "$BRANCH"
-
-# --- Resolve project key (e.g. "PI" → "[PI-42]", fallback to "[#42]") ---
-# Set PROJECT_KEY env var, or add `project_key: PI` to .claude/config.yaml
-if [ -z "${PROJECT_KEY:-}" ]; then
-  PROJECT_KEY=$(grep -oP '(?<=project_key: ).*' .claude/config.yaml 2>/dev/null | tr -d '[:space:]"' || true)
-fi
-if [ -n "${PROJECT_KEY:-}" ]; then
-  ISSUE_REF="${PROJECT_KEY}-${ISSUE_NUMBER}"
-else
-  ISSUE_REF="#${ISSUE_NUMBER}"
-fi
 
 # --- Open draft PR ---
 PR_TITLE="[${ISSUE_REF}][${TYPE}] ${CLEAN_TITLE}"
@@ -103,15 +133,6 @@ PR_URL=$(gh pr create \
 
 echo "Draft PR: $PR_URL"
 
-# --- Arm auto-merge (requires repo setting: Allow auto-merge + branch protection) ---
-PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-if gh pr merge "$PR_NUMBER" --auto --squash --delete-branch 2>/dev/null; then
-  echo "Auto-merge armed — GitHub will merge when CI passes and requirements are met"
-else
-  echo "Note: auto-merge not available (enable in repo Settings → General → Allow auto-merge)"
-  echo "Run manually when ready: gh pr merge $PR_NUMBER --squash --delete-branch"
-fi
-
 echo ""
 echo "Ready. Branch: $BRANCH | PR: $PR_URL"
-echo "Next: implement, commit, push. Then run promote-review.sh when ready for review."
+echo "Next: implement, commit, push. Then run promote-review.sh when ready for review and monitor-pr.sh --merge when checks pass."

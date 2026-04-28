@@ -1,29 +1,5 @@
-# Gemini Agent Instructions — {{project_name}}
+# Gemini Agent Instructions
 
-See [AGENTS.md](AGENTS.md) for full agent rules and layout spec, and [CLAUDE.md](CLAUDE.md) for project conventions.
+Canonical instructions for this project live in [CLAUDE.md](CLAUDE.md).
 
-## Quick reference
-
-### Orientation
-1. Read [`.claude/project-init.md`](.claude/project-init.md) — workflow and coding standards
-2. Read [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) — prior context index
-3. Check open issues: `gh issue list`
-
-### Issue & project tracking
-- Tracking system: **GitHub Projects** (kanban board) + **GitHub Issues** (tickets)
-- Create issues: `gh issue create` — use the right template (bug / feature / chore)
-- Board cards move automatically via `board-automation.yml` — no manual updates needed
-- Use a dedicated branch for each issue; include the project key, e.g. `PI-42-add-auth`; no direct commits to `main`
-- Issue, branch, and PR names use a project key: `<PROJECT-KEY>-<issue-number>`, e.g. `PI-42`
-- PR titles must follow: `[PROJECT-123][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[PI-42][feat] Add OAuth login`
-- For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
-- PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
-- Draft PRs are opened immediately when work starts, not when done
-- When asked to push/finish a PR, continue autonomously: push, run `.claude/scripts/monitor-pr.sh <pr-number> --merge`, inspect any failed checks or review comments it reports, fix actionable feedback, push again, and rerun the script until it merges cleanly.
-
-### Key rules
-- One issue → one branch → one PR.
-- Write failing tests before implementation (TDD).
-- No secrets in code — use `os.environ` or `.env` (gitignored).
-{{#if lint_command}}- `{{lint_command}}` must pass before closing a task.
-{{/if}}- Prefer deterministic bash/python over LLM calls for hooks and scripts.
+Read [CLAUDE.md](CLAUDE.md) before working in this codebase. It is the source of truth for workflow, conventions, memory, tools, and branch naming.

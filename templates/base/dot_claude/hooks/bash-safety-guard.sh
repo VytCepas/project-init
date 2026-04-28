@@ -27,7 +27,7 @@ fi
 # Force push to protected branches
 if printf '%s' "$CMD" | grep -qE 'git push.*(--force|-f)' && \
    printf '%s' "$CMD" | grep -qE '(main|master|production|prod|release)'; then
-    block "Blocked: force push to a protected branch (main/master/production). Use a project-key branch like PI-42-short-title, or ask the user to confirm explicitly."
+    block "Blocked: force push to a protected branch (main/master/production). Use a project-key branch like feat/PI-42-short-title, or ask the user to confirm explicitly."
 fi
 
 # Hard reset without an explicit path (blanket discard of working tree)

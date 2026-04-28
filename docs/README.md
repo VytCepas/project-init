@@ -12,7 +12,7 @@ Architecture decisions, development guides, and references for contributors and 
 
 ## Agent instruction
 
-For active agent workflow rules, start with `AGENTS.md`. Use `CLAUDE.md` for repo conventions and `.github/copilot-instructions.md` for GitHub Issues, PR titles, PR bodies, and board behavior.
+For active agent workflow rules, start with `CLAUDE.md`. `AGENTS.md` and `GEMINI.md` redirect there. Use `.github/copilot-instructions.md` for GitHub Issues, PR titles, PR bodies, and board behavior.
 
 ## Adding an ADR
 

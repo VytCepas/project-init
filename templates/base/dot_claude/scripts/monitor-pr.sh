@@ -75,6 +75,6 @@ fi
 echo "PR #$PR_NUMBER passed: $PR_URL"
 
 if [ "$MODE" = "--merge" ]; then
-  gh pr merge "$PR_NUMBER" --squash --delete-branch --yes 2>&1 | grep -v "^$"
+  GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1 | grep -v "^$"
   echo "Merged PR #$PR_NUMBER"
 fi

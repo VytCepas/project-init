@@ -11,7 +11,7 @@ uv sync --extra dev
 ## Workflow
 
 1. `gh issue list` — pick or create an issue
-2. Create a branch for the issue work using `PI-<issue-number>` in the name
+2. Create a branch for the issue work using `<issue_type>/PI-<issue-number>-<branch-short-description>`
 3. Write failing tests first (TDD)
 4. Implement until tests pass
 5. `uv run ruff check . && uv run ruff format .` — lint and format

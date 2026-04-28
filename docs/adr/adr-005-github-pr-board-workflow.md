@@ -32,7 +32,7 @@ Each step maps to a GitHub Projects board column:
 
 ### Ticket, branch, and PR naming
 
-Use the Project Init key `PI-<issue-number>` in issue titles, branch names, and PR titles. Keep branch names short and descriptive after the key.
+Use the Project Init key `PI-<issue-number>` in issue titles and PR titles. Branch names must include the issue type prefix and project key: `<issue_type>/PI-<issue-number>-<branch-short-description>`. Keep branch names short and descriptive after the key.
 
 ### PR rules
 

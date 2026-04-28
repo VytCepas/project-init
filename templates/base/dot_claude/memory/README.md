@@ -30,7 +30,7 @@ type: user | feedback | project | reference
 - Code patterns/architecture (derivable from the repo)
 - Git history (use `git log`)
 - Ephemeral task state (use TODOs)
-- Anything already in `project-init.md` or `AGENTS.md`
+- Anything already in `CLAUDE.md` or `project-init.md`
 
 ## Index
 
