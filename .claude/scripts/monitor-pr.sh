@@ -93,6 +93,12 @@ PR_URL=$(gh pr view "$PR_NUMBER" --json url -q '.url')
 echo "PR #$PR_NUMBER passed: $PR_URL"
 
 if [ "$MODE" = "--merge" ]; then
-  GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1 | grep -v "^$"
-  echo "Merged PR #$PR_NUMBER"
+  # Try direct merge first; if branch protection blocks it, fall back to --auto
+  # (queues merge to happen once all requirements, e.g. review approval, are met).
+  if ! GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch 2>/dev/null; then
+    GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --auto 2>&1 | grep -v "^$"
+    echo "Auto-merge enabled for PR #$PR_NUMBER — will merge once all requirements are met."
+  else
+    echo "Merged PR #$PR_NUMBER"
+  fi
 fi
