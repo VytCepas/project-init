@@ -7,7 +7,7 @@ name: Board automation
 #   - PROJECT_NUMBER variable (or hardcoded below): the numeric project board number
 #
 # Column transitions:
-#   issue opened          → To Do
+#   issue opened          → Backlog
 #   PR opened (draft)     → In Progress  (linked issue, via "Closes #N" in body)
 #   PR ready_for_review   → In Review    (linked issue)
 #   PR merged             → Done         (linked issue)
@@ -37,7 +37,7 @@ jobs:
           ACTION="${{ github.event.action }}"
 
           if [[ "$EVENT" == "issues" && "$ACTION" == "opened" ]]; then
-            echo "status=To Do" >> $GITHUB_OUTPUT
+            echo "status=Backlog" >> $GITHUB_OUTPUT
             echo "item_type=issue" >> $GITHUB_OUTPUT
 
           elif [[ "$EVENT" == "pull_request" && "$ACTION" == "opened" ]]; then

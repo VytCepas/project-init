@@ -14,6 +14,7 @@ set -euo pipefail
 VALID_TYPES="feat fix chore docs test"
 VALID_PRIORITIES="high medium low"
 VALID_SIZES="XS S M L XL"
+VALID_SCALES="epic task"
 
 usage() {
   cat <<'EOF'
@@ -26,6 +27,9 @@ Options:
   --priority high|medium|low      Apply priority label and body metadata
   --area VALUE                    Record affected area in body metadata
   --size XS|S|M|L|XL              Apply size label and body metadata
+  --scale epic|task               Mark as epic (parent) or task (leaf); adds scale label
+  --parent VALUE                  Link new issue as sub-issue of VALUE
+                                  Formats: 42, #42, owner/repo#42, or full issue URL
   --reference VALUE               Add a reference; repeatable
   --dependency VALUE              Add a dependency; repeatable
   --acceptance VALUE              Add an acceptance criterion; repeatable
@@ -34,9 +38,14 @@ Options:
   --body-file FILE                Append extra markdown body content
   -h, --help                      Show this help
 
+Sub-issues:
+  --parent links the new issue as a native GitHub sub-issue of the given parent.
+  Cross-repo parents use owner/repo#42 or the full issue URL.
+  --scale epic marks this issue as a parent work item (adds scale:epic label).
+
 Metadata model:
-  GitHub labels: type, priority, and size when labels exist or can be created.
-  Markdown body: area, references, dependencies, acceptance criteria, notes,
+  GitHub labels: type, priority, size, and scale when labels exist or can be created.
+  Markdown body: area, scale, parent, references, dependencies, acceptance criteria,
   Definition of Ready, and Definition of Done.
 
 Missing label fallback:
@@ -62,6 +71,8 @@ shift 2
 PRIORITY=""
 AREA=""
 SIZE=""
+SCALE=""
+PARENT=""
 ASSIGNEE=""
 MILESTONE=""
 BODY_FILE=""
@@ -100,6 +111,16 @@ while [ $# -gt 0 ]; do
     --size)
       require_option_value "$1" "${2:-}"
       SIZE="$2"
+      shift 2
+      ;;
+    --scale)
+      require_option_value "$1" "${2:-}"
+      SCALE="$2"
+      shift 2
+      ;;
+    --parent)
+      require_option_value "$1" "${2:-}"
+      PARENT="$2"
       shift 2
       ;;
     --reference)
@@ -164,9 +185,47 @@ if [ -n "$SIZE" ] && ! contains_word "$SIZE" "$VALID_SIZES"; then
   exit 1
 fi
 
+if [ -n "$SCALE" ] && ! contains_word "$SCALE" "$VALID_SCALES"; then
+  echo "ERROR: invalid scale '$SCALE'. Valid scales: $VALID_SCALES" >&2
+  exit 1
+fi
+
 if [ -n "$BODY_FILE" ] && [ ! -f "$BODY_FILE" ]; then
   echo "ERROR: body file not found: $BODY_FILE" >&2
   exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Parse --parent reference into owner / repo / number.
+# Accepts: 42, #42, owner/repo#42, or full GitHub issue URL.
+# Sets globals PARENT_OWNER, PARENT_REPO, PARENT_NUMBER.
+# ---------------------------------------------------------------------------
+PARENT_OWNER=""
+PARENT_REPO=""
+PARENT_NUMBER=""
+
+parse_parent() {
+  local raw="${1#\#}"   # strip leading #
+  if [[ "$raw" =~ ^https://github\.com/([^/]+)/([^/]+)/issues/([0-9]+)$ ]]; then
+    PARENT_OWNER="${BASH_REMATCH[1]}"
+    PARENT_REPO="${BASH_REMATCH[2]}"
+    PARENT_NUMBER="${BASH_REMATCH[3]}"
+  elif [[ "$raw" =~ ^([^/#]+)/([^#]+)#([0-9]+)$ ]]; then
+    PARENT_OWNER="${BASH_REMATCH[1]}"
+    PARENT_REPO="${BASH_REMATCH[2]}"
+    PARENT_NUMBER="${BASH_REMATCH[3]}"
+  elif [[ "$raw" =~ ^[0-9]+$ ]]; then
+    PARENT_OWNER=$(gh repo view --json owner -q .owner.login)
+    PARENT_REPO=$(gh repo view --json name -q .name)
+    PARENT_NUMBER="$raw"
+  else
+    echo "ERROR: cannot parse parent '$1'. Use: 42, #42, owner/repo#42, or full URL" >&2
+    exit 1
+  fi
+}
+
+if [ -n "$PARENT" ]; then
+  parse_parent "$PARENT"
 fi
 
 case "$TYPE" in
@@ -177,7 +236,8 @@ case "$TYPE" in
   test)  TYPE_LABEL="test" ;;
 esac
 
-TITLE="[$TYPE] $DESCRIPTION"
+TITLE="$DESCRIPTION"
+
 BODY_PATH=$(mktemp)
 trap 'rm -f "$BODY_PATH"' EXIT
 
@@ -213,9 +273,13 @@ write_bullets() {
   echo "## Metadata"
   echo
   echo "- Type: $TYPE"
+  echo "- Scale: ${SCALE:-task}"
   echo "- Priority: ${PRIORITY:-unset}"
   echo "- Area: ${AREA:-unset}"
   echo "- Size: ${SIZE:-unset}"
+  if [ -n "$PARENT" ]; then
+    echo "- Parent: $PARENT_OWNER/$PARENT_REPO#$PARENT_NUMBER"
+  fi
   if [ -n "$ASSIGNEE" ]; then
     echo "- Assignee: @$ASSIGNEE"
   fi
@@ -288,6 +352,11 @@ if [ -n "$SIZE" ]; then
     [ -n "$LABEL" ] && LABEL_ARGS+=(--label "$LABEL")
   fi
 fi
+if [ -n "$SCALE" ]; then
+  if LABEL=$(ensure_label "scale:$SCALE" "f9d0c4" "Issue scale"); then
+    [ -n "$LABEL" ] && LABEL_ARGS+=(--label "$LABEL")
+  fi
+fi
 
 CREATE_ARGS=(--title "$TITLE" --body-file "$BODY_PATH")
 if [ -n "$ASSIGNEE" ]; then
@@ -299,5 +368,36 @@ fi
 
 ISSUE_URL=$(gh issue create "${CREATE_ARGS[@]}" "${LABEL_ARGS[@]}")
 ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+
+# ---------------------------------------------------------------------------
+# Link as a native GitHub sub-issue when --parent was specified.
+# Uses the addSubIssue GraphQL mutation (supports cross-repo parents via URL).
+# ---------------------------------------------------------------------------
+if [ -n "$PARENT" ]; then
+  PARENT_NODE_ID=$(gh api graphql -f query='
+    query($owner: String!, $repo: String!, $number: Int!) {
+      repository(owner: $owner, name: $repo) {
+        issue(number: $number) { id }
+      }
+    }' \
+    -f owner="$PARENT_OWNER" \
+    -f repo="$PARENT_REPO" \
+    -F number="$PARENT_NUMBER" \
+    --jq '.data.repository.issue.id')
+
+  CHILD_NODE_ID=$(gh api "repos/:owner/:repo/issues/$ISSUE_NUMBER" --jq '.node_id')
+
+  gh api graphql -f query='
+    mutation($parent: ID!, $child: ID!) {
+      addSubIssue(input: { issueId: $parent, subIssueId: $child }) {
+        issue { number }
+        subIssue { number }
+      }
+    }' \
+    -f parent="$PARENT_NODE_ID" \
+    -f child="$CHILD_NODE_ID" > /dev/null
+
+  echo "Linked #$ISSUE_NUMBER as sub-issue of $PARENT_OWNER/$PARENT_REPO#$PARENT_NUMBER" >&2
+fi
 
 echo "$ISSUE_NUMBER"

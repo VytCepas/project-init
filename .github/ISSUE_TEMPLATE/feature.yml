@@ -27,7 +27,37 @@ body:
     validations:
       required: true
   - type: dropdown
+    id: scale
+    attributes:
+      label: Scale
+      description: Is this a standalone task or a parent epic broken into sub-issues?
+      options: [task, epic]
+      default: 0
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: [high, medium, low, unset]
+      default: 3
+  - type: dropdown
     id: effort
     attributes:
-      label: Effort estimate
+      label: Size estimate
       options: [XS, S, M, L, XL]
+  - type: input
+    id: area
+    attributes:
+      label: Area / component
+      placeholder: "e.g. auth, scaffold, templates, ci"
+  - type: input
+    id: parent
+    attributes:
+      label: Parent issue
+      description: If this is a sub-task of a larger epic. Use #N (same repo) or owner/repo#N (cross-repo).
+      placeholder: "#42 or VytCepas/other-repo#7"
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Related issues, PRs, ADRs, external links, or cross-project context
+      placeholder: "- #N\n- owner/repo#N\n- https://..."

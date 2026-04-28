@@ -11,8 +11,8 @@ Read this file before any GitHub issue, branch, push, PR, review, CI, or merge w
 - Create issues: `gh issue create` — pick the right template (bug / feature / chore / docs / test)
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
 - Branch names use `<issue_type>/<project_abbr>-<issue_number>-<branch-short-description>`, e.g. `chore/PI-40-split-scaffold-tests`
-- Issue and PR names use the Project Init key: `PI-<issue-number>`, e.g. `PI-42`
-- PR titles must follow: `[PI-N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[PI-42][feat] Add OAuth login`
+- **Issue titles**: plain description only — no prefix. Type is carried by the label (`feature`, `bug`, etc.) which GitHub shows everywhere. E.g. `Add OAuth login`, not `[feat] Add OAuth login`.
+- **PR titles** must follow `[PI-N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[PI-42][feat] Add OAuth login`. The type prefix is kept here because PR titles become merge commit messages in `git log`, where labels are invisible. This enables changelog generation and quick log scanning.
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
 - PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
 - When asked to push/finish a PR, continue autonomously using the review cycle protocol below.

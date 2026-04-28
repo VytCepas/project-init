@@ -24,6 +24,29 @@ body:
       label: Expected behaviour
     validations:
       required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: [high, medium, low, unset]
+      default: 3
+  - type: input
+    id: area
+    attributes:
+      label: Area / component
+      placeholder: "e.g. auth, scaffold, templates, ci"
+  - type: input
+    id: source_project
+    attributes:
+      label: Source project
+      description: If this bug was reported from another project or repo, record it here.
+      placeholder: "owner/repo or owner/repo#N"
+  - type: input
+    id: parent
+    attributes:
+      label: Parent issue
+      description: If this bug is tracked under a larger epic. Use #N or owner/repo#N.
+      placeholder: "#42 or VytCepas/other-repo#7"
   - type: textarea
     id: environment
     attributes:
