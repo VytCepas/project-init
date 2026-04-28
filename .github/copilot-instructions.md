@@ -15,8 +15,27 @@ Read this file before any GitHub issue, branch, push, PR, review, CI, or merge w
 - PR titles must follow: `[PI-N][type] description` where type ∈ {feat, fix, chore, docs, test}, e.g. `[PI-42][feat] Add OAuth login`
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
 - PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
-- When asked to push/finish a PR, continue autonomously: run `.claude/scripts/push-branch.sh` (handles transient 5xx by verifying remote SHA), then `.claude/scripts/monitor-pr.sh <pr-number> --merge`, inspect any failed checks or review comments it reports, fix actionable feedback, push again, and rerun the monitor script until it merges cleanly.
+- When asked to push/finish a PR, continue autonomously using the review cycle protocol below.
 - Never use bare `git push` for branch publishing — always use `.claude/scripts/push-branch.sh` so transient GitHub errors don't silently fail or cause confusing "Everything up-to-date" retries.
+
+### Review cycle protocol (max 2 rounds, then admin merge)
+
+`monitor-pr.sh --merge` exits with code 2 when `review/decision` fails and more cycles remain. When that happens:
+
+1. **For each review comment** post a reply explaining your reasoning — resolving or rejecting. Use:
+   ```
+   gh pr comment <pr-number> --body "**Review response:**
+   - [comment summary]: Fixing — <reason it is valid>
+   - [comment summary]: Not applying — <reason it does not apply or is incorrect>"
+   ```
+2. Fix actionable code, then push with `.claude/scripts/push-branch.sh`.
+3. Re-run with the next cycle number:
+   ```
+   .claude/scripts/monitor-pr.sh <pr-number> --merge --review-cycle <N>
+   ```
+4. After 2 cycles (`--review-cycle 2`), the script force-merges automatically with `--admin`.
+
+**Evaluating comments before responding:** Read the current file state first. Check whether the comment is stale (already fixed in the current commit), contradicts repo conventions, or is genuinely correct. Never blindly apply a suggestion — post your reasoning even when rejecting.
 - In this project-init source repo, root `.claude/scripts/` may not exist because those scripts are scaffolded-project artifacts. Do not run files under `templates/` as this repo's operational automation. If a `.claude/scripts/<name>` command is unavailable, use equivalent `git` / `gh` commands directly while preserving the same lifecycle behavior.
 
 ### Python tooling

@@ -125,9 +125,12 @@ class TestScaffoldGitHubFiles:
     def test_board_automation_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
 
+    def test_review_status_workflow_created(self):
+        assert (self.target / ".github" / "workflows" / "review-status.yml").is_file()
+
     def test_workflow_runners_are_pinned(self):
         workflows = self.target / ".github" / "workflows"
-        for name in ("ci.yml", "validate-pr.yml", "board-automation.yml"):
+        for name in ("ci.yml", "validate-pr.yml", "board-automation.yml", "review-status.yml"):
             content = (workflows / name).read_text()
             assert "runs-on: ubuntu-24.04" in content
             assert "runs-on: ubuntu-latest" not in content
@@ -157,7 +160,8 @@ class TestScaffoldGitHubFiles:
         assert "[#N][type] description" not in content
         assert "PR title must start with" not in content
         assert ".claude/scripts/monitor-pr.sh <pr-number> --merge" in content
-        assert "fix actionable feedback" in content
+        assert "review-cycle" in content
+        assert "--admin" in content
 
     def test_gemini_md_created(self):
         f = self.target / "GEMINI.md"
