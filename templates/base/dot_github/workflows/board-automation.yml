@@ -45,7 +45,11 @@ jobs:
 
           if [ "$EVENT" = "issues" ]; then
             issue="$ISSUE_NUMBER"
-            status="To Do"
+            if [ "$ACTION" = "opened" ] || [ "$ACTION" = "reopened" ]; then
+              status="To Do"
+            else
+              status="metadata"
+            fi
           elif [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "opened" ]; then
             issue=$(printf '%s\n' "$PR_BODY" | grep -oiP '(closes|fixes|resolves)\s+#\K[0-9]+' | head -1 || true)
             status="In Progress"
@@ -92,15 +96,39 @@ jobs:
                   }
                 }
               }
+              organization(login: $owner) {
+                projectV2(number: $number) {
+                  id
+                  fields(first: 50) {
+                    nodes {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options { id name }
+                      }
+                    }
+                  }
+                  items(first: 100) {
+                    nodes {
+                      id
+                      content {
+                        ... on Issue { number }
+                      }
+                    }
+                  }
+                }
+              }
             }' -f owner="$OWNER" -F number="$PROJECT_NUMBER")
 
-          PROJECT_ID=$(echo "$PROJECT_DATA" | jq -r '.data.user.projectV2.id // empty')
-          ITEM_ID=$(echo "$PROJECT_DATA" | jq -r --argjson n "$ISSUE_NUM" '.data.user.projectV2.items.nodes[] | select(.content.number == $n) | .id')
+          PROJECT=$(echo "$PROJECT_DATA" | jq -c '.data.user.projectV2 // .data.organization.projectV2 // empty')
+          PROJECT_ID=$(echo "$PROJECT" | jq -r '.id // empty')
 
           if [ -z "$PROJECT_ID" ]; then
             echo "Skipping project sync: project not found or PROJECT_TOKEN lacks access"
             exit 0
           fi
+
+          ITEM_ID=$(echo "$PROJECT" | jq -r --argjson n "$ISSUE_NUM" '(.items.nodes // [])[] | select(.content.number == $n) | .id')
 
           if [ -z "$ITEM_ID" ]; then
             echo "Issue #$ISSUE_NUM not found on board; adding it first"
@@ -122,7 +150,30 @@ jobs:
           ISSUE_DATA=$(gh issue view "$ISSUE_NUM" --json labels,body)
           PRIORITY=$(echo "$ISSUE_DATA" | jq -r '[.labels[].name | select(startswith("priority:"))][0] // empty' | sed 's/^priority://')
           SIZE=$(echo "$ISSUE_DATA" | jq -r '[.labels[].name | select(startswith("size:"))][0] // empty' | sed 's/^size://')
-          AREA=$(echo "$ISSUE_DATA" | jq -r '.body' | sed -n 's/^- Area: //Ip' | head -1)
+          parse_area() {
+            local body="$1"
+            local area
+
+            area=$(printf '%s\n' "$body" | sed -n 's/^- Area: //Ip' | head -1)
+            if [ -n "$area" ]; then
+              printf '%s\n' "$area"
+              return 0
+            fi
+
+            printf '%s\n' "$body" | awk '
+              BEGIN { in_area = 0 }
+              /^[[:space:]]*###[[:space:]]+Area[[:space:]]*$/ {
+                in_area = 1
+                next
+              }
+              in_area && /^[[:space:]]*$/ { next }
+              in_area {
+                print
+                exit
+              }
+            '
+          }
+          AREA=$(parse_area "$(echo "$ISSUE_DATA" | jq -r '.body')")
 
           update_single_select() {
             local field_name="$1"
@@ -131,13 +182,13 @@ jobs:
 
             local field_id
             local option_id
-            field_id=$(echo "$PROJECT_DATA" | jq -r --arg f "$field_name" '.data.user.projectV2.fields.nodes[] | select(.name == $f) | .id')
+            field_id=$(echo "$PROJECT" | jq -r --arg f "$field_name" '(.fields.nodes // [])[] | select(.name == $f) | .id')
             if [ -z "$field_id" ]; then
               echo "Skipping missing project field: $field_name"
               return 0
             fi
 
-            option_id=$(echo "$PROJECT_DATA" | jq -r --arg f "$field_name" --arg o "$option_name" '.data.user.projectV2.fields.nodes[] | select(.name == $f) | .options[] | select(.name == $o) | .id')
+            option_id=$(echo "$PROJECT" | jq -r --arg f "$field_name" --arg o "$option_name" '(.fields.nodes // [])[] | select(.name == $f) | (.options // [])[] | select(.name == $o) | .id')
             if [ -z "$option_id" ]; then
               echo "Skipping missing project option: $field_name=$option_name"
               return 0
@@ -154,7 +205,9 @@ jobs:
               }' -f project="$PROJECT_ID" -f item="$ITEM_ID" -f field="$field_id" -f option="$option_id"
           }
 
-          update_single_select "Status" "$TARGET_STATUS"
+          if [ "$TARGET_STATUS" != "metadata" ]; then
+            update_single_select "Status" "$TARGET_STATUS"
+          fi
           update_single_select "Priority" "$PRIORITY"
           update_single_select "Area" "$AREA"
           update_single_select "Size" "$SIZE"

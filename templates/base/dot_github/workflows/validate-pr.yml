@@ -39,12 +39,13 @@ jobs:
             exit 0
           fi
 
-          if ! echo "$PR_BODY" | grep -qiE 'closes\s+#[0-9]+'; then
-            echo "ERROR: PR body must include 'Closes #<number>' to auto-close the linked issue"
+          ISSUE_REF_REGEX='(closes|fixes|resolves)\s+#[0-9]+'
+          if ! echo "$PR_BODY" | grep -qiE "$ISSUE_REF_REGEX"; then
+            echo "ERROR: PR body must include 'Closes #<number>', 'Fixes #<number>', or 'Resolves #<number>' to auto-close the linked issue"
             exit 1
           fi
 
-          ISSUE_NUM=$(echo "$PR_BODY" | grep -oiE 'closes\s+#[0-9]+' | head -1 | grep -oE '[0-9]+')
+          ISSUE_NUM=$(echo "$PR_BODY" | grep -oiE "$ISSUE_REF_REGEX" | head -1 | grep -oE '[0-9]+')
           ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '^\[[A-Z][A-Z0-9]{1,9}-[0-9]+\]' | tr -d '[]')
           PR_TYPE=$(echo "$PR_TITLE" | grep -oE '\]\[(feat|fix|chore|docs|test)\]' | tr -d '[]')
 
@@ -66,7 +67,7 @@ jobs:
             exit 1
           fi
 
-          if echo "$ISSUE_DATA" | jq -e '.labels[].name == "status:needs-info"' >/dev/null; then
+          if echo "$ISSUE_DATA" | jq -e 'any(.labels[].name; . == "status:needs-info")' >/dev/null; then
             echo "ERROR: linked issue #$ISSUE_NUM is labeled status:needs-info"
             exit 1
           fi
@@ -79,7 +80,7 @@ jobs:
             test) EXPECTED_LABEL="test" ;;
           esac
 
-          if ! echo "$ISSUE_DATA" | jq -e --arg label "$EXPECTED_LABEL" '.labels[].name == $label' >/dev/null; then
+          if ! echo "$ISSUE_DATA" | jq -e --arg label "$EXPECTED_LABEL" 'any(.labels[].name; . == $label)' >/dev/null; then
             echo "ERROR: PR type '$PR_TYPE' does not match linked issue label '$EXPECTED_LABEL'"
             exit 1
           fi

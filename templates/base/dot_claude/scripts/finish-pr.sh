@@ -14,7 +14,12 @@ CYCLE_ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --review-cycle)
-      CYCLE_ARGS+=("$1" "${2:-0}")
+      if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "Missing value for --review-cycle" >&2
+        echo "Usage: finish-pr.sh [pr-number] [--review-cycle N]" >&2
+        exit 2
+      fi
+      CYCLE_ARGS+=("$1" "$2")
       shift 2
       ;;
     --review-cycle=*)

@@ -192,6 +192,7 @@ class TestScaffoldGitHubFiles:
         assert "promote-review.sh" in content
         assert "monitor-pr.sh" in content
         assert 'PR_NUMBER=""' in content
+        assert "Missing value for --review-cycle" in content
         assert "--review-cycle" in content
 
     def test_validate_pr_enforces_project_key_title_format(self):

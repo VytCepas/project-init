@@ -46,6 +46,10 @@ class TestIssueMetadataScaffold:
         assert "runs-on: ubuntu-24.04" in content
         assert "status:needs-info" in content
         assert "issues:" in content
+        assert "labeled, unlabeled" in content
+        assert "priority label" in content
+        assert "gh label create \"status:needs-info\"" in content
+        assert "unset" in content
 
     def test_board_automation_syncs_metadata_fields(self):
         content = (
@@ -58,12 +62,18 @@ class TestIssueMetadataScaffold:
         assert "Area" in content
         assert "Size" in content
         assert "Skipping missing project field" in content
+        assert "organization(login: $owner)" in content
+        assert "parse_area()" in content
+        assert "metadata" in content
+        assert "(.items.nodes // [])[]" in content
 
     def test_validate_pr_checks_issue_readiness(self):
         content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
         assert "status:needs-info" in content
         assert "<type>/<PROJECT>-<issue-number>-<slug>" in content
         assert "Linked issue is closed" in content
+        assert "ISSUE_REF_REGEX" in content
+        assert "any(.labels[].name" in content
 
     def test_issue_metadata_docs_created(self):
         doc = self.target / ".claude" / "docs" / "guides" / "issue-metadata.md"
@@ -76,6 +86,7 @@ class TestIssueMetadataScaffold:
         content = script.read_text()
         assert "branches/main/protection" in content
         assert "Copilot code review" in content
+        assert "Validate PR / Check PR title, branch, and linked issue" in content
 
     def test_project_init_references_github_setup(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
@@ -126,6 +137,15 @@ class TestCreateIssueScript:
     def test_script_documents_missing_label_fallback(self):
         content = self.script.read_text()
         assert "label missing" in content.lower() or "missing label" in content.lower()
+
+    def test_script_reports_missing_option_value(self):
+        result = subprocess.run(
+            [str(self.script), "feat", "Example", "--priority"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1
+        assert "missing value for '--priority'" in result.stderr
 
 
 class TestCreateIssueSkill:
@@ -198,3 +218,17 @@ class TestGitHubWorkflowHooks:
         ]
         assert any("github-command-guard.sh" in command for command in pre_commands)
         assert "UserPromptSubmit" in data["hooks"]
+
+    def test_workflow_state_reminder_reads_prompt_stdin(self):
+        hook = self.target / ".claude" / "hooks" / "workflow-state-reminder.sh"
+        payload = json.dumps({"prompt": "please finish this PR"})
+        result = subprocess.run(
+            [str(hook)],
+            input=payload,
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=self.target,
+        )
+        out = json.loads(result.stdout)
+        assert "additionalContext" in out

@@ -75,42 +75,61 @@ contains_word() {
   echo "$haystack" | grep -qw "$needle"
 }
 
+require_option_value() {
+  local option="$1"
+  local value="${2:-}"
+  if [ -z "$value" ]; then
+    echo "ERROR: missing value for '$option'" >&2
+    usage >&2
+    exit 1
+  fi
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --priority)
-      PRIORITY="${2:-}"
+      require_option_value "$1" "${2:-}"
+      PRIORITY="$2"
       shift 2
       ;;
     --area)
-      AREA="${2:-}"
+      require_option_value "$1" "${2:-}"
+      AREA="$2"
       shift 2
       ;;
     --size)
-      SIZE="${2:-}"
+      require_option_value "$1" "${2:-}"
+      SIZE="$2"
       shift 2
       ;;
     --reference)
-      REFERENCES+=("${2:-}")
+      require_option_value "$1" "${2:-}"
+      REFERENCES+=("$2")
       shift 2
       ;;
     --dependency)
-      DEPENDENCIES+=("${2:-}")
+      require_option_value "$1" "${2:-}"
+      DEPENDENCIES+=("$2")
       shift 2
       ;;
     --acceptance)
-      ACCEPTANCE+=("${2:-}")
+      require_option_value "$1" "${2:-}"
+      ACCEPTANCE+=("$2")
       shift 2
       ;;
     --assignee)
-      ASSIGNEE="${2:-}"
+      require_option_value "$1" "${2:-}"
+      ASSIGNEE="$2"
       shift 2
       ;;
     --milestone)
-      MILESTONE="${2:-}"
+      require_option_value "$1" "${2:-}"
+      MILESTONE="$2"
       shift 2
       ;;
     --body-file)
-      BODY_FILE="${2:-}"
+      require_option_value "$1" "${2:-}"
+      BODY_FILE="$2"
       shift 2
       ;;
     -h|--help)

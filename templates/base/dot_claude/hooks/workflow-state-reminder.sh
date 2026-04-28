@@ -6,7 +6,7 @@ set -euo pipefail
 
 INPUT=$(cat)
 
-python3 -c '
+printf '%s' "$INPUT" | python3 -c '
 import json
 import re
 import sys

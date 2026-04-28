@@ -27,7 +27,7 @@ cat > "$PROTECTION" <<'JSON'
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "Validate PR",
+      "Validate PR / Check PR title, branch, and linked issue",
       "review/decision"
     ]
   },
