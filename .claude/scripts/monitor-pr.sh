@@ -51,7 +51,7 @@ import json, sys
 data = json.load(sys.stdin)
 # Exclude review/decision — it is a derived commit status that only appears after a review
 # is submitted. We detect review state directly via reviewDecision below.
-print(sum(1 for c in data if c.get('name') != 'review/decision' and c.get('state') in ('PENDING', 'IN_PROGRESS')))
+print(sum(1 for c in data if c.get('name') != 'review/decision' and c.get('state') in ('PENDING', 'IN_PROGRESS', 'EXPECTED')))
 "
 }
 
@@ -90,8 +90,9 @@ _admin_merge() {
 # Query the PR's aggregate review decision directly — source of truth regardless of
 # whether the review/decision commit status has been posted yet.
 # Returns: APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | (empty = no review policy)
+# Returns UNKNOWN on API failure — callers must treat this as fail-closed (do not merge).
 _get_review_decision() {
-  gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""' 2>/dev/null || echo ""
+  gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""' 2>/dev/null || echo "UNKNOWN"
 }
 
 # --- Wait for all CI checks (excludes review/decision commit status) ---
@@ -108,20 +109,29 @@ done
 REVIEW_TIMEOUT=600
 REVIEW_ELAPSED=0
 REVIEW_DECISION=$(_get_review_decision)
-if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
-  echo "Waiting for reviewer (up to ${REVIEW_TIMEOUT}s) — reviewDecision: REVIEW_REQUIRED"
+if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UNKNOWN" ]; then
+  echo "Waiting for reviewer (up to ${REVIEW_TIMEOUT}s) — reviewDecision: ${REVIEW_DECISION}"
 fi
-while [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] && [ "$REVIEW_ELAPSED" -lt "$REVIEW_TIMEOUT" ]; do
+while { [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UNKNOWN" ]; } && [ "$REVIEW_ELAPSED" -lt "$REVIEW_TIMEOUT" ]; do
   sleep 15
   REVIEW_ELAPSED=$((REVIEW_ELAPSED + 15))
   REVIEW_DECISION=$(_get_review_decision)
-  echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
+  # Print a status line once per minute to avoid noise
+  if [ $((REVIEW_ELAPSED % 60)) -eq 0 ]; then
+    echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
+  fi
   # Refresh CHECKS too so late-arriving CI failures are caught
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
 done
 
 FAIL_CODE=0
 _print_failures "$CHECKS" || FAIL_CODE=$?
+
+# Fail closed: if reviewDecision could not be fetched, do not merge
+if [ "$REVIEW_DECISION" = "UNKNOWN" ]; then
+  echo "ERROR: could not fetch reviewDecision for PR #$PR_NUMBER — cannot verify review state." >&2
+  exit 2
+fi
 
 # Handle review outcome
 if [ "$REVIEW_DECISION" = "CHANGES_REQUESTED" ]; then
