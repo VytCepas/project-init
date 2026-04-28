@@ -26,9 +26,11 @@ venv/
 *.log
 logs/
 
-# Local agent runtime state — skills/, hooks/, scripts/ are tracked (committed)
+# Local agent runtime state — committed: skills/, hooks/, scripts/, settings.json
+# gitignored: vault/, settings.local.json, scheduled_tasks.lock (personal/runtime)
 .claude/*
 !.claude/skills
 !.claude/hooks
 !.claude/scripts
+!.claude/settings.json
 .codex
