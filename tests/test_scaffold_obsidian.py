@@ -138,6 +138,8 @@ class TestScaffoldObsidianOnly:
         assert "--merge" in content
         assert "gh pr checks" in content
         assert "--json" in content  # suppresses per-refresh noise; only prints failures
+        assert "--yes" not in content
+        assert "GH_PROMPT_DISABLED=1" in content
 
     def test_push_branch_sh_verifies_remote_sha(self):
         content = (self.target / ".claude" / "scripts" / "push-branch.sh").read_text()

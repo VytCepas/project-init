@@ -20,11 +20,11 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
    echo "Created issue #$ISSUE_NUMBER"
    ```
 
-4. **Start work** — create the branch, push, open draft PR, arm auto-merge:
+4. **Start work** — create the branch, push, and open a draft PR:
    ```bash
    .claude/scripts/start-issue.sh <issue-number> <type>
    ```
-   This derives the branch name (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) from the issue title, pushes it, opens a draft PR with the correct `[PROJECT-123][type]` title and `Closes #n` body, and arms auto-merge if the repo supports it.
+   This derives the branch name (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) from the issue title, pushes it, and opens a draft PR with the correct `[PROJECT-123][type]` title and `Closes #n` body.
 
 5. **Proceed** — only begin implementation after the scripts have run successfully.
 

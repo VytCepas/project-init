@@ -5,5 +5,8 @@ Helper scripts invoked by the user, by hooks, or by agents via the Bash tool. Pr
 ## Available scripts
 
 - **`install-hooks.sh`** — Symlink or copy git hooks from `.github/hooks/` to `.git/hooks/`
-- **`monitor-pr.sh`** — Monitor a PR for test completion and review status (1-min checks, max 5 retries)
+- **`create-issue.sh`** — Create a typed GitHub issue and print its issue number
+- **`start-issue.sh`** — Create an issue branch, push it, and open a draft PR
+- **`promote-review.sh`** — Mark a draft PR ready for review
+- **`monitor-pr.sh`** — Poll PR checks and optionally squash-merge with `--merge`
 - **`push-branch.sh`** — Push current branch with retry and remote-SHA verification (handles transient 5xx errors)

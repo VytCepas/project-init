@@ -113,6 +113,12 @@ class TestScaffoldGitHubFiles:
     def test_issue_template_chore_created(self):
         assert (self.target / ".github" / "ISSUE_TEMPLATE" / "chore.yml").is_file()
 
+    def test_issue_template_docs_created(self):
+        assert (self.target / ".github" / "ISSUE_TEMPLATE" / "docs.yml").is_file()
+
+    def test_issue_template_test_created(self):
+        assert (self.target / ".github" / "ISSUE_TEMPLATE" / "test.yml").is_file()
+
     def test_validate_pr_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "validate-pr.yml").is_file()
 
@@ -183,7 +189,7 @@ class TestScaffoldGitHubFiles:
         assert r"grep -qE '^\[#[0-9]+\]'" not in content
 
     def test_issue_templates_have_required_fields(self):
-        for name in ("bug.yml", "feature.yml", "chore.yml"):
+        for name in ("bug.yml", "feature.yml", "chore.yml", "docs.yml", "test.yml"):
             content = (self.target / ".github" / "ISSUE_TEMPLATE" / name).read_text()
             assert "name:" in content
             assert "labels:" in content

@@ -4,7 +4,9 @@ This repo is a **scaffolder**. It produces a `.claude/` layout inside *other* pr
 
 This is the canonical instruction file for agents working in this repository. [AGENTS.md](AGENTS.md) and [GEMINI.md](GEMINI.md) intentionally redirect here to avoid duplicated rules.
 
-Use [README.md](README.md) for user-facing behavior and [.github/copilot-instructions.md](.github/copilot-instructions.md) for GitHub Issues, PR titles, PR bodies, and board behavior.
+Use [README.md](README.md) for user-facing behavior.
+
+Before doing any GitHub issue, branch, push, PR, review, CI, or merge work, read [.github/copilot-instructions.md](.github/copilot-instructions.md). Those instructions are mandatory for GitHub workflow details, including PR titles, PR bodies, board behavior, and lifecycle scripts.
 
 ## Layout
 
@@ -32,11 +34,13 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 
 ## GitHub workflow
 
+- Read [.github/copilot-instructions.md](.github/copilot-instructions.md) before any GitHub action. Do not rely on this summary alone.
 - Work is tracked in GitHub Projects backed by GitHub Issues.
 - Branch names must follow `<issue_type>/<project_abbr>-<issue_number>-<branch-short-description>`, for example `chore/PI-40-split-scaffold-tests`.
 - Project Init uses `PI` as the project abbreviation.
 - PR titles must follow `[PI-IssueNumber][type] description` where type is one of `feat`, `fix`, `chore`, `docs`, or `test`.
 - PR bodies must include `Closes #<number>` to auto-link the issue and move the board card on merge.
+- This repo may not have root `.claude/scripts/` files because it is the scaffolder source. If `.github/copilot-instructions.md` references `.claude/scripts/<name>`, use the corresponding source template at `templates/base/dot_claude/scripts/<name>` unless a root `.claude/scripts/` copy exists.
 
 ## CI Optimizations
 

@@ -1,0 +1,23 @@
+name: Test
+description: Missing or insufficient test coverage
+labels: [test]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What behavior needs coverage?
+      description: Describe the behavior, template, script, or workflow that needs tests.
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk
+      description: What regression or bug could slip through without this test?
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Suggested approach
+      placeholder: "Unit test, scaffold-output diff, CLI test, workflow validation..."

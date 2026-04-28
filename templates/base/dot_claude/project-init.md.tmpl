@@ -25,7 +25,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Command | `/plan <task>` | acceptance tests first, then implementation plan |
 | Command | `/request-review` | mark PR ready for review, optional agent review |
 | Script | `create-issue.sh <type> "desc"` | create typed issue, prints issue number |
-| Script | `start-issue.sh <n> <type>` | branch + draft PR + arm auto-merge |
+| Script | `start-issue.sh <n> <type>` | branch + draft PR |
 | Script | `promote-review.sh` | mark PR ready (board card moves automatically) |
 | Script | `monitor-pr.sh <n> [--merge]` | wait for CI; --merge squash-merges when clean |
 | Skill | `session-summary` | summarise session and save to vault |
@@ -64,14 +64,14 @@ Test conventions: one assertion per test, name as `test_<unit>_<scenario>`, run 
 
 Work items are GitHub Issues; the project board is GitHub Projects (kanban with To Do / In Progress / In Review / Done columns). Board cards move automatically via `board-automation.yml` — **no manual board moves needed**.
 
-### Lifecycle: Issue → branch → draft PR → auto-merge
+### Lifecycle: Issue → branch → draft PR → merge
 
 Every non-trivial task follows this exact sequence. Run the scripts; the LLM's only job is writing commit messages and fixing CI failures.
 
 | Step | Command | What happens automatically |
 |------|---------|---------------------------|
 | 1. Create issue | `.claude/scripts/create-issue.sh <type> "description"` | Issue created, board card → **To Do** |
-| 2. Start work | `.claude/scripts/start-issue.sh <issue-n> <type>` | Branch (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) + push + draft PR + auto-merge armed, board → **In Progress** |
+| 2. Start work | `.claude/scripts/start-issue.sh <issue-n> <type>` | Branch (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) + push + draft PR, board → **In Progress** |
 | 3. Commit | `git add … && git commit -m "[#n][type] message"` | `commit-msg` hook validates format; `pre-commit-gate` auto-lints |
 | 4. Push | `git push` | CI runs; if it fails a comment is posted on the PR with `gh run view --log-failed` |
 | 5. Mark ready | `.claude/scripts/promote-review.sh` | PR marked ready for review, board → **In Review** |
@@ -79,14 +79,14 @@ Every non-trivial task follows this exact sequence. Run the scripts; the LLM's o
 
 Steps 3–4 repeat until the work is complete. **When asked to push or finish a PR, keep going until the lifecycle is complete**: push → promote → `monitor-pr.sh --merge` → fix any CI failures → repeat until merged.
 
-### Auto-merge setup (one-time per repo)
+### Merge setup (one-time per repo)
 
-Auto-merge (step 2) requires two repo settings enabled by an admin:
+Automated completion via `monitor-pr.sh --merge` works after checks pass. GitHub-native auto-merge requires two repo settings enabled by an admin:
 
 1. **GitHub Settings → General → Allow auto-merge** — tick the checkbox
 2. **Branch protection rule on `main`** — require CI status checks to pass
 
-Without it, `monitor-pr.sh --merge` still works (it merges explicitly after CI passes).
+Without GitHub-native auto-merge, `monitor-pr.sh --merge` still works by merging explicitly after CI passes.
 
 ### Commit and PR format
 
@@ -130,7 +130,7 @@ Run `/request-review` to also invoke the `reviewer` agent (~500 extra tokens). S
 
 ```bash
 .claude/scripts/create-issue.sh <type> "description"  # new issue → prints issue number
-.claude/scripts/start-issue.sh <n> <type>             # branch + draft PR + arm auto-merge
+.claude/scripts/start-issue.sh <n> <type>             # branch + draft PR
 .claude/scripts/promote-review.sh                     # mark PR ready for review
 .claude/scripts/monitor-pr.sh <n> --merge             # wait for CI, merge when clean
 gh run view --log-failed                              # see what CI failed

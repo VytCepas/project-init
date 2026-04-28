@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start work on a GitHub issue: create branch, push, open draft PR, arm auto-merge.
+# Start work on a GitHub issue: create branch, push, and open a draft PR.
 #
 # Usage:
 #   .claude/scripts/start-issue.sh <issue-number> <type>
@@ -133,15 +133,6 @@ PR_URL=$(gh pr create \
 
 echo "Draft PR: $PR_URL"
 
-# --- Arm auto-merge (requires repo setting: Allow auto-merge + branch protection) ---
-PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-if gh pr merge "$PR_NUMBER" --auto --squash --delete-branch 2>/dev/null; then
-  echo "Auto-merge armed — GitHub will merge when CI passes and requirements are met"
-else
-  echo "Note: auto-merge not available (enable in repo Settings → General → Allow auto-merge)"
-  echo "Run manually when ready: gh pr merge $PR_NUMBER --squash --delete-branch"
-fi
-
 echo ""
 echo "Ready. Branch: $BRANCH | PR: $PR_URL"
-echo "Next: implement, commit, push. Then run promote-review.sh when ready for review."
+echo "Next: implement, commit, push. Then run promote-review.sh when ready for review and monitor-pr.sh --merge when checks pass."

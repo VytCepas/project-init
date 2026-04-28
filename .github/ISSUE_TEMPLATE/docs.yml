@@ -1,0 +1,22 @@
+name: Docs
+description: Documentation addition or correction
+labels: [documentation]
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: What needs documenting?
+      description: Which behavior, workflow, or decision needs clearer documentation?
+    validations:
+      required: true
+  - type: textarea
+    id: audience
+    attributes:
+      label: Audience
+      description: Who needs this documentation?
+      placeholder: "Users, maintainers, agents, contributors, operators..."
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Related issues, PRs, ADRs, files, or external links
