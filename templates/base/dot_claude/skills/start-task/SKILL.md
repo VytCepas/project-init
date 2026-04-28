@@ -28,6 +28,14 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 5. **Proceed** — only begin implementation after the scripts have run successfully.
 
+6. **When ready to merge** — mark ready, then monitor CI and merge:
+   ```bash
+   .claude/scripts/promote-review.sh
+   .claude/scripts/monitor-pr.sh <n> --merge
+   ```
+   Do NOT use `gh pr checks --watch` or bare `gh pr merge` — `monitor-pr.sh` handles
+   the "no checks registered yet" wait and blocks on failures.
+
 ## Rules
 
 - Every non-trivial task must have a GitHub Issue, a branch, and a draft PR — all before the first line of implementation code.
