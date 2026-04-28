@@ -49,7 +49,9 @@ _count_pending() {
   echo "$1" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-print(sum(1 for c in data if c.get('state') in ('PENDING', 'IN_PROGRESS')))
+# Exclude review/decision — it can stay pending indefinitely awaiting a human reviewer.
+# We handle it separately after the CI wait loop.
+print(sum(1 for c in data if c.get('name') != 'review/decision' and c.get('state') in ('PENDING', 'IN_PROGRESS')))
 "
 }
 
@@ -88,6 +90,14 @@ sys.exit(0 if any(c.get('name') == 'review/decision' and c.get('conclusion') == 
 " 2>/dev/null
 }
 
+_review_decision_pending() {
+  echo "$1" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+sys.exit(0 if any(c.get('name') == 'review/decision' and c.get('state') in ('PENDING', 'IN_PROGRESS') for c in data) else 1)
+" 2>/dev/null
+}
+
 # --- Wait for all checks (CI + review/decision) ---
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
@@ -113,6 +123,27 @@ if _review_decision_failed "$CHECKS"; then
     else
       NEXT=$((REVIEW_CYCLE + 1))
       echo "Address the comments above, push your changes, then re-run:"
+      echo "  .claude/scripts/monitor-pr.sh $PR_NUMBER --merge --review-cycle $NEXT"
+      exit 2
+    fi
+  fi
+  exit 1
+fi
+
+# Handle review/decision still pending (no reviewer has acted yet)
+if _review_decision_pending "$CHECKS"; then
+  echo "PR #$PR_NUMBER is awaiting a reviewer — review/decision is still pending."
+  echo "  Full PR: $(gh pr view "$PR_NUMBER" --json url -q '.url' 2>/dev/null || true)"
+
+  if [ "$MODE" = "--merge" ]; then
+    if [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ]; then
+      echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — force-merging with admin override."
+      GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --admin 2>&1 | grep -v "^$" || true
+      echo "Merged PR #$PR_NUMBER (admin)"
+      exit 0
+    else
+      NEXT=$((REVIEW_CYCLE + 1))
+      echo "Request a review or wait for a reviewer, then re-run:"
       echo "  .claude/scripts/monitor-pr.sh $PR_NUMBER --merge --review-cycle $NEXT"
       exit 2
     fi
