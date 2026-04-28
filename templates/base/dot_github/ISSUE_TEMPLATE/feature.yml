@@ -2,6 +2,27 @@ name: Feature
 description: New feature or enhancement
 labels: [feature]
 body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: [high, medium, low]
+    validations:
+      required: true
+  - type: input
+    id: area
+    attributes:
+      label: Area
+      placeholder: frontend, backend, docs, devops, product
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      options: [XS, S, M, L, XL]
+    validations:
+      required: true
   - type: input
     id: title
     attributes:
@@ -24,6 +45,30 @@ body:
       placeholder: |
         - [ ] Criterion 1
         - [ ] Criterion 2
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Related issues, PRs, ADRs, docs, designs, or external links.
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Blocked-by, parent, or follow-up relationships.
+  - type: textarea
+    id: ready
+    attributes:
+      label: Definition of Ready
+      placeholder: What must be true before implementation starts?
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of Done
+      placeholder: What must be true before this can close?
     validations:
       required: true
   - type: dropdown

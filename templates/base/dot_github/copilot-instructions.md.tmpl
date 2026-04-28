@@ -5,7 +5,7 @@ Canonical agent rules: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-in
 ## Issue & project tracking
 
 - Tracking system: **GitHub Projects** (kanban board) + **GitHub Issues** (tickets)
-- Create issues: `gh issue create` — use the right template (bug / feature / chore / docs / test)
+- Create issues: load `.claude/skills/create-issue/SKILL.md` and use `.claude/scripts/create-issue.sh`; it handles metadata gathering, priority labels, and acceptance criteria
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
 - Use a dedicated branch for each issue; format it as `<issue_type>/<project_abbr>-<issue_number>-<slug>`, e.g. `feat/PI-42-add-auth`; no direct commits to `main`
 - Issue and PR names use a project key: `<PROJECT-KEY>-<issue-number>`, e.g. `PI-42`
@@ -15,6 +15,7 @@ Canonical agent rules: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-in
 - Draft PRs are opened immediately when work starts, not when done
 - When asked to push/finish a PR, continue autonomously using the review cycle protocol below.
 - Never use bare `git push` for branch publishing — always use `.claude/scripts/push-branch.sh` so transient GitHub errors don't silently fail.
+- Prefer `.claude/scripts/finish-pr.sh <pr-number>` when the user asks to finish a PR; it pushes, marks ready, runs `monitor-pr.sh --merge`, and preserves the review-cycle behavior.
 - No direct commits to `main`
 
 ### Review cycle protocol (max 2 rounds, then admin merge)

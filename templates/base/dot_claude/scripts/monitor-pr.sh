@@ -109,7 +109,7 @@ if _review_decision_failed "$CHECKS"; then
     if [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ]; then
       echo ""
       echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — force-merging with admin override."
-      GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --admin 2>&1 | grep -v "^$"
+      GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --admin 2>&1 | grep -v "^$" || true
       echo "Merged PR #$PR_NUMBER (admin)"
       exit 0
     else
@@ -134,7 +134,7 @@ echo "PR #$PR_NUMBER passed: $PR_URL"
 if [ "$MODE" = "--merge" ]; then
   # Try direct merge first; if branch protection blocks it, fall back to --auto
   if ! GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch 2>/dev/null; then
-    GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --auto 2>&1 | grep -v "^$"
+    GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --auto 2>&1 | grep -v "^$" || true
     echo "Auto-merge enabled for PR #$PR_NUMBER — will merge once all requirements are met."
   else
     echo "Merged PR #$PR_NUMBER"

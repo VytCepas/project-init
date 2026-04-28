@@ -14,9 +14,9 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 2. **Check for existing issue** — run `gh issue list` and ask: "Does a GitHub Issue already exist for this? If so, provide the number and skip to step 4."
 
-3. **Create the issue**:
+3. **Create the issue** — load `.claude/skills/create-issue/SKILL.md` and follow it. It gathers priority, area, size, references, dependencies, and acceptance criteria before running:
    ```bash
-   ISSUE_NUMBER=$(.claude/scripts/create-issue.sh <type> "<title>")
+   ISSUE_NUMBER=$(.claude/scripts/create-issue.sh <type> "<title>" --priority <priority> --area "<area>" --size <size> --acceptance "<criterion>")
    echo "Created issue #$ISSUE_NUMBER"
    ```
 
