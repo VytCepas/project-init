@@ -4,10 +4,13 @@ name: Review status
 # submitted, edited, or dismissed. This lets monitor-pr.sh treat review state
 # as just another CI check instead of polling reviewDecision in a separate loop.
 #
+# Maps the PR's *aggregate* reviewDecision (not just the triggering event) so
+# that a later COMMENT review doesn't flip an already-approved PR back to pending.
+#
 # Status mapping:
 #   APPROVED          → success  ("Approved")
 #   CHANGES_REQUESTED → failure  ("Changes requested")
-#   COMMENTED/other   → pending  ("Review required — awaiting approval")
+#   REVIEW_REQUIRED / other → pending  ("Review required — awaiting approval")
 
 on:
   pull_request_review:
@@ -15,6 +18,7 @@ on:
 
 permissions:
   statuses: write
+  pull-requests: read
 
 jobs:
   set-review-status:
@@ -24,11 +28,12 @@ jobs:
       - name: Post commit status
         env:
           GH_TOKEN: ${{ github.token }}
-          REVIEW_STATE: ${{ github.event.review.state }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
           REPO: ${{ github.repository }}
         run: |
-          case "$REVIEW_STATE" in
+          DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json reviewDecision -q '.reviewDecision // ""')
+          case "$DECISION" in
             APPROVED)
               STATE="success"; DESCRIPTION="Approved" ;;
             CHANGES_REQUESTED)
