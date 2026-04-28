@@ -94,8 +94,15 @@ _review_decision_pending() {
   echo "$1" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-sys.exit(0 if any(c.get('name') == 'review/decision' and c.get('state') in ('PENDING', 'IN_PROGRESS') for c in data) else 1)
+# PENDING/IN_PROGRESS: commit-status pending or check-run in progress.
+# EXPECTED: required check registered in branch protection but not yet reported.
+sys.exit(0 if any(c.get('name') == 'review/decision' and c.get('state') in ('PENDING', 'IN_PROGRESS', 'EXPECTED') for c in data) else 1)
 " 2>/dev/null
+}
+
+_admin_merge() {
+  GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --admin 2>&1 | grep -v "^$" || true
+  echo "Merged PR #$PR_NUMBER (admin)"
 }
 
 # --- Wait for all checks (CI + review/decision) ---
@@ -104,6 +111,16 @@ while true; do
   PENDING=$(_count_pending "$CHECKS")
   [ "$PENDING" -eq 0 ] && break
   sleep 10
+done
+
+# If review/decision is still pending after CI, do a bounded wait (up to 10 min) for a
+# reviewer to act.  This replaces the original infinite-wait behaviour with a timeout.
+REVIEW_TIMEOUT=600
+REVIEW_ELAPSED=0
+while _review_decision_pending "$CHECKS" && [ "$REVIEW_ELAPSED" -lt "$REVIEW_TIMEOUT" ]; do
+  sleep 15
+  REVIEW_ELAPSED=$((REVIEW_ELAPSED + 15))
+  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
 done
 
 FAIL_CODE=0
@@ -117,9 +134,7 @@ if _review_decision_failed "$CHECKS"; then
   if [ "$MODE" = "--merge" ]; then
     if [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ]; then
       echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — force-merging with admin override."
-      GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --admin 2>&1 | grep -v "^$" || true
-      echo "Merged PR #$PR_NUMBER (admin)"
-      exit 0
+      _admin_merge; exit 0
     else
       NEXT=$((REVIEW_CYCLE + 1))
       echo "Address the comments above, push your changes, then re-run:"
@@ -130,17 +145,15 @@ if _review_decision_failed "$CHECKS"; then
   exit 1
 fi
 
-# Handle review/decision still pending (no reviewer has acted yet)
+# Handle review/decision still pending after timeout (no reviewer acted within REVIEW_TIMEOUT seconds)
 if _review_decision_pending "$CHECKS"; then
-  echo "PR #$PR_NUMBER is awaiting a reviewer — review/decision is still pending."
+  echo "PR #$PR_NUMBER: review/decision still pending after ${REVIEW_TIMEOUT}s — no reviewer has acted."
   echo "  Full PR: $(gh pr view "$PR_NUMBER" --json url -q '.url' 2>/dev/null || true)"
 
   if [ "$MODE" = "--merge" ]; then
     if [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ]; then
       echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — force-merging with admin override."
-      GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --admin 2>&1 | grep -v "^$" || true
-      echo "Merged PR #$PR_NUMBER (admin)"
-      exit 0
+      _admin_merge; exit 0
     else
       NEXT=$((REVIEW_CYCLE + 1))
       echo "Request a review or wait for a reviewer, then re-run:"
