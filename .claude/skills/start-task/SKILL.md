@@ -23,12 +23,20 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 4. **Create branch and draft PR**:
    ```bash
    git checkout -b <type>/PI-<n>-<slug>
-   git push -u origin HEAD
+   .claude/scripts/push-branch.sh          # retrying push with SHA verification
    gh pr create --title "[PI-<n>][<type>] <title>" --body "Closes #<n>" --draft
    ```
    Branch name pattern: `<issue_type>/PI-<issue_number>-<short-slug>`
 
 5. **Proceed** — only begin implementation after issue + branch + draft PR exist.
+
+6. **When ready to merge** — mark ready, then monitor CI and merge:
+   ```bash
+   gh pr ready <n>
+   .claude/scripts/monitor-pr.sh <n> --merge
+   ```
+   Do NOT use `gh pr checks --watch` or bare `gh pr merge` — `monitor-pr.sh` handles
+   the "no checks registered yet" wait and blocks on failures.
 
 ## Rules
 
