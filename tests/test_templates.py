@@ -160,7 +160,8 @@ class TestScaffoldGitHubFiles:
         assert "[#N][type] description" not in content
         assert "PR title must start with" not in content
         assert ".claude/scripts/monitor-pr.sh <pr-number> --merge" in content
-        assert "fix actionable feedback" in content
+        assert "review-cycle" in content
+        assert "--admin" in content
 
     def test_gemini_md_created(self):
         f = self.target / "GEMINI.md"

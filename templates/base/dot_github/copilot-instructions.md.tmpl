@@ -13,10 +13,28 @@ Canonical agent rules: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-in
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
 - PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
 - Draft PRs are opened immediately when work starts, not when done
-- When asked to push/finish a PR, continue autonomously: run `.claude/scripts/push-branch.sh` (retries on transient 5xx, verifies remote SHA), then `.claude/scripts/monitor-pr.sh <pr-number> --merge`. Inspect any failed checks or review comments, fix actionable feedback, push again, rerun the monitor script until it merges cleanly.
+- When asked to push/finish a PR, continue autonomously using the review cycle protocol below.
 - Never use bare `git push` for branch publishing — always use `.claude/scripts/push-branch.sh` so transient GitHub errors don't silently fail.
-- After pushing, check for automated review comments: `gh api repos/{owner}/{repo}/pulls/{pr}/comments --jq '.[] | {id, user: .user.login, path, line, body}'`. Reply to inline comments via `gh api -X POST repos/{owner}/{repo}/pulls/{pr}/comments/{id}/replies -F body="..."` (use `-F`, not `-f`).
 - No direct commits to `main`
+
+### Review cycle protocol (max 2 rounds, then admin merge)
+
+`monitor-pr.sh --merge` exits with code 2 when `review/decision` fails and more cycles remain. When that happens:
+
+1. **For each review comment** post a reply explaining your reasoning — resolving or rejecting. Use:
+   ```
+   gh pr comment <pr-number> --body "**Review response:**
+   - [comment summary]: Fixing — <reason it is valid>
+   - [comment summary]: Not applying — <reason it does not apply or is incorrect>"
+   ```
+2. Fix actionable code, then push with `.claude/scripts/push-branch.sh`.
+3. Re-run with the next cycle number:
+   ```
+   .claude/scripts/monitor-pr.sh <pr-number> --merge --review-cycle <N>
+   ```
+4. After 2 cycles (`--review-cycle 2`), the script force-merges automatically with `--admin`.
+
+**Evaluating comments before responding:** Read the current file state first. Check whether the comment is stale (already fixed), contradicts repo conventions, or is genuinely correct. Never blindly apply a suggestion — post your reasoning even when rejecting.
 
 ## Key rules
 
