@@ -6,4 +6,4 @@ Read [CLAUDE.md](CLAUDE.md) before working in this codebase. It is the source of
 
 ## Skills (load on demand)
 
-Before any GitHub action (create issue, branch, push, PR, merge), check [`.github/copilot-instructions.md`](.github/copilot-instructions.md) for the quick-reference workflow rules. This repo does not ship its own `.claude/skills/` directory — it is the scaffolder source.
+Before any GitHub action (create issue, branch, push, PR, merge), check [`.claude/skills/INDEX.md`](.claude/skills/INDEX.md) and load the relevant skill. Do not read all skills upfront — load only the one that matches what you are about to do.
