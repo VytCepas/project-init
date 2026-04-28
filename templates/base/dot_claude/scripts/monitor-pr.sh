@@ -49,6 +49,27 @@ sys.exit(len(bad))
 "
 }
 
+# Print all review comments — called when CHANGES_REQUESTED so the agent
+# sees exactly what needs fixing without a separate gh pr view call.
+_print_review_comments() {
+  gh api "repos/{owner}/{repo}/pulls/$PR_NUMBER/comments" \
+    --jq '.[] | "  \(.path):\(.line // "?") [\(.user.login)]\n  \(.body)\n"' \
+    2>/dev/null || true
+}
+
+# Safe gh pr view wrapper — retries up to 3 times on transient failures
+# so a brief API hiccup doesn't abort the whole poll loop.
+_get_review_decision() {
+  local attempts=0
+  while [ "$attempts" -lt 3 ]; do
+    local result
+    result=$(gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""' 2>/dev/null) && echo "$result" && return
+    attempts=$((attempts + 1))
+    sleep 5
+  done
+  echo ""  # treat as no decision on repeated failure — keep polling
+}
+
 # --- Phase 1: wait for CI ---
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
@@ -73,25 +94,24 @@ PR_URL=$(gh pr view "$PR_NUMBER" --json url -q '.url')
 #   CHANGES_REQUESTED — blocked, must address
 #   REVIEW_REQUIRED  — waiting on a pending review (Copilot or human)
 #   ""               — no review requirement, proceed
+_handle_changes_requested() {
+  echo "Changes requested on PR #$PR_NUMBER — address the following before merging:"
+  _print_review_comments
+  echo "  Re-run after pushing fixes: .claude/scripts/monitor-pr.sh $PR_NUMBER --merge"
+  exit 1
+}
+
 if [ "$MODE" = "--merge" ]; then
   while true; do
-    REVIEW=$(gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""')
-    if [ "$REVIEW" = "CHANGES_REQUESTED" ]; then
-      echo "Changes requested on PR #$PR_NUMBER — address review comments before merging."
-      echo "  gh pr view $PR_NUMBER --comments"
-      exit 1
-    fi
+    REVIEW=$(_get_review_decision)
+    [ "$REVIEW" = "CHANGES_REQUESTED" ] && _handle_changes_requested
     [ "$REVIEW" != "REVIEW_REQUIRED" ] && break
     echo "Waiting for review on PR #$PR_NUMBER (review required)..."
     sleep 30
   done
 else
-  REVIEW=$(gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""')
-  if [ "$REVIEW" = "CHANGES_REQUESTED" ]; then
-    echo "Changes requested on PR #$PR_NUMBER — address review comments before merging."
-    echo "  gh pr view $PR_NUMBER --comments"
-    exit 1
-  fi
+  REVIEW=$(_get_review_decision)
+  [ "$REVIEW" = "CHANGES_REQUESTED" ] && _handle_changes_requested
   if [ "$REVIEW" = "REVIEW_REQUIRED" ]; then
     echo "PR #$PR_NUMBER: CI passed but review is still pending."
     echo "  $PR_URL"
