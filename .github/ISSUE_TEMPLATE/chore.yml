@@ -13,3 +13,32 @@ body:
     attributes:
       label: Why now?
       description: What breaks or degrades if this is skipped?
+  - type: dropdown
+    id: scale
+    attributes:
+      label: Scale
+      description: Is this a standalone task or a parent grouping sub-tasks?
+      options: [task, epic]
+      default: 0
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: [high, medium, low, unset]
+      default: 3
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Size estimate
+      options: [XS, S, M, L, XL]
+  - type: input
+    id: area
+    attributes:
+      label: Area / component
+      placeholder: "e.g. ci, deps, scaffold, templates"
+  - type: input
+    id: parent
+    attributes:
+      label: Parent issue
+      description: Use #N (same repo) or owner/repo#N (cross-repo).
+      placeholder: "#42 or VytCepas/other-repo#7"
