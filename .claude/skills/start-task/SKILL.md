@@ -1,7 +1,9 @@
 ---
-description: Create a GitHub Issue + branch + draft PR before starting work
+name: start-task
+description: Creates a GitHub Issue, branch, and draft PR before implementation begins. Use before any non-trivial task to keep work traceable — one issue, one branch, one PR.
+when_to_use: Use when the user says "start work on X", "create a ticket for Y", or "begin a new task". Do not use for trivial one-off changes that don't need tracking.
 argument-hint: "[task title]"
-allowed-tools: Bash Read
+allowed-tools: Bash(gh *) Bash(git *) Read
 ---
 
 Before starting any non-trivial task, create a GitHub Issue, a dedicated branch, and a draft PR. This keeps work traceable and every PR maps to exactly one issue.

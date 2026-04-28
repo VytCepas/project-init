@@ -129,10 +129,11 @@ class TestCreateIssueScript:
             "## References",
             "## Dependencies",
             "## Acceptance criteria",
-            "## Definition of Ready",
-            "## Definition of Done",
         ):
             assert section in content
+        # Definition of Ready/Done removed — boilerplate that added noise without value
+        assert "## Definition of Ready" not in content
+        assert "## Definition of Done" not in content
 
     def test_script_documents_missing_label_fallback(self):
         content = self.script.read_text()

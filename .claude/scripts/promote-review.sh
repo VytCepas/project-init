@@ -34,7 +34,3 @@ gh pr ready "$PR_NUMBER"
 
 PR_URL=$(gh pr view "$PR_NUMBER" --json url -q '.url')
 echo "PR #$PR_NUMBER is now ready for review: $PR_URL"
-echo "board-automation.yml will move the board card to In Review."
-echo ""
-echo "Next: wait for CI and review."
-echo "To merge when checks pass: .claude/scripts/monitor-pr.sh $PR_NUMBER --merge"

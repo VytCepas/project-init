@@ -35,14 +35,11 @@ for hook_file in "$GIT_HOOKS_SRC"/*; do
   # Create symlink (or copy if symlinks not available)
   if cp -P "$hook_file" "$hook_dst" 2>/dev/null; then
     chmod +x "$hook_dst"
-    echo "  ✓ Installed $hook_name"
   else
     echo "  ✗ Failed to install $hook_name"
     exit 1
   fi
 done
 
-echo "✓ All git hooks installed successfully"
-echo ""
 echo "To reinstall hooks after pulling changes, run:"
 echo "  .claude/scripts/install-hooks.sh"

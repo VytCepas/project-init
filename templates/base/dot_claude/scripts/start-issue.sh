@@ -79,7 +79,6 @@ if [ -z "$PROJECT_KEY" ]; then
 fi
 
 # --- Fetch issue title ---
-echo "Fetching issue #$ISSUE_NUMBER..."
 ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title -q '.title' 2>/dev/null)
 if [ -z "$ISSUE_TITLE" ]; then
   echo "ERROR: issue #$ISSUE_NUMBER not found" >&2
@@ -125,7 +124,6 @@ fi
 PR_TITLE="[${ISSUE_REF}][${TYPE}] ${CLEAN_TITLE}"
 PR_BODY="Closes #${ISSUE_NUMBER}"
 
-echo "Creating draft PR..."
 PR_URL=$(gh pr create \
   --draft \
   --title "$PR_TITLE" \
@@ -133,6 +131,3 @@ PR_URL=$(gh pr create \
 
 echo "Draft PR: $PR_URL"
 
-echo ""
-echo "Ready. Branch: $BRANCH | PR: $PR_URL"
-echo "Next: implement, commit, push. Then run promote-review.sh when ready for review and monitor-pr.sh --merge when checks pass."

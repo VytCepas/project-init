@@ -1,7 +1,9 @@
 ---
-description: Create a GitHub Issue + branch + draft PR before starting work
+name: start-task
+description: Creates a GitHub Issue, branch, and draft PR before implementation begins. Use before any non-trivial task to keep work traceable — one issue, one branch, one PR.
+when_to_use: Use when the user says "start work on X", "create a ticket for Y", or "begin a new task". Do not use for trivial one-off changes that don't need tracking.
 argument-hint: "[task title]"
-allowed-tools: Bash Read
+allowed-tools: Bash(gh *) Bash(git *) Read
 ---
 
 Before starting any non-trivial task, create a GitHub Issue, a dedicated branch, and a draft PR. This keeps work traceable and every PR maps to exactly one issue.
@@ -28,13 +30,8 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 5. **Proceed** — only begin implementation after the scripts have run successfully.
 
-6. **When ready to merge** — mark ready, then monitor CI and merge:
-   ```bash
-   .claude/scripts/promote-review.sh
-   .claude/scripts/monitor-pr.sh <n> --merge
-   ```
-   Do NOT use `gh pr checks --watch` or bare `gh pr merge` — `monitor-pr.sh` handles
-   the "no checks registered yet" wait and blocks on failures.
+6. **When ready to merge** — load `.claude/skills/github-workflow/SKILL.md` for the
+   full push → promote → monitor/merge lifecycle and review-cycle protocol.
 
 ## Rules
 

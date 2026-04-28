@@ -34,14 +34,11 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 
 ## GitHub workflow
 
-- Read [.github/copilot-instructions.md](.github/copilot-instructions.md) before any GitHub action. Do not rely on this summary alone.
-- Work is tracked in GitHub Projects backed by GitHub Issues.
-- Branch names must follow `<issue_type>/<project_abbr>-<issue_number>-<branch-short-description>`, for example `chore/PI-40-split-scaffold-tests`.
-- Project Init uses `PI` as the project abbreviation.
-- Issue titles: plain description only — type is carried by the label, not the title.
-- PR titles must follow `[PI-IssueNumber][type] description` where type ∈ {feat, fix, chore, docs, test} — the type prefix is kept because PR titles become merge commit messages in git log where labels are invisible.
-- PR bodies must include `Closes #<number>` to auto-link the issue and move the board card on merge.
-- This repo may not have root `.claude/scripts/` files because it is the scaffolder source. Do not run files under `templates/` as this repo's operational automation; those are scaffolded-project artifacts. If a referenced lifecycle script is absent in the root `.claude/scripts/`, use the equivalent `git` / `gh` commands directly.
+For any push, PR, review, or merge work: load `.claude/skills/github-workflow/SKILL.md`.
+
+Quick ref: branch = `<type>/PI-<n>-<slug>` | PR title = `[PI-N][type] desc` | body includes `Closes #N`.
+
+Root `.claude/scripts/` lifecycle scripts exist here but may not cover every variant — they are scaffolded-project artifacts. If a script is missing, the skill documents the `git`/`gh` fallback.
 
 ## CI Optimizations
 

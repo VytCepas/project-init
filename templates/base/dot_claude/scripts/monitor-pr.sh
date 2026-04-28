@@ -101,20 +101,17 @@ _print_failures "$CHECKS" || FAIL_CODE=$?
 
 # Handle review/decision failure
 if _review_decision_failed "$CHECKS"; then
-  echo ""
   echo "Review/decision failed on PR #$PR_NUMBER (cycle $REVIEW_CYCLE/$MAX_REVIEW_CYCLES):"
   _print_review_comments
 
   if [ "$MODE" = "--merge" ]; then
     if [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ]; then
-      echo ""
       echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — force-merging with admin override."
       GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --admin 2>&1 | grep -v "^$" || true
       echo "Merged PR #$PR_NUMBER (admin)"
       exit 0
     else
       NEXT=$((REVIEW_CYCLE + 1))
-      echo ""
       echo "Address the comments above, push your changes, then re-run:"
       echo "  .claude/scripts/monitor-pr.sh $PR_NUMBER --merge --review-cycle $NEXT"
       exit 2

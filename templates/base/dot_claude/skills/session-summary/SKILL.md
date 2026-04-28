@@ -1,7 +1,9 @@
 ---
 name: session-summary
-description: Summarize the current session — what was done, decisions made, open items — and save to vault
-allowed-tools: Bash Read Write Glob Grep
+description: Summarizes the current session and saves it to the vault. Use at the end of a work session to record completed work, decisions made, and open items for the next session.
+when_to_use: Use when the user says "save the session", "wrap up", "summarize what we did", or at the end of a long work session.
+effort: medium
+allowed-tools: Bash(git *) Read Write Glob Grep
 ---
 
 Summarize this session and save it to the vault:
