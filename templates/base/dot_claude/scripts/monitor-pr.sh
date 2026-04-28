@@ -1,12 +1,13 @@
 #!/bin/bash
-# Wait for all CI checks on a PR to complete, then optionally merge.
+# Wait for all CI checks and required reviews on a PR, then optionally merge.
 # Only prints failures or the final pass line — no per-refresh noise.
 # Requires: gh, python3 (stdlib only — no jq dependency).
 #
 # Usage:
 #   .claude/scripts/monitor-pr.sh <pr-number> [--merge]
 #
-# --merge: squash-merge and delete branch automatically when checks pass.
+# --merge: squash-merge and delete branch automatically when checks pass
+#          and any required review is approved.
 #
 # Agents: use this to complete the full PR lifecycle without manual steps.
 #   .claude/scripts/monitor-pr.sh <n> --merge
@@ -48,6 +49,7 @@ sys.exit(len(bad))
 "
 }
 
+# --- Phase 1: wait for CI ---
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
   PENDING=$(_count_pending "$CHECKS")
@@ -64,12 +66,37 @@ if [ "$FAIL_CODE" -gt 0 ]; then
 fi
 
 PR_URL=$(gh pr view "$PR_NUMBER" --json url -q '.url')
-REVIEW=$(gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""')
 
-if [ "$REVIEW" = "CHANGES_REQUESTED" ]; then
-  echo "Changes requested on PR #$PR_NUMBER — address review comments before merging."
-  echo "  gh pr view $PR_NUMBER --comments"
-  exit 1
+# --- Phase 2: wait for required reviews (Copilot, human, etc.) ---
+# reviewDecision values:
+#   APPROVED         — green, proceed
+#   CHANGES_REQUESTED — blocked, must address
+#   REVIEW_REQUIRED  — waiting on a pending review (Copilot or human)
+#   ""               — no review requirement, proceed
+if [ "$MODE" = "--merge" ]; then
+  while true; do
+    REVIEW=$(gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""')
+    if [ "$REVIEW" = "CHANGES_REQUESTED" ]; then
+      echo "Changes requested on PR #$PR_NUMBER — address review comments before merging."
+      echo "  gh pr view $PR_NUMBER --comments"
+      exit 1
+    fi
+    [ "$REVIEW" != "REVIEW_REQUIRED" ] && break
+    echo "Waiting for review on PR #$PR_NUMBER (review required)..."
+    sleep 30
+  done
+else
+  REVIEW=$(gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""')
+  if [ "$REVIEW" = "CHANGES_REQUESTED" ]; then
+    echo "Changes requested on PR #$PR_NUMBER — address review comments before merging."
+    echo "  gh pr view $PR_NUMBER --comments"
+    exit 1
+  fi
+  if [ "$REVIEW" = "REVIEW_REQUIRED" ]; then
+    echo "PR #$PR_NUMBER: CI passed but review is still pending."
+    echo "  $PR_URL"
+    exit 0
+  fi
 fi
 
 echo "PR #$PR_NUMBER passed: $PR_URL"
