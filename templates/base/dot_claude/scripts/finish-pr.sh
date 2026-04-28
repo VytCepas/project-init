@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-PR_NUMBER="${1:-}"
+PR_NUMBER=""
 CYCLE_ARGS=()
 
 while [ $# -gt 0 ]; do
