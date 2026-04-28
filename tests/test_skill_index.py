@@ -45,6 +45,18 @@ class TestSkillIndex:
         assert "session-summary" in content
         assert "add-hook" in content
         assert "add-command" in content
+        assert "github-workflow" in content
+
+    def test_github_workflow_skill_scaffolded(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        preset = load_preset("obsidian-only")
+        scaffold(target, preset, make_variables())
+        skill = target / ".claude" / "skills" / "github-workflow" / "SKILL.md"
+        assert skill.exists(), "github-workflow/SKILL.md not scaffolded"
+        content = skill.read_text()
+        assert "finish-pr.sh" in content
+        assert "monitor-pr.sh" in content
+        assert "review-cycle" in content
 
 
 class TestAgentInstructionFiles:

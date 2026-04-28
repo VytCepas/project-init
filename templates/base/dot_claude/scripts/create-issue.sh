@@ -273,10 +273,10 @@ write_bullets() {
   echo "## Metadata"
   echo
   echo "- Type: $TYPE"
-  echo "- Scale: ${SCALE:-task}"
-  echo "- Priority: ${PRIORITY:-unset}"
-  echo "- Area: ${AREA:-unset}"
-  echo "- Size: ${SIZE:-unset}"
+  [ -n "$SCALE" ] && echo "- Scale: $SCALE"
+  [ -n "$PRIORITY" ] && echo "- Priority: $PRIORITY"
+  [ -n "$AREA" ] && echo "- Area: $AREA"
+  [ -n "$SIZE" ] && echo "- Size: $SIZE"
   if [ -n "$PARENT" ]; then
     echo "- Parent: $PARENT_OWNER/$PARENT_REPO#$PARENT_NUMBER"
   fi
@@ -286,32 +286,22 @@ write_bullets() {
   if [ -n "$MILESTONE" ]; then
     echo "- Milestone: $MILESTONE"
   fi
-  echo
-  echo "## References"
-  echo
-  write_bullets "None" "${REFERENCES[@]}"
-  echo
-  echo "## Dependencies"
-  echo
-  write_bullets "None" "${DEPENDENCIES[@]}"
+  if [ "${#REFERENCES[@]}" -gt 0 ]; then
+    echo
+    echo "## References"
+    echo
+    write_bullets "None" "${REFERENCES[@]}"
+  fi
+  if [ "${#DEPENDENCIES[@]}" -gt 0 ]; then
+    echo
+    echo "## Dependencies"
+    echo
+    write_bullets "None" "${DEPENDENCIES[@]}"
+  fi
   echo
   echo "## Acceptance criteria"
   echo
   write_list "Define acceptance criteria before implementation" "${ACCEPTANCE[@]}"
-  echo
-  echo "## Implementation notes"
-  echo
-  echo "- Affected area: ${AREA:-unset}"
-  echo
-  echo "## Definition of Ready"
-  echo
-  echo "- [ ] Priority, area, size, and acceptance criteria are set"
-  echo "- [ ] Dependencies and references are captured or marked none"
-  echo
-  echo "## Definition of Done"
-  echo
-  echo "- [ ] Acceptance criteria are met"
-  echo "- [ ] Tests and documentation are updated where needed"
 } > "$BODY_PATH"
 
 if [ -n "$BODY_FILE" ]; then

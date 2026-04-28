@@ -58,4 +58,3 @@ else
   echo "  https://github.com/$OWNER/$NAME/settings/code_review" >&2
 fi
 
-echo "GitHub governance setup complete."

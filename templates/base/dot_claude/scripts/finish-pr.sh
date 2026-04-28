@@ -58,14 +58,4 @@ set +e
 STATUS=$?
 set -e
 
-if [ "$STATUS" -eq 2 ]; then
-  echo ""
-  echo "Review fixes are required before merge. Reply to each review comment, commit fixes, then rerun:"
-  if [ "${#CYCLE_ARGS[@]}" -gt 0 ]; then
-    echo "  .claude/scripts/finish-pr.sh $PR_NUMBER <next review-cycle from monitor-pr output>"
-  else
-    echo "  .claude/scripts/finish-pr.sh $PR_NUMBER --review-cycle 1"
-  fi
-fi
-
 exit "$STATUS"

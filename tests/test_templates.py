@@ -159,9 +159,8 @@ class TestScaffoldGitHubFiles:
         assert "[PROJECT-123][type] description" in content
         assert "[#N][type] description" not in content
         assert "PR title must start with" not in content
-        assert ".claude/scripts/monitor-pr.sh <pr-number> --merge" in content
-        assert "review-cycle" in content
-        assert "--admin" in content
+        # Review cycle protocol moved to github-workflow skill — file now points to it
+        assert "github-workflow" in content
 
     def test_gemini_md_created(self):
         f = self.target / "GEMINI.md"

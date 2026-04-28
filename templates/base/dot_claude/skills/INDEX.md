@@ -6,7 +6,7 @@ Load the relevant skill file when the trigger applies. Do not load all skills at
 |---|---|
 | Create a GitHub Issue | `.claude/skills/create-issue/SKILL.md` |
 | Start a new task (branch + draft PR) | `.claude/skills/start-task/SKILL.md` |
-| Push, review, or merge a PR | `.claude/skills/github-workflow/SKILL.md` (if present) or follow `.github/copilot-instructions.md` |
+| Push, review, or merge a PR | `.claude/skills/github-workflow/SKILL.md` |
 | Summarize the session | `.claude/skills/session-summary/SKILL.md` |
 | Add a hook | `.claude/skills/add-hook/SKILL.md` |
 | Add a slash command | `.claude/skills/add-command/SKILL.md` |

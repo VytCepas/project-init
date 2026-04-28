@@ -37,7 +37,6 @@ while [ "$attempt" -le "$MAX_RETRIES" ]; do
 
   attempt=$((attempt + 1))
   if [ "$attempt" -le "$MAX_RETRIES" ]; then
-    echo "push-branch: attempt $attempt failed, retrying in 3s..."
     sleep 3
   fi
 done

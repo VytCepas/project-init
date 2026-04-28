@@ -17,8 +17,8 @@ All agentic-development infrastructure lives under [`.claude/`](.claude/). Start
 ## Key rules for agents
 
 - **TDD** — write failing tests before any implementation. Use `/plan <task>` to generate acceptance tests first.
-- **GitHub Projects** — work is tracked on the GitHub Projects board (kanban) backed by GitHub Issues. Before starting non-trivial work, create or reference an issue. Use `/start-task` if one does not exist.
-- **Branch names** — use `<issue_type>/<project_abbr>-<issue_number>-<branch-short-description>`, for example `feat/PI-42-add-oauth-login`.
+- **GitHub Projects** — work is tracked on the GitHub Projects board backed by GitHub Issues. Before starting non-trivial work, create or reference an issue. Use `/start-task` if one does not exist.
+- **GitHub workflow** — for any push, PR, review, or merge action, load `.claude/skills/github-workflow/SKILL.md`. Quick ref: branch = `<type>/<KEY>-<n>-<slug>` | PR title = `[KEY-N][type] desc` | body includes `Closes #N`.
 {{#if lint_command}}- **Lint** — `{{lint_command}}` must pass before closing a task. The `pre-commit-gate` hook enforces this on every commit.
 {{/if}}- **No secrets in code** — never hardcode API keys, tokens, or personal data. Use `os.environ['KEY']` or a `.env` file (gitignored).
 

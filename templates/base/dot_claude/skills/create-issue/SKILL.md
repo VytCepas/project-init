@@ -1,7 +1,8 @@
 ---
-description: Create a GitHub Issue with planning metadata
-argument-hint: "[type] [title]"
-allowed-tools: Bash Read
+name: create-issue
+description: Creates a GitHub Issue with typed labels and structured planning metadata via create-issue.sh. Sub-skill invoked by start-task — do not call directly; use /start-task instead.
+user-invocable: false
+allowed-tools: Bash(gh *) Bash(.claude/scripts/*) Read
 ---
 
 Use this skill whenever creating a GitHub Issue.
