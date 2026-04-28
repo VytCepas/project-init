@@ -125,9 +125,12 @@ class TestScaffoldGitHubFiles:
     def test_board_automation_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
 
+    def test_review_status_workflow_created(self):
+        assert (self.target / ".github" / "workflows" / "review-status.yml").is_file()
+
     def test_workflow_runners_are_pinned(self):
         workflows = self.target / ".github" / "workflows"
-        for name in ("ci.yml", "validate-pr.yml", "board-automation.yml"):
+        for name in ("ci.yml", "validate-pr.yml", "board-automation.yml", "review-status.yml"):
             content = (workflows / name).read_text()
             assert "runs-on: ubuntu-24.04" in content
             assert "runs-on: ubuntu-latest" not in content

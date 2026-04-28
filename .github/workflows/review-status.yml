@@ -1,0 +1,43 @@
+name: Review status
+
+# Creates a commit status named "review/decision" whenever a PR review is
+# submitted, edited, or dismissed. This lets monitor-pr.sh treat review state
+# as just another CI check instead of polling reviewDecision in a separate loop.
+#
+# Status mapping:
+#   APPROVED          → success  ("Approved")
+#   CHANGES_REQUESTED → failure  ("Changes requested")
+#   COMMENTED/other   → pending  ("Review required — awaiting approval")
+
+on:
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+permissions:
+  statuses: write
+
+jobs:
+  set-review-status:
+    name: Set review/decision status
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Post commit status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          case "$REVIEW_STATE" in
+            APPROVED)
+              STATE="success"; DESCRIPTION="Approved" ;;
+            CHANGES_REQUESTED)
+              STATE="failure"; DESCRIPTION="Changes requested" ;;
+            *)
+              STATE="pending"; DESCRIPTION="Review required — awaiting approval" ;;
+          esac
+          gh api --method POST "repos/${REPO}/statuses/${SHA}" \
+            --field state="$STATE" \
+            --field description="$DESCRIPTION" \
+            --field context="review/decision" \
+            --field target_url="${{ github.event.review.html_url }}"
