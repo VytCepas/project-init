@@ -36,7 +36,7 @@ LOG="$SESSIONS_DIR/$STAMP.md"
 # Append one-liner to operational log
 OPS_LOG="$ROOT/.claude/vault/log.md"
 if [ -f "$OPS_LOG" ]; then
-  COMMIT_COUNT="$(git -C "$ROOT" log --since='2 hours ago' --oneline 2>/dev/null | wc -l | tr -d ' ')"
+  COMMIT_COUNT="$(git -C "$ROOT" log --since='2 hours ago' --oneline 2>/dev/null | wc -l | tr -d ' ' || echo 0)"
   echo "## [$STAMP] session-end | ${COMMIT_COUNT} commit(s)" >> "$OPS_LOG"
 fi
 

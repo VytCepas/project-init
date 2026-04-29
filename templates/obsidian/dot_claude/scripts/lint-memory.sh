@@ -38,8 +38,8 @@ for file in "$MEMORY_DIR"/*.md; do
     continue
   fi
 
-  # Get frontmatter block
-  frontmatter="$(sed -n '2,/^---$/p' "$file" | head -n -1)"
+  # Get frontmatter block (between first and second --- delimiters, POSIX-portable)
+  frontmatter="$(awk 'NR==1{next} /^---$/{exit} {print}' "$file")"
 
   # Check required fields
   for field in name description type; do
@@ -79,7 +79,7 @@ else
     if [ ! -f "$MEMORY_DIR/$ref" ]; then
       error "MEMORY.md references '$ref' but file does not exist"
     fi
-  done < <(grep -oP '\[.*?\]\(\K[^)]+' "$INDEX" 2>/dev/null || true)
+  done < <(sed -n 's/.*\[[^]]*\](\([^)]*\)).*/\1/p' "$INDEX" 2>/dev/null || true)
 fi
 
 # --- Report orphaned vault notes (warnings only) ---
@@ -89,7 +89,7 @@ if [ -d "$VAULT_DIR" ]; then
   # Collect all wikilink targets from vault notes
   all_links="$(grep -roh '\[\[[^]]*\]\]' "$VAULT_DIR" 2>/dev/null | sed 's/\[\[//;s/\]\]//' | sort -u || true)"
 
-  for file in $(find "$VAULT_DIR" -name '*.md' -not -path '*/.obsidian/*' -not -path '*/templates/*' -not -name 'README.md' -not -name 'log.md'); do
+  while IFS= read -r -d '' file; do
     name="$(basename "$file" .md)"
     # Check if any other note links to this one
     if [ -n "$all_links" ]; then
@@ -97,7 +97,7 @@ if [ -d "$VAULT_DIR" ]; then
         warn "$(basename "$file"): no inbound wikilinks (orphan note)"
       fi
     fi
-  done
+  done < <(find "$VAULT_DIR" -name '*.md' -not -path '*/.obsidian/*' -not -path '*/templates/*' -not -name 'README.md' -not -name 'log.md' -print0)
 fi
 
 # --- Summary ---

@@ -25,7 +25,7 @@ type: user | feedback | project | reference
 
 ## File naming
 
-`<type>_<slug>.md` — lowercase, hyphenated slug.
+Convention (not enforced by lint): `<type>_<slug>.md` — lowercase, hyphenated slug.
 
 Examples: `user_role.md`, `feedback_testing.md`, `project_deadline.md`, `reference_api-docs.md`
 
