@@ -33,4 +33,27 @@ LOG="$SESSIONS_DIR/$STAMP.md"
   echo "<!-- Add manual notes here; agents may append below. -->"
 } > "$LOG"
 
+# Append one-liner to operational log
+OPS_LOG="$ROOT/.claude/vault/log.md"
+if [ -f "$OPS_LOG" ]; then
+  COMMIT_COUNT="$(git -C "$ROOT" log --since='2 hours ago' --oneline 2>/dev/null | wc -l | tr -d ' ')"
+  echo "## [$STAMP] session-end | ${COMMIT_COUNT} commit(s)" >> "$OPS_LOG"
+fi
+
+# Run memory lint if available; append warnings to session log
+LINT_SCRIPT="$ROOT/.claude/scripts/lint-memory.sh"
+if [ -x "$LINT_SCRIPT" ]; then
+  LINT_OUTPUT="$("$LINT_SCRIPT" 2>&1)" || true
+  if [ -n "$LINT_OUTPUT" ]; then
+    {
+      echo
+      echo "## Memory lint"
+      echo
+      echo '```'
+      echo "$LINT_OUTPUT"
+      echo '```'
+    } >> "$LOG"
+  fi
+fi
+
 echo "[session-end] wrote $LOG" >&2
