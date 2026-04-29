@@ -36,8 +36,11 @@ MEMORY_DIR = ROOT / ".claude" / "memory"
 HASH_FILE = WORKING_DIR / "ingested.json"
 
 
-def _file_hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+OPS_LOG = ROOT / ".claude" / "vault" / "log.md"
+
+
+def _content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 def _load_hashes() -> dict[str, str]:
@@ -51,13 +54,19 @@ def _save_hashes(hashes: dict[str, str]) -> None:
 
 
 def collect_markdown() -> list[tuple[str, str]]:
-    """Return [(source_path_str, content), ...] for all markdown to ingest."""
+    """Return [(source_path_str, content), ...] for all markdown to ingest.
+
+    log.md is excluded: the ingest script appends to it after hashing, so
+    including it would guarantee a hash miss on every subsequent incremental run.
+    """
     docs: list[tuple[str, str]] = []
     for base in (VAULT_DIR, MEMORY_DIR):
         if not base.exists():
             continue
         for md in base.rglob("*.md"):
             if ".lightrag" in md.parts:
+                continue
+            if md.resolve() == OPS_LOG.resolve():
                 continue
             docs.append((str(md.relative_to(ROOT)), md.read_text(encoding="utf-8")))
     return docs
@@ -104,8 +113,7 @@ def main() -> int:
     ingested = 0
 
     for source, content in docs:
-        file_path = ROOT / source
-        current_hash = _file_hash(file_path)
+        current_hash = _content_hash(content)
         new_hashes[source] = current_hash
 
         if not args.full and stored_hashes.get(source) == current_hash:
