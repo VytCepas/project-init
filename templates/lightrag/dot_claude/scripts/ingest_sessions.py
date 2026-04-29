@@ -6,11 +6,15 @@ the markdown to LightRAG. LightRAG internally uses an LLM for entity
 extraction, but this wrapper itself makes no model decisions.
 
 Usage:
-    uv run .claude/scripts/ingest_sessions.py
+    uv run .claude/scripts/ingest_sessions.py           # incremental (default)
+    uv run .claude/scripts/ingest_sessions.py --full     # re-ingest everything
 """
 
 from __future__ import annotations
 
+import argparse
+import hashlib
+import json
 import os
 import sys
 from pathlib import Path
@@ -21,9 +25,7 @@ try:
     from lightrag.llm.openai import openai_embedding
     from lightrag.utils import EmbeddingFunc
 except ImportError:
-    sys.stderr.write(
-        "lightrag-hku not installed. Run: uv pip install lightrag-hku\n"
-    )
+    sys.stderr.write("lightrag-hku not installed. Run: uv pip install lightrag-hku\n")
     sys.exit(1)
 
 
@@ -31,6 +33,21 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKING_DIR = ROOT / ".claude" / "memory" / ".lightrag"
 VAULT_DIR = ROOT / ".claude" / "vault"
 MEMORY_DIR = ROOT / ".claude" / "memory"
+HASH_FILE = WORKING_DIR / "ingested.json"
+
+
+def _file_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _load_hashes() -> dict[str, str]:
+    if HASH_FILE.exists():
+        return json.loads(HASH_FILE.read_text(encoding="utf-8"))
+    return {}
+
+
+def _save_hashes(hashes: dict[str, str]) -> None:
+    HASH_FILE.write_text(json.dumps(hashes, indent=2) + "\n", encoding="utf-8")
 
 
 def collect_markdown() -> list[tuple[str, str]]:
@@ -47,6 +64,14 @@ def collect_markdown() -> list[tuple[str, str]]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Re-ingest all files (ignore hash cache)",
+    )
+    args = parser.parse_args()
+
     WORKING_DIR.mkdir(parents=True, exist_ok=True)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -74,11 +99,36 @@ def main() -> int:
         print("no markdown found to ingest")
         return 0
 
+    stored_hashes = {} if args.full else _load_hashes()
+    new_hashes: dict[str, str] = {}
+    ingested = 0
+
     for source, content in docs:
+        file_path = ROOT / source
+        current_hash = _file_hash(file_path)
+        new_hashes[source] = current_hash
+
+        if not args.full and stored_hashes.get(source) == current_hash:
+            continue
+
         print(f"ingest: {source}")
         rag.insert(content)
+        ingested += 1
 
-    print(f"ingested {len(docs)} documents into {WORKING_DIR}")
+    _save_hashes(new_hashes)
+
+    skipped = len(docs) - ingested
+    print(f"ingested {ingested} documents ({skipped} unchanged) into {WORKING_DIR}")
+
+    # Append to operational log if it exists
+    ops_log = ROOT / ".claude" / "vault" / "log.md"
+    if ops_log.exists() and ingested > 0:
+        from datetime import UTC, datetime
+
+        stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
+        with ops_log.open("a", encoding="utf-8") as f:
+            f.write(f"## [{stamp}] lightrag-ingest | {ingested} document(s)\n")
+
     return 0
 
 

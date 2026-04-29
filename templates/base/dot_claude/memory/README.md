@@ -2,6 +2,8 @@
 
 Small, grep-able, human-readable memory files. Intended for facts an agent should reuse across sessions.
 
+See [`SCHEMA.md`](SCHEMA.md) for the authoritative governance rules (types, frontmatter, naming, lint enforcement).
+
 ## Convention
 
 Every memory file has YAML frontmatter:
