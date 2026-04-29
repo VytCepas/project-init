@@ -26,12 +26,14 @@ Types: `feat` `fix` `chore` `docs` `test`
 ## Standard lifecycle
 
 1. **Start work** — use the `start-task` skill. It creates a branch and draft PR.
+   For minor no-issue work, use `.claude/scripts/create-nojira-pr.sh <type> "description"`.
 
 2. **Push during development:**
    ```bash
    .claude/scripts/push-branch.sh
-   # fallback: git push -u origin <branch>
    ```
+   Never use bare `git push` in this repo — `push-branch.sh` retries transient
+   GitHub errors and verifies the remote SHA.
 
 3. **Finish — push, mark ready, and merge:**
    ```bash

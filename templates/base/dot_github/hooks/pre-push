@@ -11,7 +11,7 @@ while read local_ref local_sha remote_ref remote_sha; do
     echo ""
     echo "To contribute:"
     echo "  1. Create a new branch with the project key: git checkout -b <issue_type>/<project_abbr>-<issue_number>-<slug>"
-    echo "  2. Make your changes and push: git push origin <branch-name>"
+    echo "  2. Make your changes and push: .claude/scripts/push-branch.sh"
     echo "  3. Open a PR on GitHub"
     echo ""
     echo "For more details, see .claude/project-init.md"

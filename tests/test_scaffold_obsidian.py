@@ -129,7 +129,14 @@ class TestScaffoldObsidianOnly:
         assert (self.target / ".claude" / "scripts" / "push-branch.sh").is_file()
 
     def test_lifecycle_scripts_are_executable(self):
-        for name in ("create-issue.sh", "start-issue.sh", "promote-review.sh", "install-hooks.sh", "push-branch.sh"):
+        for name in (
+            "create-issue.sh",
+            "create-nojira-pr.sh",
+            "start-issue.sh",
+            "promote-review.sh",
+            "install-hooks.sh",
+            "push-branch.sh",
+        ):
             path = self.target / ".claude" / "scripts" / name
             assert path.stat().st_mode & 0o111, f"{name} must be executable"
 
@@ -157,6 +164,7 @@ class TestScaffoldObsidianOnly:
     def test_project_init_md_has_script_commands(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
         assert "create-issue.sh" in content
+        assert "create-nojira-pr.sh" in content
         assert "start-issue.sh" in content
         assert "promote-review.sh" in content
 

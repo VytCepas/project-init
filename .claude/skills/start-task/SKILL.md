@@ -34,11 +34,11 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 6. **When ready to merge** — mark ready, then monitor CI and merge:
    ```bash
-   gh pr ready <n>
-   .claude/scripts/monitor-pr.sh <n> --merge
+   .claude/scripts/finish-pr.sh <n>
    ```
-   Do NOT use `gh pr checks --watch` or bare `gh pr merge` — `monitor-pr.sh` handles
-   the "no checks registered yet" wait and blocks on failures.
+   Do NOT use `gh pr ready`, `gh pr checks --watch`, raw `git push`, or bare
+   `gh pr merge` — the lifecycle scripts handle retrying pushes, review waits,
+   and review cycles.
 
 ## Rules
 
