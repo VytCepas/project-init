@@ -59,9 +59,16 @@ _print_failures() {
   echo "$1" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-bad = [c for c in data if c.get('conclusion') in ('FAILURE', 'CANCELLED', 'TIMED_OUT')]
+bad = [
+    c for c in data
+    if c.get('name') != 'review/decision'
+    and (
+        c.get('bucket') in ('fail', 'cancel')
+        or c.get('state') in ('FAILURE', 'CANCELLED', 'TIMED_OUT', 'ERROR')
+    )
+]
 for c in bad:
-    print(f\"  {c['name']}: {c['conclusion']}\")
+    print(f\"  {c['name']}: {c.get('state') or c.get('bucket')}\")
 sys.exit(len(bad))
 "
 }
@@ -97,11 +104,19 @@ _get_review_decision() {
 
 # --- Wait for all CI checks (excludes review/decision commit status) ---
 while true; do
-  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
+  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
   PENDING=$(_count_pending "$CHECKS")
   [ "$PENDING" -eq 0 ] && break
   sleep 10
 done
+
+FAIL_CODE=0
+_print_failures "$CHECKS" || FAIL_CODE=$?
+
+if [ "$FAIL_CODE" -gt 0 ]; then
+  echo "CI failed on PR #$PR_NUMBER — fix the issues, push, then re-run this script."
+  exit 1
+fi
 
 # --- Wait up to 10 min for a reviewer to act (bounded replacement for the original infinite wait) ---
 # We query reviewDecision directly so this works even before the review/decision commit
@@ -121,11 +136,8 @@ while { [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UN
     echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
   fi
   # Refresh CHECKS too so late-arriving CI failures are caught
-  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,conclusion 2>/dev/null) || CHECKS="[]"
+  CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
 done
-
-FAIL_CODE=0
-_print_failures "$CHECKS" || FAIL_CODE=$?
 
 # Fail closed: if reviewDecision could not be fetched, do not merge
 if [ "$REVIEW_DECISION" = "UNKNOWN" ]; then
@@ -167,11 +179,6 @@ if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
       exit 2
     fi
   fi
-  exit 1
-fi
-
-if [ "$FAIL_CODE" -gt 0 ]; then
-  echo "CI failed on PR #$PR_NUMBER — fix the issues, push, then re-run this script."
   exit 1
 fi
 

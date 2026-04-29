@@ -29,8 +29,12 @@ if printf '%s' "$CMD" | grep -qE '(^|[[:space:]])gh[[:space:]]+issue[[:space:]]+
 fi
 
 if printf '%s' "$CMD" | grep -qE '(^|[[:space:]])gh[[:space:]]+pr[[:space:]]+create\b'; then
-  if [ -x ".claude/scripts/start-issue.sh" ] || [ -f ".claude/scripts/start-issue.sh" ] || [ -x ".claude/scripts/create-nojira-pr.sh" ] || [ -f ".claude/scripts/create-nojira-pr.sh" ]; then
+  if [ -x ".claude/scripts/start-issue.sh" ] || [ -f ".claude/scripts/start-issue.sh" ]; then
     block "Use .claude/scripts/start-issue.sh for issue-backed PRs or .claude/scripts/create-nojira-pr.sh for no-issue PRs instead of raw gh pr create."
+  fi
+
+  if { [ -x ".claude/scripts/create-nojira-pr.sh" ] || [ -f ".claude/scripts/create-nojira-pr.sh" ]; } && printf '%s' "$CMD" | grep -qi '\[nojira\]'; then
+    block "Use .claude/scripts/create-nojira-pr.sh for no-issue PRs instead of raw gh pr create."
   fi
 fi
 
