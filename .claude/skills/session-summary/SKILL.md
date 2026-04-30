@@ -30,6 +30,6 @@ Summarize this session and save it to the vault:
    - (anything else worth remembering)
    ```
 
-3. **Update memory** if any reusable facts emerged (write to `~/.claude/projects/.../memory/`)
+3. **Update memory** if any reusable facts emerged (write to the project memory directory)
 
 Keep the summary concise — a future agent should be able to skim it in 30 seconds.

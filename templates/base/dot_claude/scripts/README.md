@@ -8,6 +8,8 @@ Helper scripts invoked by the user, by hooks, or by agents via the Bash tool. Pr
 - **`create-issue.sh`** — Create a typed GitHub issue and print its issue number
 - **`start-issue.sh`** — Create an issue branch, push it, and open a draft PR
 - **`create-nojira-pr.sh`** — Create or reuse a no-issue branch, push it, and open a draft PR
+- **`push-branch.sh`** — Push current branch with retry and remote-SHA verification (handles transient 5xx errors)
 - **`promote-review.sh`** — Mark a draft PR ready for review
 - **`monitor-pr.sh`** — Poll PR checks and optionally squash-merge with `--merge`
-- **`push-branch.sh`** — Push current branch with retry and remote-SHA verification (handles transient 5xx errors)
+- **`finish-pr.sh`** — Composite: push, mark ready, monitor checks/review, and merge
+- **`setup-github.sh`** — One-time GitHub repository governance setup (branch protection, review settings)

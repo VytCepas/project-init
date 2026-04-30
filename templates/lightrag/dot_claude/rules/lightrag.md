@@ -6,7 +6,7 @@ alwaysApply: false
 
 ## LightRAG memory
 
-- Ingest: `./scripts/ingest_sessions.py`
-- Query: `./scripts/query_memory.py "<question>"`
+- Ingest: `.claude/scripts/ingest_sessions.py`
+- Query: `.claude/scripts/query_memory.py "<question>"`
 
 Scripts are deterministic wrappers; the LLM is invoked only inside LightRAG for entity extraction and synthesis.

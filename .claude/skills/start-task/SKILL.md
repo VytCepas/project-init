@@ -18,9 +18,10 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 3. **Create the issue** (no `create-issue.sh` in this repo — use gh directly):
    ```bash
-   gh issue create --title "[PI-new][<type>] <title>" --label "<type>" --body "..."
+   gh issue create --title "<title>" --label "<type>" --body "..."
    # Note the issue number from the output URL
    ```
+   Issue titles are plain descriptions — the type is carried by the label.
 
 4. **Create branch and draft PR**:
    ```bash

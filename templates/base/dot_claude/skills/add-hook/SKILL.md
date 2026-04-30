@@ -11,7 +11,7 @@ allowed-tools: Read Write Bash
 Pick the event that matches when the hook should fire:
 
 **Tool execution** (most common):
-- `PreToolUse` — before a tool runs; exit 1 to block it
+- `PreToolUse` — before a tool runs; output block JSON to block it
 - `PostToolUse` — after a tool runs; cannot block, can log or validate
 - `PostToolBatch` — after a batch of parallel tool calls completes
 - `PermissionRequest` — when Claude asks for permission; can auto-approve
@@ -42,16 +42,26 @@ Create `.claude/hooks/<name>.sh`:
 INPUT=$(cat)
 
 # exit 0 = allow (or no-op for non-blocking events)
-# exit 1 = block (PreToolUse only)
-# stdout JSON = optional context injected into Claude's next turn
+# stdout JSON with {"decision":"block","reason":"..."} = block (PreToolUse)
+# stdout JSON with {"additionalContext":"..."} = inject context
+# Always exit 0 — exit 1 means hook error, not a block
 
 # Example: block pushes to main
-TOOL=$(echo "$INPUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('tool_name',''))" 2>/dev/null)
-CMD=$(echo "$INPUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('command',''))" 2>/dev/null)
+CMD=$(echo "$INPUT" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+print((data.get('tool_input', {}) or {}).get('command', '') or '')
+" 2>/dev/null || true)
 
-if [ "$TOOL" = "Bash" ] && echo "$CMD" | grep -q "push.*main\|push.*master"; then
-  echo '{"decision":"block","reason":"Direct push to main is not allowed. Use a branch and PR."}' >&2
-  exit 1
+[ -z "$CMD" ] && exit 0
+
+if echo "$CMD" | grep -qE 'git push.*(main|master)'; then
+  python3 -c "import json,sys; print(json.dumps({'decision':'block','reason':sys.argv[1]}))" \
+    "Direct push to main is not allowed. Use a branch and PR."
+  exit 0
 fi
 exit 0
 ```

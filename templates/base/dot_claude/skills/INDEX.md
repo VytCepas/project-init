@@ -10,6 +10,7 @@ Load the relevant skill file when the trigger applies. Do not load all skills at
 | Summarize the session | `.claude/skills/session-summary/SKILL.md` |
 | Add a hook | `.claude/skills/add-hook/SKILL.md` |
 | Add a slash command | `.claude/skills/add-command/SKILL.md` |
+| Audit project health | `.claude/skills/audit/SKILL.md` |
 
 ## How to use this index
 

@@ -12,9 +12,11 @@ All hooks fire automatically — do not invoke them manually in normal flow.
 |---|---|---|
 | `secret-guard.py` | PreToolUse | any Write / Edit / Bash |
 | `bash-safety-guard.sh` | PreToolUse | Bash |
+| `github-command-guard.sh` | PreToolUse | Bash — steers agents toward lifecycle scripts |
 | `pre-commit-gate.sh` | PreToolUse | Bash containing `git commit` |
+| `pre-merge-ci-check.sh` | PreToolUse | Bash — blocks merge when CI pending/failing |
 | `post-edit-lint.sh` | PostToolUse | Edit / Write / MultiEdit |
-| `session-end.sh` | Stop | end of session (Obsidian preset only) |
+| `workflow-state-reminder.sh` | UserPromptSubmit | injects workflow lifecycle context |
 
 **Manual invocation** (debugging or one-off runs only):
 ```bash
