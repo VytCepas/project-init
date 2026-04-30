@@ -107,6 +107,15 @@ _get_review_decision() {
   gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""' 2>/dev/null || echo "UNKNOWN"
 }
 
+# Check if any review activity exists (COMMENTED, APPROVED, or CHANGES_REQUESTED).
+# Bot reviewers like Codex post COMMENTED reviews that don't change reviewDecision,
+# so we use this as an early exit signal from the wait loop.
+_has_review_activity() {
+  local count
+  count=$(gh pr view "$PR_NUMBER" --json reviews -q '.reviews | length' 2>/dev/null) || count=0
+  [ "$count" -gt 0 ]
+}
+
 # --- Wait for all CI checks (excludes review/decision commit status) ---
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
@@ -135,14 +144,18 @@ if [ "$MODE" = "--merge" ] && [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ] && [ 
 fi
 
 if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UNKNOWN" ]; then
-  echo "Waiting for reviewer (up to ${REVIEW_TIMEOUT}s) — reviewDecision: ${REVIEW_DECISION}"
+  echo "Waiting for reviewer (up to ${REVIEW_TIMEOUT}s, polling every 30s) — reviewDecision: ${REVIEW_DECISION}"
 fi
 while { [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UNKNOWN" ]; } && [ "$REVIEW_ELAPSED" -lt "$REVIEW_TIMEOUT" ]; do
-  sleep 15
-  REVIEW_ELAPSED=$((REVIEW_ELAPSED + 15))
+  sleep 30
+  REVIEW_ELAPSED=$((REVIEW_ELAPSED + 30))
   REVIEW_DECISION=$(_get_review_decision)
-  if [ $((REVIEW_ELAPSED % 60)) -eq 0 ]; then
-    echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
+  echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
+  # Early exit: if any review activity exists (even COMMENTED), stop waiting.
+  # Bot reviewers like Codex post comments without changing reviewDecision.
+  if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] && _has_review_activity; then
+    echo "  Review comments detected — proceeding without waiting for formal approval."
+    break
   fi
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
 done
