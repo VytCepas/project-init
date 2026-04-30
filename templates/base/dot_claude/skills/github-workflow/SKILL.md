@@ -23,6 +23,7 @@ Types: `feat` `fix` `chore` `docs` `test`
 
 1. **Start work** — use the `start-task` skill. It runs `start-issue.sh` which creates
    the branch, pushes, and opens a draft PR.
+   For minor no-issue work, use `.claude/scripts/create-nojira-pr.sh <type> "description"`.
 
 2. **Push during development:**
    ```bash

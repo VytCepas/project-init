@@ -172,6 +172,14 @@ class TestCreateIssueSkill:
         ).read_text()
         assert ".claude/skills/create-issue/SKILL.md" in content
 
+    def test_nojira_pr_script_scaffolded(self):
+        script = self.target / ".claude" / "scripts" / "create-nojira-pr.sh"
+        content = script.read_text()
+        assert script.stat().st_mode & 0o111, "create-nojira-pr.sh must be executable"
+        assert "[nojira]" in content
+        assert "push-branch.sh" in content
+        assert "gh pr create" in content
+
 
 class TestGitHubWorkflowHooks:
     @pytest.fixture(autouse=True)
@@ -203,6 +211,30 @@ class TestGitHubWorkflowHooks:
         out = self._run_hook("github-command-guard.sh", "gh pr merge 42 --squash")
         assert out is not None and out["decision"] == "block"
 
+    def test_github_command_guard_blocks_raw_pr_merge_auto(self):
+        out = self._run_hook("github-command-guard.sh", "gh pr merge 42 --auto")
+        assert out is not None and out["decision"] == "block"
+
+    def test_github_command_guard_blocks_raw_pr_create(self):
+        out = self._run_hook(
+            "github-command-guard.sh",
+            'gh pr create --title "[PI-42][fix] Example" --body "Closes #42"',
+        )
+        assert out is not None and out["decision"] == "block"
+        assert "create-nojira-pr.sh" in out["reason"]
+
+    def test_github_command_guard_blocks_raw_pr_ready(self):
+        out = self._run_hook("github-command-guard.sh", "gh pr ready 42")
+        assert out is not None and out["decision"] == "block"
+
+    def test_github_command_guard_blocks_raw_git_push(self):
+        out = self._run_hook("github-command-guard.sh", "git push -u origin fix/PI-42-example")
+        assert out is not None and out["decision"] == "block"
+
+    def test_github_command_guard_blocks_pr_checks_watch(self):
+        out = self._run_hook("github-command-guard.sh", "gh pr checks 42 --watch")
+        assert out is not None and out["decision"] == "block"
+
     def test_github_command_guard_allows_monitor_pr_merge(self):
         out = self._run_hook(
             "github-command-guard.sh",
@@ -219,6 +251,13 @@ class TestGitHubWorkflowHooks:
         ]
         assert any("github-command-guard.sh" in command for command in pre_commands)
         assert "UserPromptSubmit" in data["hooks"]
+
+    def test_monitor_pr_queries_review_decision_directly(self):
+        content = (self.target / ".claude" / "scripts" / "monitor-pr.sh").read_text()
+        assert "reviewDecision" in content
+        assert "_get_review_decision" in content
+        assert "Waiting for reviewer" in content
+        assert "could not fetch reviewDecision" in content
 
     def test_workflow_state_reminder_reads_prompt_stdin(self):
         hook = self.target / ".claude" / "hooks" / "workflow-state-reminder.sh"

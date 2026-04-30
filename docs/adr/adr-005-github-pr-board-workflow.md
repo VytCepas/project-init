@@ -68,12 +68,15 @@ PRs must pass all CI checks before merge. The base scaffold ships a CI workflow 
 
 ### Code review
 
-Code review by the `reviewer` agent is **optional** and triggered only via `/request-review`. The command explicitly asks the user before running the agent to surface the token cost. Use it for:
-- Security-sensitive changes (auth, secrets, input validation)
-- Architectural changes (new abstractions, schema changes)
-- Any PR the author is uncertain about
+GitHub PR review is part of the normal merge lifecycle: `finish-pr.sh` and
+`monitor-pr.sh --merge` wait for the aggregate `reviewDecision`, print review
+feedback when changes are requested, and require the next `--review-cycle`
+after fixes are pushed.
 
-Skip for: typo fixes, dependency bumps, doc-only changes.
+The local `reviewer` agent remains optional and is triggered via
+`/request-review` when an extra pre-merge pass is worth the token cost. Use it
+for security-sensitive changes, architectural changes, or any PR the author is
+uncertain about.
 
 ### GitHub Projects board
 

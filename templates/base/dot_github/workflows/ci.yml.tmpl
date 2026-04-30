@@ -59,7 +59,7 @@ jobs:
           gh run view --log-failed
           \`\`\`
 
-          Fix the issues, then \`git push\` to re-trigger CI."
+          Fix the issues, then run \`.claude/scripts/push-branch.sh\` to re-trigger CI."
 
   # Optimization #2: Split heavyweight tests into separate job
   # Only run integration/smoke tests after fast lint+unit tests pass
