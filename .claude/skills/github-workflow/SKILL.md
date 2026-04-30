@@ -3,7 +3,7 @@ name: github-workflow
 description: Guides Claude through the full GitHub PR lifecycle — branch naming, push, review responses, and merge. Loaded automatically before any push, PR creation, review response, or merge action.
 user-invocable: false
 effort: high
-allowed-tools: Bash(git *) Bash(gh *)
+allowed-tools: Bash(git *) Bash(gh *) Bash(.claude/scripts/*)
 ---
 
 Load this skill before any push, PR creation, review response, or merge action.
