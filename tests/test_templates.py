@@ -183,6 +183,10 @@ class TestScaffoldGitHubFiles:
         assert 'grep -v "^$" || true' in content
         assert "reviewDecision" in content
         assert "Waiting for reviewer" in content
+        assert "MAX_REVIEW_CYCLES=1" in content
+        assert "REVIEW_TIMEOUT=360" in content
+        assert "old policy allowed two review cycles" in content
+        assert "skipping reviewer wait" in content
 
     def test_finish_pr_wraps_push_ready_monitor_flow(self):
         script = self.target / ".claude" / "scripts" / "finish-pr.sh"

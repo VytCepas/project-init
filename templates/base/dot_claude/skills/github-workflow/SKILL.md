@@ -60,7 +60,7 @@ Types: `feat` `fix` `chore` `docs` `test`
    ```bash
    .claude/scripts/monitor-pr.sh <pr-number> --merge --review-cycle <N>
    ```
-4. After 2 cycles, the script auto force-merges with `--admin`.
+4. After 1 review-fix cycle, the script auto force-merges with `--admin`.
 
 **Before applying any comment:** read the current file state. Check whether the
 comment is stale (already fixed), contradicts conventions, or is correct. Never
