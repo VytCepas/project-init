@@ -129,6 +129,11 @@ fi
 REVIEW_TIMEOUT=360
 REVIEW_ELAPSED=0
 REVIEW_DECISION=$(_get_review_decision)
+if [ "$MODE" = "--merge" ] && [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ] && [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
+  echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — skipping reviewer wait and force-merging with admin override."
+  _admin_merge; exit 0
+fi
+
 if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UNKNOWN" ]; then
   echo "Waiting for reviewer (up to ${REVIEW_TIMEOUT}s) — reviewDecision: ${REVIEW_DECISION}"
 fi

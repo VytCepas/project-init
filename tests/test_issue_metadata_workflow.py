@@ -260,6 +260,7 @@ class TestGitHubWorkflowHooks:
         assert "could not fetch reviewDecision" in content
         assert "MAX_REVIEW_CYCLES=1" in content
         assert "REVIEW_TIMEOUT=360" in content
+        assert "skipping reviewer wait" in content
 
     def test_workflow_state_reminder_reads_prompt_stdin(self):
         hook = self.target / ".claude" / "hooks" / "workflow-state-reminder.sh"
