@@ -8,7 +8,8 @@
 #
 # --merge: squash-merge and delete branch automatically when all checks pass.
 # --review-cycle N: current review fix cycle count (0-based, default 0).
-#   When N >= 2 and review/decision is still failing, force-merges with --admin.
+#   When N >= MAX_REVIEW_CYCLES and review/decision is still failing or pending,
+#   force-merges with --admin.
 #
 # Full lifecycle for agents:
 #   1. .claude/scripts/monitor-pr.sh <n> --merge
