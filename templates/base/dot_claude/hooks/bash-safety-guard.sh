@@ -6,11 +6,14 @@ set -euo pipefail
 
 INPUT=$(cat)
 
-if command -v jq &>/dev/null; then
-    CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
-else
-    exit 0
-fi
+CMD=$(printf '%s' "$INPUT" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+print((data.get('tool_input', {}) or {}).get('command', '') or '')
+" 2>/dev/null || true)
 
 [ -z "$CMD" ] && exit 0
 

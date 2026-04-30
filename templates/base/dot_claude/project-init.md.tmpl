@@ -34,6 +34,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Skill | `session-summary` | summarise session and save to vault |
 | Skill | `add-hook` | add a new deterministic hook |
 | Skill | `add-command` | add a new slash command |
+| Skill | `audit` | full project health scan, creates issue with findings |
 | Agent | `reviewer` | code review specialist |
 | Agent | `researcher` | codebase explorer |
 
@@ -102,11 +103,11 @@ It attempts to configure branch protection, required checks, conversation resolu
 
 | What | Format | Example |
 |------|--------|---------|
-| Commit message | `[#<n>][<type>] description` | `[#42][feat] Add OAuth login` |
-| PR title | same | `[#42][feat] Add OAuth login` |
+| Commit message | `[KEY-<n>][<type>] description` | `[PI-42][feat] Add OAuth login` |
+| PR title | `[KEY-<n>][<type>] description` | `[PI-42][feat] Add OAuth login` |
 | No-issue PR | `[nojira][<type>] description` | `[nojira][fix] Fix typo` |
 | PR body | must include `Closes #<n>` | triggers auto-close on merge |
-| Branch | `<issue_type>/<project_abbr>-<issue_number>-<slug>` | `feat/PI-42-add-oauth-login` |
+| Branch | `<type>/<KEY>-<n>-<slug>` | `feat/PI-42-add-oauth-login` |
 
 Types: `feat` · `fix` · `chore` · `docs` · `test`
 
@@ -131,7 +132,7 @@ When CI fails, GitHub posts a comment on the PR. Read it, fix the code, push:
 ```bash
 gh run view --log-failed   # full failure output
 # fix the code
-git add … && git commit -m "[#n][fix] Fix failing tests"
+git add … && git commit -m "[KEY-n][fix] Fix failing tests"
 .claude/scripts/push-branch.sh
 .claude/scripts/monitor-pr.sh <n> --merge   # wait and merge when clean
 ```
