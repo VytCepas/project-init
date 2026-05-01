@@ -7,7 +7,8 @@ import pytest
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
-_SKILLS_DIR = Path(__file__).parent.parent / "templates" / "base" / "dot_claude" / "skills"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_SKILLS_DIR = _REPO_ROOT / "templates" / "base" / "dot_claude" / "skills"
 _INDEX_PATH = _SKILLS_DIR / "INDEX.md"
 
 

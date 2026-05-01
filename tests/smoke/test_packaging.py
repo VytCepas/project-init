@@ -20,7 +20,7 @@ class TestInstalledWheel:
     """
 
     def test_wheel_install_and_scaffold(self, tmp_path: Path):
-        repo_root = Path(__file__).resolve().parent.parent
+        repo_root = Path(__file__).resolve().parents[2]
         build_dir = tmp_path / "build"
         venv_dir = tmp_path / "venv"
         scaffold_target = tmp_path / "scaffolded"

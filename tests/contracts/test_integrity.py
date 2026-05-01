@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -87,7 +88,7 @@ class TestStrictMode:
         finally:
             sm._TEMPLATES_DIR = original
 
-    def test_strict_atomic_target_untouched_on_error(self, tmp_path: Path):
+    def test_strict_target_untouched_on_validation_error(self, tmp_path: Path):
         """PI-21: strict mode must leave target untouched on validation error."""
         from project_init.scaffold import TemplateRenderError
         target = tmp_path / "p"
@@ -112,6 +113,31 @@ class TestStrictMode:
         finally:
             sm._TEMPLATES_DIR = original
 
+    def test_strict_preserves_existing_project_files_on_success(self, tmp_path: Path):
+        """Strict mode must not replace the whole target directory on success."""
+        target = tmp_path / "p"
+        target.mkdir()
+        user_file = target / "user.txt"
+        user_file.write_text("keep me\n", encoding="utf-8")
+
+        preset = load_preset("obsidian-only")
+        scaffold(target, preset, make_variables(), strict=True)
+
+        assert user_file.read_text(encoding="utf-8") == "keep me\n"
+        assert (target / ".claude" / "settings.json").is_file()
+
+    def test_strict_preserves_user_memory_files_on_rerun(self, tmp_path: Path):
+        """Strict mode should honor the same memory/vault idempotency as default mode."""
+        target = tmp_path / "p"
+        preset = load_preset("obsidian-only")
+        scaffold(target, preset, make_variables(), strict=True)
+
+        memory_file = target / ".claude" / "memory" / "project_context.md"
+        memory_file.write_text("custom project context\n", encoding="utf-8")
+        scaffold(target, preset, make_variables(project_name="changed"), strict=True)
+
+        assert memory_file.read_text(encoding="utf-8") == "custom project context\n"
+
     def test_non_strict_still_permissive(self, tmp_path: Path):
         """Default mode tolerates unknown variables (back-compat)."""
         target = tmp_path / "p"
@@ -135,3 +161,32 @@ class TestStrictMode:
             "--strict",
         ])
         assert rc == 0
+
+    def test_strict_mode_docs_describe_validated_merge(self):
+        readme = Path("README.md").read_text(encoding="utf-8")
+        template_system = Path("docs/development/template-system.md").read_text(
+            encoding="utf-8"
+        )
+
+        assert "validated scaffold files are merged into the target" in readme
+        assert "strict mode is not a whole-directory replacement" in readme.lower()
+        assert "If validation fails, the target is untouched" in template_system
+        assert "same idempotency rules as normal mode" in template_system
+
+
+class TestTestSuiteOrganization:
+    def test_pytest_markers_are_declared_for_suite_directories(self):
+        pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+        markers = "\n".join(pyproject["tool"]["pytest"]["ini_options"]["markers"])
+
+        for marker in ("unit", "contract", "integration", "smoke", "optional_dependency"):
+            assert f"{marker}:" in markers
+
+    def test_testing_docs_describe_directory_layout_and_markers(self):
+        docs = Path("docs/development/testing.md").read_text(encoding="utf-8")
+
+        for path in ("tests/unit/", "tests/contracts/", "tests/integration/", "tests/smoke/"):
+            assert path in docs
+        for marker in ("unit", "contract", "integration", "smoke", "optional_dependency"):
+            assert marker in docs
+        assert "auto-marked in `tests/conftest.py`" in docs

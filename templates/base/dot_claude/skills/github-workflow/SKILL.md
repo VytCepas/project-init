@@ -47,7 +47,11 @@ Types: `feat` `fix` `chore` `docs` `test`
 
 ## Review cycle protocol
 
-`monitor-pr.sh --merge` exits **2** when `review/decision` fails and cycles remain.
+`monitor-pr.sh --merge` exits **1** for CI or merge failures and **2** when
+`review/decision` fails while review cycles remain. Treat any non-zero exit as
+unfinished work: inspect the printed failure, fix or retry, then rerun the
+workflow. Do not report a PR as merged unless the script exits 0 after printing
+the merged or auto-merge-enabled status.
 
 1. Post a response for each review comment:
    ```

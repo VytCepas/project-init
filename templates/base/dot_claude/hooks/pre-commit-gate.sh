@@ -28,45 +28,35 @@ ERRORS=""
 # Lint and auto-fix staged Python files. Prefer 'uv run ruff' inside a
 # uv-managed project so the hook uses the same ruff the project itself uses;
 # fall back to a system ruff binary.
-STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
-if [ -n "$STAGED_PY" ]; then
+mapfile -t STAGED_PY < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
+if [ "${#STAGED_PY[@]}" -gt 0 ]; then
     LINT_OUT=""
     if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
-        # shellcheck disable=SC2086
-        uv run ruff check --fix --quiet $STAGED_PY 2>/dev/null || true
-        # shellcheck disable=SC2086
-        uv run ruff format --quiet $STAGED_PY 2>/dev/null || true
-        # shellcheck disable=SC2086
-        LINT_OUT=$(uv run ruff check --quiet $STAGED_PY 2>&1 || true)
+        uv run ruff check --fix --quiet "${STAGED_PY[@]}" 2>/dev/null || true
+        uv run ruff format --quiet "${STAGED_PY[@]}" 2>/dev/null || true
+        LINT_OUT=$(uv run ruff check --quiet "${STAGED_PY[@]}" 2>&1 || true)
     elif command -v ruff &>/dev/null; then
-        # shellcheck disable=SC2086
-        ruff check --fix --quiet $STAGED_PY 2>/dev/null || true
-        # shellcheck disable=SC2086
-        ruff format --quiet $STAGED_PY 2>/dev/null || true
-        # shellcheck disable=SC2086
-        LINT_OUT=$(ruff check --quiet $STAGED_PY 2>&1 || true)
+        ruff check --fix --quiet "${STAGED_PY[@]}" 2>/dev/null || true
+        ruff format --quiet "${STAGED_PY[@]}" 2>/dev/null || true
+        LINT_OUT=$(ruff check --quiet "${STAGED_PY[@]}" 2>&1 || true)
     fi
     if [ -n "$LINT_OUT" ]; then
         ERRORS="${ERRORS}Python lint errors:\n${LINT_OUT}\n"
     fi
     # Re-stage auto-fixed files so the commit includes the fixes
-    # shellcheck disable=SC2086
-    git add $STAGED_PY 2>/dev/null || true
+    git add "${STAGED_PY[@]}" 2>/dev/null || true
 fi
 
 # Lint and auto-fix staged JS/TS files
 # Use bunx (bun's package runner) — consistent with project convention (PI-15).
-STAGED_JS=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '\.(js|ts|jsx|tsx)$' || true)
-if [ -n "$STAGED_JS" ] && command -v bunx &>/dev/null; then
-    # shellcheck disable=SC2086
-    bunx eslint --fix --quiet $STAGED_JS 2>/dev/null || true
-    # shellcheck disable=SC2086
-    LINT_OUT=$(bunx eslint --quiet $STAGED_JS 2>&1 || true)
+mapfile -t STAGED_JS < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '\.(js|ts|jsx|tsx)$' || true)
+if [ "${#STAGED_JS[@]}" -gt 0 ] && command -v bunx &>/dev/null; then
+    bunx eslint --fix --quiet "${STAGED_JS[@]}" 2>/dev/null || true
+    LINT_OUT=$(bunx eslint --quiet "${STAGED_JS[@]}" 2>&1 || true)
     if [ -n "$LINT_OUT" ]; then
         ERRORS="${ERRORS}JS/TS lint errors:\n${LINT_OUT}\n"
     fi
-    # shellcheck disable=SC2086
-    git add $STAGED_JS 2>/dev/null || true
+    git add "${STAGED_JS[@]}" 2>/dev/null || true
 fi
 
 if [ -n "$ERRORS" ]; then

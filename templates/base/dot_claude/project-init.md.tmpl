@@ -76,7 +76,7 @@ Every non-trivial task follows this exact sequence. Run the scripts; the LLM's o
 |------|---------|---------------------------|
 | 1. Create issue | `.claude/scripts/create-issue.sh <type> "description" --priority <priority> --area "<area>" --size <size> --acceptance "<criterion>"` | Issue created with metadata, board card → **To Do** |
 | 2. Start work | `.claude/scripts/start-issue.sh <issue-n> <type>` | Branch (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) + push + draft PR, board → **In Progress** |
-| 3. Commit | `git add … && git commit -m "[#n][type] message"` | `commit-msg` hook validates format; `pre-commit-gate` auto-lints |
+| 3. Commit | `git add … && git commit -m "[<KEY>-<n>][type] message"` | `commit-msg` hook validates format; `pre-commit-gate` auto-lints |
 | 4. Push | `.claude/scripts/push-branch.sh` | CI runs; if it fails a comment is posted on the PR with `gh run view --log-failed` |
 | 5. Finish PR | `.claude/scripts/finish-pr.sh <n>` | Pushes, marks ready, monitors CI/review, and merges when clean |
 

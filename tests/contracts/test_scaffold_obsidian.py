@@ -101,6 +101,13 @@ class TestScaffoldObsidianOnly:
         assert hook.is_file()
         assert hook.stat().st_mode & 0o111
 
+    def test_pre_commit_gate_quotes_staged_file_paths(self):
+        content = (self.target / ".claude" / "hooks" / "pre-commit-gate.sh").read_text()
+        assert "mapfile -t STAGED_PY" in content
+        assert '"${STAGED_PY[@]}"' in content
+        assert "mapfile -t STAGED_JS" in content
+        assert '"${STAGED_JS[@]}"' in content
+
     def test_bash_safety_guard_hook_exists(self):
         hook = self.target / ".claude" / "hooks" / "bash-safety-guard.sh"
         assert hook.is_file()
@@ -167,6 +174,11 @@ class TestScaffoldObsidianOnly:
         assert "create-nojira-pr.sh" in content
         assert "start-issue.sh" in content
         assert "promote-review.sh" in content
+
+    def test_project_init_md_uses_commit_message_format_hook_accepts(self):
+        content = (self.target / ".claude" / "project-init.md").read_text()
+        assert 'git commit -m "[<KEY>-<n>][type] message"' in content
+        assert "[#n][type]" not in content
 
     def test_start_task_skill_delegates_to_scripts(self):
         content = (self.target / ".claude" / "skills" / "start-task" / "SKILL.md").read_text()

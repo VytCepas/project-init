@@ -97,19 +97,20 @@ def scaffold(
     ``{{...}}`` placeholder or unclosed conditional survives rendering.
 
     In strict mode, all output is written to a temporary directory first.
-    Only on successful validation is the output committed to target (atomic).
+    Only on successful validation are rendered files committed to target.
     """
     import uuid
 
     layers: list[str] = preset["layers"]
     created: list[Path] = []
+    staged: list[Path] = []
     rendered_files: list[tuple[Path, str]] = []  # for strict-mode scan
 
-    # For strict mode: write to temp, validate, then rename. Non-strict: write
-    # directly to target (best-effort behavior acceptable per PI-21).
+    # For strict mode: write to temp, validate, then copy into target.
+    # Non-strict: write directly to target (best-effort behavior acceptable per PI-21).
     if strict:
-        # Use a temp directory under target.parent to ensure same-filesystem
-        # rename (atomic on POSIX). UUID suffix prevents collisions.
+        # Use a temp directory under target.parent so staged files are close to
+        # the final target. UUID suffix prevents collisions.
         temp_suffix = f".partial-{uuid.uuid4().hex[:8]}"
         work_dir = target.parent / (target.name + temp_suffix)
         work_dir.mkdir(parents=True, exist_ok=True)
@@ -156,7 +157,10 @@ def scaffold(
                 if src.stat().st_mode & 0o111:
                     dest.chmod(dest.stat().st_mode | 0o111)
 
-                created.append(rel_path)
+                if strict:
+                    staged.append(rel_path)
+                else:
+                    created.append(rel_path)
 
         # Strict-mode validation: check for unrendered placeholders.
         if strict:
@@ -171,11 +175,21 @@ def scaffold(
                 )
                 raise TemplateRenderError(msg)
 
-            # Validation passed; commit the temp directory to target (atomic rename).
-            # If target exists, remove it first (we're strict, so we want a clean replace).
-            if target.exists():
-                shutil.rmtree(target)
-            work_dir.rename(target)
+            # Validation passed; commit staged files into target. Strict mode
+            # validates in isolation first, but still honors rerun idempotency:
+            # user-owned memory/vault files must not be overwritten.
+            target.mkdir(parents=True, exist_ok=True)
+            for rel_path in staged:
+                if _should_preserve(rel_path, target):
+                    continue
+
+                src = work_dir / rel_path
+                dest = target / rel_path
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dest)
+                created.append(rel_path)
+
+            shutil.rmtree(work_dir)
 
     except Exception:
         # On any error (validation or I/O), clean up temp directory in strict mode.

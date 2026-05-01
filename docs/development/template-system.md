@@ -43,11 +43,13 @@ Variables are defined by the wizard (`src/project_init/__main__.py`) and passed 
 
 ## Idempotency
 
-Re-running the wizard does not overwrite files in `memory/` or `vault/` (user content). `README.md` files inside those dirs are always refreshed.
+Re-running the wizard merges scaffold files into the target project. It does not delete unrelated project files, and it does not overwrite files in `memory/` or `vault/` (user content). `README.md` files inside those dirs are always refreshed.
 
 ## Strict mode
 
 `--strict` raises `TemplateRenderError` if any `{{...}}` placeholder survives rendering. Used in CI smoke tests to catch missing variables.
+
+Strict mode renders all scaffold files into a temporary directory first. If validation fails, the target is untouched. If validation passes, the validated files are copied into the target using the same idempotency rules as normal mode. Strict mode is deliberately not a whole-directory replacement, because project-init is normally run inside existing projects.
 
 ## Current template variables
 

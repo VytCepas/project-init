@@ -302,6 +302,16 @@ write_bullets() {
   echo "## Acceptance criteria"
   echo
   write_list "Define acceptance criteria before implementation" "${ACCEPTANCE[@]}"
+  echo
+  echo "## Definition of Ready"
+  echo
+  echo "- [ ] Acceptance criteria are clear enough to verify"
+  echo "- [ ] Dependencies, references, and affected areas are recorded"
+  echo
+  echo "## Definition of Done"
+  echo
+  echo "- [ ] Implementation is complete"
+  echo "- [ ] Relevant checks, tests, or manual validation are documented"
 } > "$BODY_PATH"
 
 if [ -n "$BODY_FILE" ]; then

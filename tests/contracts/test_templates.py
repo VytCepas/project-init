@@ -180,7 +180,8 @@ class TestScaffoldGitHubFiles:
         assert "gh pr checks" in content
         assert "--json" in content  # uses json polling, not --watch, to suppress noise
         assert "--delete-branch" in content
-        assert 'grep -v "^$" || true' in content
+        assert "_run_gh" in content
+        assert "ERROR: merge failed" in content
         assert "reviewDecision" in content
         assert "Waiting for reviewer" in content
         assert "MAX_REVIEW_CYCLES=1" in content
@@ -272,7 +273,7 @@ class TestScaffoldGitHubFiles:
 def test_project_validate_pr_workflow_accepts_project_keys():
     """The live validate-pr.yml must accept any project key (PI-, APP-, etc.) not just PI-."""
     content = (
-        Path(__file__).resolve().parent.parent / ".github" / "workflows" / "validate-pr.yml"
+        Path(__file__).resolve().parents[2] / ".github" / "workflows" / "validate-pr.yml"
     ).read_text()
     assert "[A-Z]" in content  # generic project key pattern
     assert "nojira" in content
