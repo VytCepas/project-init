@@ -2,6 +2,8 @@
 
 This repo is a **scaffolder**. It produces a `.claude/` layout inside *other* projects. Nothing here runs as a long-lived service.
 
+**Scaffolder source ≠ scaffolded project.** The hooks and scripts under `.claude/` here are development infrastructure *for this repo*. A project produced by running `project-init` (the output) gets a richer set of hooks from `templates/` — including safety hooks like `secret-guard`, `bash-safety-guard`, and `pre-commit-gate` that are absent here. If you see a script or skill referenced in `templates/` that does not exist under `.claude/` in this repo, that is expected.
+
 This is the canonical instruction file for agents working in this repository. [AGENTS.md](AGENTS.md) and [GEMINI.md](GEMINI.md) intentionally redirect here to avoid duplicated rules.
 
 Use [README.md](README.md) for user-facing behavior.
@@ -32,6 +34,20 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 - **ruff only** — no black / isort / mypy.
 - **Templates are tested by scaffolding into a temp dir** — any change to `templates/` should have a corresponding test in the focused `tests/test_*.py` module for that behavior. Create a new focused file if no existing module fits.
 
+## Settings
+
+`.claude/settings.json` wires deterministic hooks to Claude Code events. Active hooks in this repo:
+
+| Event | Script | Purpose |
+|---|---|---|
+| PreToolUse(Bash) | `github-command-guard.sh` | Steers toward lifecycle scripts; blocks raw `git push main`, `gh pr merge` |
+| PreToolUse(Bash) | `pre-merge-ci-check.sh` | Blocks merge if CI is pending or failing |
+| UserPromptSubmit | `workflow-state-reminder.sh` | Injects workflow context when GitHub actions are mentioned |
+
+`.claude/settings.local.json` pre-approves tool calls for development work (Bash, WebFetch, test paths). It is a convenience file — not a security boundary. Entries are auto-added by Claude Code when you approve a prompt; stale entries can be removed safely.
+
+`$CLAUDE_PROJECT_DIR` in hook commands expands to the project root at runtime. To add a new hook, use the `add-hook` skill or edit `settings.json` directly following the existing pattern.
+
 ## GitHub workflow
 
 For any push, PR, review, or merge work: load `.claude/skills/github-workflow/SKILL.md`.
@@ -39,6 +55,8 @@ For any push, PR, review, or merge work: load `.claude/skills/github-workflow/SK
 Quick ref: branch = `<type>/PI-<n>-<slug>` | PR title = `[PI-N][type] desc` | body includes `Closes #N`.
 
 Root `.claude/scripts/` lifecycle scripts exist here but may not cover every variant — they are scaffolded-project artifacts. If a script is missing, the skill documents the `git`/`gh` fallback.
+
+Template skills (in `templates/base/dot_claude/skills/`) reference scripts like `create-issue.sh` and `start-issue.sh` that live in scaffolded projects, not in this source repo. The source `.claude/skills/INDEX.md` documents what's available here.
 
 ## CI Optimizations
 
@@ -49,6 +67,19 @@ This repo uses three strategies to reduce CI time and token usage:
 3. **Job Dependencies** — Integration/smoke tests are separate jobs that only run when main lint passes, avoiding wasted cycles on failures.
 
 Scaffolded projects get a `ci.yml.tmpl` template with these patterns built in. See the comments in that file for how to customize conditional paths (skip docs-only changes, etc.)
+
+## Extending the agent infrastructure
+
+Use this table when adding new capabilities to this repo or its templates:
+
+| You want to… | Add a… | Where |
+|---|---|---|
+| Automate a repeatable multi-step workflow | **Skill** (`SKILL.md` with frontmatter) | `.claude/skills/<name>/SKILL.md` — register in `INDEX.md` |
+| Enforce a rule on every tool call or commit | **Hook** (bash/python script) | `.claude/hooks/` — wire in `settings.json`. Use the `add-hook` skill. |
+| Expose a shortcut as `/command` | **Command** (markdown file) | `.claude/commands/<name>.md`. Use the `add-command` skill. |
+| Add a reusable sub-agent persona | **Agent spec** | `.claude/agents/<name>.md` |
+
+After creating a skill, add an entry to `.claude/skills/INDEX.md` so it is discoverable without reading every file.
 
 ## What this repo does NOT include
 
