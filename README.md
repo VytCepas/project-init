@@ -76,7 +76,7 @@ The wizard asks:
 - Database MCP — none / Postgres / SQLite
 - Browser automation — Playwright (yes/no)
 
-Your answers are recorded in `.claude/config.yaml`. Re-run any time — it reconciles, never overwrites memory or vault notes.
+Your answers are recorded in `.claude/config.yaml`. Re-run any time — it reconciles, preserves existing project files, and never overwrites memory or vault notes. With `--strict`, templates are rendered and validated in a temporary directory first, then the validated scaffold files are merged into the target; strict mode is not a whole-directory replacement.
 
 ## Example command
 

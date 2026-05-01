@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -129,11 +130,12 @@ class TestCreateIssueScript:
             "## References",
             "## Dependencies",
             "## Acceptance criteria",
+            "## Definition of Ready",
+            "## Definition of Done",
         ):
             assert section in content
-        # Definition of Ready/Done removed — boilerplate that added noise without value
-        assert "## Definition of Ready" not in content
-        assert "## Definition of Done" not in content
+        assert "Acceptance criteria are clear enough to verify" in content
+        assert "Relevant checks, tests, or manual validation" in content
 
     def test_script_documents_missing_label_fallback(self):
         content = self.script.read_text()
@@ -161,6 +163,7 @@ class TestCreateIssueSkill:
         content = skill.read_text()
         assert "priority" in content.lower()
         assert ".claude/scripts/create-issue.sh" in content
+        assert "Definition of Ready/Done defaults" in content
 
     def test_skill_index_references_create_issue_skill(self):
         content = (self.target / ".claude" / "skills" / "INDEX.md").read_text()
@@ -261,6 +264,57 @@ class TestGitHubWorkflowHooks:
         assert "MAX_REVIEW_CYCLES=1" in content
         assert "REVIEW_TIMEOUT=360" in content
         assert "skipping reviewer wait" in content
+        assert "_run_gh" in content
+        assert "ERROR: admin merge failed" in content
+
+    def test_github_workflow_skill_documents_nonzero_monitor_exit(self):
+        content = (
+            self.target / ".claude" / "skills" / "github-workflow" / "SKILL.md"
+        ).read_text()
+        assert "exits **1** for CI or merge failures" in content
+        assert "Do not report a PR as merged unless the script exits 0" in content
+
+    def test_monitor_pr_exits_nonzero_when_merge_fails(self, tmp_path: Path):
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        fake_gh = fake_bin / "gh"
+        fake_gh.write_text(
+            """#!/usr/bin/env bash
+if [ "$1 $2" = "pr checks" ]; then
+  echo '[]'
+  exit 0
+fi
+if [ "$1 $2" = "pr view" ]; then
+  case "$*" in
+    *reviewDecision*) echo 'APPROVED'; exit 0 ;;
+    *mergeStateStatus*) echo 'CLEAN'; exit 0 ;;
+    *url*) echo 'https://example.invalid/pr/42'; exit 0 ;;
+  esac
+fi
+if [ "$1 $2" = "pr merge" ]; then
+  echo 'merge failed from fake gh' >&2
+  exit 7
+fi
+exit 2
+""",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(0o755)
+
+        script = self.target / ".claude" / "scripts" / "monitor-pr.sh"
+        env = {"PATH": f"{fake_bin}:{os.environ['PATH']}"}
+        result = subprocess.run(
+            [str(script), "42", "--merge"],
+            capture_output=True,
+            text=True,
+            cwd=self.target,
+            env=env,
+        )
+
+        assert result.returncode == 1
+        assert "merge failed from fake gh" in result.stdout
+        assert "ERROR: merge failed for PR #42" in result.stderr
+        assert "Merged PR #42" not in result.stdout
 
     def test_workflow_state_reminder_reads_prompt_stdin(self):
         hook = self.target / ".claude" / "hooks" / "workflow-state-reminder.sh"

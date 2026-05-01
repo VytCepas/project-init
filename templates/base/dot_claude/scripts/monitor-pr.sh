@@ -94,9 +94,29 @@ _print_review_comments() {
   echo "  Full PR: $(gh pr view "$PR_NUMBER" --json url -q '.url' 2>/dev/null || true)"
 }
 
+_run_gh() {
+  local output
+  local status
+
+  set +e
+  output=$(GH_PROMPT_DISABLED=1 gh "$@" 2>&1)
+  status=$?
+  set -e
+
+  if [ -n "$output" ]; then
+    printf '%s\n' "$output" | grep -v "^$" || true
+  fi
+
+  return "$status"
+}
+
 _admin_merge() {
-  GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --admin 2>&1 | grep -v "^$" || true
-  echo "Merged PR #$PR_NUMBER (admin)"
+  if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --admin; then
+    echo "Merged PR #$PR_NUMBER (admin)"
+  else
+    echo "ERROR: admin merge failed for PR #$PR_NUMBER" >&2
+    return 1
+  fi
 }
 
 # Query the PR's aggregate review decision directly — source of truth regardless
@@ -208,14 +228,21 @@ if [ "$MODE" = "--merge" ]; then
   MERGE_STATE=$(gh pr view "$PR_NUMBER" --json mergeStateStatus -q '.mergeStateStatus' 2>/dev/null || echo "UNKNOWN")
 
   if [ "$MERGE_STATE" = "CLEAN" ] || [ "$MERGE_STATE" = "UNSTABLE" ]; then
-    GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1 | grep -v "^$" || true
-    echo "Merged PR #$PR_NUMBER"
+    if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
+      echo "Merged PR #$PR_NUMBER"
+    else
+      echo "ERROR: merge failed for PR #$PR_NUMBER" >&2
+      exit 1
+    fi
   elif [ "$MERGE_STATE" = "BLOCKED" ]; then
     echo "PR is blocked by review protection — merging with admin override."
     _admin_merge
   else
-    if ! GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch 2>/dev/null; then
-      GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --auto 2>&1 | grep -v "^$" || true
+    if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
+      if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --auto; then
+        echo "ERROR: could not merge or enable auto-merge for PR #$PR_NUMBER" >&2
+        exit 1
+      fi
       echo "Auto-merge enabled for PR #$PR_NUMBER — will merge once all requirements are met."
     else
       echo "Merged PR #$PR_NUMBER"

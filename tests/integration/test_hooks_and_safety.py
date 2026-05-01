@@ -193,12 +193,11 @@ class TestShellLineEndings:
     """
 
     def test_no_crlf_in_shell_templates(self):
-        repo_root = Path(__file__).resolve().parent.parent
+        repo_root = Path(__file__).resolve().parents[2]
         offenders: list[str] = []
         for sh in repo_root.glob("**/*.sh"):
             # Skip generated venv / build dirs.
-            if any(part in {".venv", "build", "dist", "node_modules"}
-                   for part in sh.parts):
+            if any(part in {".venv", "build", "dist", "node_modules"} for part in sh.parts):
                 continue
             data = sh.read_bytes()
             if b"\r\n" in data:

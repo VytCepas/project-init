@@ -48,3 +48,10 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "unit: pure Python logic and small rendering checks with no subprocesses",
+    "contract: scaffolded template and documentation contract checks",
+    "integration: CLI, hook, or scaffolded script behavior using subprocesses",
+    "smoke: packaging or installed-artifact end-to-end smoke checks",
+    "optional_dependency: tests that require dependencies outside the default dev extra",
+]
