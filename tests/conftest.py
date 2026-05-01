@@ -22,7 +22,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     tests_root = Path(__file__).parent
     for item in items:
         try:
-            rel_path = Path(item.fspath).relative_to(tests_root)
+            rel_path = item.path.relative_to(tests_root)
         except ValueError:
             continue
 
