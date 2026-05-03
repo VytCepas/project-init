@@ -7,6 +7,7 @@ Load the relevant skill file when the trigger applies. Do not load all skills at
 | Create a GitHub Issue | `.claude/skills/start-task/SKILL.md` (then use `gh issue create` directly — no `create-issue.sh` in this repo) |
 | Start a new task (branch + draft PR) | `.claude/skills/start-task/SKILL.md` |
 | Push, review, or merge a PR | `.claude/skills/github-workflow/SKILL.md` |
+| Create or manage wiki pages | `.claude/skills/wiki/SKILL.md` |
 | Summarize the session | `.claude/skills/session-summary/SKILL.md` |
 | Add a hook | `.claude/skills/add-hook/SKILL.md` |
 | Add a slash command | `.claude/skills/add-command/SKILL.md` |
