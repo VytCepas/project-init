@@ -8,13 +8,21 @@ allowed-tools: Bash(gh *) Bash(git *) Read
 
 Before starting any non-trivial task, create a GitHub Issue, a dedicated branch, and a draft PR. This keeps work traceable and every PR maps to exactly one issue.
 
+## Mandatory scripts
+
+| Action | Script | Never use |
+|--------|--------|-----------|
+| Start issue + branch + draft PR | `.claude/scripts/start-issue.sh <n> <type>` | bare `git checkout -b` + bare `gh pr create` |
+| Push branch | `.claude/scripts/push-branch.sh` | bare `git push` |
+| **Push + promote + merge (all-in-one)** | `.claude/scripts/finish-pr.sh <n>` | `gh pr ready`, bare `gh pr merge`, `gh pr checks --watch` |
+
 ## Steps
 
 1. **Clarify scope** — if $ARGUMENTS is empty or vague, ask the user for:
    - Task title (one line, imperative: "Add X", "Fix Y", "Refactor Z")
    - Work type: `feat` / `fix` / `chore` / `docs` / `test`
 
-2. **Check for existing issue** — run `gh issue list` and ask: "Does a GitHub Issue already exist for this? If so, provide the number and skip to step 4."
+2. **Check for existing issue and PR** — run `gh issue list` and `gh pr list`. If an issue already exists, use its number. If a draft PR already exists for that issue, use it — do **not** create a second PR. Skip to step 5.
 
 3. **Create the issue** — load `.claude/skills/create-issue/SKILL.md` and follow it. It gathers priority, area, size, references, dependencies, and acceptance criteria before running:
    ```bash
