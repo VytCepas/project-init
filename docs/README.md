@@ -8,7 +8,7 @@ Architecture decisions, development guides, and references for contributors and 
 |---|---|
 | [`adr/`](adr/) | Architecture Decision Records — why decisions were made |
 | [`development/`](development/) | Standards, testing, template system |
-| [`guides/`](guides/) | How-to guides for contributors |
+| [`guides/`](guides/) | How-to guides for users and contributors |
 
 ## Agent instruction
 
