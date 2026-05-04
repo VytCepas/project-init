@@ -51,17 +51,21 @@ class TestScaffoldObsidianOnly:
         hook = self.target / ".claude" / "hooks" / "session-end.sh"
         assert hook.is_file()
 
-    def test_slash_commands_created(self):
-        cmds = self.target / ".claude" / "commands"
-        assert (cmds / "status.md").is_file()
-        assert (cmds / "review.md").is_file()
-        assert (cmds / "save-memory.md").is_file()
-        assert (cmds / "plan.md").is_file()
+    def test_skills_created(self):
+        skills = self.target / ".claude" / "skills"
+        assert (skills / "status" / "SKILL.md").is_file()
+        assert (skills / "review" / "SKILL.md").is_file()
+        assert (skills / "save-memory" / "SKILL.md").is_file()
+        assert (skills / "plan" / "SKILL.md").is_file()  # SKILL.md.tmpl rendered to SKILL.md
+        assert (skills / "request-review" / "SKILL.md").is_file()
 
-    def test_agents_created(self):
+    def test_agents_dir_exists(self):
         agents = self.target / ".claude" / "agents"
-        assert (agents / "reviewer.md").is_file()
-        assert (agents / "researcher.md").is_file()
+        assert agents.is_dir()
+        assert (agents / "README.md").is_file()
+        # No example agent files should exist
+        assert not (agents / "reviewer.md").exists()
+        assert not (agents / "researcher.md").exists()
 
     def test_skill_created(self):
         skill = self.target / ".claude" / "skills" / "session-summary" / "SKILL.md"
@@ -195,11 +199,10 @@ class TestScaffoldObsidianOnly:
         assert (docs / "development" / "testing.md").is_file()
         assert (docs / "guides" / "using-memory.md").is_file()
 
-    def test_plan_command_is_tdd_first(self):
-        plan = self.target / ".claude" / "commands" / "plan.md"
+    def test_plan_skill_is_tdd_first(self):
+        plan = self.target / ".claude" / "skills" / "plan" / "SKILL.md"
         content = plan.read_text()
-        assert "acceptance test" in content.lower()
-        assert "red" in content.lower()
+        assert "write tests first" in content.lower()
 
     def test_project_init_md_has_tdd_instruction(self):
         content = (self.target / ".claude" / "project-init.md").read_text()

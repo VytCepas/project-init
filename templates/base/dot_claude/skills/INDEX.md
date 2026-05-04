@@ -6,8 +6,13 @@ Load the relevant skill file when the trigger applies. Do not load all skills at
 |---|---|
 | Create a GitHub Issue | `.claude/skills/create-issue/SKILL.md` |
 | Start a new task (branch + draft PR) | `.claude/skills/start-task/SKILL.md` |
+| Plan work before implementing | `.claude/skills/plan/SKILL.md` |
+| Review code for bugs and style | `.claude/skills/review/SKILL.md` |
+| Request review on a draft PR | `.claude/skills/request-review/SKILL.md` |
 | Push, review, or merge a PR | `.claude/skills/github-workflow/SKILL.md` |
+| Show project status and open items | `.claude/skills/status/SKILL.md` |
 | Summarize the session | `.claude/skills/session-summary/SKILL.md` |
+| Save something to project memory | `.claude/skills/save-memory/SKILL.md` |
 | Add a hook | `.claude/skills/add-hook/SKILL.md` |
 | Add a slash command | `.claude/skills/add-command/SKILL.md` |
 | Audit project health | `.claude/skills/audit/SKILL.md` |

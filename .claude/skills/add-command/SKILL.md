@@ -1,26 +1,18 @@
 ---
 name: add-command
-description: Creates a new slash command or skill that users can invoke with /name. Use when asked to add a command, automate a repeatable workflow step, or expose a task as a /name shortcut.
-when_to_use: Use when the user says "add a /command", "make a shortcut for X", or "I want to run this with a slash command". Both .claude/commands/ and .claude/skills/ work — prefer skills/ for new work.
+description: Creates a new slash command (skill) that users can invoke with /name. Use when asked to add a command, automate a repeatable workflow step, or expose a task as a /name shortcut.
+when_to_use: Use when the user says "add a /command", "make a shortcut for X", or "I want to run this with a slash command".
 argument-hint: "<command-name> <what it does>"
 allowed-tools: Write
 ---
 
-## Commands vs skills — which to use
+## Create a skill
 
-`.claude/commands/` and `.claude/skills/` both create `/name` slash commands and support the same frontmatter. **Skills are preferred for new work.** Use commands only when editing an existing commands file.
-
-| | `.claude/commands/name.md` | `.claude/skills/name/SKILL.md` |
-|---|---|---|
-| Status | Legacy, still works | Preferred |
-| Invocation | `/name` | `/name` |
-| Frontmatter | Same spec | Same spec |
+Slash commands in this project live in `.claude/skills/<name>/SKILL.md`. Each skill is a markdown file with YAML frontmatter.
 
 ## Step 1 — Create the file
 
-**Skills (preferred):** `.claude/skills/<name>/SKILL.md`
-
-**Commands (legacy):** `.claude/commands/<name>.md`
+Create `.claude/skills/<name>/SKILL.md` where `<name>` is the command name (lowercase, hyphen-separated).
 
 ## Step 2 — Write the frontmatter
 
