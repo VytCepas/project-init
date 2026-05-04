@@ -171,7 +171,7 @@ uv run .claude/scripts/ingest_sessions.py
 uv run .claude/scripts/query_memory.py "What were the key decisions about auth?"
 ```
 
-Ingestion is manual by design — you control when API calls happen. Requires `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`. See [LIGHTRAG_REVIEW.md](../../LIGHTRAG_REVIEW.md) for sizing guidance.
+Ingestion is manual by design — you control when API calls happen. Requires `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`.
 
 ---
 
