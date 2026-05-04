@@ -16,7 +16,7 @@ Inside any target project:
     ├── project-init.md      # workflow + conventions
     ├── config.yaml          # record of options chosen at init
     ├── settings.json        # Claude Code settings + hooks
-    ├── commands/ skills/ agents/ hooks/ scripts/
+    ├── skills/ agents/ hooks/ scripts/ rules/
     ├── memory/
     │   ├── MEMORY.md        # grep-able memory index
     │   └── .lightrag/       # optional KG index (if chosen)
@@ -41,33 +41,30 @@ This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to 
 
 ## Use
 
-In any project:
+### Option 1: Inside a Claude Code session (interactive)
 
-```bash
-# Inside a Claude Code session:
+After installing, a `/project-init` slash command is available in any Claude Code session:
+
+```
 /project-init
-
-# Or from a shell:
-cd your-project
-uvx --from ~/.local/share/project-init project-init
 ```
 
-### Non-interactive (CI / scripts)
+This runs the interactive wizard in the current project directory. It asks for project name, language, memory stack, and MCPs — then scaffolds `.claude/` for you.
+
+### Option 2: From a shell (non-interactive, for CI / scripts)
 
 ```bash
-project-init ./my-app \
+cd your-project
+uvx --from ~/.local/share/project-init project-init . \
   --non-interactive \
   --preset obsidian-only \
   --name my-app \
   --description "an app" \
   --language python \
-  --mcps context7 \
-  --db postgres \
-  --browser \
-  --strict
+  --mcps context7
 ```
 
-The wizard asks:
+The wizard asks (interactive mode only):
 
 - Project name / description
 - Language (Python/Node/Go/none) — drives `lint_command`, `format_command`, `test_command`
@@ -80,10 +77,11 @@ Your answers are recorded in `.claude/config.yaml`. Re-run any time — it recon
 
 ## Example command
 
-Run this to scaffold an Obsidian-only project with Context7 MCP:
+Scaffold an Obsidian-only Python project with Context7 MCP:
 
 ```bash
-project-init /path/to/my-project --non-interactive \
+uvx --from ~/.local/share/project-init project-init /path/to/my-project \
+  --non-interactive \
   --preset obsidian-only --name example --description "example python project" \
   --language python --mcps context7
 ```
@@ -124,6 +122,12 @@ Edit and commit from inside WSL (`wsl` then `cd ~/projects/...`). Editing WSL fi
 
 **`Unknown preset 'foo'`**
 Run `project-init --help` and pick from `obsidian-only` or `obsidian-lightrag`. Custom presets go in `templates/presets/<name>.toml`.
+
+## Further reading
+
+- [Using project-init in Your Project](docs/guides/using-project-init.md) — full workflow, day-to-day usage, customization, and troubleshooting
+- [Template System](docs/development/template-system.md) — how layers and variables work
+- [Contributing](docs/development/contributing.md) — how to contribute to project-init itself
 
 ## Layout of this repo
 
