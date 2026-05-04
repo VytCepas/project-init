@@ -76,7 +76,7 @@ Use this table when adding new capabilities to this repo or its templates:
 |---|---|---|
 | Automate a repeatable multi-step workflow | **Skill** (`SKILL.md` with frontmatter) | `.claude/skills/<name>/SKILL.md` — register in `INDEX.md` |
 | Enforce a rule on every tool call or commit | **Hook** (bash/python script) | `.claude/hooks/` — wire in `settings.json`. Use the `add-hook` skill. |
-| Expose a shortcut as `/command` | **Command** (markdown file) | `.claude/commands/<name>.md`. Use the `add-command` skill. |
+| Expose a shortcut as `/command` | **Skill** (`SKILL.md` with frontmatter) | `.claude/skills/<name>/SKILL.md` — register in `INDEX.md`. Use the `add-command` skill. |
 | Add a reusable sub-agent persona | **Agent spec** | `.claude/agents/<name>.md` |
 
 After creating a skill, add an entry to `.claude/skills/INDEX.md` so it is discoverable without reading every file.

@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Full project health audit — scans hooks, skills, scripts, commands, rules, CI config, docs, and GitHub workflow for inconsistencies, broken references, and common mistakes. Creates a GitHub issue with findings and optionally starts fixing them.
+description: Full project health audit — scans hooks, skills, scripts, rules, CI config, docs, and GitHub workflow for inconsistencies, broken references, and common mistakes. Creates a GitHub issue with findings and optionally starts fixing them.
 when_to_use: Use when the user says "audit the project", "health check", "scan for issues", "hardening pass", or "review everything".
 argument-hint: "[--fix]"
 allowed-tools: Bash(git *) Bash(gh *) Bash(stat *) Bash(file *) Bash(head *) Read Write Edit Glob Grep
@@ -19,7 +19,6 @@ Scan these directories and build a file inventory:
 |---|---|
 | `.claude/hooks/` | All hook scripts |
 | `.claude/skills/` | All SKILL.md files |
-| `.claude/commands/` | All command .md files |
 | `.claude/scripts/` | All lifecycle scripts |
 | `.claude/rules/` | All rule .md files |
 | `.claude/docs/` | ADRs, conventions |
@@ -67,11 +66,6 @@ For every SKILL.md in `.claude/skills/*/`:
 1. **Required frontmatter** — `name` and `description` must exist
 2. **Listed in INDEX.md** — `.claude/skills/INDEX.md` should reference every skill. Missing → `[WARN]`
 3. **Listed in project-init.md** — `.claude/project-init.md` Tools table should list it. Missing → `[WARN]`
-
-For every `.md` in `.claude/commands/`:
-
-1. **Frontmatter** — `description` must exist
-2. **Listed in project-init.md** — should appear in Tools table
 
 ### 2.5 Settings.json coherence
 

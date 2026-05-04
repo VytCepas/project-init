@@ -1,5 +1,7 @@
 ---
+name: review
 description: Review staged or recent changes for bugs, style issues, and missed edge cases
+when_to_use: Use when you want a code review of work — staged changes, a specific commit, or a commit range.
 argument-hint: "[commit-range or file]"
 allowed-tools: Bash Read Grep Glob
 ---
@@ -13,5 +15,3 @@ Focus on:
 - **Security** — injection, auth issues, secret exposure
 - **Style** — naming, dead code, overly complex logic
 - **Edge cases** — empty inputs, concurrency, error paths
-
-Be specific: cite file:line, quote the problematic code, suggest a fix. Skip nitpicks.
