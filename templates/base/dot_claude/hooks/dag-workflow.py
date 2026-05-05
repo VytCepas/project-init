@@ -2,15 +2,31 @@
 """DAG-based workflow enforcement for the GitHub lifecycle.
 
 Subcommands:
-  check <node>   exit 0 if every prerequisite of <node> is satisfied,
-                 exit 2 otherwise (with a human-readable reason on stdout).
-  guard          read PreToolUse hook input JSON from stdin, map the Bash
-                 command to a target node, emit {decision: block, reason: ...}
-                 if the command should not proceed.
+  check <node>          exit 0 if every prerequisite of <node> is satisfied,
+                        exit 2 otherwise (with reason on stdout).
+  guard                 read PreToolUse hook input JSON from stdin, map the
+                        Bash command to a target node, emit
+                        {decision: block, reason: ...} if disallowed.
+  nodes                 list every DAG node and its prerequisites.
+  push [<branch>] [N]   push current (or named) branch with retry + remote-SHA
+                        verification (handles transient GitHub 5xx).
+  promote [<pr>]        mark current (or numbered) draft PR ready for review.
+  finish [<pr>] [--review-cycle N]
+                        push, promote, then exec monitor-pr.sh --merge.
+  create-pr-nojira <type> <title> [--branch B] [--base B]
+                        create a no-issue feature branch + draft PR.
 
-Stateless code. Reads live state from `gh` / `git`. An optional cache at
-.claude/.workflow-state.json may be written by lifecycle scripts to speed
-checks; the cache is advisory and is always re-validated.
+The `check` and `guard` paths are pure read-only; they're used by hooks and
+lifecycle scripts. The other subcommands consolidate the bash lifecycle
+scripts (push-branch.sh, promote-review.sh, finish-pr.sh,
+create-nojira-pr.sh) so the tool is the single source of truth for the
+GitHub workflow. The .sh files become thin shims that exec into here.
+
+Issue-ref prefix detection:
+  By default, branches matching `[A-Z]{2,}-<n>` (e.g. PI-98, ACME-42) are
+  treated as issue-backed. Override with the DAG_ISSUE_PREFIX env var to pin
+  a specific prefix (e.g. DAG_ISSUE_PREFIX=PROJ matches only `PROJ-<n>`).
+  Branches with no recognized prefix fall through to the no-jira flow.
 
 stdlib only.
 """
@@ -18,9 +34,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 CACHE_PATH = Path(".claude/.workflow-state.json")
@@ -35,7 +53,13 @@ GRAPH: dict[str, list[str]] = {
     "pr.merged": ["ci.green", "review.approved"],
 }
 
-ISSUE_RE = re.compile(r"PI-(\d+)", re.IGNORECASE)
+_CONFIGURED_PREFIX = os.environ.get("DAG_ISSUE_PREFIX", "").strip()
+if _CONFIGURED_PREFIX:
+    ISSUE_RE: re.Pattern[str] = re.compile(
+        rf"\b{re.escape(_CONFIGURED_PREFIX)}-(\d+)\b", re.IGNORECASE
+    )
+else:
+    ISSUE_RE = re.compile(r"\b[A-Z]{2,}-(\d+)\b")
 
 
 def _run(cmd: list[str]) -> tuple[int, str]:
@@ -71,7 +95,7 @@ def check_issue_created() -> tuple[bool, str]:
         return False, "no current branch"
     n = _issue_from_branch(branch)
     if n is None:
-        return True, f"branch '{branch}' has no PI-N ref (no-jira flow allowed)"
+        return True, f"branch '{branch}' has no issue ref (no-jira flow allowed)"
     code, out = _gh(["issue", "view", str(n), "--json", "number,state"])
     if code != 0:
         return False, f"issue #{n} not found via gh"
@@ -319,13 +343,219 @@ def cmd_guard() -> int:
     return 0
 
 
+def _detect_pr_number() -> int | None:
+    code, out = _gh(["pr", "view", "--json", "number", "-q", ".number"])
+    if code != 0:
+        return None
+    try:
+        return int(out.strip())
+    except ValueError:
+        return None
+
+
+def cmd_push(branch: str | None, max_retries: int) -> int:
+    """Push the current (or named) branch with retry + remote-SHA verification.
+
+    Handles transient GitHub 5xx where `git push` exits non-zero but the
+    commit actually landed on the remote.
+    """
+    if branch is None:
+        branch = _current_branch()
+    if not branch:
+        sys.stderr.write("push: no current branch\n")
+        return 1
+
+    code, sha_out = _git(["rev-parse", branch])
+    if code != 0:
+        sys.stderr.write(f"push: cannot resolve sha for {branch}\n")
+        return 1
+    expected_sha = sha_out.strip()
+
+    def remote_has_sha() -> bool:
+        code, out = _git(["ls-remote", "origin", f"refs/heads/{branch}"])
+        if code != 0:
+            return False
+        for line in out.splitlines():
+            parts = line.split()
+            if parts and parts[0] == expected_sha:
+                return True
+        return False
+
+    for attempt in range(max_retries + 1):
+        proc = subprocess.run(["git", "push", "-u", "origin", branch])
+        if proc.returncode == 0:
+            sys.stdout.write(f"push: pushed {branch} ({expected_sha})\n")
+            return 0
+        if remote_has_sha():
+            sys.stdout.write(
+                f"push: remote already has {expected_sha} on {branch} "
+                "(transient error, treating as success)\n"
+            )
+            _git(["branch", f"--set-upstream-to=origin/{branch}", branch])
+            return 0
+        if attempt < max_retries:
+            time.sleep(3)
+    sys.stderr.write(f"push: failed after {max_retries} retries\n")
+    return 1
+
+
+def cmd_promote(pr_number: int | None) -> int:
+    """Mark a draft PR ready for review."""
+    if pr_number is None:
+        pr_number = _detect_pr_number()
+    if pr_number is None:
+        sys.stderr.write(
+            "promote: no PR found for current branch. Pass a PR number.\n"
+        )
+        return 1
+    code, out = _gh(
+        ["pr", "view", str(pr_number), "--json", "isDraft", "-q", ".isDraft"]
+    )
+    if code != 0:
+        sys.stderr.write(f"promote: cannot read PR #{pr_number}\n")
+        return 1
+    if out.strip() == "false":
+        _, url = _gh(["pr", "view", str(pr_number), "--json", "url", "-q", ".url"])
+        sys.stdout.write(
+            f"PR #{pr_number} is already ready for review: {url.strip()}\n"
+        )
+        return 0
+    code, _ = _gh(["pr", "ready", str(pr_number)])
+    if code != 0:
+        sys.stderr.write(f"promote: gh pr ready failed for #{pr_number}\n")
+        return code
+    _, url = _gh(["pr", "view", str(pr_number), "--json", "url", "-q", ".url"])
+    sys.stdout.write(
+        f"PR #{pr_number} is now ready for review: {url.strip()}\n"
+    )
+    return 0
+
+
+def cmd_finish(pr_number: int | None, review_cycle: int | None) -> int:
+    """Push, promote, then hand off to monitor-pr.sh for CI/review/merge."""
+    rc = cmd_push(None, 3)
+    if rc != 0:
+        return rc
+    if pr_number is None:
+        pr_number = _detect_pr_number()
+    if pr_number is None:
+        sys.stderr.write("finish: no PR found for current branch.\n")
+        return 1
+    rc = cmd_promote(pr_number)
+    if rc != 0:
+        return rc
+    monitor_args = [".claude/scripts/monitor-pr.sh", str(pr_number), "--merge"]
+    if review_cycle is not None:
+        monitor_args += ["--review-cycle", str(review_cycle)]
+    return subprocess.run(monitor_args).returncode
+
+
+_VALID_TYPES = {"feat", "fix", "chore", "docs", "test"}
+_BRANCH_RE = re.compile(r"^(feat|fix|chore|docs|test)/[A-Za-z0-9._/-]+$")
+
+
+def _slugify(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", text.lower())
+    return s.strip("-")
+
+
+def cmd_create_pr_nojira(
+    type_: str, title: str, branch: str | None, base: str | None
+) -> int:
+    """Create a no-issue feature branch (if needed) and open a draft PR."""
+    if type_ not in _VALID_TYPES:
+        sys.stderr.write(
+            f"ERROR: invalid type '{type_}'. Valid: {' '.join(sorted(_VALID_TYPES))}\n"
+        )
+        return 1
+    if not title.strip():
+        sys.stderr.write("ERROR: title must not be empty\n")
+        return 1
+
+    current = _current_branch()
+    if not branch:
+        if current and current not in {"main", "master"}:
+            branch = current
+        else:
+            slug = _slugify(title)
+            if not slug:
+                sys.stderr.write(
+                    "ERROR: title must contain at least one letter or number\n"
+                )
+                return 1
+            prefix = "nojira-"
+            max_slug = max(12, 80 - len(type_) - 1 - len(prefix))
+            slug = slug[:max_slug].rstrip("-")
+            branch = f"{type_}/{prefix}{slug}"
+
+    if not _BRANCH_RE.match(branch):
+        sys.stderr.write(
+            f"ERROR: branch '{branch}' must start with feat|fix|chore|docs|test/\n"
+        )
+        return 1
+
+    if current == branch:
+        sys.stdout.write(f"Already on branch {branch}\n")
+    else:
+        code, _ = _git(["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"])
+        if code == 0:
+            sys.stdout.write(f"Branch {branch} already exists - switching\n")
+            _git(["checkout", branch])
+        else:
+            _git(["checkout", "-b", branch])
+
+    rc = cmd_push(branch, 3)
+    if rc != 0:
+        return rc
+
+    code, url = _gh(["pr", "view", "--json", "url", "-q", ".url"])
+    if code == 0 and url.strip():
+        sys.stdout.write(f"Draft PR already exists: {url.strip()}\n")
+        return 0
+
+    pr_title = f"[nojira][{type_}] {title}"
+    pr_body = "No linked issue (nojira)."
+    args = ["pr", "create", "--draft", "--title", pr_title, "--body", pr_body]
+    if base:
+        args += ["--base", base]
+    code, out = _gh(args)
+    if code != 0:
+        sys.stderr.write("create-pr-nojira: gh pr create failed\n")
+        return code
+    sys.stdout.write(f"Draft PR: {out.strip()}\n")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dag-workflow")
     sub = parser.add_subparsers(dest="cmd", required=True)
+
     p_check = sub.add_parser("check", help="check whether a node is reachable")
     p_check.add_argument("node", help="DAG node name (e.g. pr.merged)")
+
     sub.add_parser("guard", help="PreToolUse hook entrypoint (reads stdin)")
     sub.add_parser("nodes", help="list all DAG nodes")
+
+    p_push = sub.add_parser("push", help="push current branch with retry + SHA verify")
+    p_push.add_argument("branch", nargs="?", default=None)
+    p_push.add_argument("max_retries", nargs="?", type=int, default=3)
+
+    p_promote = sub.add_parser("promote", help="mark a draft PR ready for review")
+    p_promote.add_argument("pr_number", nargs="?", type=int, default=None)
+
+    p_finish = sub.add_parser("finish", help="push, promote, monitor-pr --merge")
+    p_finish.add_argument("pr_number", nargs="?", type=int, default=None)
+    p_finish.add_argument("--review-cycle", type=int, default=None)
+
+    p_nojira = sub.add_parser(
+        "create-pr-nojira",
+        help="create a no-issue branch + draft PR",
+    )
+    p_nojira.add_argument("type", choices=sorted(_VALID_TYPES))
+    p_nojira.add_argument("title")
+    p_nojira.add_argument("--branch", default=None)
+    p_nojira.add_argument("--base", default=None)
+
     args = parser.parse_args(argv)
 
     if args.cmd == "check":
@@ -336,6 +566,14 @@ def main(argv: list[str] | None = None) -> int:
         for node, prereqs in GRAPH.items():
             sys.stdout.write(f"{node}: requires={prereqs or '[]'}\n")
         return 0
+    if args.cmd == "push":
+        return cmd_push(args.branch, args.max_retries)
+    if args.cmd == "promote":
+        return cmd_promote(args.pr_number)
+    if args.cmd == "finish":
+        return cmd_finish(args.pr_number, args.review_cycle)
+    if args.cmd == "create-pr-nojira":
+        return cmd_create_pr_nojira(args.type, args.title, args.branch, args.base)
     return 1
 
 

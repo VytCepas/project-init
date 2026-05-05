@@ -177,11 +177,14 @@ class TestCreateIssueSkill:
 
     def test_nojira_pr_script_scaffolded(self):
         script = self.target / ".claude" / "scripts" / "create-nojira-pr.sh"
-        content = script.read_text()
+        shim = script.read_text()
         assert script.stat().st_mode & 0o111, "create-nojira-pr.sh must be executable"
-        assert "[nojira]" in content
-        assert "push-branch.sh" in content
-        assert "gh pr create" in content
+        # Shim delegates to dag-workflow.py create-pr-nojira; the [nojira]
+        # PR-title prefix and gh pr create call live in the Python module.
+        assert "dag-workflow.py" in shim and "create-pr-nojira" in shim
+        dag = (self.target / ".claude" / "hooks" / "dag-workflow.py").read_text()
+        assert "[nojira]" in dag
+        assert 'pr", "create"' in dag or "pr_create" in dag
 
 
 class TestGitHubWorkflowHooks:

@@ -190,26 +190,27 @@ class TestScaffoldGitHubFiles:
         assert "skipping reviewer wait" in content
 
     def test_finish_pr_wraps_push_ready_monitor_flow(self):
+        # finish-pr.sh is a shim; the chain logic lives in dag-workflow.py.
         script = self.target / ".claude" / "scripts" / "finish-pr.sh"
         assert script.is_file()
         assert script.stat().st_mode & 0o111, "finish-pr.sh must be executable"
-        content = script.read_text()
-        assert "push-branch.sh" in content
-        assert "promote-review.sh" in content
-        assert "monitor-pr.sh" in content
-        assert 'PR_NUMBER=""' in content
-        assert "Missing value for --review-cycle" in content
-        assert "--review-cycle" in content
+        shim = script.read_text()
+        assert "dag-workflow.py" in shim and "finish" in shim
+        dag = (self.target / ".claude" / "hooks" / "dag-workflow.py").read_text()
+        assert "monitor-pr.sh" in dag
+        assert "cmd_push" in dag and "cmd_promote" in dag
+        assert "--review-cycle" in dag
 
     def test_create_nojira_pr_wraps_branch_push_pr_flow(self):
         script = self.target / ".claude" / "scripts" / "create-nojira-pr.sh"
         assert script.is_file()
         assert script.stat().st_mode & 0o111, "create-nojira-pr.sh must be executable"
-        content = script.read_text()
-        assert "[nojira]" in content
-        assert "push-branch.sh" in content
-        assert "gh pr create" in content
-        assert "--draft" in content
+        shim = script.read_text()
+        assert "dag-workflow.py" in shim and "create-pr-nojira" in shim
+        dag = (self.target / ".claude" / "hooks" / "dag-workflow.py").read_text()
+        assert "[nojira]" in dag
+        assert "pr_create" in dag or 'pr", "create"' in dag
+        assert "--draft" in dag
 
     def test_validate_pr_enforces_project_key_title_format(self):
         """PR title must match [PROJECT-123][type] or [nojira][type] format."""

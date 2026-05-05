@@ -221,10 +221,54 @@ class TestIssueExtraction:
         assert dag._issue_from_branch("fix/PI-1") == 1
         assert dag._issue_from_branch("claude/PI-42-bar") == 42
 
+    def test_extracts_other_uppercase_prefixes(self, dag):
+        # Generic [A-Z]{2,}-<n> default works for any project's prefix.
+        assert dag._issue_from_branch("feat/ACME-7-foo") == 7
+        assert dag._issue_from_branch("fix/PROJ-1234-bug") == 1234
+
     def test_returns_none_for_no_jira_branch(self, dag):
         assert dag._issue_from_branch("main") is None
         assert dag._issue_from_branch("feat/no-issue-foo") is None
         assert dag._issue_from_branch("claude/some-slug-iAbc") is None
+        assert dag._issue_from_branch("feat/x-1-foo") is None  # single-letter prefix
+
+
+class TestIssuePrefixOverride:
+    """DAG_ISSUE_PREFIX env var pins a specific prefix."""
+
+    def _run_module(self, branch: str, env_prefix: str | None) -> str:
+        env = {"PATH": "/usr/bin:/bin"}
+        if env_prefix is not None:
+            env["DAG_ISSUE_PREFIX"] = env_prefix
+        # Reload the module under the requested env, then call _issue_from_branch
+        # via a one-shot Python invocation (subprocess so env is honored).
+        code = (
+            "import importlib.util, sys; "
+            f"spec = importlib.util.spec_from_file_location('dw', {str(SOURCE_HOOK)!r}); "
+            "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); "
+            f"r = m._issue_from_branch({branch!r}); "
+            "sys.stdout.write('None' if r is None else str(r))"
+        )
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert proc.returncode == 0, proc.stderr
+        return proc.stdout
+
+    def test_default_uses_generic_uppercase_prefix(self):
+        assert self._run_module("feat/PI-98-foo", env_prefix=None) == "98"
+        assert self._run_module("feat/ACME-7-x", env_prefix=None) == "7"
+
+    def test_pinned_prefix_only_matches_that_prefix(self):
+        # ACME pinned: PI-98 should NOT match
+        assert self._run_module("feat/ACME-42-x", env_prefix="ACME") == "42"
+        assert self._run_module("feat/PI-98-x", env_prefix="ACME") == "None"
+
+    def test_pinned_prefix_is_case_insensitive(self):
+        assert self._run_module("feat/acme-9-x", env_prefix="ACME") == "9"
 
 
 class TestCheckSubcommand:
@@ -246,6 +290,81 @@ class TestCheckSubcommand:
         assert proc.returncode == 0
         for required in ["issue.created", "pr.merged", "ci.green", "review.approved"]:
             assert required in proc.stdout
+
+
+class TestSubcommands:
+    """The lifecycle subcommands are wired and validate inputs without
+    requiring a live gh/git setup."""
+
+    def _run(self, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(SOURCE_HOOK), *args],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+        )
+
+    def test_help_lists_all_subcommands(self):
+        proc = self._run("--help")
+        assert proc.returncode == 0
+        for cmd in ["check", "guard", "nodes", "push", "promote", "finish", "create-pr-nojira"]:
+            assert cmd in proc.stdout
+
+    def test_create_pr_nojira_rejects_invalid_type(self):
+        proc = self._run("create-pr-nojira", "wrong", "Some title")
+        assert proc.returncode != 0  # argparse choices rejection
+        assert "invalid choice" in proc.stderr or "wrong" in proc.stderr
+
+    def test_create_pr_nojira_rejects_empty_title(self, tmp_path: Path):
+        proc = self._run("create-pr-nojira", "feat", "   ", cwd=tmp_path)
+        assert proc.returncode == 1
+        assert "title must not be empty" in proc.stderr
+
+    def test_create_pr_nojira_rejects_bad_branch(self, tmp_path: Path):
+        # Use a branch arg that doesn't match the type/* convention.
+        proc = self._run(
+            "create-pr-nojira", "feat", "Some title",
+            "--branch", "no-prefix-here",
+            cwd=tmp_path,
+        )
+        assert proc.returncode == 1
+        assert "feat|fix|chore|docs|test" in proc.stderr
+
+
+class TestSlugify:
+    def test_slugify_basic(self, dag):
+        assert dag._slugify("Hello World") == "hello-world"
+
+    def test_slugify_strips_edges(self, dag):
+        assert dag._slugify("--Foo--") == "foo"
+
+    def test_slugify_empty(self, dag):
+        assert dag._slugify("!!!") == ""
+
+    def test_slugify_unicode_punct(self, dag):
+        assert dag._slugify("Fix bug: foo & bar") == "fix-bug-foo-bar"
+
+
+class TestScriptShims:
+    """The bash lifecycle scripts are now thin shims around dag-workflow.py."""
+
+    @pytest.mark.parametrize("name", ["push-branch.sh", "promote-review.sh", "finish-pr.sh", "create-nojira-pr.sh"])
+    def test_source_script_is_shim(self, name: str):
+        path = REPO_ROOT / ".claude" / "scripts" / name
+        assert path.is_file()
+        text = path.read_text()
+        assert "dag-workflow.py" in text
+        assert "exec python3" in text
+        # Each shim should be tiny.
+        assert len(text.splitlines()) <= 6
+
+    @pytest.mark.parametrize("name", ["push-branch.sh", "promote-review.sh", "finish-pr.sh", "create-nojira-pr.sh"])
+    def test_template_script_is_shim(self, name: str):
+        path = REPO_ROOT / "templates" / "base" / "dot_claude" / "scripts" / name
+        assert path.is_file()
+        text = path.read_text()
+        assert "dag-workflow.py" in text
+        assert "exec python3" in text
 
 
 class TestScaffoldedTemplate:
