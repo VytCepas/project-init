@@ -40,9 +40,10 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 
 | Event | Script | Purpose |
 |---|---|---|
-| PreToolUse(Bash) | `github-command-guard.sh` | Steers toward lifecycle scripts; blocks raw `git push main`, `gh pr merge` |
-| PreToolUse(Bash) | `pre-merge-ci-check.sh` | Blocks merge if CI is pending or failing |
-| UserPromptSubmit | `workflow-state-reminder.sh` | Injects workflow context when GitHub actions are mentioned |
+| PreToolUse(Bash) | `github-command-guard.sh` | Thin shim → `dag-workflow.py guard`. Blocks `git push main`, `gh pr merge`, `gh api .../merge`, `gh pr ready/create`, `gh pr checks --watch`, raw `git push`. |
+| PreToolUse(Bash) | `pre-merge-ci-check.sh` | Defense-in-depth shim → `dag-workflow.py guard`. Same logic; runs even if the broader guard is disabled. |
+| UserPromptSubmit | `workflow-state-reminder.sh` | Injects the full lifecycle DAG, banned-command → wrapper-script map, and naming rules into context when a workflow keyword is mentioned. |
+| (library) | `dag-workflow.py` | Stdlib DAG state machine. `check <node>` walks prerequisites for lifecycle scripts; `guard` is the hook entrypoint. Adding a banned command means editing `COMMAND_RULES` there, not the shell shims. |
 
 `.claude/settings.local.json` pre-approves tool calls for development work (Bash, WebFetch, test paths). It is a convenience file — not a security boundary. Entries are auto-added by Claude Code when you approve a prompt; stale entries can be removed safely.
 

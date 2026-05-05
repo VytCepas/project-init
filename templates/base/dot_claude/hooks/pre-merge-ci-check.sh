@@ -1,60 +1,12 @@
 #!/usr/bin/env bash
-# pre-merge-ci-check.sh — blocks gh pr merge when CI checks are pending or failing.
+# pre-merge-ci-check.sh — defense-in-depth wrapper around dag-workflow guard.
 # PreToolUse hook on Bash. Receives tool input JSON on stdin.
 #
-# Note: github-command-guard blocks raw gh pr merge. This hook remains as a
-# defense-in-depth CI check if that broader guard is disabled.
+# The guard subcommand already enforces ci.green + review.approved before
+# pr.merged via the DAG. This hook is kept as a separate entry in
+# settings.json so the gate is honored even if github-command-guard is
+# disabled. Both hooks read stdin; we tee the same input through both.
 
 set -euo pipefail
 
-INPUT=$(cat)
-
-CMD=$(printf '%s' "$INPUT" | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    sys.exit(0)
-print((data.get('tool_input', {}) or {}).get('command', '') or '')
-" 2>/dev/null || true)
-
-[ -z "$CMD" ] && exit 0
-
-# Only intercept gh pr merge commands
-printf '%s' "$CMD" | grep -qE 'gh pr merge' || exit 0
-
-# --auto lets GitHub wait for CI itself; the workflow guard may still block raw
-# merge commands so agents use monitor-pr.sh.
-printf '%s' "$CMD" | grep -qE '\-\-auto' && exit 0
-
-block() {
-    python3 -c "import json,sys; print(json.dumps({'decision':'block','reason':sys.argv[1]}))" "$1"
-    exit 0
-}
-
-# Extract PR number: first bare integer after 'merge'
-PR_NUM=$(printf '%s' "$CMD" | grep -oE 'merge\s+[0-9]+' | grep -oE '[0-9]+' || true)
-
-# Fallback: infer from the current branch's open PR
-if [ -z "$PR_NUM" ]; then
-    PR_NUM=$(gh pr view --json number -q '.number' 2>/dev/null || true)
-fi
-
-[ -z "$PR_NUM" ] && exit 0
-
-# Fetch check statuses
-CHECKS=$(gh pr checks "$PR_NUM" 2>/dev/null || true)
-[ -z "$CHECKS" ] && exit 0
-
-FAILING=$(printf '%s' "$CHECKS" | grep -cE '\s(fail|error)\b' || true)
-PENDING=$(printf '%s' "$CHECKS"  | grep -cE '\s(pending|in_progress)\b' || true)
-
-if [ "$FAILING" -gt 0 ]; then
-    block "CI checks are failing on PR #${PR_NUM} — fix before merging. See: gh pr checks ${PR_NUM}"
-fi
-
-if [ "$PENDING" -gt 0 ]; then
-    block "CI checks are still running on PR #${PR_NUM}. Use: .claude/scripts/monitor-pr.sh ${PR_NUM} --merge"
-fi
-
-exit 0
+exec python3 "$(dirname "$0")/dag-workflow.py" guard

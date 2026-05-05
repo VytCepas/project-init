@@ -160,10 +160,15 @@ class TestScaffoldObsidianOnly:
         assert "GH_PROMPT_DISABLED=1" in content
 
     def test_push_branch_sh_verifies_remote_sha(self):
-        content = (self.target / ".claude" / "scripts" / "push-branch.sh").read_text()
-        assert "git ls-remote" in content
-        assert "EXPECTED_SHA" in content
-        assert "MAX_RETRIES" in content
+        # push-branch.sh is a thin shim that delegates to dag-workflow.py.
+        # The SHA-verification logic lives in the Python module.
+        shim = (self.target / ".claude" / "scripts" / "push-branch.sh").read_text()
+        assert "dag-workflow.py" in shim
+        assert "exec python3" in shim
+        dag = (self.target / ".claude" / "hooks" / "dag-workflow.py").read_text()
+        assert "ls-remote" in dag
+        assert "expected_sha" in dag
+        assert "max_retries" in dag
 
     def test_start_issue_sh_uses_project_key_branch_format(self):
         content = (self.target / ".claude" / "scripts" / "start-issue.sh").read_text()
