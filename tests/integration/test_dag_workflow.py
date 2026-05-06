@@ -12,8 +12,8 @@ from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_HOOK = REPO_ROOT / ".claude" / "hooks" / "dag-workflow.py"
-TEMPLATE_HOOK = REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "dag-workflow.py"
+SOURCE_HOOK = REPO_ROOT / ".claude" / "hooks" / "dag_workflow.py"
+TEMPLATE_HOOK = REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "dag_workflow.py"
 
 
 def _load_module(path: Path):
@@ -30,7 +30,7 @@ def dag():
 
 
 def _run_guard(payload: dict, cwd: Path | None = None) -> dict | None:
-    """Run dag-workflow.py guard via subprocess and return parsed stdout."""
+    """Run dag_workflow.py guard via subprocess and return parsed stdout."""
     proc = subprocess.run(
         [sys.executable, str(SOURCE_HOOK), "guard"],
         input=json.dumps(payload),
@@ -109,34 +109,34 @@ class TestGuardSteering:
         assert out["decision"] == "block"
 
     def test_blocks_gh_pr_merge(self, tmp_path: Path):
-        # No scripts dir in tmp_path → message references monitor-pr.sh which
+        # No scripts dir in tmp_path → message references monitor_pr.sh which
         # doesn't exist there, so the rule is suppressed. Create the script
         # to make the redirect applicable.
         scripts = tmp_path / ".claude" / "scripts"
         scripts.mkdir(parents=True)
-        (scripts / "monitor-pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (scripts / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard({"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path)
         assert out is not None
-        assert "monitor-pr.sh" in out["reason"]
+        assert "monitor_pr.sh" in out["reason"]
 
     def test_blocks_gh_api_merge(self, tmp_path: Path):
         scripts = tmp_path / ".claude" / "scripts"
         scripts.mkdir(parents=True)
-        (scripts / "monitor-pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (scripts / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard(
             {"tool_input": {"command": "gh api repos/foo/bar/pulls/42/merge -X PUT"}},
             cwd=tmp_path,
         )
         assert out is not None
-        assert "monitor-pr.sh" in out["reason"]
+        assert "monitor_pr.sh" in out["reason"]
 
     def test_blocks_raw_git_push_when_wrapper_exists(self, tmp_path: Path):
         scripts = tmp_path / ".claude" / "scripts"
         scripts.mkdir(parents=True)
-        (scripts / "push-branch.sh").write_text("#!/bin/sh\nexit 0\n")
+        (scripts / "push_branch.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard({"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path)
         assert out is not None
-        assert "push-branch.sh" in out["reason"]
+        assert "push_branch.sh" in out["reason"]
 
     def test_no_redirect_when_wrapper_missing(self, tmp_path: Path):
         # No .claude/scripts dir → suppress redirect for raw git push
@@ -346,24 +346,24 @@ class TestSlugify:
 
 
 class TestScriptShims:
-    """The bash lifecycle scripts are now thin shims around dag-workflow.py."""
+    """The bash lifecycle scripts are now thin shims around dag_workflow.py."""
 
-    @pytest.mark.parametrize("name", ["push-branch.sh", "promote-review.sh", "finish-pr.sh", "create-nojira-pr.sh"])
+    @pytest.mark.parametrize("name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"])
     def test_source_script_is_shim(self, name: str):
         path = REPO_ROOT / ".claude" / "scripts" / name
         assert path.is_file()
         text = path.read_text()
-        assert "dag-workflow.py" in text
+        assert "dag_workflow.py" in text
         assert "exec python3" in text
         # Each shim should be tiny.
         assert len(text.splitlines()) <= 6
 
-    @pytest.mark.parametrize("name", ["push-branch.sh", "promote-review.sh", "finish-pr.sh", "create-nojira-pr.sh"])
+    @pytest.mark.parametrize("name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"])
     def test_template_script_is_shim(self, name: str):
         path = REPO_ROOT / "templates" / "base" / "dot_claude" / "scripts" / name
         assert path.is_file()
         text = path.read_text()
-        assert "dag-workflow.py" in text
+        assert "dag_workflow.py" in text
         assert "exec python3" in text
 
 
@@ -376,22 +376,18 @@ class TestScaffoldedTemplate:
         scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
 
     def test_dag_workflow_py_in_scaffolded_hooks(self):
-        assert (self.target / ".claude" / "hooks" / "dag-workflow.py").is_file()
+        assert (self.target / ".claude" / "hooks" / "dag_workflow.py").is_file()
 
     def test_github_command_guard_delegates(self):
-        text = (self.target / ".claude" / "hooks" / "github-command-guard.sh").read_text()
-        assert "dag-workflow.py" in text
+        text = (self.target / ".claude" / "hooks" / "github_command_guard.sh").read_text()
+        assert "dag_workflow.py" in text
         assert "guard" in text
 
-    def test_pre_merge_check_delegates(self):
-        text = (self.target / ".claude" / "hooks" / "pre-merge-ci-check.sh").read_text()
-        assert "dag-workflow.py" in text
-
     def test_workflow_reminder_includes_full_rules(self):
-        text = (self.target / ".claude" / "hooks" / "workflow-state-reminder.sh").read_text()
+        text = (self.target / ".claude" / "hooks" / "workflow_state_reminder.sh").read_text()
         assert "DAG" in text or "dag" in text
-        assert "monitor-pr.sh" in text
-        assert "push-branch.sh" in text
+        assert "monitor_pr.sh" in text
+        assert "push_branch.sh" in text
 
     def test_settings_json_wires_hooks(self):
         path = self.target / ".claude" / "settings.json"
@@ -401,5 +397,4 @@ class TestScaffoldedTemplate:
         for entry in data.get("hooks", {}).get("PreToolUse", []):
             for h in entry.get("hooks", []):
                 commands.append(h.get("command", ""))
-        assert any("github-command-guard.sh" in c for c in commands)
-        assert any("pre-merge-ci-check.sh" in c for c in commands)
+        assert any("github_command_guard.sh" in c for c in commands)

@@ -28,7 +28,7 @@ Three-tier documentation system with strict separation of concerns:
 ## Consequences
 
 - Scaffolded projects receive `.claude/docs/` with ADR and development templates
-- `session-end.sh` hook writes session logs to `vault/sessions/` (human review later)
+- `session_end.sh` hook writes session logs to `vault/sessions/` (human review later)
 - Agents instructed to read `docs/adr/` before starting tasks
 - `CLAUDE.md.tmpl` updated to explain the two-layer system
 - MkDocs site deployed to GitHub Pages from `docs/` on push to main

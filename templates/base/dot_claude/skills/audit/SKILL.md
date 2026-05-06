@@ -70,7 +70,7 @@ For every SKILL.md in `.claude/skills/*/`:
 ### 2.5 Settings.json coherence
 
 1. **Every hook file referenced** has a corresponding file in `.claude/hooks/`. Dead references → `[FAIL]`
-2. **Hook ordering** — `github-command-guard` must come BEFORE `pre-merge-ci-check` (steering before validation)
+2. **Hook files referenced** in settings.json must exist on disk with the correct snake_case names
 
 ### 2.6 Documentation cross-references
 
@@ -124,7 +124,7 @@ Compile findings into a structured report:
 Create a GitHub issue using the project's lifecycle script:
 
 ```bash
-.claude/scripts/create-issue.sh chore "Project audit findings" \
+.claude/scripts/create_issue.sh chore "Project audit findings" \
   --priority medium \
   --area "tooling" \
   --size M \
@@ -137,9 +137,9 @@ Paste the full report as a comment on the issue.
 
 If `$ARGUMENTS` contains `--fix`:
 
-1. Start work on the issue: `.claude/scripts/start-issue.sh <n> fix`
+1. Start work on the issue: `.claude/scripts/start_issue.sh <n> fix`
 2. Fix all `[FAIL]` items. Review `[WARN]` items and fix where appropriate.
 3. Run lint and tests after fixes.
-4. Push and finish: `.claude/scripts/finish-pr.sh <n>`
+4. Push and finish: `.claude/scripts/finish_pr.sh <n>`
 
 If `--fix` is not specified, stop after Phase 4 and report the issue number.

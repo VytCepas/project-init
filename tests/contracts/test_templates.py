@@ -51,7 +51,7 @@ class TestNodeTemplate:
         assert "npx " not in content
 
     def test_hooks_use_bunx_not_node_modules(self):
-        for hook in ["post-edit-lint.sh", "pre-commit-gate.sh"]:
+        for hook in ["post_edit_lint.sh", "pre_commit_gate.sh"]:
             content = (self.target / ".claude" / "hooks" / hook).read_text()
             assert "node_modules/.bin/eslint" not in content
             assert "bunx eslint" in content
@@ -159,8 +159,8 @@ class TestScaffoldGitHubFiles:
         assert "[PROJECT-123][type] description" in content
         assert "[#N][type] description" not in content
         assert "PR title must start with" not in content
-        # Review cycle protocol moved to github-workflow skill — file now points to it
-        assert "github-workflow" in content
+        # Review cycle protocol moved to github_workflow skill — file now points to it
+        assert "github_workflow" in content
 
     def test_gemini_md_created(self):
         f = self.target / "GEMINI.md"
@@ -172,7 +172,7 @@ class TestScaffoldGitHubFiles:
         assert "[PROJECT-123][type] description" not in content
 
     def test_monitor_pr_can_merge_when_clean(self):
-        script = self.target / ".claude" / "scripts" / "monitor-pr.sh"
+        script = self.target / ".claude" / "scripts" / "monitor_pr.sh"
         assert script.is_file()
         content = script.read_text()
         assert "--merge" in content
@@ -190,24 +190,24 @@ class TestScaffoldGitHubFiles:
         assert "skipping reviewer wait" in content
 
     def test_finish_pr_wraps_push_ready_monitor_flow(self):
-        # finish-pr.sh is a shim; the chain logic lives in dag-workflow.py.
-        script = self.target / ".claude" / "scripts" / "finish-pr.sh"
+        # finish_pr.sh is a shim; the chain logic lives in dag_workflow.py.
+        script = self.target / ".claude" / "scripts" / "finish_pr.sh"
         assert script.is_file()
-        assert script.stat().st_mode & 0o111, "finish-pr.sh must be executable"
+        assert script.stat().st_mode & 0o111, "finish_pr.sh must be executable"
         shim = script.read_text()
-        assert "dag-workflow.py" in shim and "finish" in shim
-        dag = (self.target / ".claude" / "hooks" / "dag-workflow.py").read_text()
-        assert "monitor-pr.sh" in dag
+        assert "dag_workflow.py" in shim and "finish" in shim
+        dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
+        assert "monitor_pr.sh" in dag
         assert "cmd_push" in dag and "cmd_promote" in dag
         assert "--review-cycle" in dag
 
     def test_create_nojira_pr_wraps_branch_push_pr_flow(self):
-        script = self.target / ".claude" / "scripts" / "create-nojira-pr.sh"
+        script = self.target / ".claude" / "scripts" / "create_nojira_pr.sh"
         assert script.is_file()
-        assert script.stat().st_mode & 0o111, "create-nojira-pr.sh must be executable"
+        assert script.stat().st_mode & 0o111, "create_nojira_pr.sh must be executable"
         shim = script.read_text()
-        assert "dag-workflow.py" in shim and "create-pr-nojira" in shim
-        dag = (self.target / ".claude" / "hooks" / "dag-workflow.py").read_text()
+        assert "dag_workflow.py" in shim and "create-pr-nojira" in shim
+        dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
         assert "[nojira]" in dag
         assert "pr_create" in dag or 'pr", "create"' in dag
         assert "--draft" in dag

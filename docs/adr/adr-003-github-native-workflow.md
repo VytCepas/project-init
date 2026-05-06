@@ -24,5 +24,5 @@ Issues were tracked in Linear alongside GitHub Issues and PRs, requiring two sys
 - All historical Linear issues migrated to GitHub Issues at migration time
 - Agents use `gh` CLI commands — available in every session without MCP config
 - Token budget freed from Linear/GitHub MCP tool definitions
-- `start-task` skill uses `gh issue create`; board card moves automatically via workflow
+- `start_task` skill uses `gh issue create`; board card moves automatically via workflow
 - `CLAUDE.md` and `project-init.md` updated to reference GitHub Projects

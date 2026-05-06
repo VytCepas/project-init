@@ -5,7 +5,7 @@ Canonical agent rules: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-in
 ## Issue & project tracking
 
 - Tracking system: **GitHub Projects** (kanban board) + **GitHub Issues** (tickets)
-- Create issues: load `.claude/skills/create-issue/SKILL.md` and use `.claude/scripts/create-issue.sh`; it handles metadata gathering, priority labels, and acceptance criteria
+- Create issues: load `.claude/skills/create_issue/SKILL.md` and use `.claude/scripts/create_issue.sh`; it handles metadata gathering, priority labels, and acceptance criteria
 - Board cards move automatically via `board-automation.yml` — no manual updates needed
 - Use a dedicated branch for each issue; format it as `<issue_type>/<project_abbr>-<issue_number>-<slug>`, e.g. `feat/PI-42-add-auth`; no direct commits to `main`
 - Issue and PR names use a project key: `<PROJECT-KEY>-<issue-number>`, e.g. `PI-42`
@@ -13,7 +13,7 @@ Canonical agent rules: [CLAUDE.md](../CLAUDE.md) | Workflow: [.claude/project-in
 - For small no-issue PRs: `[nojira][type] description`, e.g. `[nojira][fix] Fix typo`
 - PR body must still include the GitHub numeric reference `Closes #N` — auto-closes issue and moves board card to Done on merge (skip for nojira PRs)
 - Draft PRs are opened immediately when work starts, not when done
-- When asked to push/finish a PR, load `.claude/skills/github-workflow/SKILL.md` for the full lifecycle and review-cycle protocol.
+- When asked to push/finish a PR, load `.claude/skills/github_workflow/SKILL.md` for the full lifecycle and review-cycle protocol.
 - No direct commits to `main`
 
 ## Key rules

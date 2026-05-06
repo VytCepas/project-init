@@ -60,6 +60,6 @@ class TestREADMEExampleCommand:
         assert (target / "AGENTS.md").is_file()
 
         # Verify hook executable bits
-        assert (target / ".claude" / "hooks" / "post-edit-lint.sh").is_file()
-        assert (target / ".claude" / "hooks" / "pre-commit-gate.sh").is_file()
-        assert (target / ".claude" / "hooks" / "bash-safety-guard.sh").is_file()
+        assert (target / ".claude" / "hooks" / "post_edit_lint.sh").is_file()
+        assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
+        assert (target / ".claude" / "hooks" / "bash_safety_guard.sh").is_file()

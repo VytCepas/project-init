@@ -171,17 +171,17 @@ class TestLintMemoryScript:
         scaffold(tmp_target, preset, variables)
 
     def test_lint_script_exists(self):
-        script = self.target / ".claude" / "scripts" / "lint-memory.sh"
+        script = self.target / ".claude" / "scripts" / "lint_memory.sh"
         assert script.is_file()
 
     def test_lint_script_is_executable(self):
-        script = self.target / ".claude" / "scripts" / "lint-memory.sh"
+        script = self.target / ".claude" / "scripts" / "lint_memory.sh"
         assert script.stat().st_mode & 0o111
 
     def test_lint_passes_on_clean_scaffold(self):
         # Initialize a git repo so git rev-parse works
         subprocess.run(["git", "init", str(self.target)], capture_output=True, check=True)
-        script = self.target / ".claude" / "scripts" / "lint-memory.sh"
+        script = self.target / ".claude" / "scripts" / "lint_memory.sh"
         result = subprocess.run(
             ["bash", str(script)],
             cwd=str(self.target),
@@ -197,7 +197,7 @@ class TestLintMemoryScript:
         content = index.read_text()
         index.write_text(content.replace("- [User role](user_role.md)", "").strip() + "\n")
 
-        script = self.target / ".claude" / "scripts" / "lint-memory.sh"
+        script = self.target / ".claude" / "scripts" / "lint_memory.sh"
         result = subprocess.run(
             ["bash", str(script)],
             cwd=str(self.target),
@@ -212,7 +212,7 @@ class TestLintMemoryScript:
         # Delete a memory file but leave its index entry
         (self.target / ".claude" / "memory" / "user_role.md").unlink()
 
-        script = self.target / ".claude" / "scripts" / "lint-memory.sh"
+        script = self.target / ".claude" / "scripts" / "lint_memory.sh"
         result = subprocess.run(
             ["bash", str(script)],
             cwd=str(self.target),
@@ -232,12 +232,12 @@ class TestSessionEndUpdates:
         scaffold(tmp_target, preset, variables)
 
     def test_session_end_appends_to_log(self):
-        content = (self.target / ".claude" / "hooks" / "session-end.sh").read_text()
+        content = (self.target / ".claude" / "hooks" / "session_end.sh").read_text()
         assert "vault/log.md" in content
 
     def test_session_end_runs_lint(self):
-        content = (self.target / ".claude" / "hooks" / "session-end.sh").read_text()
-        assert "lint-memory.sh" in content
+        content = (self.target / ".claude" / "hooks" / "session_end.sh").read_text()
+        assert "lint_memory.sh" in content
 
 
 class TestLightRAGIncremental:

@@ -83,7 +83,7 @@ class TestIssueMetadataScaffold:
         assert "markdown body" in content
 
     def test_setup_github_script_created(self):
-        script = self.target / ".claude" / "scripts" / "setup-github.sh"
+        script = self.target / ".claude" / "scripts" / "setup_github.sh"
         content = script.read_text()
         assert "branches/main/protection" in content
         assert "Copilot code review" in content
@@ -91,7 +91,7 @@ class TestIssueMetadataScaffold:
 
     def test_project_init_references_github_setup(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
-        assert ".claude/scripts/setup-github.sh" in content
+        assert ".claude/scripts/setup_github.sh" in content
 
 
 class TestCreateIssueScript:
@@ -100,7 +100,7 @@ class TestCreateIssueScript:
         self.target = tmp_target
         preset = load_preset("obsidian-only")
         scaffold(tmp_target, preset, make_variables())
-        self.script = self.target / ".claude" / "scripts" / "create-issue.sh"
+        self.script = self.target / ".claude" / "scripts" / "create_issue.sh"
 
     def test_help_documents_metadata_flags(self):
         result = subprocess.run(
@@ -159,30 +159,30 @@ class TestCreateIssueSkill:
         scaffold(tmp_target, preset, make_variables())
 
     def test_create_issue_skill_scaffolded(self):
-        skill = self.target / ".claude" / "skills" / "create-issue" / "SKILL.md"
+        skill = self.target / ".claude" / "skills" / "create_issue" / "SKILL.md"
         content = skill.read_text()
         assert "priority" in content.lower()
-        assert ".claude/scripts/create-issue.sh" in content
+        assert ".claude/scripts/create_issue.sh" in content
         assert "Definition of Ready/Done defaults" in content
 
     def test_skill_index_references_create_issue_skill(self):
         content = (self.target / ".claude" / "skills" / "INDEX.md").read_text()
-        assert ".claude/skills/create-issue/SKILL.md" in content
+        assert ".claude/skills/create_issue/SKILL.md" in content
 
     def test_start_task_delegates_issue_creation_to_skill(self):
         content = (
-            self.target / ".claude" / "skills" / "start-task" / "SKILL.md"
+            self.target / ".claude" / "skills" / "start_task" / "SKILL.md"
         ).read_text()
-        assert ".claude/skills/create-issue/SKILL.md" in content
+        assert ".claude/skills/create_issue/SKILL.md" in content
 
     def test_nojira_pr_script_scaffolded(self):
-        script = self.target / ".claude" / "scripts" / "create-nojira-pr.sh"
+        script = self.target / ".claude" / "scripts" / "create_nojira_pr.sh"
         shim = script.read_text()
-        assert script.stat().st_mode & 0o111, "create-nojira-pr.sh must be executable"
-        # Shim delegates to dag-workflow.py create-pr-nojira; the [nojira]
+        assert script.stat().st_mode & 0o111, "create_nojira_pr.sh must be executable"
+        # Shim delegates to dag_workflow.py create-pr-nojira; the [nojira]
         # PR-title prefix and gh pr create call live in the Python module.
-        assert "dag-workflow.py" in shim and "create-pr-nojira" in shim
-        dag = (self.target / ".claude" / "hooks" / "dag-workflow.py").read_text()
+        assert "dag_workflow.py" in shim and "create-pr-nojira" in shim
+        dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
         assert "[nojira]" in dag
         assert 'pr", "create"' in dag or "pr_create" in dag
 
@@ -210,41 +210,41 @@ class TestGitHubWorkflowHooks:
         return json.loads(result.stdout)
 
     def test_github_command_guard_blocks_raw_issue_create(self):
-        out = self._run_hook("github-command-guard.sh", "gh issue create --title X")
+        out = self._run_hook("github_command_guard.sh", "gh issue create --title X")
         assert out is not None and out["decision"] == "block"
 
     def test_github_command_guard_blocks_raw_pr_merge(self):
-        out = self._run_hook("github-command-guard.sh", "gh pr merge 42 --squash")
+        out = self._run_hook("github_command_guard.sh", "gh pr merge 42 --squash")
         assert out is not None and out["decision"] == "block"
 
     def test_github_command_guard_blocks_raw_pr_merge_auto(self):
-        out = self._run_hook("github-command-guard.sh", "gh pr merge 42 --auto")
+        out = self._run_hook("github_command_guard.sh", "gh pr merge 42 --auto")
         assert out is not None and out["decision"] == "block"
 
     def test_github_command_guard_blocks_raw_pr_create(self):
         out = self._run_hook(
-            "github-command-guard.sh",
+            "github_command_guard.sh",
             'gh pr create --title "[PI-42][fix] Example" --body "Closes #42"',
         )
         assert out is not None and out["decision"] == "block"
-        assert "create-nojira-pr.sh" in out["reason"]
+        assert "create_nojira_pr.sh" in out["reason"]
 
     def test_github_command_guard_blocks_raw_pr_ready(self):
-        out = self._run_hook("github-command-guard.sh", "gh pr ready 42")
+        out = self._run_hook("github_command_guard.sh", "gh pr ready 42")
         assert out is not None and out["decision"] == "block"
 
     def test_github_command_guard_blocks_raw_git_push(self):
-        out = self._run_hook("github-command-guard.sh", "git push -u origin fix/PI-42-example")
+        out = self._run_hook("github_command_guard.sh", "git push -u origin fix/PI-42-example")
         assert out is not None and out["decision"] == "block"
 
     def test_github_command_guard_blocks_pr_checks_watch(self):
-        out = self._run_hook("github-command-guard.sh", "gh pr checks 42 --watch")
+        out = self._run_hook("github_command_guard.sh", "gh pr checks 42 --watch")
         assert out is not None and out["decision"] == "block"
 
     def test_github_command_guard_allows_monitor_pr_merge(self):
         out = self._run_hook(
-            "github-command-guard.sh",
-            ".claude/scripts/monitor-pr.sh 42 --merge",
+            "github_command_guard.sh",
+            ".claude/scripts/monitor_pr.sh 42 --merge",
         )
         assert out is None
 
@@ -255,11 +255,11 @@ class TestGitHubWorkflowHooks:
             for group in data["hooks"]["PreToolUse"]
             for hook in group["hooks"]
         ]
-        assert any("github-command-guard.sh" in command for command in pre_commands)
+        assert any("github_command_guard.sh" in command for command in pre_commands)
         assert "UserPromptSubmit" in data["hooks"]
 
     def test_monitor_pr_queries_review_decision_directly(self):
-        content = (self.target / ".claude" / "scripts" / "monitor-pr.sh").read_text()
+        content = (self.target / ".claude" / "scripts" / "monitor_pr.sh").read_text()
         assert "reviewDecision" in content
         assert "_get_review_decision" in content
         assert "Waiting for reviewer" in content
@@ -272,7 +272,7 @@ class TestGitHubWorkflowHooks:
 
     def test_github_workflow_skill_documents_nonzero_monitor_exit(self):
         content = (
-            self.target / ".claude" / "skills" / "github-workflow" / "SKILL.md"
+            self.target / ".claude" / "skills" / "github_workflow" / "SKILL.md"
         ).read_text()
         assert "exits **1** for CI or merge failures" in content
         assert "Do not report a PR as merged unless the script exits 0" in content
@@ -304,7 +304,7 @@ exit 2
         )
         fake_gh.chmod(0o755)
 
-        script = self.target / ".claude" / "scripts" / "monitor-pr.sh"
+        script = self.target / ".claude" / "scripts" / "monitor_pr.sh"
         env = {"PATH": f"{fake_bin}:{os.environ['PATH']}"}
         result = subprocess.run(
             [str(script), "42", "--merge"],
@@ -320,7 +320,7 @@ exit 2
         assert "Merged PR #42" not in result.stdout
 
     def test_workflow_state_reminder_reads_prompt_stdin(self):
-        hook = self.target / ".claude" / "hooks" / "workflow-state-reminder.sh"
+        hook = self.target / ".claude" / "hooks" / "workflow_state_reminder.sh"
         payload = json.dumps({"prompt": "please finish this PR"})
         result = subprocess.run(
             [str(hook)],
