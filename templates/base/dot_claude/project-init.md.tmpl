@@ -14,7 +14,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 
 1. **Start of session** — read [`memory/MEMORY.md`](memory/MEMORY.md), then check [`docs/adr/`](docs/adr/) for relevant decisions.
 2. **During work** — permanent decisions → [`docs/adr/`](docs/adr/); exploratory notes → [`vault/`](vault/); reusable facts → [`memory/`](memory/).
-3. **End of session** — `session-end` hook writes a session log to [`vault/sessions/`](vault/sessions/){{#if lightrag}}, LightRAG ingester indexes memory{{/if}}.
+3. **End of session** — `session_end` hook writes a session log to [`vault/sessions/`](vault/sessions/){{#if lightrag}}, LightRAG ingester indexes memory{{/if}}.
 
 ## Tools
 
@@ -23,22 +23,22 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Command | `/status` | git state, recent commits, open TODOs |
 | Command | `/review` | code review of staged changes or a file |
 | Command | `/plan <task>` | acceptance tests first, then implementation plan |
-| Command | `/request-review` | mark PR ready for review, optional agent review |
-| Script | `create-issue.sh <type> "desc"` | create typed issue, prints issue number |
-| Script | `create-nojira-pr.sh <type> "desc"` | branch + push + draft PR without an issue |
-| Script | `setup-github.sh [branch]` | configure branch protection and review governance |
-| Script | `start-issue.sh <n> <type>` | branch + draft PR |
-| Script | `promote-review.sh` | mark PR ready (board card moves automatically) |
-| Script | `monitor-pr.sh <n> [--merge]` | wait for CI; --merge squash-merges when clean |
-| Script | `finish-pr.sh [n] [--review-cycle N]` | push branch, mark ready, monitor checks/review, and merge |
-| Skill | `session-summary` | summarise session and save to vault |
-| Skill | `add-hook` | add a new deterministic hook |
-| Skill | `add-command` | add a new slash command |
+| Command | `/request_review` | mark PR ready for review, optional agent review |
+| Script | `create_issue.sh <type> "desc"` | create typed issue, prints issue number |
+| Script | `create_nojira_pr.sh <type> "desc"` | branch + push + draft PR without an issue |
+| Script | `setup_github.sh [branch]` | configure branch protection and review governance |
+| Script | `start_issue.sh <n> <type>` | branch + draft PR |
+| Script | `promote_review.sh` | mark PR ready (board card moves automatically) |
+| Script | `monitor_pr.sh <n> [--merge]` | wait for CI; --merge squash-merges when clean |
+| Script | `finish_pr.sh [n] [--review-cycle N]` | push branch, mark ready, monitor checks/review, and merge |
+| Skill | `session_summary` | summarise session and save to vault |
+| Skill | `add_hook` | add a new deterministic hook |
+| Skill | `add_command` | add a new slash command |
 | Skill | `audit` | full project health scan, creates issue with findings |
 | Agent | `reviewer` | code review specialist |
 | Agent | `researcher` | codebase explorer |
 
-Hooks run automatically via `settings.json`: `bash-safety-guard`, `github-command-guard`, `workflow-state-reminder`, `pre-commit-gate`, `post-edit-lint`{{#if obsidian}}, `session-end`{{/if}}.
+Hooks run automatically via `settings.json`: `bash_safety_guard`, `github_command_guard`, `workflow_state_reminder`, `pre_commit_gate`, `post_edit_lint`{{#if obsidian}}, `session_end`{{/if}}.
 
 **Rules** (`.claude/rules/`): per-filetype conventions loaded automatically by Claude Code when you open a matching file.
 
@@ -74,27 +74,27 @@ Every non-trivial task follows this exact sequence. Run the scripts; the LLM's o
 
 | Step | Command | What happens automatically |
 |------|---------|---------------------------|
-| 1. Create issue | `.claude/scripts/create-issue.sh <type> "description" --priority <priority> --area "<area>" --size <size> --acceptance "<criterion>"` | Issue created with metadata, board card → **To Do** |
-| 2. Start work | `.claude/scripts/start-issue.sh <issue-n> <type>` | Branch (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) + push + draft PR, board → **In Progress** |
-| 3. Commit | `git add … && git commit -m "[<KEY>-<n>][type] message"` | `commit-msg` hook validates format; `pre-commit-gate` auto-lints |
-| 4. Push | `.claude/scripts/push-branch.sh` | CI runs; if it fails a comment is posted on the PR with `gh run view --log-failed` |
-| 5. Finish PR | `.claude/scripts/finish-pr.sh <n>` | Pushes, marks ready, monitors CI/review, and merges when clean |
+| 1. Create issue | `.claude/scripts/create_issue.sh <type> "description" --priority <priority> --area "<area>" --size <size> --acceptance "<criterion>"` | Issue created with metadata, board card → **To Do** |
+| 2. Start work | `.claude/scripts/start_issue.sh <issue-n> <type>` | Branch (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) + push + draft PR, board → **In Progress** |
+| 3. Commit | `git add … && git commit -m "[<KEY>-<n>][type] message"` | `commit-msg` hook validates format; `pre_commit_gate` auto-lints |
+| 4. Push | `.claude/scripts/push_branch.sh` | CI runs; if it fails a comment is posted on the PR with `gh run view --log-failed` |
+| 5. Finish PR | `.claude/scripts/finish_pr.sh <n>` | Pushes, marks ready, monitors CI/review, and merges when clean |
 
-Steps 3–4 repeat until the work is complete. **When asked to push or finish a PR, keep going until the lifecycle is complete**: `finish-pr.sh` → fix any CI or review failures → rerun with the next review cycle until merged.
+Steps 3–4 repeat until the work is complete. **When asked to push or finish a PR, keep going until the lifecycle is complete**: `finish_pr.sh` → fix any CI or review failures → rerun with the next review cycle until merged.
 
 ### Merge setup (one-time per repo)
 
-Automated completion via `monitor-pr.sh --merge` works after checks pass. GitHub-native auto-merge requires two repo settings enabled by an admin:
+Automated completion via `monitor_pr.sh --merge` works after checks pass. GitHub-native auto-merge requires two repo settings enabled by an admin:
 
 1. **GitHub Settings → General → Allow auto-merge** — tick the checkbox
 2. **Branch protection rule on `main`** — require CI status checks to pass
 
-Without GitHub-native auto-merge, `monitor-pr.sh --merge` still works by merging explicitly after CI passes.
+Without GitHub-native auto-merge, `monitor_pr.sh --merge` still works by merging explicitly after CI passes.
 
 Run the scaffolded setup helper after creating the repository:
 
 ```bash
-.claude/scripts/setup-github.sh
+.claude/scripts/setup_github.sh
 ```
 
 It attempts to configure branch protection, required checks, conversation resolution, and Copilot code review. If GitHub does not expose a setting through the API or your token lacks permission, it prints the manual setup step.
@@ -111,8 +111,8 @@ It attempts to configure branch protection, required checks, conversation resolu
 
 Types: `feat` · `fix` · `chore` · `docs` · `test`
 
-For minor work without an issue, use `.claude/scripts/create-nojira-pr.sh <type> "description"`.
-It creates or reuses a typed `nojira` branch, pushes through `push-branch.sh`,
+For minor work without an issue, use `.claude/scripts/create_nojira_pr.sh <type> "description"`.
+It creates or reuses a typed `nojira` branch, pushes through `push_branch.sh`,
 and opens a draft PR titled `[nojira][type] description`.
 
 ### Rules
@@ -120,7 +120,7 @@ and opens a draft PR titled `[nojira][type] description`.
 - **No direct commits to `main`** — all changes through PRs. The `pre-push` hook enforces this locally.
 - Install hooks once after cloning:
   ```bash
-  .claude/scripts/install-hooks.sh
+  .claude/scripts/install_hooks.sh
   ```
 - One issue → one branch → one PR.
 - Draft PRs created immediately when work starts — not when it's done.
@@ -133,26 +133,26 @@ When CI fails, GitHub posts a comment on the PR. Read it, fix the code, push:
 gh run view --log-failed   # full failure output
 # fix the code
 git add … && git commit -m "[KEY-n][fix] Fix failing tests"
-.claude/scripts/push-branch.sh
-.claude/scripts/monitor-pr.sh <n> --merge   # wait and merge when clean
+.claude/scripts/push_branch.sh
+.claude/scripts/monitor_pr.sh <n> --merge   # wait and merge when clean
 ```
 
 ### Code review
 
-`finish-pr.sh` and `monitor-pr.sh --merge` wait for GitHub's review decision and print review feedback when changes are requested. Resolve actionable comments, post a review response, push with `.claude/scripts/push-branch.sh`, then rerun `monitor-pr.sh` with the next `--review-cycle`.
+`finish_pr.sh` and `monitor_pr.sh --merge` wait for GitHub's review decision and print review feedback when changes are requested. Resolve actionable comments, post a review response, push with `.claude/scripts/push_branch.sh`, then rerun `monitor_pr.sh` with the next `--review-cycle`.
 
-`/request-review` may also invoke the local `reviewer` agent for an extra pre-merge pass; that agent review is optional, but the GitHub PR review gate is part of the normal lifecycle.
+`/request_review` may also invoke the local `reviewer` agent for an extra pre-merge pass; that agent review is optional, but the GitHub PR review gate is part of the normal lifecycle.
 
 ### Quick reference
 
 ```bash
-.claude/scripts/create-issue.sh <type> "description" --priority high --area docs --size S --acceptance "Done when ..."  # new issue → prints issue number
-.claude/scripts/start-issue.sh <n> <type>             # branch + draft PR
-.claude/scripts/create-nojira-pr.sh fix "description" # no-issue branch + draft PR
-.claude/scripts/setup-github.sh                       # one-time branch protection/review setup
-.claude/scripts/promote-review.sh                     # mark PR ready for review
-.claude/scripts/monitor-pr.sh <n> --merge             # wait for CI, merge when clean
-.claude/scripts/finish-pr.sh <n>                      # push, ready, monitor, merge
+.claude/scripts/create_issue.sh <type> "description" --priority high --area docs --size S --acceptance "Done when ..."  # new issue → prints issue number
+.claude/scripts/start_issue.sh <n> <type>             # branch + draft PR
+.claude/scripts/create_nojira_pr.sh fix "description" # no-issue branch + draft PR
+.claude/scripts/setup_github.sh                       # one-time branch protection/review setup
+.claude/scripts/promote_review.sh                     # mark PR ready for review
+.claude/scripts/monitor_pr.sh <n> --merge             # wait for CI, merge when clean
+.claude/scripts/finish_pr.sh <n>                      # push, ready, monitor, merge
 gh run view --log-failed                              # see what CI failed
 gh issue list                                         # open issues
 gh pr list                                            # open PRs

@@ -1,7 +1,7 @@
 name: Review status
 
 # Creates a commit status named "review/decision" whenever a PR review is
-# submitted, edited, or dismissed. This lets monitor-pr.sh treat review state
+# submitted, edited, or dismissed. This lets monitor_pr.sh treat review state
 # as just another CI check instead of polling reviewDecision in a separate loop.
 #
 # Maps the PR's *aggregate* reviewDecision (not just the triggering event) so

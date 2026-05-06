@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions
 
-Full agent rules: [CLAUDE.md](../CLAUDE.md). For any push, PR, review, or merge action: load `.claude/skills/github-workflow/SKILL.md`.
+Full agent rules: [CLAUDE.md](../CLAUDE.md). For any push, PR, review, or merge action: load `.claude/skills/github_workflow/SKILL.md`.
 
 ## Quick reference
 

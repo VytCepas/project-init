@@ -5,11 +5,11 @@
 
 ## Context
 
-Projects scaffolded by project-init previously had partial GitHub workflow guidance: issues were created via `start-task`, but there was no standard for branch naming, PR creation timing, board column transitions, or when/how to request code review. This caused inconsistency across projects — some created PRs at the end, some committed directly to main, and code review was ad-hoc.
+Projects scaffolded by project-init previously had partial GitHub workflow guidance: issues were created via `start_task`, but there was no standard for branch naming, PR creation timing, board column transitions, or when/how to request code review. This caused inconsistency across projects — some created PRs at the end, some committed directly to main, and code review was ad-hoc.
 
 The goals of this ADR are to:
 1. Define a single canonical lifecycle every project follows.
-2. Make the happy path fast (automated by `/start-task` and `/request-review`).
+2. Make the happy path fast (automated by `/start_task` and `/request_review`).
 3. Keep code review optional to control token cost.
 
 ## Decision
@@ -26,8 +26,8 @@ Each step maps to a GitHub Projects board column:
 |---|---|
 | Backlog | Issues not yet scheduled |
 | To Do | Issue exists, work not started |
-| In Progress | `/start-task` run — branch + draft PR created |
-| In Review | `/request-review` run — PR marked ready-for-review |
+| In Progress | `/start_task` run — branch + draft PR created |
+| In Review | `/request_review` run — PR marked ready-for-review |
 | Done | PR merged with `Closes #<n>` in body |
 
 ### Ticket, branch, and PR naming
@@ -68,13 +68,13 @@ PRs must pass all CI checks before merge. The base scaffold ships a CI workflow 
 
 ### Code review
 
-GitHub PR review is part of the normal merge lifecycle: `finish-pr.sh` and
-`monitor-pr.sh --merge` wait for the aggregate `reviewDecision`, print review
+GitHub PR review is part of the normal merge lifecycle: `finish_pr.sh` and
+`monitor_pr.sh --merge` wait for the aggregate `reviewDecision`, print review
 feedback when changes are requested, and require the next `--review-cycle`
 after fixes are pushed.
 
 The local `reviewer` agent remains optional and is triggered via
-`/request-review` when an extra pre-merge pass is worth the token cost. Use it
+`/request_review` when an extra pre-merge pass is worth the token cost. Use it
 for security-sensitive changes, architectural changes, or any PR the author is
 uncertain about.
 
@@ -88,8 +88,8 @@ A project board named after the repository should be created once per repo. Colu
 ## Consequences
 
 - All projects scaffolded after this ADR follow the same lifecycle.
-- `start-task` skill updated to create branch + draft PR automatically.
-- `/request-review` command added to base scaffold.
+- `start_task` skill updated to create branch + draft PR automatically.
+- `/request_review` command added to base scaffold.
 - `.github/pull_request_template.md` added to base scaffold.
 - `project-init.md.tmpl` updated with lifecycle table and rules.
 - Agents working on scaffolded projects have unambiguous instructions — no guessing when to create PRs or how to name branches.

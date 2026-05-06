@@ -188,7 +188,7 @@ class TestShellLineEndings:
     """Regression: shell hook scripts must be LF-only.
 
     Codex evaluation 2026-04-25 caught templates/base/dot_claude/hooks/
-    bash-safety-guard.sh shipping with CRLF endings, which made
+    bash_safety_guard.sh shipping with CRLF endings, which made
     `/usr/bin/env: 'bash\\r': No such file or directory` on Unix.
     """
 

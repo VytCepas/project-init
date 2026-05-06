@@ -48,16 +48,16 @@ class TestScaffoldObsidianOnly:
         assert "{{project_name}}" not in content
 
     def test_session_end_hook_exists(self):
-        hook = self.target / ".claude" / "hooks" / "session-end.sh"
+        hook = self.target / ".claude" / "hooks" / "session_end.sh"
         assert hook.is_file()
 
     def test_skills_created(self):
         skills = self.target / ".claude" / "skills"
         assert (skills / "status" / "SKILL.md").is_file()
         assert (skills / "review" / "SKILL.md").is_file()
-        assert (skills / "save-memory" / "SKILL.md").is_file()
+        assert (skills / "save_memory" / "SKILL.md").is_file()
         assert (skills / "plan" / "SKILL.md").is_file()  # SKILL.md.tmpl rendered to SKILL.md
-        assert (skills / "request-review" / "SKILL.md").is_file()
+        assert (skills / "request_review" / "SKILL.md").is_file()
 
     def test_agents_dir_exists(self):
         agents = self.target / ".claude" / "agents"
@@ -68,13 +68,13 @@ class TestScaffoldObsidianOnly:
         assert not (agents / "researcher.md").exists()
 
     def test_skill_created(self):
-        skill = self.target / ".claude" / "skills" / "session-summary" / "SKILL.md"
+        skill = self.target / ".claude" / "skills" / "session_summary" / "SKILL.md"
         assert skill.is_file()
         content = skill.read_text()
-        assert "session-summary" in content
+        assert "session_summary" in content
 
     def test_post_edit_lint_hook(self):
-        hook = self.target / ".claude" / "hooks" / "post-edit-lint.sh"
+        hook = self.target / ".claude" / "hooks" / "post_edit_lint.sh"
         assert hook.is_file()
         assert hook.stat().st_mode & 0o111  # executable
 
@@ -101,58 +101,58 @@ class TestScaffoldObsidianOnly:
         assert any("MultiEdit" in m for m in matchers)
 
     def test_pre_commit_gate_hook_exists(self):
-        hook = self.target / ".claude" / "hooks" / "pre-commit-gate.sh"
+        hook = self.target / ".claude" / "hooks" / "pre_commit_gate.sh"
         assert hook.is_file()
         assert hook.stat().st_mode & 0o111
 
     def test_pre_commit_gate_quotes_staged_file_paths(self):
-        content = (self.target / ".claude" / "hooks" / "pre-commit-gate.sh").read_text()
+        content = (self.target / ".claude" / "hooks" / "pre_commit_gate.sh").read_text()
         assert "mapfile -t STAGED_PY" in content
         assert '"${STAGED_PY[@]}"' in content
         assert "mapfile -t STAGED_JS" in content
         assert '"${STAGED_JS[@]}"' in content
 
     def test_bash_safety_guard_hook_exists(self):
-        hook = self.target / ".claude" / "hooks" / "bash-safety-guard.sh"
+        hook = self.target / ".claude" / "hooks" / "bash_safety_guard.sh"
         assert hook.is_file()
         assert hook.stat().st_mode & 0o111
 
     def test_post_edit_lint_outputs_additional_context(self):
-        content = (self.target / ".claude" / "hooks" / "post-edit-lint.sh").read_text()
+        content = (self.target / ".claude" / "hooks" / "post_edit_lint.sh").read_text()
         assert "additionalContext" in content
         assert "ruff format" in content
 
     def test_start_task_skill_exists(self):
-        skill = self.target / ".claude" / "skills" / "start-task" / "SKILL.md"
+        skill = self.target / ".claude" / "skills" / "start_task" / "SKILL.md"
         assert skill.is_file()
         assert "gh issue" in skill.read_text()
 
     def test_create_issue_script_created(self):
-        assert (self.target / ".claude" / "scripts" / "create-issue.sh").is_file()
+        assert (self.target / ".claude" / "scripts" / "create_issue.sh").is_file()
 
     def test_start_issue_script_created(self):
-        assert (self.target / ".claude" / "scripts" / "start-issue.sh").is_file()
+        assert (self.target / ".claude" / "scripts" / "start_issue.sh").is_file()
 
     def test_promote_review_script_created(self):
-        assert (self.target / ".claude" / "scripts" / "promote-review.sh").is_file()
+        assert (self.target / ".claude" / "scripts" / "promote_review.sh").is_file()
 
     def test_push_branch_script_created(self):
-        assert (self.target / ".claude" / "scripts" / "push-branch.sh").is_file()
+        assert (self.target / ".claude" / "scripts" / "push_branch.sh").is_file()
 
     def test_lifecycle_scripts_are_executable(self):
         for name in (
-            "create-issue.sh",
-            "create-nojira-pr.sh",
-            "start-issue.sh",
-            "promote-review.sh",
-            "install-hooks.sh",
-            "push-branch.sh",
+            "create_issue.sh",
+            "create_nojira_pr.sh",
+            "start_issue.sh",
+            "promote_review.sh",
+            "install_hooks.sh",
+            "push_branch.sh",
         ):
             path = self.target / ".claude" / "scripts" / name
             assert path.stat().st_mode & 0o111, f"{name} must be executable"
 
     def test_monitor_pr_sh_has_merge_flag(self):
-        content = (self.target / ".claude" / "scripts" / "monitor-pr.sh").read_text()
+        content = (self.target / ".claude" / "scripts" / "monitor_pr.sh").read_text()
         assert "--merge" in content
         assert "gh pr checks" in content
         assert "--json" in content  # suppresses per-refresh noise; only prints failures
@@ -160,18 +160,18 @@ class TestScaffoldObsidianOnly:
         assert "GH_PROMPT_DISABLED=1" in content
 
     def test_push_branch_sh_verifies_remote_sha(self):
-        # push-branch.sh is a thin shim that delegates to dag-workflow.py.
+        # push_branch.sh is a thin shim that delegates to dag_workflow.py.
         # The SHA-verification logic lives in the Python module.
-        shim = (self.target / ".claude" / "scripts" / "push-branch.sh").read_text()
-        assert "dag-workflow.py" in shim
+        shim = (self.target / ".claude" / "scripts" / "push_branch.sh").read_text()
+        assert "dag_workflow.py" in shim
         assert "exec python3" in shim
-        dag = (self.target / ".claude" / "hooks" / "dag-workflow.py").read_text()
+        dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
         assert "ls-remote" in dag
         assert "expected_sha" in dag
         assert "max_retries" in dag
 
     def test_start_issue_sh_uses_project_key_branch_format(self):
-        content = (self.target / ".claude" / "scripts" / "start-issue.sh").read_text()
+        content = (self.target / ".claude" / "scripts" / "start_issue.sh").read_text()
         assert "derive_project_key" in content
         assert 'ISSUE_REF="${PROJECT_KEY}-${ISSUE_NUMBER}"' in content
         assert 'BRANCH="${TYPE}/${PREFIX}${SLUG}"' in content
@@ -179,10 +179,10 @@ class TestScaffoldObsidianOnly:
 
     def test_project_init_md_has_script_commands(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
-        assert "create-issue.sh" in content
-        assert "create-nojira-pr.sh" in content
-        assert "start-issue.sh" in content
-        assert "promote-review.sh" in content
+        assert "create_issue.sh" in content
+        assert "create_nojira_pr.sh" in content
+        assert "start_issue.sh" in content
+        assert "promote_review.sh" in content
 
     def test_project_init_md_uses_commit_message_format_hook_accepts(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
@@ -190,9 +190,9 @@ class TestScaffoldObsidianOnly:
         assert "[#n][type]" not in content
 
     def test_start_task_skill_delegates_to_scripts(self):
-        content = (self.target / ".claude" / "skills" / "start-task" / "SKILL.md").read_text()
-        assert "create-issue.sh" in content
-        assert "start-issue.sh" in content
+        content = (self.target / ".claude" / "skills" / "start_task" / "SKILL.md").read_text()
+        assert "create_issue.sh" in content
+        assert "start_issue.sh" in content
 
     def test_docs_layer_exists(self):
         """PI-27: .claude/docs/ scaffold with ADRs and guides."""
@@ -248,14 +248,14 @@ class TestScaffoldObsidianOnly:
         assert (rules / "hooks.md").exists()
 
     def test_add_hook_skill_exists(self):
-        skill = self.target / ".claude" / "skills" / "add-hook" / "SKILL.md"
+        skill = self.target / ".claude" / "skills" / "add_hook" / "SKILL.md"
         assert skill.is_file()
         content = skill.read_text()
         assert "settings.json" in content
         assert "PreToolUse" in content
 
     def test_add_command_skill_exists(self):
-        skill = self.target / ".claude" / "skills" / "add-command" / "SKILL.md"
+        skill = self.target / ".claude" / "skills" / "add_command" / "SKILL.md"
         assert skill.is_file()
         assert "$ARGUMENTS" in skill.read_text()
 

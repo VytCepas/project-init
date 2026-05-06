@@ -11,7 +11,7 @@ Use labels for values that workflows and project boards can read.
 - Size labels: `size:XS`, `size:S`, `size:M`, `size:L`, `size:XL`
 - Area labels are repository-specific. Use existing labels only; do not invent new area labels from agent context.
 
-`create-issue.sh` creates missing priority and size labels when the token has permission. If label creation fails, the issue is still created and the value remains in the markdown body.
+`create_issue.sh` creates missing priority and size labels when the token has permission. If label creation fails, the issue is still created and the value remains in the markdown body.
 
 ## Markdown body
 

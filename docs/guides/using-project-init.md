@@ -88,7 +88,7 @@ your-project/
     ├── docs/                    # Agent-readable reference docs
     ├── hooks/                   # Deterministic safety hooks
     ├── scripts/                 # GitHub lifecycle scripts
-    ├── skills/                  # Slash commands (/start-task, etc.)
+    ├── skills/                  # Slash commands (/start_task, etc.)
     ├── rules/                   # Language-specific agent rules
     └── agents/                  # Sub-agent persona specs
 ```
@@ -122,13 +122,13 @@ Memory lives in `.claude/memory/`. Four types:
 
 Each memory is a markdown file with YAML frontmatter. `MEMORY.md` is the index — agents grep it without loading every file.
 
-Run `/session-summary` at the end of each session to record what was done and update memory.
+Run `/session_summary` at the end of each session to record what was done and update memory.
 
 ### Obsidian Vault
 
 Open `.claude/vault/` as the vault root in Obsidian to get wikilinks, graph view, and Templater templates for ADRs, session notes, design notes, and knowledge entries.
 
-`vault/log.md` is auto-appended by the `session-end` hook — a running operational log.
+`vault/log.md` is auto-appended by the `session_end` hook — a running operational log.
 
 Write an ADR for every non-obvious architectural decision. Future agents will understand why choices were made.
 
@@ -139,23 +139,23 @@ Wired in `.claude/settings.json`:
 | Hook | Trigger | Purpose |
 |------|---------|---------|
 | `secret-guard.py` | File writes | Blocks API keys and tokens from being committed |
-| `bash-safety-guard.sh` | Bash commands | Warns on risky patterns (`rm -rf`, force push) |
-| `pre-commit-gate.sh` | Pre-commit | Runs lint and format before every commit |
-| `github-command-guard.sh` | git/gh commands | Steers toward lifecycle scripts |
-| `session-end.sh` | Session end | Appends to `vault/log.md`, runs memory lint |
+| `bash_safety_guard.sh` | Bash commands | Warns on risky patterns (`rm -rf`, force push) |
+| `pre_commit_gate.sh` | Pre-commit | Runs lint and format before every commit |
+| `github_command_guard.sh` | git/gh commands | Steers toward lifecycle scripts |
+| `session_end.sh` | Session end | Appends to `vault/log.md`, runs memory lint |
 
 ### Skills (Slash Commands)
 
 | Skill | Purpose |
 |-------|---------|
-| `/start-task` | Create GitHub issue + branch + draft PR |
-| `/session-summary` | Save session note and update memory |
-| `/github-workflow` | Load PR lifecycle instructions |
-| `/add-hook` | Add a new hook to `settings.json` |
-| `/add-command` | Create a new slash command |
+| `/start_task` | Create GitHub issue + branch + draft PR |
+| `/session_summary` | Save session note and update memory |
+| `/github_workflow` | Load PR lifecycle instructions |
+| `/add_hook` | Add a new hook to `settings.json` |
+| `/add_command` | Create a new slash command |
 | `/audit` | Review for security and quality issues |
 
-Use `/start-task` before any non-trivial work — one issue, one branch, one PR keeps work traceable.
+Use `/start_task` before any non-trivial work — one issue, one branch, one PR keeps work traceable.
 
 ---
 
@@ -177,9 +177,9 @@ Ingestion is manual by design — you control when API calls happen. Requires `A
 
 ## 7. Common Customization
 
-**Add a hook**: run `/add-hook` or edit `.claude/settings.json` directly. Scripts go in `.claude/hooks/`.
+**Add a hook**: run `/add_hook` or edit `.claude/settings.json` directly. Scripts go in `.claude/hooks/`.
 
-**Add a slash command**: run `/add-command`. Creates a `SKILL.md` in `.claude/skills/<name>/`. Register it in `.claude/skills/INDEX.md`.
+**Add a slash command**: run `/add_command`. Creates a `SKILL.md` in `.claude/skills/<name>/`. Register it in `.claude/skills/INDEX.md`.
 
 **Re-run to update**: `/project-init` is safe to re-run anytime. It never overwrites `memory/` or `vault/` content.
 
@@ -192,9 +192,9 @@ Ingestion is manual by design — you control when API calls happen. Requires `A
 ls .claude/hooks/
 
 # Lint memory index integrity
-bash .claude/scripts/lint-memory.sh
+bash .claude/scripts/lint_memory.sh
 
-# Confirm pre-commit-gate fires
+# Confirm pre_commit_gate fires
 git commit --allow-empty -m "test: verify hooks"
 ```
 
@@ -209,5 +209,5 @@ git commit --allow-empty -m "test: verify hooks"
 | `bunx: command not found` when adding MCPs | `curl -fsSL https://bun.sh/install \| bash` |
 | Hooks don't fire on commit | Check `python3 --version`; hooks need `python3` on PATH |
 | Unrendered `{{...}}` in output | Re-run with `--strict` to surface the missing variable |
-| `lint-memory.sh` reports errors | Each file in `memory/` needs a matching entry in `MEMORY.md` |
+| `lint_memory.sh` reports errors | Each file in `memory/` needs a matching entry in `MEMORY.md` |
 | CRLF line ending errors on WSL | Edit and commit from inside WSL, not Git Bash on Windows |

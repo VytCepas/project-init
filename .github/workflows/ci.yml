@@ -73,9 +73,9 @@ jobs:
           test -f /tmp/smoke-target/CLAUDE.md
           test -f /tmp/smoke-target/AGENTS.md
           # Verify hook executable bits survived packaging
-          test -x /tmp/smoke-target/.claude/hooks/post-edit-lint.sh
-          test -x /tmp/smoke-target/.claude/hooks/pre-commit-gate.sh
-          test -x /tmp/smoke-target/.claude/hooks/bash-safety-guard.sh
+          test -x /tmp/smoke-target/.claude/hooks/post_edit_lint.sh
+          test -x /tmp/smoke-target/.claude/hooks/pre_commit_gate.sh
+          test -x /tmp/smoke-target/.claude/hooks/bash_safety_guard.sh
           # Verify no surviving {{...}} placeholders (--strict already guarantees this)
           ! grep -rn '{{[a-z_]*}}' /tmp/smoke-target || (echo "Unrendered placeholders found"; exit 1)
           echo "OK - wheel smoke test passed"

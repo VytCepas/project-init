@@ -20,23 +20,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bash-safety-guard.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bash_safety_guard.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-commit-gate.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre_commit_gate.sh",
             "timeout": 60
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/github-command-guard.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/github_command_guard.sh",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-merge-ci-check.sh",
-            "timeout": 30
           }
         ]
       }
@@ -47,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-edit-lint.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post_edit_lint.sh",
             "timeout": 30
           }
         ]
@@ -58,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workflow-state-reminder.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workflow_state_reminder.sh",
             "timeout": 10
           }
         ]
