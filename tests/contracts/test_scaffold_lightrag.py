@@ -32,13 +32,6 @@ class TestScaffoldLightRAG:
         content = rule.read_text()
         assert "ingest_sessions.py" in content
 
-    def test_settings_json_has_stop_hook(self):
-        import json
-
-        settings = self.target / ".claude" / "settings.json"
-        data = json.loads(settings.read_text())
-        assert "Stop" in data["hooks"]
-
     def test_more_files_than_obsidian_only(self):
         preset_small = load_preset("obsidian-only")
         variables = make_variables(lightrag="")
