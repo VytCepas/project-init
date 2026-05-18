@@ -65,12 +65,16 @@ def _home_path_patterns() -> list[tuple[re.Pattern[str], str]]:
     escaped = re.escape(home.rstrip("/\\"))
     return [(re.compile(escaped + r"[/\\]\S+"), f"Personal home-directory path ({home}/...)")]
 
+# Patterns checked on all tools (Write, Edit, MultiEdit, Bash)
 ALL_PATTERNS: list[tuple[re.Pattern[str], str]] = (
     _API_KEY_PATTERNS
     + [(_SECRET_ASSIGNMENT, "Hardcoded secret assignment")]
     + _PII_PATTERNS
-    + _home_path_patterns()
 )
+
+# Home-path patterns checked on file writes/edits only — not Bash commands,
+# which legitimately reference $HOME paths (MCP configs, tool binaries, etc.)
+FILE_ONLY_PATTERNS: list[tuple[re.Pattern[str], str]] = _home_path_patterns()
 
 # ---------------------------------------------------------------------------
 # Exemptions
@@ -89,10 +93,11 @@ def _is_exempt_file(file_path: str) -> bool:
     return name in _EXEMPT_BASENAMES or name.endswith(".example")
 
 
-def _scan(text: str, source: str) -> list[str]:
+def _scan(text: str, source: str, extra_patterns: list[tuple[re.Pattern[str], str]] | None = None) -> list[str]:
     """Return list of finding descriptions, empty if clean."""
     findings: list[str] = []
-    for pattern, label in ALL_PATTERNS:
+    patterns = ALL_PATTERNS + (extra_patterns or [])
+    for pattern, label in patterns:
         match = pattern.search(text)
         if match:
             # Skip if the matched value is adjacent to a placeholder marker
@@ -122,6 +127,8 @@ def main() -> int:
 
     texts: list[tuple[str, str]] = []  # (text, source_label)
 
+    is_file_tool = tool_name in ("Write", "Edit", "MultiEdit")
+
     if tool_name == "Write":
         texts.append((tool_input.get("content", ""), file_path or "file content"))
     elif tool_name == "Edit":
@@ -134,9 +141,10 @@ def main() -> int:
     else:
         return 0
 
+    extra = FILE_ONLY_PATTERNS if is_file_tool else None
     all_findings: list[str] = []
     for text, source in texts:
-        all_findings.extend(_scan(text, source))
+        all_findings.extend(_scan(text, source, extra))
 
     if all_findings:
         unique = list(dict.fromkeys(all_findings))  # deduplicate, preserve order
