@@ -281,6 +281,17 @@ COMMAND_RULES: list[tuple[re.Pattern[str], str | None, str]] = [
 ]
 
 
+_HEREDOC_RE = re.compile(
+    r"<<-?\s*['\"]?(\w+)['\"]?[ \t]*\n.*?\n\1[ \t]*(?:\n|$)",
+    re.DOTALL,
+)
+
+
+def _strip_heredocs(cmd: str) -> str:
+    """Remove heredoc body text so pattern rules don't fire on body content."""
+    return _HEREDOC_RE.sub("", cmd)
+
+
 def _redirect_target_exists(reason: str) -> bool:
     """Best-effort: scan the redirect message for a `.claude/scripts/<name>`
     reference and check whether the file exists. If no reference is found,
@@ -297,8 +308,12 @@ def guard(payload: dict) -> dict | None:
     if not cmd:
         return None
 
+    # Strip heredoc bodies so pattern rules don't fire on body content
+    # (e.g. `gh issue create --body "$(cat <<'EOF'\n...git push...\nEOF\n)"`)
+    cmd_scan = _strip_heredocs(cmd)
+
     for pattern, target, message in COMMAND_RULES:
-        if not pattern.search(cmd):
+        if not pattern.search(cmd_scan):
             continue
         # If the redirect points at a wrapper script that doesn't exist in
         # this repo, skip (don't block — there's nothing to redirect to).
