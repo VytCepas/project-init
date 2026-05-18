@@ -183,6 +183,31 @@ class TestSecretGuard:
         })
         assert out is None
 
+    def test_allows_home_path_in_bash_command(self):
+        """PI-101 regression: Bash commands referencing $HOME paths must not be blocked.
+
+        Home-path detection is scoped to file tools (Write/Edit/MultiEdit) only.
+        Blocking Bash broke legitimate MCP config reads and tool invocations.
+        """
+        home = os.environ.get("HOME", "/home/testuser")
+        out = run_secret_guard(self._script, {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"cat {home}/.claude/settings.json"},
+        })
+        assert out is None
+
+    def test_still_blocks_home_path_in_write(self):
+        """Companion to PI-101: home-path detection remains active for Write."""
+        home = os.environ.get("HOME", "/home/testuser")
+        out = run_secret_guard(self._script, {
+            "tool_name": "Write",
+            "tool_input": {
+                "file_path": "/tmp/config.yaml",
+                "content": f"mcp_config: {home}/.claude/mcp.json",
+            },
+        })
+        assert out is not None and out["decision"] == "block"
+
 
 class TestShellLineEndings:
     """Regression: shell hook scripts must be LF-only.
