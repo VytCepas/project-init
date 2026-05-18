@@ -44,8 +44,10 @@ if [ -n "$MODE" ] && [ "$MODE" != "--merge" ]; then
   exit 2
 fi
 
-# Parse remaining flags (order-independent after position 2)
-shift 2 2>/dev/null || true
+# Parse remaining flags (order-independent after position 2).
+# Shift past <pr-number> and optional --merge; remaining args are flags.
+shift 1  # drop PR_NUMBER
+[ "$MODE" = "--merge" ] && shift 1  # drop --merge if present
 while [ $# -gt 0 ]; do
   case "$1" in
     --review-cycle)   REVIEW_CYCLE="${2:-0}"; shift 2 ;;
