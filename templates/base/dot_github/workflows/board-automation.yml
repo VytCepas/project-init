@@ -147,9 +147,23 @@ jobs:
               }' -f project="$PROJECT_ID" -f content="$ISSUE_NODE_ID" | jq -r '.data.addProjectV2ItemById.item.id')
           fi
 
-          ISSUE_DATA=$(gh issue view "$ISSUE_NUM" --json labels,body)
-          PRIORITY=$(echo "$ISSUE_DATA" | jq -r '[.labels[].name | select(startswith("priority:"))][0] // empty' | sed 's/^priority://')
-          SIZE=$(echo "$ISSUE_DATA" | jq -r '[.labels[].name | select(startswith("size:"))][0] // empty' | sed 's/^size://')
+          ISSUE_DATA=$(gh issue view "$ISSUE_NUM" -R "$OWNER/$REPO_NAME" --json labels,body)
+          parse_body_field() {
+            local heading="$1"
+            local body="$2"
+            printf '%s\n' "$body" | awk -v h="$heading" '
+              BEGIN { in_section = 0 }
+              $0 ~ "^[[:space:]]*###[[:space:]]+" h "[[:space:]]*$" { in_section = 1; next }
+              in_section && /^[[:space:]]*$/ { next }
+              in_section { print; exit }
+            '
+          }
+          BODY=$(echo "$ISSUE_DATA" | jq -r '.body')
+          PRIORITY=$(parse_body_field "Priority" "$BODY")
+          SIZE=$(parse_body_field "Size" "$BODY")
+          AGENT_READY=$(parse_body_field "Agent ready" "$BODY")
+          CONFIDENCE=$(parse_body_field "Confidence" "$BODY")
+          TYPE_LABEL=$(echo "$ISSUE_DATA" | jq -r '[.labels[].name | select(. == "feature" or . == "bug" or . == "chore" or . == "documentation" or . == "test")][0] // empty')
           parse_area() {
             local body="$1"
             local area
@@ -208,8 +222,11 @@ jobs:
           if [ "$TARGET_STATUS" != "metadata" ]; then
             update_single_select "Status" "$TARGET_STATUS"
           fi
-          update_single_select "Priority" "$PRIORITY"
-          update_single_select "Area" "$AREA"
-          update_single_select "Size" "$SIZE"
+          update_single_select "Priority"    "$PRIORITY"
+          update_single_select "Area"        "$AREA"
+          update_single_select "Size"        "$SIZE"
+          update_single_select "Agent ready" "$AGENT_READY"
+          update_single_select "Confidence"  "$CONFIDENCE"
+          update_single_select "Type"        "$TYPE_LABEL"
 
           echo "Synced issue #$ISSUE_NUM to GitHub Project metadata fields"

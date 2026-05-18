@@ -54,6 +54,20 @@ body:
         - [ ] ...
     validations:
       required: true
+  - type: dropdown
+    id: agent_ready
+    attributes:
+      label: Agent ready
+      description: Can an AI agent implement this without human clarification?
+      options: ["Yes", "No"]
+      default: 1
+  - type: dropdown
+    id: confidence
+    attributes:
+      label: Confidence
+      description: How well-understood is the scope and approach?
+      options: [high, medium, low, unknown]
+      default: 3
   - type: textarea
     id: ready
     attributes:

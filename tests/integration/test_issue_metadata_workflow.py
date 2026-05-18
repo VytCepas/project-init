@@ -29,6 +29,8 @@ class TestIssueMetadataScaffold:
             "Priority",
             "Area",
             "Size",
+            "Agent ready",
+            "Confidence",
             "References",
             "Dependencies",
             "Acceptance criteria",
@@ -48,9 +50,9 @@ class TestIssueMetadataScaffold:
         assert "status:needs-info" in content
         assert "issues:" in content
         assert "labeled, unlabeled" in content
-        assert "priority label" in content
+        assert "Agent ready" in content
+        assert "Confidence" in content
         assert "gh label create \"status:needs-info\"" in content
-        assert "unset" in content
 
     def test_board_automation_syncs_metadata_fields(self):
         content = (
@@ -62,6 +64,10 @@ class TestIssueMetadataScaffold:
         assert "Priority" in content
         assert "Area" in content
         assert "Size" in content
+        assert "Agent ready" in content
+        assert "Confidence" in content
+        assert "Type" in content
+        assert "parse_body_field" in content
         assert "Skipping missing project field" in content
         assert "organization(login: $owner)" in content
         assert "parse_area()" in content
@@ -111,9 +117,7 @@ class TestCreateIssueScript:
         )
         help_text = result.stdout
         for flag in (
-            "--priority",
             "--area",
-            "--size",
             "--reference",
             "--dependency",
             "--acceptance",
@@ -143,12 +147,12 @@ class TestCreateIssueScript:
 
     def test_script_reports_missing_option_value(self):
         result = subprocess.run(
-            [str(self.script), "feat", "Example", "--priority"],
+            [str(self.script), "feat", "Example", "--area"],
             capture_output=True,
             text=True,
         )
         assert result.returncode == 1
-        assert "missing value for '--priority'" in result.stderr
+        assert "missing value for '--area'" in result.stderr
 
 
 class TestCreateIssueSkill:

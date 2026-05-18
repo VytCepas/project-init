@@ -12,8 +12,6 @@
 set -euo pipefail
 
 VALID_TYPES="feat fix chore docs test"
-VALID_PRIORITIES="high medium low"
-VALID_SIZES="XS S M L XL"
 VALID_SCALES="epic task"
 
 usage() {
@@ -24,9 +22,7 @@ Types:
   feat  fix  chore  docs  test
 
 Options:
-  --priority high|medium|low      Apply priority label and body metadata
   --area VALUE                    Record affected area in body metadata
-  --size XS|S|M|L|XL              Apply size label and body metadata
   --scale epic|task               Mark as epic (parent) or task (leaf); adds scale label
   --parent VALUE                  Link new issue as sub-issue of VALUE
                                   Formats: 42, #42, owner/repo#42, or full issue URL
@@ -44,7 +40,7 @@ Sub-issues:
   --scale epic marks this issue as a parent work item (adds scale:epic label).
 
 Metadata model:
-  GitHub labels: type, priority, size, and scale when labels exist or can be created.
+  GitHub labels: type and scale when labels exist or can be created.
   Markdown body: area, scale, parent, references, dependencies, acceptance criteria,
   Definition of Ready, and Definition of Done.
 
@@ -68,9 +64,7 @@ TYPE="$1"
 DESCRIPTION="$2"
 shift 2
 
-PRIORITY=""
 AREA=""
-SIZE=""
 SCALE=""
 PARENT=""
 ASSIGNEE=""
@@ -98,19 +92,9 @@ require_option_value() {
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --priority)
-      require_option_value "$1" "${2:-}"
-      PRIORITY="$2"
-      shift 2
-      ;;
     --area)
       require_option_value "$1" "${2:-}"
       AREA="$2"
-      shift 2
-      ;;
-    --size)
-      require_option_value "$1" "${2:-}"
-      SIZE="$2"
       shift 2
       ;;
     --scale)
@@ -172,16 +156,6 @@ fi
 
 if [ -z "$DESCRIPTION" ]; then
   echo "ERROR: description cannot be empty" >&2
-  exit 1
-fi
-
-if [ -n "$PRIORITY" ] && ! contains_word "$PRIORITY" "$VALID_PRIORITIES"; then
-  echo "ERROR: invalid priority '$PRIORITY'. Valid priorities: $VALID_PRIORITIES" >&2
-  exit 1
-fi
-
-if [ -n "$SIZE" ] && ! contains_word "$SIZE" "$VALID_SIZES"; then
-  echo "ERROR: invalid size '$SIZE'. Valid sizes: $VALID_SIZES" >&2
   exit 1
 fi
 
@@ -274,9 +248,7 @@ write_bullets() {
   echo
   echo "- Type: $TYPE"
   [ -n "$SCALE" ] && echo "- Scale: $SCALE"
-  [ -n "$PRIORITY" ] && echo "- Priority: $PRIORITY"
   [ -n "$AREA" ] && echo "- Area: $AREA"
-  [ -n "$SIZE" ] && echo "- Size: $SIZE"
   if [ -n "$PARENT" ]; then
     echo "- Parent: $PARENT_OWNER/$PARENT_REPO#$PARENT_NUMBER"
   fi
@@ -341,16 +313,6 @@ ensure_label() {
 LABEL_ARGS=()
 if LABEL=$(ensure_label "$TYPE_LABEL" "0075ca" "Issue type"); then
   [ -n "$LABEL" ] && LABEL_ARGS+=(--label "$LABEL")
-fi
-if [ -n "$PRIORITY" ]; then
-  if LABEL=$(ensure_label "priority:$PRIORITY" "d93f0b" "Issue priority"); then
-    [ -n "$LABEL" ] && LABEL_ARGS+=(--label "$LABEL")
-  fi
-fi
-if [ -n "$SIZE" ]; then
-  if LABEL=$(ensure_label "size:$SIZE" "5319e7" "Issue size"); then
-    [ -n "$LABEL" ] && LABEL_ARGS+=(--label "$LABEL")
-  fi
 fi
 if [ -n "$SCALE" ]; then
   if LABEL=$(ensure_label "scale:$SCALE" "f9d0c4" "Issue scale"); then

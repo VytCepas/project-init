@@ -38,3 +38,17 @@ body:
       label: Parent issue
       description: Use #N (same repo) or owner/repo#N (cross-repo).
       placeholder: "#42 or VytCepas/other-repo#7"
+  - type: dropdown
+    id: agent_ready
+    attributes:
+      label: Agent ready
+      description: Can an AI agent implement this without human clarification?
+      options: ["Yes", "No"]
+      default: 1
+  - type: dropdown
+    id: confidence
+    attributes:
+      label: Confidence
+      description: How well-understood is the scope and approach?
+      options: [high, medium, low, unknown]
+      default: 3
