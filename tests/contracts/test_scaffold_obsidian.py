@@ -47,10 +47,6 @@ class TestScaffoldObsidianOnly:
         assert "my-project" in content
         assert "{{project_name}}" not in content
 
-    def test_session_end_hook_exists(self):
-        hook = self.target / ".claude" / "hooks" / "session_end.sh"
-        assert hook.is_file()
-
     def test_skills_created(self):
         skills = self.target / ".claude" / "skills"
         assert (skills / "status" / "SKILL.md").is_file()

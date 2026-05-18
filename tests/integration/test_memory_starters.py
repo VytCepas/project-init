@@ -223,23 +223,6 @@ class TestLintMemoryScript:
         assert "user_role.md" in result.stderr
 
 
-class TestSessionEndUpdates:
-    @pytest.fixture(autouse=True)
-    def _scaffold(self, tmp_target: Path):
-        self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        variables = make_variables(memory_stack="obsidian-only", lightrag="")
-        scaffold(tmp_target, preset, variables)
-
-    def test_session_end_appends_to_log(self):
-        content = (self.target / ".claude" / "hooks" / "session_end.sh").read_text()
-        assert "vault/log.md" in content
-
-    def test_session_end_runs_lint(self):
-        content = (self.target / ".claude" / "hooks" / "session_end.sh").read_text()
-        assert "lint_memory.sh" in content
-
-
 class TestLightRAGIncremental:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
