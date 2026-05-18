@@ -426,29 +426,38 @@ sync_project_fields() {
           }
         }
       }
-    }' -f owner="$owner" -F number="$project_num" 2>/dev/null || echo '{}')
+    }' -f owner="$owner" -F number="$project_num" 2>/dev/null) || true
+  [ -z "$project_data" ] && project_data='{}'
 
-  project_id=$(python3 -c "
+  # Write project data to a temp file to avoid single-quote issues in shell args
+  local pdata_file
+  pdata_file=$(mktemp)
+  printf '%s' "$project_data" > "$pdata_file"
+
+  project_id=$(python3 - "$pdata_file" <<'PYEOF' 2>/dev/null || true
 import sys, json
-d = json.loads(sys.argv[1]).get('data', {})
+d = json.load(open(sys.argv[1])).get('data', {})
 p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
 print(p.get('id', ''))
-" "$project_data" 2>/dev/null || true)
+PYEOF
+)
 
   if [ -z "$project_id" ]; then
+    rm -f "$pdata_file"
     echo "Warning: project #$project_num not found — skipping field sync (set PROJECT_NUMBER if needed)" >&2
     return 0
   fi
 
-  item_id=$(python3 -c "
+  item_id=$(python3 - "$pdata_file" "$issue_num" <<'PYEOF' 2>/dev/null || true
 import sys, json
-d = json.loads(sys.argv[1]).get('data', {})
+d = json.load(open(sys.argv[1])).get('data', {})
 p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
 for item in (p.get('items') or {}).get('nodes', []):
     if (item.get('content') or {}).get('number') == int(sys.argv[2]):
         print(item['id'])
         break
-" "$project_data" "$issue_num" 2>/dev/null || true)
+PYEOF
+)
 
   if [ -z "$item_id" ]; then
     local issue_node_id
@@ -474,24 +483,25 @@ for item in (p.get('items') or {}).get('nodes', []):
     [ -n "$option_name" ] || return 0
 
     local field_id option_id
-    field_id=$(python3 -c "
+    field_id=$(python3 - "$pdata_file" "$field_name" <<'PYEOF' 2>/dev/null || true
 import sys, json
-d = json.loads(sys.argv[1]).get('data', {})
+d = json.load(open(sys.argv[1])).get('data', {})
 p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
 for f in (p.get('fields') or {}).get('nodes', []):
     if f.get('name') == sys.argv[2]:
         print(f.get('id', ''))
         break
-" "$project_data" "$field_name" 2>/dev/null || true)
+PYEOF
+)
 
     if [ -z "$field_id" ]; then
       echo "Warning: project field '$field_name' not found — skipping" >&2
       return 0
     fi
 
-    option_id=$(python3 -c "
+    option_id=$(python3 - "$pdata_file" "$field_name" "$option_name" <<'PYEOF' 2>/dev/null || true
 import sys, json
-d = json.loads(sys.argv[1]).get('data', {})
+d = json.load(open(sys.argv[1])).get('data', {})
 p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
 for f in (p.get('fields') or {}).get('nodes', []):
     if f.get('name') == sys.argv[2]:
@@ -500,7 +510,8 @@ for f in (p.get('fields') or {}).get('nodes', []):
                 print(opt['id'])
                 break
         break
-" "$project_data" "$field_name" "$option_name" 2>/dev/null || true)
+PYEOF
+)
 
     if [ -z "$option_id" ]; then
       echo "Warning: option '$option_name' not found in field '$field_name' — skipping" >&2
@@ -525,6 +536,7 @@ for f in (p.get('fields') or {}).get('nodes', []):
   [ -n "$SIZE" ]        && set_field "Size"         "$SIZE"
   [ -n "$AGENT_READY" ] && set_field "Agent ready"  "$AGENT_READY"
   [ -n "$CONFIDENCE" ]  && set_field "Confidence"   "$CONFIDENCE"
+  rm -f "$pdata_file"
 }
 
 if [ -n "$PRIORITY" ] || [ -n "$SIZE" ] || [ -n "$AGENT_READY" ] || [ -n "$CONFIDENCE" ]; then
