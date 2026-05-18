@@ -1,5 +1,7 @@
 #!/bin/bash
 # Create a GitHub issue with typed labels and planning metadata.
+# Priority, Size, Agent ready, and Confidence are set directly on the
+# GitHub Project v2 board — not written to the issue body.
 #
 # Usage:
 #   .claude/scripts/create_issue.sh <type> "Short description" [metadata flags]
@@ -13,6 +15,9 @@ set -euo pipefail
 
 VALID_TYPES="feat fix chore docs test"
 VALID_SCALES="epic task"
+VALID_PRIORITIES="high medium low"
+VALID_SIZES="XS S M L XL"
+VALID_CONFIDENCES="high medium low unknown"
 
 usage() {
   cat <<'EOF'
@@ -22,17 +27,21 @@ Types:
   feat  fix  chore  docs  test
 
 Options:
-  --area VALUE                    Record affected area in body metadata
-  --scale epic|task               Mark as epic (parent) or task (leaf); adds scale label
-  --parent VALUE                  Link new issue as sub-issue of VALUE
-                                  Formats: 42, #42, owner/repo#42, or full issue URL
-  --reference VALUE               Add a reference; repeatable
-  --dependency VALUE              Add a dependency; repeatable
-  --acceptance VALUE              Add an acceptance criterion; repeatable
-  --assignee USER                 Assign the issue
-  --milestone NAME                Set milestone by name
-  --body-file FILE                Append extra markdown body content
-  -h, --help                      Show this help
+  --priority high|medium|low           Set Priority on the project board
+  --size XS|S|M|L|XL                   Set Size on the project board
+  --agent-ready Yes|No                 Set Agent ready on the project board
+  --confidence high|medium|low|unknown Set Confidence on the project board
+  --area VALUE                         Record affected area in body metadata
+  --scale epic|task                    Mark as epic (parent) or task (leaf); adds scale label
+  --parent VALUE                       Link new issue as sub-issue of VALUE
+                                       Formats: 42, #42, owner/repo#42, or full issue URL
+  --reference VALUE                    Add a reference; repeatable
+  --dependency VALUE                   Add a dependency; repeatable
+  --acceptance VALUE                   Add an acceptance criterion; repeatable
+  --assignee USER                      Assign the issue
+  --milestone NAME                     Set milestone by name
+  --body-file FILE                     Append extra markdown body content
+  -h, --help                           Show this help
 
 Sub-issues:
   --parent links the new issue as a native GitHub sub-issue of the given parent.
@@ -41,6 +50,7 @@ Sub-issues:
 
 Metadata model:
   GitHub labels: type and scale when labels exist or can be created.
+  GitHub Project fields: priority, size, agent-ready, confidence (set directly via GraphQL).
   Markdown body: area, scale, parent, references, dependencies, acceptance criteria,
   Definition of Ready, and Definition of Done.
 
@@ -64,6 +74,10 @@ TYPE="$1"
 DESCRIPTION="$2"
 shift 2
 
+PRIORITY=""
+SIZE=""
+AGENT_READY=""
+CONFIDENCE=""
 AREA=""
 SCALE=""
 PARENT=""
@@ -92,6 +106,26 @@ require_option_value() {
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --priority)
+      require_option_value "$1" "${2:-}"
+      PRIORITY="$2"
+      shift 2
+      ;;
+    --size)
+      require_option_value "$1" "${2:-}"
+      SIZE="$2"
+      shift 2
+      ;;
+    --agent-ready)
+      require_option_value "$1" "${2:-}"
+      AGENT_READY="$2"
+      shift 2
+      ;;
+    --confidence)
+      require_option_value "$1" "${2:-}"
+      CONFIDENCE="$2"
+      shift 2
+      ;;
     --area)
       require_option_value "$1" "${2:-}"
       AREA="$2"
@@ -156,6 +190,21 @@ fi
 
 if [ -z "$DESCRIPTION" ]; then
   echo "ERROR: description cannot be empty" >&2
+  exit 1
+fi
+
+if [ -n "$PRIORITY" ] && ! contains_word "$PRIORITY" "$VALID_PRIORITIES"; then
+  echo "ERROR: invalid priority '$PRIORITY'. Valid: $VALID_PRIORITIES" >&2
+  exit 1
+fi
+
+if [ -n "$SIZE" ] && ! contains_word "$SIZE" "$VALID_SIZES"; then
+  echo "ERROR: invalid size '$SIZE'. Valid: $VALID_SIZES" >&2
+  exit 1
+fi
+
+if [ -n "$CONFIDENCE" ] && ! contains_word "$CONFIDENCE" "$VALID_CONFIDENCES"; then
+  echo "ERROR: invalid confidence '$CONFIDENCE'. Valid: $VALID_CONFIDENCES" >&2
   exit 1
 fi
 
@@ -330,6 +379,157 @@ fi
 
 ISSUE_URL=$(gh issue create "${CREATE_ARGS[@]}" "${LABEL_ARGS[@]}")
 ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+
+# ---------------------------------------------------------------------------
+# Set Priority / Size / Agent ready / Confidence directly on the GitHub
+# Project v2 board. These are not written to the issue body — the board is
+# the authoritative location for these fields.
+# PROJECT_NUMBER defaults to 1; override with the env var if needed.
+# ---------------------------------------------------------------------------
+sync_project_fields() {
+  local issue_num="$1"
+  local project_num owner repo_name project_data project_id item_id
+
+  project_num="${PROJECT_NUMBER:-1}"
+  owner=$(gh repo view --json owner -q .owner.login)
+  repo_name=$(gh repo view --json name -q .name)
+
+  project_data=$(gh api graphql -f query='
+    query($owner: String!, $number: Int!) {
+      user(login: $owner) {
+        projectV2(number: $number) {
+          id
+          fields(first: 50) {
+            nodes {
+              ... on ProjectV2SingleSelectField {
+                id name options { id name }
+              }
+            }
+          }
+          items(first: 100) {
+            nodes { id content { ... on Issue { number } } }
+          }
+        }
+      }
+      organization(login: $owner) {
+        projectV2(number: $number) {
+          id
+          fields(first: 50) {
+            nodes {
+              ... on ProjectV2SingleSelectField {
+                id name options { id name }
+              }
+            }
+          }
+          items(first: 100) {
+            nodes { id content { ... on Issue { number } } }
+          }
+        }
+      }
+    }' -f owner="$owner" -F number="$project_num" 2>/dev/null || echo '{}')
+
+  project_id=$(python3 -c "
+import sys, json
+d = json.loads(sys.argv[1]).get('data', {})
+p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
+print(p.get('id', ''))
+" "$project_data" 2>/dev/null || true)
+
+  if [ -z "$project_id" ]; then
+    echo "Warning: project #$project_num not found — skipping field sync (set PROJECT_NUMBER if needed)" >&2
+    return 0
+  fi
+
+  item_id=$(python3 -c "
+import sys, json
+d = json.loads(sys.argv[1]).get('data', {})
+p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
+for item in (p.get('items') or {}).get('nodes', []):
+    if (item.get('content') or {}).get('number') == int(sys.argv[2]):
+        print(item['id'])
+        break
+" "$project_data" "$issue_num" 2>/dev/null || true)
+
+  if [ -z "$item_id" ]; then
+    local issue_node_id
+    issue_node_id=$(gh api "repos/$owner/$repo_name/issues/$issue_num" --jq '.node_id' 2>/dev/null || true)
+    if [ -n "$issue_node_id" ]; then
+      item_id=$(gh api graphql -f query='
+        mutation($project: ID!, $content: ID!) {
+          addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
+            item { id }
+          }
+        }' -f project="$project_id" -f content="$issue_node_id" \
+        --jq '.data.addProjectV2ItemById.item.id' 2>/dev/null || true)
+    fi
+  fi
+
+  if [ -z "$item_id" ]; then
+    echo "Warning: could not add #$issue_num to project #$project_num — skipping field sync" >&2
+    return 0
+  fi
+
+  set_field() {
+    local field_name="$1" option_name="$2"
+    [ -n "$option_name" ] || return 0
+
+    local field_id option_id
+    field_id=$(python3 -c "
+import sys, json
+d = json.loads(sys.argv[1]).get('data', {})
+p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
+for f in (p.get('fields') or {}).get('nodes', []):
+    if f.get('name') == sys.argv[2]:
+        print(f.get('id', ''))
+        break
+" "$project_data" "$field_name" 2>/dev/null || true)
+
+    if [ -z "$field_id" ]; then
+      echo "Warning: project field '$field_name' not found — skipping" >&2
+      return 0
+    fi
+
+    option_id=$(python3 -c "
+import sys, json
+d = json.loads(sys.argv[1]).get('data', {})
+p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
+for f in (p.get('fields') or {}).get('nodes', []):
+    if f.get('name') == sys.argv[2]:
+        for opt in f.get('options', []):
+            if opt.get('name') == sys.argv[3]:
+                print(opt['id'])
+                break
+        break
+" "$project_data" "$field_name" "$option_name" 2>/dev/null || true)
+
+    if [ -z "$option_id" ]; then
+      echo "Warning: option '$option_name' not found in field '$field_name' — skipping" >&2
+      return 0
+    fi
+
+    gh api graphql -f query='
+      mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+        updateProjectV2ItemFieldValue(input: {
+          projectId: $project
+          itemId: $item
+          fieldId: $field
+          value: { singleSelectOptionId: $option }
+        }) { projectV2Item { id } }
+      }' \
+      -f project="$project_id" -f item="$item_id" \
+      -f field="$field_id" -f option="$option_id" > /dev/null 2>&1 \
+      || echo "Warning: failed to set '$field_name'='$option_name'" >&2
+  }
+
+  [ -n "$PRIORITY" ]    && set_field "Priority"    "$PRIORITY"
+  [ -n "$SIZE" ]        && set_field "Size"         "$SIZE"
+  [ -n "$AGENT_READY" ] && set_field "Agent ready"  "$AGENT_READY"
+  [ -n "$CONFIDENCE" ]  && set_field "Confidence"   "$CONFIDENCE"
+}
+
+if [ -n "$PRIORITY" ] || [ -n "$SIZE" ] || [ -n "$AGENT_READY" ] || [ -n "$CONFIDENCE" ]; then
+  sync_project_fields "$ISSUE_NUMBER"
+fi
 
 # ---------------------------------------------------------------------------
 # Link as a native GitHub sub-issue when --parent was specified.
