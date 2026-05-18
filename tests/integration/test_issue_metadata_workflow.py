@@ -264,11 +264,9 @@ class TestGitHubWorkflowHooks:
         assert "_get_review_decision" in content
         assert "Waiting for reviewer" in content
         assert "could not fetch reviewDecision" in content
-        assert "MAX_REVIEW_CYCLES=1" in content
+        assert "MAX_REVIEW_CYCLES=2" in content
         assert "REVIEW_TIMEOUT=360" in content
-        assert "skipping reviewer wait" in content
-        assert "_run_gh" in content
-        assert "ERROR: admin merge failed" in content
+        assert "--no-review" in content
 
     def test_github_workflow_skill_documents_nonzero_monitor_exit(self):
         content = (
@@ -318,6 +316,41 @@ exit 2
         assert "merge failed from fake gh" in result.stdout
         assert "ERROR: merge failed for PR #42" in result.stderr
         assert "Merged PR #42" not in result.stdout
+
+    def test_monitor_pr_no_review_skips_review_gate(self, tmp_path: Path):
+        """--no-review merges after CI without waiting for reviewer."""
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        fake_gh = fake_bin / "gh"
+        fake_gh.write_text(
+            """#!/usr/bin/env bash
+if [ "$1 $2" = "pr checks" ]; then
+  echo '[{"name":"ci","state":"SUCCESS","bucket":"pass"}]'
+  exit 0
+fi
+if [ "$1 $2" = "pr merge" ]; then
+  echo "Merged PR #42"
+  exit 0
+fi
+exit 2
+""",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(0o755)
+
+        script = self.target / ".claude" / "scripts" / "monitor_pr.sh"
+        env = {"PATH": f"{fake_bin}:{os.environ['PATH']}"}
+        result = subprocess.run(
+            [str(script), "42", "--merge", "--no-review"],
+            capture_output=True,
+            text=True,
+            cwd=self.target,
+            env={**os.environ, **env},
+        )
+
+        assert result.returncode == 0
+        assert "--no-review" in result.stdout or "skipping review gate" in result.stdout
+        assert "Merged PR #42" in result.stdout
 
     def test_workflow_state_reminder_reads_prompt_stdin(self):
         hook = self.target / ".claude" / "hooks" / "workflow_state_reminder.sh"

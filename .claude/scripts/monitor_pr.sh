@@ -4,33 +4,38 @@
 # Requires: gh, python3 (stdlib only — no jq dependency).
 #
 # Usage:
-#   .claude/scripts/monitor_pr.sh <pr-number> [--merge] [--review-cycle N]
+#   .claude/scripts/monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review]
 #
 # --merge: squash-merge and delete branch automatically when all checks pass.
 # --review-cycle N: current review fix cycle count (0-based, default 0).
 #   When N >= MAX_REVIEW_CYCLES and review/decision is still failing or pending,
 #   force-merges with --admin.
+# --no-review: skip all review waiting and admin-merge after CI passes.
+#   Use ONLY for solo-dev PRs where no human reviewer will ever respond.
+#   Do NOT use to avoid addressing legitimate review feedback.
 #
 # Full lifecycle for agents:
 #   1. .claude/scripts/monitor_pr.sh <n> --merge
-#   2. Exit 2 → review comments printed → address them, push, re-run with --review-cycle 1
-#   3. --review-cycle 1 + review still failing or pending after 6 min → admin merge fires automatically
+#   2. Exit 2 → review comments printed → read and address them, push
+#   3. Re-run with --review-cycle 1
+#   4. Exit 2 again → address remaining comments, push
+#   5. Re-run with --review-cycle 2 → admin-merge fires if still blocked
 #
 # Review cycle policy:
-#   The old policy allowed two review cycles. This is intentionally one cycle now:
-#   one fix pass is enough for automated/stale review comments, then the script
-#   uses --admin to avoid leaving agent-created PRs blocked indefinitely.
+#   Two fix cycles are required before admin-merge is allowed. This ensures
+#   review feedback (including Copilot comments) is read and addressed at
+#   least once before force-merging.
 
 set -euo pipefail
 
 PR_NUMBER="${1:-}"
 MODE="${2:-}"
-CYCLE_ARG="${3:-}"
 REVIEW_CYCLE=0
-MAX_REVIEW_CYCLES=1
+MAX_REVIEW_CYCLES=2
+NO_REVIEW=0
 
 if [ -z "$PR_NUMBER" ]; then
-  echo "Usage: monitor_pr.sh <pr-number> [--merge] [--review-cycle N]" >&2
+  echo "Usage: monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review]" >&2
   exit 1
 fi
 
@@ -39,16 +44,16 @@ if [ -n "$MODE" ] && [ "$MODE" != "--merge" ]; then
   exit 2
 fi
 
-if [ -n "$CYCLE_ARG" ]; then
-  if [[ "$CYCLE_ARG" =~ ^--review-cycle=?([0-9]+)$ ]]; then
-    REVIEW_CYCLE="${BASH_REMATCH[1]}"
-  elif [[ "$CYCLE_ARG" == "--review-cycle" ]]; then
-    REVIEW_CYCLE="${4:-0}"
-  else
-    echo "Unknown option: $CYCLE_ARG" >&2
-    exit 2
-  fi
-fi
+# Parse remaining flags (order-independent after position 2)
+shift 2 2>/dev/null || true
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --review-cycle)   REVIEW_CYCLE="${2:-0}"; shift 2 ;;
+    --review-cycle=*) REVIEW_CYCLE="${1#*=}"; shift ;;
+    --no-review)      NO_REVIEW=1; shift ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
+  esac
+done
 
 _count_pending() {
   echo "$1" | python3 -c "
@@ -137,6 +142,13 @@ if [ "$FAIL_CODE" -gt 0 ]; then
   exit 1
 fi
 
+# --no-review: explicit bypass — skip review gate entirely after CI passes.
+# Use only for solo-dev PRs where no reviewer will ever respond.
+if [ "$NO_REVIEW" -eq 1 ] && [ "$MODE" = "--merge" ]; then
+  echo "PR #$PR_NUMBER: CI passed. --no-review specified — skipping review gate."
+  _admin_merge; exit 0
+fi
+
 # --- Wait up to 6 min for a reviewer to act (bounded replacement for the original infinite wait) ---
 # We query reviewDecision directly so this works even before the review/decision commit
 # status is created (which only happens after the first review event fires review-status.yml).
@@ -144,7 +156,7 @@ REVIEW_TIMEOUT=360
 REVIEW_ELAPSED=0
 REVIEW_DECISION=$(_get_review_decision)
 if [ "$MODE" = "--merge" ] && [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ] && [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
-  echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — skipping reviewer wait and force-merging with admin override."
+  echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — force-merging with admin override."
   _admin_merge; exit 0
 fi
 
