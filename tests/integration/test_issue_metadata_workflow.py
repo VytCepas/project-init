@@ -117,6 +117,10 @@ class TestCreateIssueScript:
         )
         help_text = result.stdout
         for flag in (
+            "--priority",
+            "--size",
+            "--agent-ready",
+            "--confidence",
             "--area",
             "--reference",
             "--dependency",
@@ -145,14 +149,22 @@ class TestCreateIssueScript:
         content = self.script.read_text()
         assert "label missing" in content.lower() or "missing label" in content.lower()
 
+    def test_project_fields_not_written_to_body(self):
+        content = self.script.read_text()
+        # Priority/Size/Agent ready/Confidence go to project board, not the body
+        assert "Priority:" not in content.split("## Metadata")[1].split("sync_project_fields")[0]
+        # Confirm the sync function exists instead
+        assert "sync_project_fields" in content
+        assert "updateProjectV2ItemFieldValue" in content
+
     def test_script_reports_missing_option_value(self):
         result = subprocess.run(
-            [str(self.script), "feat", "Example", "--area"],
+            [str(self.script), "feat", "Example", "--priority"],
             capture_output=True,
             text=True,
         )
         assert result.returncode == 1
-        assert "missing value for '--area'" in result.stderr
+        assert "missing value for '--priority'" in result.stderr
 
 
 class TestCreateIssueSkill:
