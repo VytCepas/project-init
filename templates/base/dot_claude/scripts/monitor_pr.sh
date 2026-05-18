@@ -137,8 +137,13 @@ _has_review_activity() {
 }
 
 # --- Wait for all CI checks (excludes review/decision commit status) ---
+# Guard: if checks haven't registered yet (empty list), keep polling.
+# An empty list is indistinguishable from "all done" without this guard,
+# which caused premature merges before CI even started.
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
+  CHECK_COUNT=$(echo "$CHECKS" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
+  [ "$CHECK_COUNT" -eq 0 ] && { sleep 10; continue; }
   PENDING=$(_count_pending "$CHECKS")
   [ "$PENDING" -eq 0 ] && break
   sleep 10

@@ -284,7 +284,7 @@ class TestGitHubWorkflowHooks:
         fake_gh.write_text(
             """#!/usr/bin/env bash
 if [ "$1 $2" = "pr checks" ]; then
-  echo '[]'
+  echo '[{"name":"ci","state":"SUCCESS","bucket":"pass"}]'
   exit 0
 fi
 if [ "$1 $2" = "pr view" ]; then
