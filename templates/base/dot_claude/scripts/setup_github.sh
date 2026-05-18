@@ -94,6 +94,8 @@ PROJECT_ID=$(echo "$PROJECT_DATA" | jq -r \
 if [ -z "$PROJECT_ID" ]; then
   echo "WARNING: Project #$PROJECT_NUMBER not found for $REPO." >&2
   echo "  Ensure PROJECT_TOKEN has 'project' scope, or create these fields manually:" >&2
+  echo "  • Priority     — options: high, medium, low" >&2
+  echo "  • Size         — options: XS, S, M, L, XL" >&2
   echo "  • Agent ready  — options: Yes, No" >&2
   echo "  • Confidence   — options: high, medium, low, unknown" >&2
   echo "  • Type         — options: feature, bug, chore, documentation, test" >&2
@@ -117,6 +119,36 @@ else
       echo "    https://github.com/users/$OWNER/projects/$PROJECT_NUMBER/settings/fields" >&2
     fi
   }
+
+  ensure_single_select_field "Priority" '
+    mutation($projectId: ID!) {
+      createProjectV2Field(input: {
+        projectId: $projectId
+        dataType: SINGLE_SELECT
+        name: "Priority"
+        singleSelectOptions: [
+          { name: "high",   color: RED,    description: "" }
+          { name: "medium", color: YELLOW, description: "" }
+          { name: "low",    color: GRAY,   description: "" }
+        ]
+      }) { projectV2Field { ... on ProjectV2SingleSelectField { id } } }
+    }'
+
+  ensure_single_select_field "Size" '
+    mutation($projectId: ID!) {
+      createProjectV2Field(input: {
+        projectId: $projectId
+        dataType: SINGLE_SELECT
+        name: "Size"
+        singleSelectOptions: [
+          { name: "XS", color: BLUE,   description: "" }
+          { name: "S",  color: GREEN,  description: "" }
+          { name: "M",  color: YELLOW, description: "" }
+          { name: "L",  color: ORANGE, description: "" }
+          { name: "XL", color: RED,    description: "" }
+        ]
+      }) { projectV2Field { ... on ProjectV2SingleSelectField { id } } }
+    }'
 
   ensure_single_select_field "Agent ready" '
     mutation($projectId: ID!) {
