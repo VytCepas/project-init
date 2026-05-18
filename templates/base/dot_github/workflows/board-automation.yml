@@ -147,7 +147,7 @@ jobs:
               }' -f project="$PROJECT_ID" -f content="$ISSUE_NODE_ID" | jq -r '.data.addProjectV2ItemById.item.id')
           fi
 
-          ISSUE_DATA=$(gh issue view "$ISSUE_NUM" --json labels,body)
+          ISSUE_DATA=$(gh issue view "$ISSUE_NUM" -R "$OWNER/$REPO_NAME" --json labels,body)
           parse_body_field() {
             local heading="$1"
             local body="$2"
