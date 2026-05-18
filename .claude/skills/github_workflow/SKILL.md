@@ -50,6 +50,8 @@ Types: `feat` `fix` `chore` `docs` `test`
 ## Review cycle protocol
 
 `monitor_pr.sh --merge` exits **2** when `review/decision` fails and cycles remain.
+**Two cycles are required** before admin-merge is allowed — review feedback must
+be read and addressed at least once.
 
 1. Post a response for each review comment:
    ```
@@ -60,9 +62,19 @@ Types: `feat` `fix` `chore` `docs` `test`
 2. Fix actionable code, then push: `.claude/scripts/push_branch.sh`
 3. Re-run with the next cycle number:
    ```bash
-   .claude/scripts/monitor_pr.sh <pr-number> --merge --review-cycle <N>
+   .claude/scripts/monitor_pr.sh <pr-number> --merge --review-cycle 1
    ```
-4. After 1 review-fix cycle, the script auto force-merges with `--admin`.
+4. If still blocked after addressing feedback:
+   ```bash
+   .claude/scripts/monitor_pr.sh <pr-number> --merge --review-cycle 2
+   ```
+   This is the admin-merge threshold — only use after genuinely addressing comments.
+
+**Solo-dev bypass** — if no human reviewer will ever respond (e.g. bot-only feedback
+already addressed), use `--no-review` instead of abusing `--review-cycle`:
+   ```bash
+   .claude/scripts/monitor_pr.sh <pr-number> --merge --no-review
+   ```
 
 **Before applying any comment:** read the current file state. Check whether the
 comment is stale (already fixed), contradicts conventions, or is correct. Never

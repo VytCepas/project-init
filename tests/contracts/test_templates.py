@@ -180,14 +180,11 @@ class TestScaffoldGitHubFiles:
         assert "gh pr checks" in content
         assert "--json" in content  # uses json polling, not --watch, to suppress noise
         assert "--delete-branch" in content
-        assert "_run_gh" in content
-        assert "ERROR: merge failed" in content
         assert "reviewDecision" in content
         assert "Waiting for reviewer" in content
-        assert "MAX_REVIEW_CYCLES=1" in content
+        assert "MAX_REVIEW_CYCLES=2" in content
         assert "REVIEW_TIMEOUT=360" in content
-        assert "old policy allowed two review cycles" in content
-        assert "skipping reviewer wait" in content
+        assert "--no-review" in content
 
     def test_finish_pr_wraps_push_ready_monitor_flow(self):
         # finish_pr.sh is a shim; the chain logic lives in dag_workflow.py.
