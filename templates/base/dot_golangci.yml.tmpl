@@ -1,0 +1,20 @@
+{{#if go}}# .golangci.yml — quality gates for project code (scaffolded by project-init).
+# Requires golangci-lint v2.5.0+ (godoclint is bundled since v2.5.0).
+version: "2"
+
+linters:
+  enable:
+    # Enforced doc comments on exported symbols.
+    - revive
+    # Doc-comment style/completeness checks.
+    - godoclint
+    # Cognitive complexity cap — mechanical guard against noodly code.
+    - gocognit
+  settings:
+    revive:
+      rules:
+        - name: exported
+    gocognit:
+      # >15 usually means the function wants splitting.
+      min-complexity: 15
+{{/if go}}

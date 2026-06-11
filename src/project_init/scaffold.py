@@ -84,6 +84,94 @@ def _should_preserve(rel_path: Path, target: Path) -> bool:
     return any(part in _PRESERVE_DIRS for part in rel_path.parts)
 
 
+def _output_rel_path(src: Path, layer_dir: Path) -> tuple[Path, bool]:
+    """Map a template source file to its output-relative path.
+
+    Renames ``dot_`` segments to dotfiles and strips the ``.tmpl`` suffix.
+    Returns the relative path and whether the file is a render template.
+    """
+    rel_parts = [_dot_rename(p) for p in src.relative_to(layer_dir).parts]
+    is_template = rel_parts[-1].endswith(".tmpl")
+    if is_template:
+        rel_parts[-1] = rel_parts[-1][: -len(".tmpl")]
+    return Path(*rel_parts), is_template
+
+
+def _emit_file(
+    src: Path,
+    dest: Path,
+    variables: dict[str, str],
+    is_template: bool,
+) -> str | None:
+    """Write one template file to *dest*; return rendered text for .tmpl files.
+
+    Returns None when the file was skipped: a template whose rendered output
+    is empty or whitespace-only is not created at all. Wrapping an entire
+    .tmpl file in ``{{#if lang}}...{{/if}}`` therefore makes the file itself
+    conditional on that variable.
+    """
+    if is_template:
+        rendered = _render(src.read_text(encoding="utf-8"), variables)
+        if not rendered.strip():
+            return None
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(rendered, encoding="utf-8")
+    else:
+        rendered = ""
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+
+    # Preserve executable bit.
+    if src.stat().st_mode & 0o111:
+        dest.chmod(dest.stat().st_mode | 0o111)
+    return rendered
+
+
+def _validate_no_placeholders(rendered_files: list[tuple[Path, str]]) -> None:
+    """Raise TemplateRenderError if any rendered file kept a ``{{...}}`` marker."""
+    offenders: list[str] = []
+    for rel_path, content in rendered_files:
+        for match in _ANY_PLACEHOLDER_RE.finditer(content):
+            offenders.append(f"{rel_path}: {match.group()}")
+    if offenders:
+        msg = (
+            "strict mode: unrendered placeholders survived scaffolding:\n  "
+            + "\n  ".join(offenders)
+        )
+        raise TemplateRenderError(msg)
+
+
+def _iter_layer_files(layers: list[str]):
+    """Yield (src, layer_dir) for every file across the preset's template layers."""
+    for layer_name in layers:
+        layer_dir = _TEMPLATES_DIR / layer_name
+        if not layer_dir.exists():
+            msg = f"Template layer {layer_name!r} not found at {layer_dir}"
+            raise FileNotFoundError(msg)
+        for src in sorted(layer_dir.rglob("*")):
+            if src.is_dir():
+                continue
+            yield src, layer_dir
+
+
+def _commit_staged(work_dir: Path, target: Path, staged: list[Path]) -> list[Path]:
+    """Copy validated files from the strict-mode staging dir into *target*.
+
+    Honors rerun idempotency: user-owned memory/vault files are not overwritten.
+    """
+    created: list[Path] = []
+    target.mkdir(parents=True, exist_ok=True)
+    for rel_path in staged:
+        if _should_preserve(rel_path, target):
+            continue
+        src = work_dir / rel_path
+        dest = target / rel_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        created.append(rel_path)
+    return created
+
+
 def scaffold(
     target: Path,
     preset: dict,
@@ -92,6 +180,10 @@ def scaffold(
     strict: bool = False,
 ) -> list[Path]:
     """Copy + render template layers into *target*. Return created file paths.
+
+    A .tmpl file whose rendered output is empty or whitespace-only is skipped
+    entirely (see :func:`_emit_file`) — this is how language-specific config
+    files are made conditional.
 
     When *strict* is True, raise :class:`TemplateRenderError` if any
     ``{{...}}`` placeholder or unclosed conditional survives rendering.
@@ -113,82 +205,33 @@ def scaffold(
         # the final target. UUID suffix prevents collisions.
         temp_suffix = f".partial-{uuid.uuid4().hex[:8]}"
         work_dir = target.parent / (target.name + temp_suffix)
-        work_dir.mkdir(parents=True, exist_ok=True)
     else:
         work_dir = target
-        work_dir.mkdir(parents=True, exist_ok=True)
+    work_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        for layer_name in layers:
-            layer_dir = _TEMPLATES_DIR / layer_name
-            if not layer_dir.exists():
-                msg = f"Template layer {layer_name!r} not found at {layer_dir}"
-                raise FileNotFoundError(msg)
+        for src, layer_dir in _iter_layer_files(layers):
+            rel_path, is_template = _output_rel_path(src, layer_dir)
 
-            for src in sorted(layer_dir.rglob("*")):
-                if src.is_dir():
-                    continue
+            # For non-strict mode, check preservation against the actual target.
+            # For strict mode, we're writing to temp, so skip preservation check.
+            if not strict and _should_preserve(rel_path, target):
+                continue
 
-                # Build the output-relative path, renaming dot_ segments.
-                rel_parts = [_dot_rename(p) for p in src.relative_to(layer_dir).parts]
-                is_template = rel_parts[-1].endswith(".tmpl")
-                if is_template:
-                    rel_parts[-1] = rel_parts[-1][: -len(".tmpl")]
-                rel_path = Path(*rel_parts)
+            rendered = _emit_file(src, work_dir / rel_path, variables, is_template)
+            if rendered is None:
+                continue
+            if is_template and strict:
+                rendered_files.append((rel_path, rendered))
 
-                # For non-strict mode, check preservation against the actual target.
-                # For strict mode, we're writing to temp, so skip preservation check.
-                if not strict and _should_preserve(rel_path, target):
-                    continue
-
-                dest = work_dir / rel_path
-                dest.parent.mkdir(parents=True, exist_ok=True)
-
-                if is_template:
-                    content = src.read_text(encoding="utf-8")
-                    rendered = _render(content, variables)
-                    dest.write_text(rendered, encoding="utf-8")
-                    if strict:
-                        rendered_files.append((rel_path, rendered))
-                else:
-                    shutil.copy2(src, dest)
-
-                # Preserve executable bit.
-                if src.stat().st_mode & 0o111:
-                    dest.chmod(dest.stat().st_mode | 0o111)
-
-                if strict:
-                    staged.append(rel_path)
-                else:
-                    created.append(rel_path)
-
-        # Strict-mode validation: check for unrendered placeholders.
-        if strict:
-            offenders: list[str] = []
-            for rel_path, content in rendered_files:
-                for match in _ANY_PLACEHOLDER_RE.finditer(content):
-                    offenders.append(f"{rel_path}: {match.group()}")
-            if offenders:
-                msg = (
-                    "strict mode: unrendered placeholders survived scaffolding:\n  "
-                    + "\n  ".join(offenders)
-                )
-                raise TemplateRenderError(msg)
-
-            # Validation passed; commit staged files into target. Strict mode
-            # validates in isolation first, but still honors rerun idempotency:
-            # user-owned memory/vault files must not be overwritten.
-            target.mkdir(parents=True, exist_ok=True)
-            for rel_path in staged:
-                if _should_preserve(rel_path, target):
-                    continue
-
-                src = work_dir / rel_path
-                dest = target / rel_path
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dest)
+            if strict:
+                staged.append(rel_path)
+            else:
                 created.append(rel_path)
 
+        if strict:
+            _validate_no_placeholders(rendered_files)
+            created = _commit_staged(work_dir, target, staged)
             shutil.rmtree(work_dir)
 
     except Exception:
