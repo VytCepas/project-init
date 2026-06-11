@@ -1,6 +1,7 @@
 ---
 name: create_issue
 description: Creates a GitHub Issue with typed labels and structured planning metadata via create_issue.sh. Sub-skill invoked by start_task — do not call directly; use /start_task instead.
+when_to_use: Invoked by the start_task skill whenever a GitHub Issue must be created; never called directly by users.
 user-invocable: false
 allowed-tools: Bash(gh *) Bash(.claude/scripts/*) Read
 ---

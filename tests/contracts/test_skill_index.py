@@ -76,3 +76,61 @@ class TestAgentInstructionFiles:
     def test_gemini_md_references_skills_index(self):
         content = (self.target / "GEMINI.md").read_text()
         assert "INDEX.md" in content or "skills" in content.lower()
+
+
+class TestSkillFrontmatter:
+    """PI-133: every skill carries valid, discovery-friendly frontmatter."""
+
+    def _frontmatter(self, path: Path) -> dict[str, str]:
+        lines = path.read_text().splitlines()
+        assert lines and lines[0] == "---", f"{path}: missing frontmatter open"
+        fields: dict[str, str] = {}
+        for line in lines[1:]:
+            if line == "---":
+                return fields
+            if ":" in line and not line.startswith((" ", "\t", "-")):
+                key, value = line.split(":", 1)
+                fields[key.strip()] = value.strip()
+        raise AssertionError(f"{path}: frontmatter never closed")
+
+    # Template skills and this repo's own skills both follow the standard.
+    _SKILL_ROOTS = (_SKILLS_DIR, _REPO_ROOT / ".claude" / "skills")
+
+    def _skill_files(self):
+        for root in self._SKILL_ROOTS:
+            for skill_dir in sorted(root.iterdir()):
+                if not skill_dir.is_dir():
+                    continue
+                for name in ("SKILL.md", "SKILL.md.tmpl"):
+                    p = skill_dir / name
+                    if p.exists():
+                        yield p
+
+    def test_all_skills_have_name_and_description(self):
+        for path in self._skill_files():
+            fm = self._frontmatter(path)
+            assert fm.get("name"), f"{path}: frontmatter missing name"
+            assert fm.get("description"), f"{path}: frontmatter missing description"
+
+    def test_all_skills_have_when_to_use(self):
+        """when_to_use drives discovery for both users and model invocation."""
+        for path in self._skill_files():
+            fm = self._frontmatter(path)
+            assert fm.get("when_to_use"), f"{path}: frontmatter missing when_to_use"
+
+    def test_sub_skills_marked_not_user_invocable(self):
+        """Skills documented as indirectly invoked must not be /command-visible."""
+        for root in self._SKILL_ROOTS:
+            for skill in ("create_issue", "github_workflow"):
+                path = root / skill / "SKILL.md"
+                if not path.exists():
+                    continue
+                fm = self._frontmatter(path)
+                assert fm.get("user-invocable") == "false", (
+                    f"{path}: expected user-invocable: false"
+                )
+
+    def test_audit_runs_in_forked_context(self):
+        """Heavyweight scan isolates its context; findings land in a GitHub issue."""
+        fm = self._frontmatter(_SKILLS_DIR / "audit" / "SKILL.md")
+        assert fm.get("context") == "fork"
