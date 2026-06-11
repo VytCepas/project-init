@@ -16,6 +16,9 @@ set -euo pipefail
 REPO_URL="${PROJECT_INIT_REPO:-https://github.com/VytCepas/project-init.git}"
 INSTALL_DIR="${PROJECT_INIT_HOME:-$HOME/.local/share/project-init}"
 COMMANDS_DIR="$HOME/.claude/commands"
+# Pin a version with PROJECT_INIT_REF=vX.Y.Z, or track the development head
+# with PROJECT_INIT_REF=main. Default: the latest GitHub Release (ADR-008).
+REQUESTED_REF="${PROJECT_INIT_REF:-}"
 
 say() { printf '\033[1;36m[project-init]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[project-init]\033[0m %s\n' "$*" >&2; }
@@ -38,19 +41,52 @@ ensure_uv() {
     command -v uv >/dev/null 2>&1 || die "uv install failed — check shell PATH"
 }
 
-# 2. repo
-ensure_repo() {
-    if [ -d "$INSTALL_DIR/.git" ]; then
-        say "updating existing clone at $INSTALL_DIR"
-        git -C "$INSTALL_DIR" pull --ff-only
+# 2. ref — latest release tag unless PROJECT_INIT_REF overrides
+resolve_ref() {
+    if [ -n "$REQUESTED_REF" ]; then
+        printf '%s\n' "$REQUESTED_REF"
+        return
+    fi
+    # Derive owner/repo from REPO_URL for the API query (github.com only).
+    # POSIX ERE has no lazy quantifier, so strip the .git suffix separately.
+    local slug tag
+    slug=$(printf '%s\n' "$REPO_URL" | sed -nE 's#.*github\.com[:/]([^/]+/[^/]+)$#\1#p')
+    slug="${slug%.git}"
+    if [ -n "$slug" ]; then
+        tag=$(curl -fsSL "https://api.github.com/repos/$slug/releases/latest" 2>/dev/null \
+            | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name"[^"]*"([^"]+)".*/\1/' || true)
+    fi
+    if [ -n "${tag:-}" ]; then
+        printf '%s\n' "$tag"
     else
-        say "cloning $REPO_URL -> $INSTALL_DIR"
-        mkdir -p "$(dirname "$INSTALL_DIR")"
-        git clone "$REPO_URL" "$INSTALL_DIR"
+        warn "could not resolve the latest release (none published yet?) — falling back to main"
+        warn "pin explicitly with: PROJECT_INIT_REF=vX.Y.Z"
+        printf 'main\n'
     fi
 }
 
-# 3. slash command
+# 3. repo
+ensure_repo() {
+    REF="$(resolve_ref)"
+    if [ -d "$INSTALL_DIR/.git" ]; then
+        say "updating existing clone at $INSTALL_DIR (ref: $REF)"
+        git -C "$INSTALL_DIR" fetch --tags --force origin
+    else
+        say "cloning $REPO_URL ($REF) -> $INSTALL_DIR"
+        mkdir -p "$(dirname "$INSTALL_DIR")"
+        git clone "$REPO_URL" "$INSTALL_DIR"
+    fi
+    if [ "$REF" = "main" ]; then
+        git -C "$INSTALL_DIR" checkout -q main
+        git -C "$INSTALL_DIR" pull --ff-only
+    else
+        # Release tags check out detached — exactly what a pinned install wants.
+        git -C "$INSTALL_DIR" checkout -q "$REF"
+    fi
+    say "installed: $(git -C "$INSTALL_DIR" describe --tags --always)"
+}
+
+# 4. slash command
 ensure_slash_command() {
     mkdir -p "$COMMANDS_DIR"
     cat >"$COMMANDS_DIR/project-init.md" <<CMD
@@ -79,7 +115,9 @@ $(printf '\033[1;32m[project-init]\033[0m done.')
 Next steps:
   • Inside any Claude Code session:        /project-init
   • From a shell (any project):            uvx --from $INSTALL_DIR project-init
-  • Update later:                          git -C $INSTALL_DIR pull
+  • Update to the latest release:          re-run this installer
+  • Pin a specific version:                PROJECT_INIT_REF=vX.Y.Z installer
+  • Track the development head:            PROJECT_INIT_REF=main installer
 
 EOF
 }
