@@ -17,9 +17,10 @@ and CI catches leaks instead.
 
 The repo ships a `renovate.json` (weekly grouped updates, GitHub Actions
 pinned by digest, lockfile maintenance — managers activate automatically
-from the files present). Renovate PRs arrive as `[nojira][chore] …`, which
-the PR validators accept. One per-org step: install the
-[Renovate GitHub App](https://github.com/apps/renovate) on the repository.
+from the files present). Renovate PRs arrive as `chore: Update …`, the
+canonical no-issue title format the PR validators accept. One per-org
+step: install the [Renovate GitHub App](https://github.com/apps/renovate)
+on the repository.
 
 To centralize policy across an organization, replace the `extends` list
 with a shared preset and keep repo files minimal:

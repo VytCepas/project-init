@@ -18,8 +18,9 @@ from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# Must match the legacy format accepted by validate-pr.yml and commit-msg.
-_LEGACY_TITLE_RE = re.compile(r"^\[(?:[A-Z][A-Z0-9]{1,9}-[0-9]+|nojira)\]\[(?:feat|fix|chore|docs|test)\]$")
+# The canonical no-issue title format from validate-pr.yml (ADR-006:
+# generators emit only the canonical format, never the legacy brackets).
+_CANONICAL_TITLE_RE = re.compile(r"^(feat|fix|chore|docs|test)!?: .+")
 
 
 def _assert_renovate_contract(config: dict) -> None:
@@ -28,8 +29,13 @@ def _assert_renovate_contract(config: dict) -> None:
     assert "schedule:weekly" in config["extends"]
     assert "group:allNonMajor" in config["extends"]
     assert config["semanticCommits"] == "disabled"
-    assert _LEGACY_TITLE_RE.match(config["commitMessagePrefix"]), (
-        "Renovate PR titles must pass the repo's legacy title validator"
+    # Renovate derives the PR title from the commit message's first line,
+    # which starts with commitMessagePrefix followed by a space-joined action
+    # ("Update dependency X..."). Validate the resulting title shape against
+    # the same pattern the validate-pr workflow enforces.
+    simulated_title = f"{config['commitMessagePrefix']} Update dependency foo to v9"
+    assert _CANONICAL_TITLE_RE.match(simulated_title), (
+        f"Renovate PR title {simulated_title!r} would fail the title validator"
     )
     assert config["lockFileMaintenance"]["enabled"] is True
 

@@ -7,7 +7,7 @@
     "group:allNonMajor"
   ],
   "semanticCommits": "disabled",
-  "commitMessagePrefix": "[nojira][chore]",
+  "commitMessagePrefix": "chore:",
   "lockFileMaintenance": {
     "enabled": true
   }
