@@ -15,9 +15,7 @@ Ask clarifying questions if needed. Answer: What is the core change? Why now? Wh
 
 Write the test assertions **before** implementation code:
 
-```{{#if lint_command}}
-{{lint_command}}
-{{/if}}bash
+```bash
 # Example: test that a function returns X when given Y
 assert_equals(parse_config("key=val"), {"key": "val"})
 assert_throws(parse_config("broken"), ParseError)

@@ -32,6 +32,7 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 - **Deterministic** — copy/render logic is pure file ops; never call an LLM from the scaffolder itself.
 - **uv everywhere** — `uv run …`, never `pip install` or `python -m venv`.
 - **ruff only** — no black / isort / mypy.
+- **justfile is the command surface** — `just --list` shows the canonical recipes (`setup`, `lint`, `format`, `test`, `docs`, `ci`); prefer `just <recipe>` over raw tool invocations. Recipes stay thin wrappers — no logic in the justfile.
 - **Templates are tested by scaffolding into a temp dir** — any change to `templates/` should have a corresponding test in the focused `tests/test_*.py` module for that behavior. Create a new focused file if no existing module fits.
 
 ## Settings

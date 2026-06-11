@@ -59,6 +59,16 @@ if [ "${#STAGED_JS[@]}" -gt 0 ] && command -v bunx &>/dev/null; then
     git add "${STAGED_JS[@]}" 2>/dev/null || true
 fi
 
+# PI-139: when the project ships a justfile with a lint recipe and just is
+# installed, additionally gate on `just lint` — the same definition of "lint
+# passes" CI and every agent use. Per-file findings above are preserved: the
+# recipe is language-specific, so in a mixed repo it may not cover everything
+# the per-file checks caught (a passing recipe must not wash those out).
+if command -v just >/dev/null 2>&1 && [ -f "$ROOT/justfile" ] \
+   && (cd "$ROOT" && just --show lint >/dev/null 2>&1); then
+    JUST_OUT=$(cd "$ROOT" && just lint 2>&1) || ERRORS="${ERRORS}Lint errors (just lint):\n${JUST_OUT}\n"
+fi
+
 if [ -n "$ERRORS" ]; then
     python3 -c "
 import json, sys
