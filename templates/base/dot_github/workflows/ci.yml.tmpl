@@ -58,7 +58,9 @@ jobs:
         with:
           bun-version: latest
 
-      # CI invokes the same justfile recipes agents and humans use (PI-139).
+      # Lint/test invoke the same justfile recipes agents and humans use
+      # (PI-139). Dependency install stays inline: the frozen-lockfile
+      # fallback below is CI-specific logic that doesn't belong in a recipe.
       - name: Install just
         uses: extractions/setup-just@v4
 
@@ -88,7 +90,8 @@ jobs:
       - name: Lint (golangci-lint)
         uses: golangci/golangci-lint-action@v6
 
-      # CI invokes the same justfile recipes agents and humans use (PI-139).
+      # Tests run via the justfile recipe agents and humans use (PI-139);
+      # lint stays on the action above, which installs and caches the binary.
       - name: Install just
         uses: extractions/setup-just@v4
 

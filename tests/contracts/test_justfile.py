@@ -113,8 +113,8 @@ class TestRecipesAreTheSingleCallsite:
 
     def test_no_just_reference_for_language_none(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "none")
-        for name in ("AGENTS.md", "GEMINI.md"):
-            assert "just --list" not in (target / name).read_text()
+        for name in ("CLAUDE.md", "AGENTS.md", "GEMINI.md"):
+            assert "just --list" not in (target / name).read_text(), name
 
 
 class TestDogfoodJustfile:
