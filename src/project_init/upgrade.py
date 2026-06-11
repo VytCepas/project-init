@@ -435,7 +435,10 @@ def run_upgrade(target: Path, *, apply: bool) -> int:
 
         report = compute_drift(target, staging, rendered, manifest)
         report.migrated = migrated
-        if apply and report.has_drift:
+        # Run apply even with zero file drift: the config version line and
+        # the scaffold record must still be refreshed to the current tool
+        # version when the user explicitly applied the upgrade.
+        if apply:
             apply_drift(target, staging, report, preset_name, variables)
         _print_report(report, applied=apply)
     finally:

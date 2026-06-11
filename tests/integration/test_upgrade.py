@@ -239,6 +239,28 @@ class TestUpgradeApply:
         assert (target / "justfile.new").read_bytes() == merge_in_progress
         assert (target / "justfile.new.1").read_bytes() == rendered_now
 
+    def test_apply_refreshes_version_even_without_drift(self, tmp_path: Path):
+        """Tool updated but no template drift: --apply must still bump the
+        recorded version (PR #160 review)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        config = target / _CONFIG_REL
+        text = config.read_text()
+        m = re.search(r"^(  variables: )(.*)$", text, re.MULTILINE)
+        assert m
+        variables = json.loads(m.group(2))
+        variables["project_init_version"] = "0.0.1"
+        config.write_text(
+            text[: m.start()] + m.group(1) + json.dumps(variables, sort_keys=True) + text[m.end() :]
+        )
+
+        rc = main(["upgrade", str(target), "--apply"])
+        assert rc == 0
+        _, recorded, _, _ = read_scaffold_record(target)
+        from project_init import __version__
+
+        assert recorded["project_init_version"] == __version__
+
     def test_conflicted_file_stays_unrecorded(self, tmp_path: Path):
         """A conflict keeps its .new sibling and is flagged again next run."""
         target = tmp_path / "p"
