@@ -1,0 +1,54 @@
+# Release on tag push (ADR-008): build the wheel, generate the changelog
+# for the latest tag from Conventional Commits (ADR-006), publish a GitHub
+# Release with the artifacts.
+#
+# Cutting a release:
+#   1. Bump version in pyproject.toml AND src/project_init/__init__.py
+#   2. git tag vX.Y.Z && push the tag
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history — git-cliff needs prior tags to scope --latest.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+
+      - name: Verify tag matches package version
+        run: |
+          PKG_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [ "v$PKG_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match pyproject version $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Generate changelog (latest tag)
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest
+        env:
+          OUTPUT: RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          body_path: RELEASE_NOTES.md

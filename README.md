@@ -57,7 +57,22 @@ Two honest caveats:
 curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
 ```
 
-This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to `~/.local/share/project-init` (override with `PROJECT_INIT_HOME=...`), and writes a user-level slash command at `~/.claude/commands/project-init.md`.
+This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to `~/.local/share/project-init` (override with `PROJECT_INIT_HOME=...`) **pinned to the latest tagged release**, and writes a user-level slash command at `~/.claude/commands/project-init.md`.
+
+Pin a specific version, or opt into the unreleased development head:
+
+```bash
+PROJECT_INIT_REF=v0.2.0 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
+PROJECT_INIT_REF=main   bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
+```
+
+Direct tool install without the slash command (any pinned tag):
+
+```bash
+uv tool install git+https://github.com/VytCepas/project-init@v0.2.0
+```
+
+Distribution is git-only by design — see [ADR-008](docs/adr/adr-008-distribution-channel.md).
 
 ## Use
 
@@ -110,9 +125,14 @@ The test suite validates this command works correctly — see `TestREADMEExample
 
 ## Update
 
+Re-run the installer — it moves the clone to the latest tagged release:
+
 ```bash
-git -C ~/.local/share/project-init pull
+curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
 ```
+
+(`PROJECT_INIT_REF=main` for the development head; releases are cut by
+tagging `vX.Y.Z`, which triggers the release workflow.)
 
 ## Uninstall
 

@@ -64,6 +64,18 @@ class TestInstalledWheel:
         if not venv_bin.exists():  # Windows fallback
             venv_bin = venv_dir / "Scripts" / "project-init.exe"
 
+        # PI-144: the installed release artifact must report its version —
+        # this is what install pinning and the upgrade path key off.
+        import tomllib
+        pkg_version = tomllib.loads(
+            (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text()
+        )["project"]["version"]
+        version_out = subprocess.run(
+            [str(venv_bin), "--version"], capture_output=True, text=True, timeout=30
+        )
+        assert version_out.returncode == 0
+        assert pkg_version in version_out.stdout
+
         # Scaffold using the installed binary, with --strict.
         result = subprocess.run(
             [

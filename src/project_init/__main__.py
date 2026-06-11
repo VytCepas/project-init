@@ -78,6 +78,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail if any {{...}} placeholder survives rendering (PI-17)",
     )
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return p
 
 
