@@ -199,6 +199,12 @@ class TestScaffoldObsidianOnly:
         assert (docs / "development" / "conventions.md").is_file()
         assert (docs / "development" / "testing.md").is_file()
         assert (docs / "guides" / "using-memory.md").is_file()
+        # PI-135: per-developer git hygiene lives in docs, not as scaffolder features
+        onboarding = docs / "guides" / "developer-onboarding.md"
+        assert onboarding.is_file()
+        content = onboarding.read_text()
+        assert "core.excludesFile" in content
+        assert "Settings Sync" in content
 
     def test_plan_skill_is_tdd_first(self):
         plan = self.target / ".claude" / "skills" / "plan" / "SKILL.md"

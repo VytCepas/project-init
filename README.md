@@ -28,8 +28,28 @@ Principles:
 - **One folder, `.claude/`**, for everything agentic. Project root stays clean.
 - **Obsidian vault for humans, LightRAG (optional) for agents** — separated on disk.
 - **Deterministic-first** — hooks and scripts are bash/python. LLM calls only where generative.
-- **Model-agnostic** — `AGENTS.md` and `GEMINI.md` redirect non-Claude agents to the canonical `CLAUDE.md` instructions.
+- **Claude-first, portable core** — built and tested for Claude Code; other agents get instructions, not enforcement. See [Agent support tiers](#agent-support-tiers).
 - **`bun` and `uv` only** — no `npm`/`npx`/`pip`/`venv` anywhere in scaffolded projects.
+
+## Agent support tiers
+
+This is **firstly a Claude Code scaffolder**. It aims to be agent-agnostic where
+that is cheap, but it is not natively so — be explicit about what each agent gets:
+
+| Tier | What you get | Applies to |
+|---|---|---|
+| **Native (Claude Code)** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring | Claude Code only |
+| **Instructions-only** | `AGENTS.md` / `GEMINI.md` redirect to the canonical `CLAUDE.md`; agents read conventions but **no hook fires and nothing is enforced** for them | Codex, Gemini CLI, Cursor, and other AGENTS.md-aware tools |
+| **Portable regardless** | Lifecycle scripts (plain bash), memory and vault (plain markdown), git hooks (`commit-msg`, `pre-push`) — these bind every agent and every human | Everything, including Ollama-based agents |
+
+Two honest caveats:
+
+- Hook enforcement and skill invocation **do not exist outside Claude Code**. An
+  agent reading `AGENTS.md` is asked to follow the rules; nothing makes it.
+  The git hooks and CI checks are the only enforcement that binds all agents.
+- **Automated testing covers the Claude Code artifacts only.** The test suite
+  validates settings schema, skills, hooks, and rendered files; no other agent
+  is exercised in CI.
 
 ## Install (one-time)
 
