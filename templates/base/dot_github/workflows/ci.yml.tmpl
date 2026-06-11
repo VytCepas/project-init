@@ -57,8 +57,14 @@ jobs:
         with:
           bun-version: latest
 
+      # Fresh scaffolds have no lockfile yet — fall back to a plain install.
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: |
+          if [ -f bun.lock ] || [ -f bun.lockb ]; then
+            bun install --frozen-lockfile
+          else
+            bun install
+          fi
 
       - name: Lint
         run: {{lint_command}}
