@@ -39,6 +39,22 @@ class TestRepoRenovateConfig:
         config = json.loads((_REPO_ROOT / "renovate.json").read_text())
         _assert_renovate_contract(config)
 
+    def test_custom_manager_covers_workflow_templates(self):
+        """Codex review (PI-143): .yml.tmpl workflows are not valid YAML
+        ({{#if}} blocks), so the github-actions manager skips them — a regex
+        custom manager must keep template action pins fresh instead."""
+        config = json.loads((_REPO_ROOT / "renovate.json").read_text())
+        manager = config["customManagers"][0]
+        assert manager["customType"] == "regex"
+        assert manager["datasourceTemplate"] == "github-tags"
+
+        # The regex must match every `uses:` ref in the template workflows.
+        pattern = re.compile(manager["matchStrings"][0].replace("(?<", "(?P<"))
+        for tmpl in (_REPO_ROOT / "templates").rglob("*.yml.tmpl"):
+            for line in tmpl.read_text().splitlines():
+                if "uses:" in line:
+                    assert pattern.search(line), f"unmatched action ref in {tmpl.name}: {line.strip()}"
+
 
 class TestScaffoldedRenovateConfig:
     @pytest.mark.parametrize("language", ["python", "node", "go", "none"])

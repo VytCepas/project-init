@@ -10,5 +10,15 @@
   "commitMessagePrefix": "[nojira][chore]",
   "lockFileMaintenance": {
     "enabled": true
-  }
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Action refs in scaffolded workflow templates: the github-actions manager cannot parse them ({{#if}} blocks break YAML), so match uses: lines directly. Keeps the scaffolder from shipping stale action pins.",
+      "managerFilePatterns": ["/^templates/.*\\.ya?ml\\.tmpl$/"],
+      "matchStrings": ["uses: (?<depName>[^/\\s]+/[^@/\\s]+)@(?<currentValue>v[\\d.]+)"],
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "semver-coerced"
+    }
+  ]
 }
