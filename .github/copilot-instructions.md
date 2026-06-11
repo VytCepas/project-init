@@ -8,8 +8,8 @@ Full agent rules: [CLAUDE.md](../CLAUDE.md). For any push, PR, review, or merge 
 |------|---------|
 | Branch | `<type>/PI-<n>-<slug>` e.g. `feat/PI-42-add-oauth` |
 | Issue title | plain description only — type → label |
-| PR title | `[PI-N][type] description` |
-| No-issue PR | `[nojira][type] description` |
+| PR title | `type(PI-N): description` |
+| No-issue PR | `type: description` (no scope = no issue) |
 | PR body | `Closes #N` |
 
 ## Python tooling

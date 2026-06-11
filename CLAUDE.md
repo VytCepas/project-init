@@ -52,7 +52,7 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 
 For any push, PR, review, or merge work: load `.claude/skills/github_workflow/SKILL.md`.
 
-Quick ref: branch = `<type>/PI-<n>-<slug>` | PR title = `[PI-N][type] desc` | body includes `Closes #N`.
+Quick ref: branch = `<type>/PI-<n>-<slug>` | PR title = `type(PI-N): desc` (no scope = no issue) | body includes `Closes #N`.
 
 Root `.claude/scripts/` lifecycle scripts exist here but may not cover every variant — they are scaffolded-project artifacts. If a script is missing, the skill documents the `git`/`gh` fallback.
 

@@ -121,7 +121,8 @@ fi
 .claude/scripts/push_branch.sh "$BRANCH"
 
 # --- Open draft PR ---
-PR_TITLE="[${ISSUE_REF}][${TYPE}] ${CLEAN_TITLE}"
+# Conventional Commits with issue key as scope (ADR-006)
+PR_TITLE="${TYPE}(${ISSUE_REF}): ${CLEAN_TITLE}"
 PR_BODY="Closes #${ISSUE_NUMBER}"
 
 PR_URL=$(gh pr create \
