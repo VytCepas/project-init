@@ -87,6 +87,14 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--devcontainer",
+        action="store_true",
+        help=(
+            "Render .devcontainer/ (base image + toolchain bootstrap) for "
+            "Codespaces, fresh clones, and remote agent sessions"
+        ),
+    )
+    p.add_argument(
         "--non-interactive",
         action="store_true",
         help="Skip all prompts (requires --preset, --name, --description)",
@@ -291,8 +299,8 @@ def _select_preset(
 
 def _gather_inputs_interactive(
     default_name: str,
-) -> tuple[str, str, str, list[dict], str, str]:
-    """Prompt for name, description, language, MCPs, owner, and license."""
+) -> tuple[str, str, str, list[dict], str, str, bool]:
+    """Prompt for name, description, language, MCPs, owner, license, devcontainer."""
     project_name = _prompt("Project name", default=default_name)
     project_description = _prompt("Description", default="")
     language = _prompt("Language (python/node/go/none)", default="none")
@@ -312,7 +320,21 @@ def _gather_inputs_interactive(
     license_choice = _prompt("License (mit/apache-2.0/proprietary/none)", default="none")
     if license_choice not in {"mit", "apache-2.0", "proprietary", "none"}:
         license_choice = "none"
-    return project_name, project_description, language, selected_mcps, owner, license_choice
+
+    from rich.prompt import Confirm
+
+    devcontainer = Confirm.ask(
+        "Add a devcontainer (Codespaces / remote agent sessions)?", default=False
+    )
+    return (
+        project_name,
+        project_description,
+        language,
+        selected_mcps,
+        owner,
+        license_choice,
+        devcontainer,
+    )
 
 
 # Per-language tooling commands (PI-16): (lint, format, test). Empty strings
@@ -397,10 +419,17 @@ def main(argv: list[str] | None = None) -> int:
         language = args.language or "none"
         owner = args.owner
         license_choice = args.license
+        devcontainer = args.devcontainer
     else:
-        project_name, project_description, language, selected_mcps, owner, license_choice = (
-            _gather_inputs_interactive(default_name=target.name)
-        )
+        (
+            project_name,
+            project_description,
+            language,
+            selected_mcps,
+            owner,
+            license_choice,
+            devcontainer,
+        ) = _gather_inputs_interactive(default_name=target.name)
 
     is_lightrag = "lightrag" in preset.get("name", "")
     has_obsidian = "obsidian" in preset.get("layers", [])
@@ -432,6 +461,7 @@ def main(argv: list[str] | None = None) -> int:
         "node": "true" if language == "node" else "",
         "go": "true" if language == "go" else "",
         "justfile": "true" if language != "none" else "",
+        "devcontainer": "true" if devcontainer else "",
         "lightrag": "true" if is_lightrag else "",
         "obsidian": "true" if has_obsidian else "",
         "license_mit": "true" if license_choice == "mit" else "",

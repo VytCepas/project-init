@@ -1,0 +1,29 @@
+{{#if devcontainer}}#!/bin/bash
+# Devcontainer bootstrap (scaffolded by project-init): install the toolchain
+# the scaffolded workflow expects, then sync dependencies through the same
+# path the SessionStart hook uses. Idempotent — safe to re-run.
+set -euo pipefail
+
+mkdir -p "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$PATH"
+
+# just — the canonical command surface (`just --list`)
+if ! command -v just >/dev/null 2>&1; then
+  curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh \
+    | bash -s -- --to "$HOME/.local/bin"
+fi
+{{#if python}}
+# uv — Python toolchain and dependency manager
+if ! command -v uv >/dev/null 2>&1; then
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+{{/if python}}{{#if node}}
+# bun — Node runtime and package manager
+if ! command -v bun >/dev/null 2>&1; then
+  curl -fsSL https://bun.sh/install | bash
+  export PATH="$HOME/.bun/bin:$PATH"
+fi
+{{/if node}}
+# Sync dependencies (stamps the environment so SessionStart stays fast).
+bash .claude/hooks/session_setup.sh
+{{/if devcontainer}}

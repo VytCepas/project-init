@@ -15,8 +15,11 @@ if not _TEMPLATES_DIR.exists():
 
 _DOT_PREFIX = "dot_"
 _VAR_RE = re.compile(r"\{\{(\w+)\}\}")
+# Matches an INNERMOST conditional block — the tempered dot forbids another
+# opener inside the body. _render loops to a fixpoint, so nested
+# {{#if outer}}...{{#if inner}}...{{/if}}...{{/if}} resolves inside-out.
 _BLOCK_RE = re.compile(
-    r"\{\{#if\s+(\w+)\}\}(.*?)\{\{/if(?:\s+\w+)?\}\}",
+    r"\{\{#if\s+(\w+)\}\}((?:(?!\{\{#if\s).)*?)\{\{/if(?:\s+\w+)?\}\}",
     re.DOTALL,
 )
 # Used by strict mode to detect unrendered handlebars-style markers.
@@ -55,13 +58,21 @@ def load_preset(name: str) -> dict:
 
 
 def _render(text: str, variables: dict[str, str]) -> str:
-    """Replace {{var}} placeholders and process {{#if var}}...{{/if var}} blocks."""
-    # Conditionals first.
+    """Replace {{var}} placeholders and process {{#if var}}...{{/if var}} blocks.
+
+    Conditional blocks may nest; each pass substitutes the innermost blocks,
+    looping until no block remains (unclosed markers survive for strict mode
+    to flag).
+    """
     def _replace_block(m: re.Match) -> str:
         key = m.group(1)
         return m.group(2) if variables.get(key) else ""
 
-    text = _BLOCK_RE.sub(_replace_block, text)
+    while True:
+        replaced = _BLOCK_RE.sub(_replace_block, text)
+        if replaced == text:
+            break
+        text = replaced
     # Then simple variable substitution.
     return _VAR_RE.sub(lambda m: variables.get(m.group(1), m.group(0)), text)
 

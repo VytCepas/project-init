@@ -1,0 +1,17 @@
+{{#if devcontainer}}{
+  "name": "{{project_name}}",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+{{#if go}}  "features": {
+    "ghcr.io/devcontainers/features/go:1": {}
+  },
+{{/if go}}  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "remoteEnv": {
+    "PATH": "${containerEnv:HOME}/.local/bin:${containerEnv:HOME}/.bun/bin:${containerEnv:PATH}"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["anthropic.claude-code"]
+    }
+  }
+}
+{{/if devcontainer}}

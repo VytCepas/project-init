@@ -237,6 +237,8 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "lightrag": "true" if "lightrag" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "justfile": "true" if language != "none" else "",
+        # Devcontainer (PI-146) postdates pre-record configs: faithful as off.
+        "devcontainer": "",
         # Governance (PI-145) postdates pre-record configs: those projects
         # were scaffolded without a license or owner, so these are faithful.
         "project_owner": "",
