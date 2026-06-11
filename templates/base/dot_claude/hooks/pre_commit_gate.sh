@@ -60,14 +60,13 @@ if [ "${#STAGED_JS[@]}" -gt 0 ] && command -v bunx &>/dev/null; then
 fi
 
 # PI-139: when the project ships a justfile with a lint recipe and just is
-# installed, the final gate is `just lint` — the single definition of "lint
-# passes" shared with CI and every agent. The per-file auto-fixes above still
-# ran and re-staged. A pre-existing justfile without a lint recipe (or no
-# just on PATH) keeps the per-file checks as the gate.
+# installed, additionally gate on `just lint` — the same definition of "lint
+# passes" CI and every agent use. Per-file findings above are preserved: the
+# recipe is language-specific, so in a mixed repo it may not cover everything
+# the per-file checks caught (a passing recipe must not wash those out).
 if command -v just >/dev/null 2>&1 && [ -f "$ROOT/justfile" ] \
    && (cd "$ROOT" && just --show lint >/dev/null 2>&1); then
-    ERRORS=""
-    JUST_OUT=$(cd "$ROOT" && just lint 2>&1) || ERRORS="Lint errors (just lint):\n${JUST_OUT}\n"
+    JUST_OUT=$(cd "$ROOT" && just lint 2>&1) || ERRORS="${ERRORS}Lint errors (just lint):\n${JUST_OUT}\n"
 fi
 
 if [ -n "$ERRORS" ]; then
