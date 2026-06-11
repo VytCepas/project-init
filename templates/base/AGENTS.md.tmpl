@@ -1,12 +1,46 @@
-# AGENTS.md
+# {{project_name}}
 
-Canonical instructions for this project live in [CLAUDE.md](CLAUDE.md).
+{{project_description}}
 
-Read [CLAUDE.md](CLAUDE.md) before working in this codebase. It is the source of truth for workflow, conventions, memory, tools, and branch naming.
+Canonical instructions for **all** coding agents (and humans pairing with
+them). Claude Code reads [CLAUDE.md](CLAUDE.md), which redirects here.
 
-{{#if lint_command}}Discover project commands with `just --list` — the justfile is the canonical, agent-agnostic command surface (lint, format, test, docs, ci).
-{{/if}}
+## Start here
+
+All agentic-development infrastructure lives under [`.claude/`](.claude/) —
+the directory name is historical; the contents are agent-neutral (bash
+scripts, markdown skills, memory, and docs):
+
+- [`.claude/project-init.md`](.claude/project-init.md) — workflow, conventions, task tracking
+- [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) — memory index (read first for context)
+- [`.claude/docs/`](.claude/docs/) — system of record: ADRs and development guides
+- [`.claude/vault/`](.claude/vault/) — human workspace (Obsidian vault)
 
 ## Skills (load on demand)
 
-Before any GitHub action (create issue, branch, push, PR, merge), check [`.claude/skills/INDEX.md`](.claude/skills/INDEX.md) and load the relevant skill file. Do not read all skills upfront — load only the one that matches what you are about to do.
+Before any GitHub action (create issue, branch, push, PR, merge), check
+[`.claude/skills/INDEX.md`](.claude/skills/INDEX.md) and load the relevant
+skill file. Skills are plain markdown (SKILL.md) — load only the one that
+matches what you are about to do.
+
+> Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
+
+## Key rules for agents
+
+- **TDD** — write failing tests before any implementation.
+- **GitHub Projects** — work is tracked on the GitHub Projects board backed by GitHub Issues. Before starting non-trivial work, create or reference an issue.
+- **GitHub workflow** — for any push, PR, review, or merge action, load `.claude/skills/github_workflow/SKILL.md`. Quick ref: branch = `<type>/<KEY>-<n>-<slug>` | PR title = `type(KEY-N): desc` (no scope = no issue) | body includes `Closes #N`.
+{{#if lint_command}}- **Commands** — the `justfile` is the canonical command surface: `just --list` shows every recipe (`setup`, `lint`, `format`, `test`, `docs`, `ci`). Prefer `just <recipe>` over raw tool invocations so every agent and CI run the same commands.
+- **Lint** — `just lint` must pass before closing a task. The linter config enforces docstrings and complexity caps on project code — fix the code, don't loosen the gate.
+{{/if}}- **Docs** — follow the Diátaxis layout in [`docs/`](docs/) (see `docs/index.md`). Record architectural decisions with the `add_adr` skill.
+- **No secrets in code** — never hardcode API keys, tokens, or personal data. Use `os.environ['KEY']` or a `.env` file (gitignored).
+- **Enforcement is agent-agnostic** — secret scanning (gitleaks) and lifecycle gating run as git hooks plus CI checks (`validate-pr`, `secret-scan`), binding every agent and human alike. Run `.claude/scripts/install_hooks.sh` once per clone to activate them.
+
+## Claude Code specifics
+
+This section applies only when the agent is Claude Code. Other agents get
+no automatic hooks — rely on the git/CI enforcement above.
+
+- Hooks in `.claude/settings.json` fire automatically: `pre_commit_gate` (lint gate on commit), `github_command_guard` (steers toward lifecycle scripts), `post_edit_lint`, `workflow_state_reminder`.
+- Skills are auto-discovered and invocable as `/command`s.
+- Review plugins: `pr-review-toolkit@claude-plugins-official` is pre-enabled in `.claude/settings.json`; also consider `/plugin install code-review@claude-plugins-official` for full PR reviews.

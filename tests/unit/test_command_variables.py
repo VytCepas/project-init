@@ -18,9 +18,9 @@ class TestCommandVariables:
 
     def test_python_renders_uv_run_ruff(self, tmp_path: Path):
         target = self._scaffold_with_lang(tmp_path)
-        # PI-139: CLAUDE.md points at the justfile recipe — the raw command
-        # lives in exactly one place, the justfile itself.
-        content = (target / "CLAUDE.md").read_text()
+        # PI-139/PI-136: AGENTS.md (canonical) points at the justfile recipe —
+        # the raw command lives in exactly one place, the justfile itself.
+        content = (target / "AGENTS.md").read_text()
         assert "just lint" in content
         assert "uv run ruff check ." in (target / "justfile").read_text()
         config = (target / ".claude" / "config.yaml").read_text()
@@ -53,9 +53,9 @@ class TestCommandVariables:
             format_command="",
             test_command="",
         )
-        claude = (target / "CLAUDE.md").read_text()
+        agents = (target / "AGENTS.md").read_text()
         # Must not render the lint bullet at all
-        assert "must pass before closing a task" not in claude
+        assert "must pass before closing a task" not in agents
 
     def test_no_legacy_python_linter_variable(self, tmp_path: Path):
         """The old {{python_linter}} placeholder must be gone everywhere."""

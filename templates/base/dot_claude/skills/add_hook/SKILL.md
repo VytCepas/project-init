@@ -6,6 +6,10 @@ argument-hint: "<hook-name> <event> <description>"
 allowed-tools: Read Write Bash
 ---
 
+> **Claude Code specific**: this skill manages Claude Code configuration
+> (settings.json wiring). Other agents do not consume what it produces.
+
+
 ## Step 1 — Choose an event
 
 Pick the event that matches when the hook should fire:

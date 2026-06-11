@@ -197,8 +197,8 @@ class TestQualityPlugins:
         settings = json.loads((target / ".claude" / "settings.json").read_text())
         assert settings["enabledPlugins"]["pr-review-toolkit@claude-plugins-official"] is True
 
-    def test_claude_md_recommends_review_plugins(self, tmp_target: Path):
+    def test_agents_md_recommends_review_plugins(self, tmp_target: Path):
         target = _scaffold_language(tmp_target, "python")
-        content = (target / "CLAUDE.md").read_text()
+        content = (target / "AGENTS.md").read_text()
         assert "pr-review-toolkit" in content
         assert "code-review@claude-plugins-official" in content
