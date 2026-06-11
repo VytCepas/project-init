@@ -59,6 +59,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Add Playwright browser-automation MCP",
     )
     p.add_argument(
+        "--llm-model",
+        default="claude-sonnet-4-6",
+        help="Anthropic model for lightrag.yaml (llm.provider is anthropic; LightRAG presets)",
+    )
+    p.add_argument(
+        "--embedding-model",
+        default="text-embedding-3-small",
+        help="OpenAI embedding model for lightrag.yaml (embedding.provider is openai)",
+    )
+    p.add_argument(
         "--non-interactive",
         action="store_true",
         help="Skip all prompts (requires --preset, --name, --description)",
@@ -349,6 +359,9 @@ def main(argv: list[str] | None = None) -> int:
         "go": "true" if is_go else "",
         "lightrag": "true" if is_lightrag else "",
         "obsidian": "true" if has_obsidian else "",
+        # LightRAG model selection (PI-132) — rendered into lightrag.yaml
+        "llm_model": args.llm_model,
+        "embedding_model": args.embedding_model,
     }
 
     try:

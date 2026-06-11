@@ -54,6 +54,8 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "go": "",
         "lightrag": "",
         "obsidian": "true",
+        "llm_model": "claude-sonnet-4-6",
+        "embedding_model": "text-embedding-3-small",
     }
     defaults.update(overrides)
     return defaults
