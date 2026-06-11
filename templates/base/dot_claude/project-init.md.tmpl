@@ -132,7 +132,7 @@ When CI fails, GitHub posts a comment on the PR. Read it, fix the code, push:
 ```bash
 gh run view --log-failed   # full failure output
 # fix the code
-git add … && git commit -m "fix(KEY-n): Fix failing tests"
+git add … && git commit -m "fix(<KEY>-<n>): Fix failing tests"
 .claude/scripts/push_branch.sh
 .claude/scripts/monitor_pr.sh <n> --merge   # wait and merge when clean
 ```

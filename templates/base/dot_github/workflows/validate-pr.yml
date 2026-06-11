@@ -38,8 +38,13 @@ jobs:
             exit 1
           fi
 
-          # No-issue PRs: legacy [nojira] prefix, or conventional title without a scope
+          # No-issue PRs: legacy [nojira] prefix, or conventional title without a scope.
+          # An issue-linked branch must not bypass branch/key/label checks via a scopeless title.
           if echo "$PR_TITLE" | grep -qE '^\[nojira\]|^(feat|fix|chore|docs|test)!?: '; then
+            if echo "$PR_BRANCH" | grep -qE '^(feat|fix|chore|docs|test)/[A-Z][A-Z0-9]{1,9}-[0-9]+-'; then
+              echo "ERROR: branch $PR_BRANCH is issue-linked - title must carry the issue key as scope, e.g. type(KEY-N): description"
+              exit 1
+            fi
             echo "no-issue PR - skipping Closes keyword check"
             exit 0
           fi
