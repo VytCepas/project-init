@@ -65,7 +65,8 @@ class TestPortableReferencesResolve:
     def test_referenced_paths_exist_in_scaffold(self, target: Path):
         """Every relative path AGENTS.md links or names must exist."""
         content = (target / "AGENTS.md").read_text()
-        referenced = set(re.findall(r"\]\((\.claude/[^)#]+|docs/[^)#]+|CLAUDE\.md)\)", content))
+        # * not +: bare directory links like (.claude/) must be checked too.
+        referenced = set(re.findall(r"\]\((\.claude/[^)#]*|docs/[^)#]*|CLAUDE\.md)\)", content))
         referenced |= set(re.findall(r"`(\.claude/(?:skills|scripts)/[\w./-]+)`", content))
         assert referenced, "expected path references in AGENTS.md"
         for rel in referenced:
