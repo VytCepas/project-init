@@ -49,10 +49,18 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "python": "true",
         "node": "",
         "go": "",
+        "justfile": "true",
         "lightrag": "",
         "obsidian": "true",
         "llm_model": "claude-sonnet-4-6",
         "embedding_model": "text-embedding-3-small",
+        "project_owner": "",
+        "license": "none",
+        "license_holder": "my-project",
+        "license_mit": "",
+        "license_apache": "",
+        "license_proprietary": "",
+        "created_year": "2026",
     }
     defaults.update(overrides)
     return defaults

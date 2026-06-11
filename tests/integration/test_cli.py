@@ -41,6 +41,48 @@ class TestCLI:
             main(["--non-interactive"])
 
 
+class TestCLIGovernanceFlags:
+    """PI-145: --license and --owner render governance files."""
+
+    def _run(self, target: Path, *extra: str) -> int:
+        from project_init.__main__ import main
+
+        return main([
+            str(target),
+            "--non-interactive",
+            "--preset", "obsidian-only",
+            "--name", "gov-cli",
+            "--description", "test",
+            "--language", "python",
+            *extra,
+        ])
+
+    def test_license_and_owner_render(self, tmp_path: Path):
+        from datetime import date
+
+        target = tmp_path / "p"
+        assert self._run(target, "--license", "mit", "--owner", "@acme/core") == 0
+        license_text = (target / "LICENSE").read_text()
+        assert "MIT License" in license_text
+        assert f"{date.today().year} @acme/core" in license_text
+        assert "*       @acme/core" in (target / ".github" / "CODEOWNERS").read_text()
+
+    def test_no_license_flag_renders_no_file(self, tmp_path: Path):
+        target = tmp_path / "p"
+        assert self._run(target) == 0
+        assert not (target / "LICENSE").exists()
+        assert (target / "CONTRIBUTING.md").exists()
+
+    def test_invalid_license_is_rejected(self, tmp_path: Path):
+        with pytest.raises(SystemExit):
+            self._run(tmp_path / "p", "--license", "gpl-3.0")
+
+    def test_license_holder_falls_back_to_project_name(self, tmp_path: Path):
+        target = tmp_path / "p"
+        assert self._run(target, "--license", "proprietary") == 0
+        assert "gov-cli. All rights reserved." in (target / "LICENSE").read_text()
+
+
 class TestCLINonInteractiveCommandVariables:
     """PI-16: CLI passes correct command variables based on --language."""
 

@@ -26,7 +26,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Command | `/request_review` | mark PR ready for review, optional agent review |
 | Script | `create_issue.sh <type> "desc"` | create typed issue, prints issue number |
 | Script | `create_nojira_pr.sh <type> "desc"` | branch + push + draft PR without an issue |
-| Script | `setup_github.sh [branch]` | configure branch protection and review governance |
+| Script | `setup_github.sh [branch] [--protect]` | provision board fields and review settings; `--protect` applies baseline branch protection |
 | Script | `start_issue.sh <n> <type>` | branch + draft PR |
 | Script | `promote_review.sh` | mark PR ready (board card moves automatically) |
 | Script | `monitor_pr.sh <n> [--merge]` | wait for CI; --merge squash-merges when clean |
@@ -94,7 +94,7 @@ Without GitHub-native auto-merge, `monitor_pr.sh --merge` still works by merging
 Run the scaffolded setup helper after creating the repository:
 
 ```bash
-.claude/scripts/setup_github.sh
+.claude/scripts/setup_github.sh --protect
 ```
 
 It attempts to configure branch protection, required checks, conversation resolution, and Copilot code review. If GitHub does not expose a setting through the API or your token lacks permission, it prints the manual setup step.
@@ -149,7 +149,7 @@ git add … && git commit -m "fix(<KEY>-<n>): Fix failing tests"
 .claude/scripts/create_issue.sh <type> "description" --priority high --area docs --size S --acceptance "Done when ..."  # new issue → prints issue number
 .claude/scripts/start_issue.sh <n> <type>             # branch + draft PR
 .claude/scripts/create_nojira_pr.sh fix "description" # no-issue branch + draft PR
-.claude/scripts/setup_github.sh                       # one-time branch protection/review setup
+.claude/scripts/setup_github.sh --protect            # one-time governance setup + branch protection
 .claude/scripts/promote_review.sh                     # mark PR ready for review
 .claude/scripts/monitor_pr.sh <n> --merge             # wait for CI, merge when clean
 .claude/scripts/finish_pr.sh <n>                      # push, ready, monitor, merge

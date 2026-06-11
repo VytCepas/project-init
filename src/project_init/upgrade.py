@@ -236,6 +236,16 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "test_command": fields.get("tooling.test_command", ""),
         "lightrag": "true" if "lightrag" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
+        "justfile": "true" if language != "none" else "",
+        # Governance (PI-145) postdates pre-record configs: those projects
+        # were scaffolded without a license or owner, so these are faithful.
+        "project_owner": "",
+        "license": "none",
+        "license_holder": fields.get("project.name", ""),
+        "license_mit": "",
+        "license_apache": "",
+        "license_proprietary": "",
+        "created_year": fields.get("project.created", "").split("-")[0],
         **_MIGRATION_DEFAULTS,
     }
     for flag in _LANGUAGE_FLAGS:
