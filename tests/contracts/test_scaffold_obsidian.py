@@ -108,10 +108,12 @@ class TestScaffoldObsidianOnly:
         assert "mapfile -t STAGED_JS" in content
         assert '"${STAGED_JS[@]}"' in content
 
-    def test_bash_safety_guard_hook_exists(self):
-        hook = self.target / ".claude" / "hooks" / "bash_safety_guard.sh"
-        assert hook.is_file()
-        assert hook.stat().st_mode & 0o111
+    def test_legacy_safety_hooks_not_scaffolded(self):
+        """ADR-007: secret-guard.py / bash_safety_guard.sh replaced by
+        the security-guidance plugin and git-level enforcement."""
+        hooks = self.target / ".claude" / "hooks"
+        assert not (hooks / "bash_safety_guard.sh").exists()
+        assert not (hooks / "secret-guard.py").exists()
 
     def test_post_edit_lint_outputs_additional_context(self):
         content = (self.target / ".claude" / "hooks" / "post_edit_lint.sh").read_text()

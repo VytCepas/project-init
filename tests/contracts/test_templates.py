@@ -238,14 +238,15 @@ class TestScaffoldGitHubFiles:
         assert "skipping Closes keyword check" in content
 
     def test_pre_push_hook_created(self):
-        """Pre-push hook prevents direct commits to main/master."""
+        """Pre-push hook blocks main/master pushes and gates branch naming (ADR-007)."""
         hook_path = self.target / ".github" / "hooks" / "pre-push"
         assert hook_path.is_file()
         content = hook_path.read_text()
-        # Verify the hook prevents pushing to main
-        assert "refs/heads/main" in content or "refs/heads/master" in content
+        assert '"main"' in content and '"master"' in content
         assert "ERROR" in content or "not allowed" in content
         assert "<issue_type>/<project_abbr>-<issue_number>-<slug>" in content
+        # Branch gate uses the same rule as dag_workflow.py's _BRANCH_RE
+        assert "(feat|fix|chore|docs|test)/" in content
 
     def test_commit_msg_hook_created(self):
         hook = self.target / ".github" / "hooks" / "commit-msg"

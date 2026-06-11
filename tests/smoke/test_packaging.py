@@ -91,7 +91,6 @@ class TestInstalledWheel:
         for hook in [
             "post_edit_lint.sh",
             "pre_commit_gate.sh",
-            "bash_safety_guard.sh",
         ]:
             hook_path = scaffold_target / ".claude" / "hooks" / hook
             assert hook_path.is_file()

@@ -41,5 +41,15 @@ for hook_file in "$GIT_HOOKS_SRC"/*; do
   fi
 done
 
+# The pre-commit hook scans staged changes with gitleaks (ADR-007).
+# It fails open when gitleaks is missing — CI is the hard backstop — but
+# local feedback is much faster, so nudge here.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo ""
+  echo "NOTE: gitleaks is not installed — the pre-commit secret scan will be"
+  echo "skipped locally (CI still scans). Install it for fast local feedback:"
+  echo "  https://github.com/gitleaks/gitleaks#installing"
+fi
+
 echo "To reinstall hooks after pulling changes, run:"
 echo "  .claude/scripts/install_hooks.sh"

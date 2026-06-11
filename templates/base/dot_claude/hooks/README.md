@@ -4,6 +4,11 @@ Session hooks — deterministic bash or python scripts. The `settings.json` at `
 
 Keep hooks fast, idempotent, and non-interactive.
 
+These hooks are fast-feedback UX for Claude Code sessions — they are not the
+security boundary. Secret scanning (gitleaks) and lifecycle gating run as git
+hooks installed by `.claude/scripts/install_hooks.sh`, with CI as the
+backstop, so they bind every agent and every human (ADR-007).
+
 ## Hook Executability Convention
 
 - **Shell hooks** (`.sh` files): Must have the executable bit (`+x`). They run directly via `bash path/to/hook.sh`.

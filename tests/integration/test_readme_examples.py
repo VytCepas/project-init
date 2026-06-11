@@ -62,4 +62,4 @@ class TestREADMEExampleCommand:
         # Verify hook executable bits
         assert (target / ".claude" / "hooks" / "post_edit_lint.sh").is_file()
         assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
-        assert (target / ".claude" / "hooks" / "bash_safety_guard.sh").is_file()
+        assert (target / ".github" / "hooks" / "pre-commit").is_file()

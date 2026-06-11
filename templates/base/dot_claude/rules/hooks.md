@@ -10,16 +10,19 @@ All hooks fire automatically — do not invoke them manually in normal flow.
 
 | Hook | Event | Trigger |
 |---|---|---|
-| `secret-guard.py` | PreToolUse | any Write / Edit / Bash |
-| `bash_safety_guard.sh` | PreToolUse | Bash |
 | `github_command_guard.sh` | PreToolUse | Bash — steers agents toward lifecycle scripts |
 | `pre_commit_gate.sh` | PreToolUse | Bash containing `git commit` |
 | `post_edit_lint.sh` | PostToolUse | Edit / Write / MultiEdit |
 | `workflow_state_reminder.sh` | UserPromptSubmit | injects workflow lifecycle context |
 
+Security enforcement is agent-agnostic (ADR-007), not a Claude hook:
+secret scanning runs as a git pre-commit hook (gitleaks) plus a CI
+`secret-scan` job; lifecycle gating runs as git `commit-msg`/`pre-push`
+hooks plus the `validate-pr` workflow. Claude-side security guidance comes
+from the `security-guidance` plugin enabled in `settings.json`.
+
 **Manual invocation** (debugging or one-off runs only):
 ```bash
-python3 .claude/hooks/secret-guard.py    # test secret detection
 bash .claude/hooks/pre_commit_gate.sh    # run lint gate manually
 bash .claude/hooks/post_edit_lint.sh     # run lint on last edited file
 ```
