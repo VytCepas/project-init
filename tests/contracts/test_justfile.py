@@ -102,6 +102,9 @@ class TestRecipesAreTheSingleCallsite:
         hook = (target / ".claude" / "hooks" / "pre_commit_gate.sh").read_text()
         assert "just lint" in hook
         assert "command -v just" in hook, "must fall back when just is not installed"
+        assert "just --show lint" in hook, (
+            "must fall back when a pre-existing justfile has no lint recipe"
+        )
 
     def test_instruction_files_reference_just_list(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")
