@@ -103,6 +103,28 @@ class TestColdAndWarmStart:
         calls = (tmp_path / "just-calls.log").read_text().splitlines()
         assert calls == ["setup", "setup"]
 
+    def test_nothing_to_bootstrap_stays_silent(self, tmp_path: Path):
+        """No manifest and no tools: no misleading 'synced' message, but the
+        environment is stamped so later sessions skip the probe (PR #162
+        review)."""
+        target = tmp_path / "p"
+        scaffold(
+            target,
+            load_preset("obsidian-only"),
+            make_variables(
+                language="none", python="", justfile="",
+                lint_command="", format_command="", test_command="",
+            ),
+            strict=True,
+        )
+        empty_bin = tmp_path / "empty-bin"
+        empty_bin.mkdir()
+
+        result = _run_hook(target, empty_bin)
+        assert result.returncode == 0
+        assert result.stdout == "", "must not claim a sync that never ran"
+        assert (target / _STAMP).exists()
+
     def test_failed_bootstrap_does_not_break_session(self, tmp_path: Path):
         target = _scaffold_python(tmp_path / "p")
         bin_dir = _make_shim_bin(tmp_path, target)

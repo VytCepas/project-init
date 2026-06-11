@@ -40,14 +40,23 @@ bootstrap() {
   elif [ -f go.mod ] && command -v go >/dev/null 2>&1; then
     go mod download
   else
-    return 0 # nothing recognized to set up — stay silent
+    return 2 # nothing recognized to set up
   fi
 }
 
-if bootstrap >"$LOG" 2>&1; then
+bootstrap >"$LOG" 2>&1
+case $? in
+0)
   echo "$CURRENT" >"$STAMP"
   echo "session_setup: dependencies synced for fresh environment"
-else
+  ;;
+2)
+  # No manifest/tool to bootstrap: stamp silently so later sessions skip
+  # the probe, but claim nothing — no sync happened.
+  echo "$CURRENT" >"$STAMP"
+  ;;
+*)
   echo "session_setup: bootstrap failed — see $LOG" >&2
-fi
+  ;;
+esac
 exit 0
