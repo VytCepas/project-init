@@ -57,12 +57,12 @@ class TestLightRAGModelVariables:
             memory_stack="obsidian-lightrag",
             lightrag="true",
             llm_model="claude-opus-4-8",
-            embedding_model="nomic-embed-text",
+            embedding_model="text-embedding-3-large",
         )
         scaffold(tmp_target, preset, variables, strict=True)
         content = (tmp_target / ".claude" / "memory" / "lightrag.yaml").read_text()
         assert "model: claude-opus-4-8" in content
-        assert "model: nomic-embed-text" in content
+        assert "model: text-embedding-3-large" in content
         assert "claude-sonnet-4-6" not in content
 
     def test_template_has_no_hardcoded_model(self):

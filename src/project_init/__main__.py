@@ -61,12 +61,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--llm-model",
         default="claude-sonnet-4-6",
-        help="LLM model written to .claude/memory/lightrag.yaml (LightRAG presets)",
+        help="Anthropic model for lightrag.yaml (llm.provider is anthropic; LightRAG presets)",
     )
     p.add_argument(
         "--embedding-model",
         default="text-embedding-3-small",
-        help="Embedding model written to .claude/memory/lightrag.yaml (LightRAG presets)",
+        help="OpenAI embedding model for lightrag.yaml (embedding.provider is openai)",
     )
     p.add_argument(
         "--non-interactive",

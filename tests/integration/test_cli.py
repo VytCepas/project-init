@@ -102,10 +102,10 @@ class TestLLMModelFlags:
             "--description", "testing cli",
             "--language", "python",
             "--llm-model", "claude-opus-4-8",
-            "--embedding-model", "nomic-embed-text",
+            "--embedding-model", "text-embedding-3-large",
             "--strict",
         ])
         assert rc == 0
         content = (tmp_target / ".claude" / "memory" / "lightrag.yaml").read_text()
         assert "model: claude-opus-4-8" in content
-        assert "model: nomic-embed-text" in content
+        assert "model: text-embedding-3-large" in content
