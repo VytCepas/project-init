@@ -13,6 +13,28 @@ automatically. Install [gitleaks](https://github.com/gitleaks/gitleaks#installin
 for fast local secret scanning; without it the pre-commit scan is skipped
 and CI catches leaks instead.
 
+## Dependency updates (Renovate)
+
+The repo ships a `renovate.json` (weekly grouped updates, GitHub Actions
+pinned by digest, lockfile maintenance — managers activate automatically
+from the files present). Renovate PRs arrive as `chore: Update …`, the
+canonical no-issue title format the PR validators accept. One per-org
+step: install the [Renovate GitHub App](https://github.com/apps/renovate)
+on the repository.
+
+To centralize policy across an organization, replace the `extends` list
+with a shared preset. Keep the PR-title settings unless the org preset
+provides them — Renovate's defaults (`chore(deps): …`) fail this repo's
+PR-title validator:
+
+```json
+{
+  "extends": ["github>your-org/renovate-config"],
+  "semanticCommits": "disabled",
+  "commitMessagePrefix": "chore:"
+}
+```
+
 ## Global gitignore
 
 Keep OS and editor junk out of every repo you touch, without bloating each
