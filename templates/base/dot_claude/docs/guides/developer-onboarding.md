@@ -5,8 +5,10 @@ deliberately does not manage: global git configuration and editor sync are
 personal, not repository state, so they are documented here instead of being
 scaffolded (see the project-init decision in PI-140).
 
-Everything repo-level (hooks, linting, commands, env examples) is already in
-the repository — you do not need to configure any of that by hand.
+Everything repo-level (linting, commands, env examples) ships with the
+repository. The one per-clone step: run `.claude/scripts/install_hooks.sh`
+once to activate the `commit-msg` and `pre-push` git hooks — git does not
+enable repository hooks automatically.
 
 ## Global gitignore
 
