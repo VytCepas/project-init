@@ -37,8 +37,19 @@ jobs:
       # Optimization #1: Run tests in parallel mode
       # Requires pytest-xdist in dev dependencies
       # Can reduce test time by 30-50% on multi-core machines
-      - name: Tests (pytest) — parallel
-        run: uv run pytest -n auto --tb=short -q
+      #
+      # Coverage gate (PI-138): activates automatically once pytest-cov is in
+      # dev dependencies; runs plain pytest until then. Tune --cov-fail-under
+      # to your project's baseline.
+      - name: Tests (pytest) — parallel, coverage-gated
+        run: |
+          if uv run python -c "import pytest_cov" 2>/dev/null; then
+            uv run pytest -n auto --tb=short -q --cov --cov-fail-under=70
+          else
+            echo "pytest-cov not installed — running without the coverage gate."
+            echo "Add pytest-cov to dev dependencies to enable it."
+            uv run pytest -n auto --tb=short -q
+          fi
 {{/if python}}
 {{#if node}}
       - name: Install Bun
@@ -46,8 +57,14 @@ jobs:
         with:
           bun-version: latest
 
+      # Fresh scaffolds have no lockfile yet — fall back to a plain install.
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: |
+          if [ -f bun.lock ] || [ -f bun.lockb ]; then
+            bun install --frozen-lockfile
+          else
+            bun install
+          fi
 
       - name: Lint
         run: {{lint_command}}
@@ -126,6 +143,24 @@ jobs:
             echo "No integration tests directory found (tests/integration/)"
             echo "Create tests/integration/ when you have integration tests to run"
           fi
+
+  # Test-quality verification via mutation testing (PI-138). Mutmut is slow,
+  # so it runs nightly, not per-PR. Uncomment to enable; requires mutmut in
+  # dev dependencies and a [tool.mutmut] section in pyproject.toml.
+  # mutation-tests:
+  #   name: Mutation tests (mutmut)
+  #   runs-on: ubuntu-24.04
+  #   if: github.event_name == 'schedule'
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     - uses: astral-sh/setup-uv@v8.1.0
+  #       with:
+  #         version: "0.11.7"
+  #     - run: uv sync --extra dev
+  #     - run: uv run mutmut run
+  # (also add to the top-level `on:` block:)
+  #   schedule:
+  #     - cron: "0 3 * * *"
 {{/if python}}
 
   # ADR-007: agent-agnostic secret-scanning backstop. The pre-commit git hook

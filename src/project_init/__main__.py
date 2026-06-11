@@ -241,22 +241,70 @@ def _print_mcp_commands(selected: list[dict]) -> None:
     console.print()
 
 
+def _require_non_interactive_args(
+    args: argparse.Namespace, parser: argparse.ArgumentParser
+) -> None:
+    """Fail fast when --non-interactive is missing one of its required flags."""
+    missing = []
+    if not args.preset:
+        missing.append("--preset")
+    if not args.name:
+        missing.append("--name")
+    if not args.description:
+        missing.append("--description")
+    if missing:
+        parser.error(f"--non-interactive requires: {', '.join(missing)}")
+
+
+def _select_preset(
+    args: argparse.Namespace, parser: argparse.ArgumentParser, presets: list[dict]
+) -> dict:
+    """Resolve the preset from flags or interactive choice (exits on bad --preset)."""
+    if args.preset:
+        try:
+            return load_preset(args.preset)
+        except ValueError as e:
+            parser.error(str(e))
+    if args.non_interactive:
+        return presets[0]
+    return _choose_preset_interactive(presets)
+
+
+def _gather_inputs_interactive(default_name: str) -> tuple[str, str, str, list[dict]]:
+    """Prompt for name, description, language, and MCP selection."""
+    project_name = _prompt("Project name", default=default_name)
+    project_description = _prompt("Description", default="")
+    language = _prompt("Language (python/node/go/none)", default="none")
+    if language not in {"python", "node", "go", "none"}:
+        language = "none"
+
+    # MCP selection — three steps.
+    selected_mcps = _choose_mcps_interactive(MCP_CATALOG)
+    db_mcp = _choose_db_interactive()
+    if db_mcp:
+        selected_mcps = selected_mcps + [db_mcp]
+    if _choose_browser_interactive():
+        selected_mcps = selected_mcps + [PLAYWRIGHT_MCP]
+    return project_name, project_description, language, selected_mcps
+
+
+# Per-language tooling commands (PI-16): (lint, format, test). Empty strings
+# when no convention applies — templates should wrap usages in
+# {{#if python}}/{{#if node}}/etc.
+_LANGUAGE_COMMANDS: dict[str, tuple[str, str, str]] = {
+    "python": ("uv run ruff check .", "uv run ruff format .", "uv run pytest"),
+    "node": ("bun run lint", "bun run format", "bun test"),
+    "go": ("golangci-lint run", "gofmt -w .", "go test ./..."),
+}
+
+
 def main(argv: list[str] | None = None) -> int:
+    """Run the scaffolding CLI; return the process exit code."""
     parser = _build_parser()
     args = parser.parse_args(argv)
 
     if args.non_interactive:
-        missing = []
-        if not args.preset:
-            missing.append("--preset")
-        if not args.name:
-            missing.append("--name")
-        if not args.description:
-            missing.append("--description")
-        if missing:
-            parser.error(
-                f"--non-interactive requires: {', '.join(missing)}"
-            )
+        _require_non_interactive_args(args, parser)
 
     target = Path(args.target).resolve()
 
@@ -266,16 +314,7 @@ def main(argv: list[str] | None = None) -> int:
     if not presets:
         sys.stderr.write("error: no presets found in templates/presets/\n")
         return 1
-
-    if args.preset:
-        try:
-            preset = load_preset(args.preset)
-        except ValueError as e:
-            parser.error(str(e))
-    elif args.non_interactive:
-        preset = presets[0]
-    else:
-        preset = _choose_preset_interactive(presets)
+    preset = _select_preset(args, parser, presets)
 
     # Validate non-interactive args BEFORE creating the target directory.
     # PI-20: MCP validation must happen before mkdir so an invalid --mcps
@@ -291,54 +330,20 @@ def main(argv: list[str] | None = None) -> int:
 
     target.mkdir(parents=True, exist_ok=True)
 
-    # Gather variables.
-    default_name = target.name
     if args.non_interactive:
         project_name = args.name
         project_description = args.description
         language = args.language or "none"
     else:
-        project_name = _prompt("Project name", default=default_name)
-        project_description = _prompt("Description", default="")
-        language = _prompt("Language (python/node/go/none)", default="none")
-        if language not in {"python", "node", "go", "none"}:
-            language = "none"
+        project_name, project_description, language, selected_mcps = (
+            _gather_inputs_interactive(default_name=target.name)
+        )
 
-        # MCP selection — three steps.
-        core_mcps = _choose_mcps_interactive(MCP_CATALOG)
-        db_mcp = _choose_db_interactive()
-        want_browser = _choose_browser_interactive()
-
-        selected_mcps = core_mcps
-        if db_mcp:
-            selected_mcps = selected_mcps + [db_mcp]
-        if want_browser:
-            selected_mcps = selected_mcps + [PLAYWRIGHT_MCP]
-
-    is_python = language == "python"
-    is_node = language == "node"
-    is_go = language == "go"
     is_lightrag = "lightrag" in preset.get("name", "")
     has_obsidian = "obsidian" in preset.get("layers", [])
-
-    # Per-language tooling commands (PI-16). Empty string when no convention
-    # applies — templates should wrap usages in {{#if python}}/{{#if node}}/etc.
-    if is_python:
-        lint_command = "uv run ruff check ."
-        format_command = "uv run ruff format ."
-        test_command = "uv run pytest"
-    elif is_node:
-        lint_command = "bun run lint"
-        format_command = "bun run format"
-        test_command = "bun test"
-    elif is_go:
-        lint_command = "golangci-lint run"
-        format_command = "gofmt -w ."
-        test_command = "go test ./..."
-    else:
-        lint_command = ""
-        format_command = ""
-        test_command = ""
+    lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(
+        language, ("", "", "")
+    )
 
     variables: dict[str, str] = {
         "project_name": project_name,
@@ -354,9 +359,9 @@ def main(argv: list[str] | None = None) -> int:
         "format_command": format_command,
         "test_command": test_command,
         # Conditional block flags (truthy/falsy strings).
-        "python": "true" if is_python else "",
-        "node": "true" if is_node else "",
-        "go": "true" if is_go else "",
+        "python": "true" if language == "python" else "",
+        "node": "true" if language == "node" else "",
+        "go": "true" if language == "go" else "",
         "lightrag": "true" if is_lightrag else "",
         "obsidian": "true" if has_obsidian else "",
         # LightRAG model selection (PI-132) — rendered into lightrag.yaml

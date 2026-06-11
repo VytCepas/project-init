@@ -156,6 +156,7 @@ from the official `security-guidance` plugin, enabled in `settings.json`.
 | `/session_summary` | Save session note and update memory |
 | `/github_workflow` | Load PR lifecycle instructions |
 | `/add_hook` | Add a new hook to `settings.json` |
+| `/add_adr` | Record an architectural decision (MADR template) |
 | `/add_command` | Create a new slash command |
 | `/audit` | Review for security and quality issues |
 

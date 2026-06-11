@@ -13,6 +13,7 @@ Load the relevant skill file when the trigger applies. Do not load all skills at
 | Show project status and open items | `.claude/skills/status/SKILL.md` |
 | Summarize the session | `.claude/skills/session_summary/SKILL.md` |
 | Save something to project memory | `.claude/skills/save_memory/SKILL.md` |
+| Record an architectural decision (ADR) | `.claude/skills/add_adr/SKILL.md` |
 | Add a hook | `.claude/skills/add_hook/SKILL.md` |
 | Add a slash command | `.claude/skills/add_command/SKILL.md` |
 | Audit project health | `.claude/skills/audit/SKILL.md` |

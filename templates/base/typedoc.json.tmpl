@@ -1,0 +1,14 @@
+{{#if node}}{
+  // typedoc.json — API documentation (scaffolded by project-init).
+  // TypeDoc accepts JSONC. Local build:  bunx typedoc
+  // Published to GitHub Pages by .github/workflows/docs.yml on push to main.
+  "entryPoints": ["src/index.ts"],
+  "out": "_site",
+  "excludePrivate": true,
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": true
+  }
+}
+{{/if node}}

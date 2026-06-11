@@ -398,3 +398,46 @@ class TestScaffoldedTemplate:
             for h in entry.get("hooks", []):
                 commands.append(h.get("command", ""))
         assert any("github_command_guard.sh" in c for c in commands)
+
+
+class TestPushForceWithLease:
+    """push --force-with-lease: needed after rebases forced by squash-merges."""
+
+    def test_refuses_force_on_main(self, dag):
+        assert dag.cmd_push("main", 0, force=True) == 1
+        assert dag.cmd_push("master", 0, force=True) == 1
+
+    def test_force_with_lease_pushes_rebased_branch(self, tmp_path: Path):
+        remote = tmp_path / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+        work = tmp_path / "work"
+        work.mkdir()
+        env_git = ["git", "-C", str(work)]
+        subprocess.run([*env_git, "init", "-q", "-b", "feat/x"], check=True)
+        subprocess.run([*env_git, "config", "user.email", "t@t"], check=True)
+        subprocess.run([*env_git, "config", "user.name", "t"], check=True)
+        subprocess.run([*env_git, "remote", "add", "origin", str(remote)], check=True)
+        (work / "a.txt").write_text("one\n")
+        subprocess.run([*env_git, "add", "."], check=True)
+        subprocess.run([*env_git, "commit", "-q", "-m", "feat: one"], check=True)
+
+        proc = subprocess.run(
+            [sys.executable, str(SOURCE_HOOK), "push", "feat/x", "0"],
+            cwd=work, capture_output=True, text=True,
+        )
+        assert proc.returncode == 0, proc.stderr
+
+        # Rewrite history (amend) — a plain push must now fail...
+        subprocess.run([*env_git, "commit", "-q", "--amend", "-m", "feat: one v2"], check=True)
+        proc = subprocess.run(
+            [sys.executable, str(SOURCE_HOOK), "push", "feat/x", "0"],
+            cwd=work, capture_output=True, text=True,
+        )
+        assert proc.returncode == 1
+
+        # ...and --force-with-lease must succeed.
+        proc = subprocess.run(
+            [sys.executable, str(SOURCE_HOOK), "push", "feat/x", "0", "--force-with-lease"],
+            cwd=work, capture_output=True, text=True,
+        )
+        assert proc.returncode == 0, proc.stderr
