@@ -51,6 +51,8 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "go": "",
         "justfile": "true",
         "devcontainer": "",
+        "mise": "",
+        "vscode": "",
         "lightrag": "",
         "obsidian": "true",
         "llm_model": "claude-sonnet-4-6",

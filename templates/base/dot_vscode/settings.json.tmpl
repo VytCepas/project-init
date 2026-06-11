@@ -1,0 +1,8 @@
+{{#if vscode}}{
+  "editor.formatOnSave": true{{#if python}},
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  }{{/if python}}{{#if go}},
+  "go.formatTool": "gofmt"{{/if go}}
+}
+{{/if vscode}}

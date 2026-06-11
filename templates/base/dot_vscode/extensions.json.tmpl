@@ -1,0 +1,10 @@
+{{#if vscode}}{
+  "recommendations": [
+    "anthropic.claude-code"{{#if python}},
+    "charliermarsh.ruff"{{/if python}}{{#if node}},
+    "oven.bun-vscode"{{/if node}}{{#if go}},
+    "golang.go"{{/if go}}{{#if justfile}},
+    "nefrob.vscode-just-syntax"{{/if justfile}}
+  ]
+}
+{{/if vscode}}
