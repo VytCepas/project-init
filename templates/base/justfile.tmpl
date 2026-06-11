@@ -1,0 +1,95 @@
+{{#if python}}# justfile — the canonical command interface (scaffolded by project-init).
+# `just --list` shows every recipe. Recipes are thin wrappers — logic lives
+# in the tools and their configs, never in this file.
+
+# install/sync dev dependencies
+setup:
+    uv sync --extra dev
+
+# lint project code (docstring + complexity gates per ruff.toml)
+lint:
+    uv run ruff check .
+
+# auto-format project code
+format:
+    uv run ruff format .
+
+# run the test suite
+test:
+    uv run pytest -n auto --tb=short -q
+
+# tests with the coverage gate (what CI runs when pytest-cov is installed)
+test-cov:
+    uv run pytest -n auto --tb=short -q --cov --cov-fail-under=70
+
+# serve the docs site locally
+docs:
+    uv run --with mkdocs-material --with "mkdocstrings[python]" mkdocs serve
+
+# scan staged changes for secrets (same scan as the pre-commit git hook)
+scan:
+    gitleaks git --pre-commit --staged --redact --no-banner --verbose
+
+# what CI runs
+ci: lint test
+{{/if python}}{{#if node}}# justfile — the canonical command interface (scaffolded by project-init).
+# `just --list` shows every recipe. Recipes are thin wrappers — logic lives
+# in the tools and their configs, never in this file.
+
+# install dependencies
+setup:
+    bun install
+
+# lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs)
+lint:
+    bun run lint
+
+# auto-format project code
+format:
+    bun run format
+
+# run the test suite
+test:
+    bun test
+
+# build the API docs (TypeDoc)
+docs:
+    bunx typedoc
+
+# scan staged changes for secrets (same scan as the pre-commit git hook)
+scan:
+    gitleaks git --pre-commit --staged --redact --no-banner --verbose
+
+# what CI runs
+ci: lint test
+{{/if node}}{{#if go}}# justfile — the canonical command interface (scaffolded by project-init).
+# `just --list` shows every recipe. Recipes are thin wrappers — logic lives
+# in the tools and their configs, never in this file.
+
+# download module dependencies
+setup:
+    go mod download
+
+# lint project code (revive/godoclint/gocognit gates per .golangci.yml)
+lint:
+    golangci-lint run
+
+# auto-format project code
+format:
+    gofmt -w .
+
+# run the test suite
+test:
+    go test ./...
+
+# docs: nothing to build — pkg.go.dev renders doc comments
+docs:
+    @echo "pkg.go.dev renders Go doc comments — nothing to build locally"
+
+# scan staged changes for secrets (same scan as the pre-commit git hook)
+scan:
+    gitleaks git --pre-commit --staged --redact --no-banner --verbose
+
+# what CI runs
+ci: lint test
+{{/if go}}

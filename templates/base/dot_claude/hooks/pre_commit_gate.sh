@@ -59,6 +59,14 @@ if [ "${#STAGED_JS[@]}" -gt 0 ] && command -v bunx &>/dev/null; then
     git add "${STAGED_JS[@]}" 2>/dev/null || true
 fi
 
+# PI-139: when the project ships a justfile and just is installed, the final
+# gate is `just lint` — the single definition of "lint passes" shared with CI
+# and every agent. The per-file auto-fixes above still ran and re-staged.
+if command -v just >/dev/null 2>&1 && [ -f "$ROOT/justfile" ]; then
+    ERRORS=""
+    JUST_OUT=$(cd "$ROOT" && just lint 2>&1) || ERRORS="Lint errors (just lint):\n${JUST_OUT}\n"
+fi
+
 if [ -n "$ERRORS" ]; then
     python3 -c "
 import json, sys

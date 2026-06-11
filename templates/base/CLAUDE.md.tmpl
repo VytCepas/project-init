@@ -19,7 +19,8 @@ All agentic-development infrastructure lives under [`.claude/`](.claude/). Start
 - **TDD** — write failing tests before any implementation. Use `/plan <task>` to generate acceptance tests first.
 - **GitHub Projects** — work is tracked on the GitHub Projects board backed by GitHub Issues. Before starting non-trivial work, create or reference an issue. Use `/start_task` if one does not exist.
 - **GitHub workflow** — for any push, PR, review, or merge action, load `.claude/skills/github_workflow/SKILL.md`. Quick ref: branch = `<type>/<KEY>-<n>-<slug>` | PR title = `type(KEY-N): desc` (no scope = no issue) | body includes `Closes #N`.
-{{#if lint_command}}- **Lint** — `{{lint_command}}` must pass before closing a task. The `pre_commit_gate` hook enforces this on every commit. The linter config also enforces docstrings and complexity caps on project code — fix the code, don't loosen the gate.
+{{#if lint_command}}- **Commands** — the `justfile` is the canonical command surface: `just --list` shows every recipe (`setup`, `lint`, `format`, `test`, `docs`, `ci`). Prefer `just <recipe>` over raw tool invocations so every agent and CI run the same commands.
+- **Lint** — `just lint` must pass before closing a task. The `pre_commit_gate` hook enforces this on every commit. The linter config also enforces docstrings and complexity caps on project code — fix the code, don't loosen the gate.
 {{/if}}- **Review plugins** — `pr-review-toolkit@claude-plugins-official` is pre-enabled in `.claude/settings.json` (silent-failure-hunter, code-simplifier, type-design-analyzer agents). Also consider `/plugin install code-review@claude-plugins-official` for full PR reviews.
 - **Docs** — follow the Diátaxis layout in [`docs/`](docs/) (see `docs/index.md`). Record architectural decisions with the `add_adr` skill.
 - **No secrets in code** — never hardcode API keys, tokens, or personal data. Use `os.environ['KEY']` or a `.env` file (gitignored).

@@ -18,8 +18,11 @@ class TestCommandVariables:
 
     def test_python_renders_uv_run_ruff(self, tmp_path: Path):
         target = self._scaffold_with_lang(tmp_path)
+        # PI-139: CLAUDE.md points at the justfile recipe — the raw command
+        # lives in exactly one place, the justfile itself.
         content = (target / "CLAUDE.md").read_text()
-        assert "uv run ruff check ." in content
+        assert "just lint" in content
+        assert "uv run ruff check ." in (target / "justfile").read_text()
         config = (target / ".claude" / "config.yaml").read_text()
         assert 'lint_command: "uv run ruff check ."' in config
         assert 'test_command: "uv run pytest"' in config

@@ -28,27 +28,28 @@ jobs:
           cache-dependency-glob: "pyproject.toml"
           python-version: "3.12"
 
+      # CI invokes the same justfile recipes agents and humans use (PI-139),
+      # so the command surface is defined exactly once.
+      - name: Install just
+        uses: extractions/setup-just@v4
+
       - name: Sync dev dependencies
-        run: uv sync --extra dev
+        run: just setup
 
-      - name: Lint (ruff)
-        run: {{lint_command}}
+      - name: Lint
+        run: just lint
 
-      # Optimization #1: Run tests in parallel mode
-      # Requires pytest-xdist in dev dependencies
-      # Can reduce test time by 30-50% on multi-core machines
-      #
       # Coverage gate (PI-138): activates automatically once pytest-cov is in
-      # dev dependencies; runs plain pytest until then. Tune --cov-fail-under
-      # to your project's baseline.
-      - name: Tests (pytest) — parallel, coverage-gated
+      # dev dependencies; runs plain tests until then. Tune --cov-fail-under
+      # in the justfile's test-cov recipe to your project's baseline.
+      - name: Tests — parallel, coverage-gated
         run: |
           if uv run python -c "import pytest_cov" 2>/dev/null; then
-            uv run pytest -n auto --tb=short -q --cov --cov-fail-under=70
+            just test-cov
           else
             echo "pytest-cov not installed — running without the coverage gate."
             echo "Add pytest-cov to dev dependencies to enable it."
-            uv run pytest -n auto --tb=short -q
+            just test
           fi
 {{/if python}}
 {{#if node}}
@@ -56,6 +57,10 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      # CI invokes the same justfile recipes agents and humans use (PI-139).
+      - name: Install just
+        uses: extractions/setup-just@v4
 
       # Fresh scaffolds have no lockfile yet — fall back to a plain install.
       - name: Install dependencies
@@ -67,10 +72,10 @@ jobs:
           fi
 
       - name: Lint
-        run: {{lint_command}}
+        run: just lint
 
       - name: Tests
-        run: {{test_command}}
+        run: just test
 {{/if node}}
 {{#if go}}
       - name: Set up Go
@@ -78,11 +83,17 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # The action installs + caches golangci-lint on CI; locally `just lint`
+      # runs the same `golangci-lint run` against the same .golangci.yml.
       - name: Lint (golangci-lint)
         uses: golangci/golangci-lint-action@v6
 
+      # CI invokes the same justfile recipes agents and humans use (PI-139).
+      - name: Install just
+        uses: extractions/setup-just@v4
+
       - name: Tests
-        run: {{test_command}}
+        run: just test
 {{/if go}}
 
       - name: Post failure summary
