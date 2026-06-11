@@ -118,3 +118,10 @@ class TestBranchProtectionBootstrap:
         assert "required_status_checks" in script
         assert "required_pull_request_reviews" in script
         assert '"allow_force_pushes": false' in script
+
+    def test_protection_requires_generated_ci_checks(self):
+        """The required contexts must cover the scaffolded CI workflow's
+        unconditional jobs, or 'require CI green' is an empty promise."""
+        script = _SETUP_GITHUB.read_text()
+        assert '"CI / Lint and test"' in script
+        assert '"CI / Secret scan (gitleaks)"' in script

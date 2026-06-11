@@ -36,11 +36,16 @@ if [ "$PROTECT" = 1 ]; then
 PROTECTION=$(mktemp)
 trap 'rm -f "$PROTECTION"' EXIT
 
+# Contexts must match the scaffolded workflows ("<workflow> / <job name>").
+# "CI / Integration tests" is omitted on purpose — that job is documented as
+# user-adjustable; add it here once your integration suite is stable.
 cat > "$PROTECTION" <<'JSON'
 {
   "required_status_checks": {
     "strict": true,
     "contexts": [
+      "CI / Lint and test",
+      "CI / Secret scan (gitleaks)",
       "Validate PR / Check PR title, branch, and linked issue",
       "review/decision"
     ]
