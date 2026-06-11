@@ -23,10 +23,16 @@ step: install the [Renovate GitHub App](https://github.com/apps/renovate)
 on the repository.
 
 To centralize policy across an organization, replace the `extends` list
-with a shared preset and keep repo files minimal:
+with a shared preset. Keep the PR-title settings unless the org preset
+provides them — Renovate's defaults (`chore(deps): …`) fail this repo's
+PR-title validator:
 
 ```json
-{ "extends": ["github>your-org/renovate-config"] }
+{
+  "extends": ["github>your-org/renovate-config"],
+  "semanticCommits": "disabled",
+  "commitMessagePrefix": "chore:"
+}
 ```
 
 ## Global gitignore

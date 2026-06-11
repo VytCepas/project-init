@@ -50,8 +50,11 @@ class TestRepoRenovateConfig:
         ({{#if}} blocks), so the github-actions manager skips them — a regex
         custom manager must keep template action pins fresh instead."""
         config = json.loads((_REPO_ROOT / "renovate.json").read_text())
-        manager = config["customManagers"][0]
-        assert manager["customType"] == "regex"
+        regex_managers = [
+            m for m in config["customManagers"] if m["customType"] == "regex"
+        ]
+        assert regex_managers, "regex custom manager for workflow templates missing"
+        manager = regex_managers[0]
         assert manager["datasourceTemplate"] == "github-tags"
 
         # The regex must match every `uses:` ref in the template workflows.
