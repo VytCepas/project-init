@@ -134,6 +134,41 @@ curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.s
 (`PROJECT_INIT_REF=main` for the development head; releases are cut by
 tagging `vX.Y.Z`, which triggers the release workflow.)
 
+### Upgrading a scaffolded project
+
+Scaffolded projects are snapshots — as project-init improves, they drift.
+After updating the tool itself, re-render any project from its recorded
+config and see what changed:
+
+```bash
+project-init upgrade /path/to/my-project           # drift report only, touches nothing
+project-init upgrade /path/to/my-project --apply   # apply the changes
+```
+
+The report classifies every template-owned file:
+
+| State | Meaning | `--apply` does |
+|---|---|---|
+| new | not in your project | creates it |
+| changed | drifted, but you never edited it | updates it |
+| conflict | drifted **and** locally edited | writes the new render as a `<file>.new` sibling — your edit is never overwritten |
+| removed | no longer rendered by current templates | nothing (reported only; upgrade never deletes) |
+
+`.claude/memory/` and `.claude/vault/` are never compared or touched, and
+`.claude/config.yaml` keeps your hand-edited fields (`project_key`, board
+number) — only its `project_init_version` and the scaffold record are
+refreshed.
+
+How it works: scaffolding records the preset, template variables, and a
+content-hash manifest in a `scaffold:` block at the end of
+`.claude/config.yaml`. Upgrade re-renders the same preset at the current
+template version into a staging directory and compares hashes, so user
+edits are distinguishable from upstream template changes. **Migration:**
+projects scaffolded before this record existed are reconstructed from the
+semantic config fields; without recorded hashes, every modified file is
+conservatively treated as a conflict (`.new` sibling). Run `upgrade --apply`
+once and the record is written for next time.
+
 ## Uninstall
 
 ```bash

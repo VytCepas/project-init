@@ -27,6 +27,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="project-init",
         description="Scaffold agentic-development infrastructure into a project.",
+        epilog=(
+            "Subcommand: project-init upgrade [target] [--apply] — re-render "
+            "from the recorded config and report drift (PI-142)."
+        ),
     )
     p.add_argument(
         "target",
@@ -299,8 +303,42 @@ _LANGUAGE_COMMANDS: dict[str, tuple[str, str, str]] = {
 }
 
 
+def _upgrade_main(argv: list[str]) -> int:
+    """Parse and run the `project-init upgrade` subcommand (PI-142)."""
+    from project_init.upgrade import run_upgrade
+
+    p = argparse.ArgumentParser(
+        prog="project-init upgrade",
+        description=(
+            "Re-render the recorded preset at the current template version "
+            "and report drift. Without --apply no files are touched."
+        ),
+    )
+    p.add_argument(
+        "target",
+        nargs="?",
+        default=".",
+        help="Scaffolded project directory (default: current directory)",
+    )
+    p.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply non-conflicting changes; conflicts become .new siblings",
+    )
+    p.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Accepted for CLI symmetry — upgrade never prompts",
+    )
+    args = p.parse_args(argv)
+    return run_upgrade(Path(args.target).resolve(), apply=args.apply)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the scaffolding CLI; return the process exit code."""
+    argv = list(sys.argv[1:]) if argv is None else list(argv)
+    if argv[:1] == ["upgrade"]:
+        return _upgrade_main(argv[1:])
     parser = _build_parser()
     args = parser.parse_args(argv)
 
@@ -375,6 +413,12 @@ def main(argv: list[str] | None = None) -> int:
     except TemplateRenderError as e:
         sys.stderr.write(f"error: {e}\n")
         return 2
+
+    # Record the scaffold inputs + rendered-content hashes so a later
+    # `project-init upgrade` can re-render faithfully and detect drift.
+    from project_init.upgrade import write_scaffold_record
+
+    write_scaffold_record(target, preset["name"], variables, created)
     _print_summary(target, created, preset["name"])
     _print_mcp_commands(selected_mcps)
     return 0
