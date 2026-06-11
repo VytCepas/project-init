@@ -35,7 +35,7 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
    ```bash
    git checkout -b <type>/PI-<n>-<slug>
    .claude/scripts/push_branch.sh          # retrying push with SHA verification
-   gh pr create --title "[PI-<n>][<type>] <title>" --body "Closes #<n>" --draft
+   gh pr create --title "<type>(PI-<n>): <title>" --body "Closes #<n>" --draft
    ```
    Branch name pattern: `<issue_type>/PI-<issue_number>-<short-slug>`
 
@@ -54,5 +54,5 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 - Every non-trivial task must have a GitHub Issue, a branch, and a draft PR — all before the first line of implementation code.
 - One issue → one branch → one PR.
 - `board-automation.yml` moves the board card to **In Progress** automatically when the PR is opened.
-- PR title format: `[PI-N][type] description` where type ∈ {feat, fix, chore, docs, test}
+- PR title format: `type(PI-N): description` where type ∈ {feat, fix, chore, docs, test} (ADR-006)
 - PR body must include `Closes #N` to auto-close the issue on merge.

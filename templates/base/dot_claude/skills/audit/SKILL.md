@@ -77,7 +77,7 @@ For every SKILL.md in `.claude/skills/*/`:
 1. **project-init.md** — every script, skill, command, hook, and agent listed in the Tools table must exist on disk
 2. **scripts/README.md** — every script in the directory should be documented
 3. **rules/hooks.md** (if present) — every hook listed must exist; every existing hook must be listed
-4. **Commit format** — verify that project-init.md, copilot-instructions.md, conventions.md, and config.yaml all agree on the commit/PR format (`[KEY-N][type]`)
+4. **Commit format** — verify that project-init.md, copilot-instructions.md, conventions.md, and config.yaml all agree on the commit/PR format (`type(KEY-N):`, ADR-006)
 
 ### 2.7 CI workflow validation
 
