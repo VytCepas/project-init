@@ -107,6 +107,16 @@ The wizard asks (interactive mode only):
 - Core MCPs (Context7)
 - Database MCP — none / Postgres / SQLite
 - Browser automation — Playwright (yes/no)
+- Owner/team (`--owner`) — default CODEOWNERS owner, SECURITY contact, and LICENSE copyright holder (e.g. `@org/team`)
+- License (`--license mit|apache-2.0|proprietary|none`) — renders a LICENSE with the current year and the owner (or project name); `none` skips the file
+
+Every preset also ships governance starters: `.github/CODEOWNERS`,
+`CONTRIBUTING.md` (setup, `just --list` command surface, branch/PR
+conventions, review flow), and `SECURITY.md`. After pushing to GitHub, run
+`.claude/scripts/setup_github.sh --protect` inside the project to apply
+baseline branch protection (require CI green, require PR review, block
+force-push) — unprotected default branches undermine the workflow
+enforcement everything else sets up.
 
 Your answers are recorded in `.claude/config.yaml`. Re-run any time — it reconciles, preserves existing project files, and never overwrites memory or vault notes. With `--strict`, templates are rendered and validated in a temporary directory first, then the validated scaffold files are merged into the target; strict mode is not a whole-directory replacement.
 

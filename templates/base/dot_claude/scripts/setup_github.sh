@@ -1,11 +1,24 @@
 #!/bin/bash
 # Configure or check GitHub repository governance for the scaffolded workflow.
 #
+# Usage: setup_github.sh [branch] [--protect]
+#   --protect  apply baseline branch protection to the default branch
+#              (require CI green, require PR review, block force-push).
+#              Idempotent: the PUT endpoint replaces the existing config.
+#
 # Requires: gh and admin permission on the repository.
 
 set -euo pipefail
 
-BRANCH="${1:-main}"
+BRANCH="main"
+PROTECT=0
+for arg in "$@"; do
+  case "$arg" in
+    --protect) PROTECT=1 ;;
+    --*) echo "Unknown option: $arg" >&2; exit 1 ;;
+    *) BRANCH="$arg" ;;
+  esac
+done
 
 if ! gh auth status >/dev/null 2>&1; then
   echo "ERROR: gh is not authenticated. Run gh auth login first." >&2
@@ -19,6 +32,7 @@ NAME=${REPO#*/}
 echo "Configuring GitHub governance for $REPO ($BRANCH)"
 # Default endpoint: repos/$OWNER/$NAME/branches/main/protection
 
+if [ "$PROTECT" = 1 ]; then
 PROTECTION=$(mktemp)
 trap 'rm -f "$PROTECTION"' EXIT
 
@@ -49,6 +63,9 @@ if gh api "repos/$OWNER/$NAME/branches/$BRANCH/protection" -X PUT --input "$PROT
   echo "Branch protection applied to $BRANCH"
 else
   echo "WARNING: could not apply branch protection. Check admin permissions and repository plan." >&2
+fi
+else
+  echo "Skipping branch protection (pass --protect to apply: require CI green, require review, block force-push)"
 fi
 
 if gh api "repos/$OWNER/$NAME/code-review-settings" -X PUT -f copilot_code_review_enabled=true >/dev/null 2>&1; then

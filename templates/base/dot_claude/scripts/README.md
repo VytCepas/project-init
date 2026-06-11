@@ -12,4 +12,4 @@ Helper scripts invoked by the user, by hooks, or by agents via the Bash tool. Pr
 - **`promote_review.sh`** — Mark a draft PR ready for review
 - **`monitor_pr.sh`** — Poll PR checks and optionally squash-merge with `--merge`
 - **`finish_pr.sh`** — Composite: push, mark ready, monitor checks/review, and merge
-- **`setup_github.sh`** — One-time GitHub repository governance setup (branch protection, review settings)
+- **`setup_github.sh`** — One-time GitHub repository governance setup (board fields, review settings; `--protect` applies baseline branch protection)

@@ -73,6 +73,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="OpenAI embedding model for lightrag.yaml (embedding.provider is openai)",
     )
     p.add_argument(
+        "--license",
+        choices=["mit", "apache-2.0", "proprietary", "none"],
+        default="none",
+        help="LICENSE file to render (default: none — no file)",
+    )
+    p.add_argument(
+        "--owner",
+        default="",
+        help=(
+            "Project owner/team: CODEOWNERS default owner (@user or "
+            "@org/team), SECURITY contact, and LICENSE copyright holder"
+        ),
+    )
+    p.add_argument(
         "--non-interactive",
         action="store_true",
         help="Skip all prompts (requires --preset, --name, --description)",
@@ -275,8 +289,10 @@ def _select_preset(
     return _choose_preset_interactive(presets)
 
 
-def _gather_inputs_interactive(default_name: str) -> tuple[str, str, str, list[dict]]:
-    """Prompt for name, description, language, and MCP selection."""
+def _gather_inputs_interactive(
+    default_name: str,
+) -> tuple[str, str, str, list[dict], str, str]:
+    """Prompt for name, description, language, MCPs, owner, and license."""
     project_name = _prompt("Project name", default=default_name)
     project_description = _prompt("Description", default="")
     language = _prompt("Language (python/node/go/none)", default="none")
@@ -290,7 +306,13 @@ def _gather_inputs_interactive(default_name: str) -> tuple[str, str, str, list[d
         selected_mcps = selected_mcps + [db_mcp]
     if _choose_browser_interactive():
         selected_mcps = selected_mcps + [PLAYWRIGHT_MCP]
-    return project_name, project_description, language, selected_mcps
+
+    # Governance (PI-145).
+    owner = _prompt("Owner/team for CODEOWNERS + LICENSE (e.g. @org/team)", default="")
+    license_choice = _prompt("License (mit/apache-2.0/proprietary/none)", default="none")
+    if license_choice not in {"mit", "apache-2.0", "proprietary", "none"}:
+        license_choice = "none"
+    return project_name, project_description, language, selected_mcps, owner, license_choice
 
 
 # Per-language tooling commands (PI-16): (lint, format, test). Empty strings
@@ -373,8 +395,10 @@ def main(argv: list[str] | None = None) -> int:
         project_name = args.name
         project_description = args.description
         language = args.language or "none"
+        owner = args.owner
+        license_choice = args.license
     else:
-        project_name, project_description, language, selected_mcps = (
+        project_name, project_description, language, selected_mcps, owner, license_choice = (
             _gather_inputs_interactive(default_name=target.name)
         )
 
@@ -397,12 +421,22 @@ def main(argv: list[str] | None = None) -> int:
         "lint_command": lint_command,
         "format_command": format_command,
         "test_command": test_command,
+        # Governance (PI-145). license_holder falls back to the project name
+        # so a LICENSE rendered without --owner still has a copyright line.
+        "project_owner": owner,
+        "license": license_choice,
+        "license_holder": owner or project_name,
+        "created_year": date.today().strftime("%Y"),
         # Conditional block flags (truthy/falsy strings).
         "python": "true" if language == "python" else "",
         "node": "true" if language == "node" else "",
         "go": "true" if language == "go" else "",
+        "justfile": "true" if language != "none" else "",
         "lightrag": "true" if is_lightrag else "",
         "obsidian": "true" if has_obsidian else "",
+        "license_mit": "true" if license_choice == "mit" else "",
+        "license_apache": "true" if license_choice == "apache-2.0" else "",
+        "license_proprietary": "true" if license_choice == "proprietary" else "",
         # LightRAG model selection (PI-132) — rendered into lightrag.yaml
         "llm_model": args.llm_model,
         "embedding_model": args.embedding_model,
