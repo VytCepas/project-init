@@ -368,16 +368,20 @@ def _detect_pr_number() -> int | None:
         return None
 
 
-def cmd_push(branch: str | None, max_retries: int) -> int:
+def cmd_push(branch: str | None, max_retries: int, *, force: bool = False) -> int:
     """Push the current (or named) branch with retry + remote-SHA verification.
 
     Handles transient GitHub 5xx where `git push` exits non-zero but the
-    commit actually landed on the remote.
+    commit actually landed on the remote. *force* adds --force-with-lease
+    for the rebase-after-squash-merge case; main/master are refused.
     """
     if branch is None:
         branch = _current_branch()
     if not branch:
         sys.stderr.write("push: no current branch\n")
+        return 1
+    if force and branch in ("main", "master"):
+        sys.stderr.write("push: refusing to force-push main/master\n")
         return 1
 
     code, sha_out = _git(["rev-parse", branch])
@@ -397,7 +401,10 @@ def cmd_push(branch: str | None, max_retries: int) -> int:
         return False
 
     for attempt in range(max_retries + 1):
-        proc = subprocess.run(["git", "push", "-u", "origin", branch])
+        push_cmd = ["git", "push", "-u", "origin", branch]
+        if force:
+            push_cmd.append("--force-with-lease")
+        proc = subprocess.run(push_cmd)
         if proc.returncode == 0:
             sys.stdout.write(f"push: pushed {branch} ({expected_sha})\n")
             return 0
@@ -555,6 +562,12 @@ def main(argv: list[str] | None = None) -> int:
     p_push = sub.add_parser("push", help="push current branch with retry + SHA verify")
     p_push.add_argument("branch", nargs="?", default=None)
     p_push.add_argument("max_retries", nargs="?", type=int, default=3)
+    p_push.add_argument(
+        "--force-with-lease",
+        action="store_true",
+        dest="force_with_lease",
+        help="force-push safely after a rebase (refused on main/master)",
+    )
 
     p_promote = sub.add_parser("promote", help="mark a draft PR ready for review")
     p_promote.add_argument("pr_number", nargs="?", type=int, default=None)
@@ -583,7 +596,7 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.write(f"{node}: requires={prereqs or '[]'}\n")
         return 0
     if args.cmd == "push":
-        return cmd_push(args.branch, args.max_retries)
+        return cmd_push(args.branch, args.max_retries, force=args.force_with_lease)
     if args.cmd == "promote":
         return cmd_promote(args.pr_number)
     if args.cmd == "finish":
