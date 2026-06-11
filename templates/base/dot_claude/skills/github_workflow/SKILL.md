@@ -1,6 +1,6 @@
 ---
 name: github_workflow
-description: Guides Claude through the full GitHub PR lifecycle — branch naming, push, review responses, and merge. Loaded automatically before any push, PR creation, review response, or merge action.
+description: Guides the agent through the full GitHub PR lifecycle — branch naming, push, review responses, and merge. Loaded automatically before any push, PR creation, review response, or merge action.
 when_to_use: Load before any push, PR creation, PR review response, merge, or release action — including when lifecycle scripts fail and a git/gh fallback is needed.
 user-invocable: false
 effort: high

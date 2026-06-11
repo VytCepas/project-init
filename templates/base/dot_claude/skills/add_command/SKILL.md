@@ -6,6 +6,10 @@ argument-hint: "<command-name> <what it does>"
 allowed-tools: Write
 ---
 
+> **Claude Code specific**: this skill manages Claude Code configuration
+> (settings.json wiring). Other agents do not consume what it produces.
+
+
 ## Create a skill
 
 Slash commands in this project live in `.claude/skills/<name>/SKILL.md`. Each skill is a markdown file with YAML frontmatter.

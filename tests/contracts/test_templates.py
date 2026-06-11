@@ -68,16 +68,19 @@ class TestTemplateIdentifiers:
             project_init_url="https://github.com/example/project-init"
         ))
 
-    def test_agents_md_redirects_to_claude(self):
-        content = (self.target / "AGENTS.md").read_text()
-        assert "VytCepas" not in content
-        assert "CLAUDE.md" in content
-        assert "source of truth" in content
-
-    def test_claude_md_uses_template_url(self):
+    def test_claude_md_redirects_to_agents(self):
+        """PI-136: AGENTS.md is canonical; CLAUDE.md is the redirect."""
         content = (self.target / "CLAUDE.md").read_text()
         assert "VytCepas" not in content
+        assert "AGENTS.md" in content
+        assert "source of truth" in content
+
+    def test_agents_md_is_canonical_and_uses_template_url(self):
+        content = (self.target / "AGENTS.md").read_text()
+        assert "VytCepas" not in content
         assert "github.com/example/project-init" in content
+        assert "Key rules for agents" in content
+        assert "Claude Code specifics" in content
 
     def test_project_init_md_uses_template_url(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
@@ -154,7 +157,7 @@ class TestScaffoldGitHubFiles:
         assert f.is_file()
         content = f.read_text()
         assert "GitHub Projects" in content
-        assert "CLAUDE.md" in content
+        assert "AGENTS.md" in content
         assert "<issue_type>/<project_abbr>-<issue_number>-<slug>" in content
         assert "type(PROJECT-123): description" in content
         assert "[#N][type] description" not in content
@@ -166,7 +169,7 @@ class TestScaffoldGitHubFiles:
         f = self.target / "GEMINI.md"
         assert f.is_file()
         content = f.read_text()
-        assert "CLAUDE.md" in content
+        assert "AGENTS.md" in content
         assert "source of truth" in content
         assert "GitHub Projects" not in content
         assert "[PROJECT-123][type] description" not in content

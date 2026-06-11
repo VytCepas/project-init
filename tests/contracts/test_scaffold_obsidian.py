@@ -225,8 +225,8 @@ class TestScaffoldObsidianOnly:
         content = (self.target / ".claude" / "project-init.md").read_text()
         assert "premature abstraction" in content.lower() or "no premature" in content.lower()
 
-    def test_claude_md_has_tdd_rule(self):
-        content = (self.target / "CLAUDE.md").read_text()
+    def test_agents_md_has_tdd_rule(self):
+        content = (self.target / "AGENTS.md").read_text()
         assert "TDD" in content or "test" in content.lower()
 
     def test_no_lightrag_files(self):
