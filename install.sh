@@ -48,8 +48,10 @@ resolve_ref() {
         return
     fi
     # Derive owner/repo from REPO_URL for the API query (github.com only).
+    # POSIX ERE has no lazy quantifier, so strip the .git suffix separately.
     local slug tag
-    slug=$(printf '%s\n' "$REPO_URL" | sed -nE 's#.*github\.com[:/]([^/]+/[^/]+?)(\.git)?$#\1#p')
+    slug=$(printf '%s\n' "$REPO_URL" | sed -nE 's#.*github\.com[:/]([^/]+/[^/]+)$#\1#p')
+    slug="${slug%.git}"
     if [ -n "$slug" ]; then
         tag=$(curl -fsSL "https://api.github.com/repos/$slug/releases/latest" 2>/dev/null \
             | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name"[^"]*"([^"]+)".*/\1/' || true)

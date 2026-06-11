@@ -64,6 +64,12 @@ class TestInstallScriptPinning:
         content = self._script()
         assert "falling back to main" in content
 
+    def test_strips_git_suffix_from_repo_slug(self):
+        """Codex review regression: POSIX ERE has no lazy quantifier, so the
+        .git suffix must be stripped separately or the API URL 404s."""
+        content = self._script()
+        assert '"${slug%.git}"' in content
+
     def test_no_unpinned_update_path(self):
         """The old `git pull` on whatever-was-checked-out update path is gone:
         pull only happens on an explicit main checkout."""
