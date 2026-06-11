@@ -528,7 +528,8 @@ def cmd_create_pr_nojira(
         sys.stdout.write(f"Draft PR already exists: {url.strip()}\n")
         return 0
 
-    pr_title = f"[nojira][{type_}] {title}"
+    # Conventional Commits, no scope = no linked issue (ADR-006)
+    pr_title = f"{type_}: {title}"
     pr_body = "No linked issue (nojira)."
     args = ["pr", "create", "--draft", "--title", pr_title, "--body", pr_body]
     if base:

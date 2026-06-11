@@ -18,9 +18,11 @@ Load this skill before any push, PR creation, review response, or merge action.
 | Step | Pattern |
 |------|---------|
 | Branch | `<type>/PI-<n>-<kebab-slug>` e.g. `feat/PI-42-add-oauth` |
-| PR title | `[PI-N][type] description` e.g. `[PI-42][feat] Add OAuth login` |
-| No-issue PR | `[nojira][type] description` e.g. `[nojira][fix] Fix typo` |
-| PR body | Must include `Closes #N` (skip for nojira) |
+| PR title | `type(PI-N): description` e.g. `feat(PI-42): Add OAuth login` |
+| No-issue PR | `type: description` (no scope) e.g. `fix: Fix typo` |
+| PR body | Must include `Closes #N` (skip for no-issue PRs) |
+
+Commit messages use the same format (Conventional Commits, ADR-006). Legacy `[PI-N][type]` is accepted by validators during transition but must not be emitted.
 
 Types: `feat` `fix` `chore` `docs` `test`
 

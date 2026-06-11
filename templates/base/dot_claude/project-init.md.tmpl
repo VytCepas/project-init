@@ -76,7 +76,7 @@ Every non-trivial task follows this exact sequence. Run the scripts; the LLM's o
 |------|---------|---------------------------|
 | 1. Create issue | `.claude/scripts/create_issue.sh <type> "description" --priority <priority> --area "<area>" --size <size> --acceptance "<criterion>"` | Issue created with metadata, board card → **To Do** |
 | 2. Start work | `.claude/scripts/start_issue.sh <issue-n> <type>` | Branch (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) + push + draft PR, board → **In Progress** |
-| 3. Commit | `git add … && git commit -m "[<KEY>-<n>][type] message"` | `commit-msg` hook validates format; `pre_commit_gate` auto-lints |
+| 3. Commit | `git add … && git commit -m "type(<KEY>-<n>): message"` | `commit-msg` hook validates format; `pre_commit_gate` auto-lints |
 | 4. Push | `.claude/scripts/push_branch.sh` | CI runs; if it fails a comment is posted on the PR with `gh run view --log-failed` |
 | 5. Finish PR | `.claude/scripts/finish_pr.sh <n>` | Pushes, marks ready, monitors CI/review, and merges when clean |
 
@@ -103,9 +103,9 @@ It attempts to configure branch protection, required checks, conversation resolu
 
 | What | Format | Example |
 |------|--------|---------|
-| Commit message | `[KEY-<n>][<type>] description` | `[PI-42][feat] Add OAuth login` |
-| PR title | `[KEY-<n>][<type>] description` | `[PI-42][feat] Add OAuth login` |
-| No-issue PR | `[nojira][<type>] description` | `[nojira][fix] Fix typo` |
+| Commit message | `<type>(KEY-<n>): description` | `feat(PI-42): Add OAuth login` |
+| PR title | `<type>(KEY-<n>): description` | `feat(PI-42): Add OAuth login` |
+| No-issue PR | `<type>: description` (no scope) | `fix: Fix typo` |
 | PR body | must include `Closes #<n>` | triggers auto-close on merge |
 | Branch | `<type>/<KEY>-<n>-<slug>` | `feat/PI-42-add-oauth-login` |
 
@@ -113,7 +113,7 @@ Types: `feat` · `fix` · `chore` · `docs` · `test`
 
 For minor work without an issue, use `.claude/scripts/create_nojira_pr.sh <type> "description"`.
 It creates or reuses a typed `nojira` branch, pushes through `push_branch.sh`,
-and opens a draft PR titled `[nojira][type] description`.
+and opens a draft PR titled `type: description` (no scope = no linked issue).
 
 ### Rules
 
@@ -132,7 +132,7 @@ When CI fails, GitHub posts a comment on the PR. Read it, fix the code, push:
 ```bash
 gh run view --log-failed   # full failure output
 # fix the code
-git add … && git commit -m "[KEY-n][fix] Fix failing tests"
+git add … && git commit -m "fix(<KEY>-<n>): Fix failing tests"
 .claude/scripts/push_branch.sh
 .claude/scripts/monitor_pr.sh <n> --merge   # wait and merge when clean
 ```

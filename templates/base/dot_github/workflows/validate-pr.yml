@@ -23,8 +23,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! echo "$PR_TITLE" | grep -qE '^\[([A-Z][A-Z0-9]{1,9}-[0-9]+|nojira)\]\[(feat|fix|chore|docs|test)\]'; then
-            echo "ERROR: PR title must match format: [PROJECT-123][type] or [nojira][type]"
+          # Canonical: Conventional Commits with issue key as scope (ADR-006).
+          # Legacy bracket format accepted during transition.
+          NEW_FORMAT='^(feat|fix|chore|docs|test)(\([A-Z][A-Z0-9]{1,9}-[0-9]+\))?!?: .+'
+          LEGACY_FORMAT='^\[([A-Z][A-Z0-9]{1,9}-[0-9]+|nojira)\]\[(feat|fix|chore|docs|test)\]'
+          if ! echo "$PR_TITLE" | grep -qE "$NEW_FORMAT|$LEGACY_FORMAT"; then
+            echo "ERROR: PR title must match: type(PROJECT-123): description  (or type: description for no-issue work)"
             echo "Valid types: feat, fix, chore, docs, test"
             exit 1
           fi
@@ -34,8 +38,14 @@ jobs:
             exit 1
           fi
 
-          if echo "$PR_TITLE" | grep -qE '^\[nojira\]'; then
-            echo "nojira PR - skipping Closes keyword check"
+          # No-issue PRs: legacy [nojira] prefix, or conventional title without a scope.
+          # An issue-linked branch must not bypass branch/key/label checks via a scopeless title.
+          if echo "$PR_TITLE" | grep -qE '^\[nojira\]|^(feat|fix|chore|docs|test)!?: '; then
+            if echo "$PR_BRANCH" | grep -qE '^(feat|fix|chore|docs|test)/[A-Z][A-Z0-9]{1,9}-[0-9]+-'; then
+              echo "ERROR: branch $PR_BRANCH is issue-linked - title must carry the issue key as scope, e.g. type(KEY-N): description"
+              exit 1
+            fi
+            echo "no-issue PR - skipping Closes keyword check"
             exit 0
           fi
 
@@ -46,8 +56,13 @@ jobs:
           fi
 
           ISSUE_NUM=$(echo "$PR_BODY" | grep -oiE "$ISSUE_REF_REGEX" | head -1 | grep -oE '[0-9]+')
-          ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '^\[[A-Z][A-Z0-9]{1,9}-[0-9]+\]' | tr -d '[]')
-          PR_TYPE=$(echo "$PR_TITLE" | grep -oE '\]\[(feat|fix|chore|docs|test)\]' | tr -d '[]')
+          if echo "$PR_TITLE" | grep -qE "$LEGACY_FORMAT"; then
+            ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '^\[[A-Z][A-Z0-9]{1,9}-[0-9]+\]' | tr -d '[]')
+            PR_TYPE=$(echo "$PR_TITLE" | grep -oE '\]\[(feat|fix|chore|docs|test)\]' | tr -d '[]')
+          else
+            ISSUE_KEY=$(echo "$PR_TITLE" | grep -oE '\([A-Z][A-Z0-9]{1,9}-[0-9]+\)' | head -1 | tr -d '()')
+            PR_TYPE=$(echo "$PR_TITLE" | grep -oE '^(feat|fix|chore|docs|test)')
+          fi
 
           if ! echo "$PR_BRANCH" | grep -qE '^(feat|fix|chore|docs|test)/[A-Z][A-Z0-9]{1,9}-[0-9]+-[a-z0-9][a-z0-9-]*$'; then
             echo "ERROR: branch must match <type>/<PROJECT>-<issue-number>-<slug>"

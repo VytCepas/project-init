@@ -195,11 +195,11 @@ class TestCreateIssueSkill:
         script = self.target / ".claude" / "scripts" / "create_nojira_pr.sh"
         shim = script.read_text()
         assert script.stat().st_mode & 0o111, "create_nojira_pr.sh must be executable"
-        # Shim delegates to dag_workflow.py create-pr-nojira; the [nojira]
-        # PR-title prefix and gh pr create call live in the Python module.
+        # Shim delegates to dag_workflow.py create-pr-nojira; the scopeless
+        # conventional PR title and gh pr create call live in the Python module.
         assert "dag_workflow.py" in shim and "create-pr-nojira" in shim
         dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
-        assert "[nojira]" in dag
+        assert 'pr_title = f"{type_}: {title}"' in dag
         assert 'pr", "create"' in dag or "pr_create" in dag
 
 
@@ -381,3 +381,53 @@ exit 2
         )
         out = json.loads(result.stdout)
         assert "additionalContext" in out
+
+
+class TestCommitMsgHookFormats:
+    """ADR-006: commit-msg accepts conventional format, keeps legacy, rejects garbage."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = tmp_target
+        preset = load_preset("obsidian-only")
+        scaffold(tmp_target, preset, make_variables())
+
+    def _run_commit_msg(self, message: str) -> int:
+        hook = self.target / ".github" / "hooks" / "commit-msg"
+        msg_file = self.target / "COMMIT_EDITMSG"
+        msg_file.write_text(message + "\n")
+        result = subprocess.run(
+            [str(hook), str(msg_file)],
+            capture_output=True,
+            text=True,
+            cwd=self.target,
+        )
+        return result.returncode
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "feat(PI-42): Add OAuth login",
+            "fix(APP-99): Handle null pointer in auth",
+            "chore: Bump dev dependency",
+            "feat(PI-9)!: Drop python 3.10",
+            "[PI-42][feat] Add OAuth login",  # legacy, accepted in transition
+            "[nojira][fix] Fix typo",  # legacy, accepted in transition
+            "Merge branch 'main' into feat/PI-1-x",
+        ],
+    )
+    def test_accepts_valid_formats(self, message):
+        assert self._run_commit_msg(message) == 0
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "Add OAuth login",  # no type
+            "feature(PI-42): wrong type word",
+            "feat(pi-42): lowercase key",
+            "feat(PI-42) Missing colon",
+            "feat(PI-42):",  # no description
+        ],
+    )
+    def test_rejects_invalid_formats(self, message):
+        assert self._run_commit_msg(message) != 0

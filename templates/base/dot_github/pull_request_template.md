@@ -1,4 +1,4 @@
-<!-- PR Title Format: [PROJECT-123][type] description  OR  [nojira][type] description -->
+<!-- PR Title Format: type(PROJECT-123): description  OR  type: description (no linked issue) -->
 <!-- Valid types: feat | fix | chore | docs | test -->
 
 ## Summary

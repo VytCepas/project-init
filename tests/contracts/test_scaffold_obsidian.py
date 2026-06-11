@@ -182,7 +182,7 @@ class TestScaffoldObsidianOnly:
 
     def test_project_init_md_uses_commit_message_format_hook_accepts(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
-        assert 'git commit -m "[<KEY>-<n>][type] message"' in content
+        assert 'git commit -m "type(<KEY>-<n>): message"' in content
         assert "[#n][type]" not in content
 
     def test_start_task_skill_delegates_to_scripts(self):

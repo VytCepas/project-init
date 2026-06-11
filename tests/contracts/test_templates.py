@@ -156,7 +156,7 @@ class TestScaffoldGitHubFiles:
         assert "GitHub Projects" in content
         assert "CLAUDE.md" in content
         assert "<issue_type>/<project_abbr>-<issue_number>-<slug>" in content
-        assert "[PROJECT-123][type] description" in content
+        assert "type(PROJECT-123): description" in content
         assert "[#N][type] description" not in content
         assert "PR title must start with" not in content
         # Review cycle protocol moved to github_workflow skill — file now points to it
@@ -205,14 +205,16 @@ class TestScaffoldGitHubFiles:
         shim = script.read_text()
         assert "dag_workflow.py" in shim and "create-pr-nojira" in shim
         dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
-        assert "[nojira]" in dag
+        # ADR-006: no-issue PRs use conventional title without a scope
+        assert 'pr_title = f"{type_}: {title}"' in dag
         assert "pr_create" in dag or 'pr", "create"' in dag
         assert "--draft" in dag
 
     def test_validate_pr_enforces_project_key_title_format(self):
-        """PR title must match [PROJECT-123][type] or [nojira][type] format."""
+        """PR title must match type(PROJECT-123): (canonical) or legacy bracket format."""
         content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
-        # Check for the new regex pattern with type validation
+        # Canonical Conventional Commits regex and legacy transition regex (ADR-006)
+        assert "NEW_FORMAT=" in content and "LEGACY_FORMAT=" in content
         assert "[A-Z][A-Z0-9]{1,9}-[0-9]+" in content
         assert "(feat|fix|chore|docs|test)" in content
         assert "nojira" in content

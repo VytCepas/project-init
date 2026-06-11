@@ -17,15 +17,21 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if echo "$PR_TITLE" | grep -qE '^\[([A-Z][A-Z0-9]{1,9}-[0-9]+|nojira)\]\[(feat|fix|chore|docs|test)\]'; then
-            echo "PR title format OK: $PR_TITLE"
+          # Canonical: Conventional Commits with issue key as scope (ADR-006).
+          # Legacy bracket format accepted during transition.
+          NEW_FORMAT='^(feat|fix|chore|docs|test)(\([A-Z][A-Z0-9]{1,9}-[0-9]+\))?!?: .+'
+          LEGACY_FORMAT='^\[([A-Z][A-Z0-9]{1,9}-[0-9]+|nojira)\]\[(feat|fix|chore|docs|test)\]'
+          if echo "$PR_TITLE" | grep -qE "$NEW_FORMAT"; then
+            echo "PR title format OK (conventional): $PR_TITLE"
+          elif echo "$PR_TITLE" | grep -qE "$LEGACY_FORMAT"; then
+            echo "PR title format OK (legacy, prefer type(KEY-N): ...): $PR_TITLE"
           else
-            echo "ERROR: PR title must match format: [PROJECT-123][type] or [nojira][type]"
+            echo "ERROR: PR title must match: type(PROJECT-123): description  (or type: description for no-issue work)"
             echo "Valid types: feat, fix, chore, docs, test"
             echo "Examples:"
-            echo "  [PI-42][feat] Add OAuth login"
-            echo "  [PI-99][fix] Handle null pointer in auth"
-            echo "  [nojira][fix] Fix typo in README"
+            echo "  feat(PI-42): Add OAuth login"
+            echo "  fix(PI-99): Handle null pointer in auth"
+            echo "  fix: Fix typo in README"
             exit 1
           fi
 
@@ -37,10 +43,16 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
-          # Skip Closes check for nojira PRs (no linked issue)
-          if echo "$PR_TITLE" | grep -qE '^\[nojira\]'; then
-            echo "nojira PR — skipping Closes keyword check"
+          # No-issue PRs: legacy [nojira] prefix, or conventional title without a scope.
+          # An issue-linked branch must not bypass the Closes check via a scopeless title.
+          if echo "$PR_TITLE" | grep -qE '^\[nojira\]|^(feat|fix|chore|docs|test)!?: '; then
+            if echo "$PR_BRANCH" | grep -qE '^(feat|fix|chore|docs|test)/[A-Z][A-Z0-9]{1,9}-[0-9]+-'; then
+              echo "ERROR: branch $PR_BRANCH is issue-linked — title must carry the issue key as scope, e.g. type(KEY-N): description"
+              exit 1
+            fi
+            echo "no-issue PR — skipping Closes keyword check"
             exit 0
           fi
           # For issue PRs, require Closes keyword
