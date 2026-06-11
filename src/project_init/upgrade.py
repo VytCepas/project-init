@@ -134,8 +134,8 @@ def _scalar(line: str) -> str:
     return value.strip("\"'")
 
 
-def _parse_record_block(lines: list[str]) -> tuple[str, dict, dict] | None:
-    """Parse the scaffold record block; None when it is absent."""
+def _record_fields(lines: list[str]) -> tuple[str | None, dict | None, dict | None]:
+    """Extract preset/variables/manifest from the lines after the marker."""
     preset = variables = manifest = None
     in_block = False
     for line in lines:
@@ -144,6 +144,8 @@ def _parse_record_block(lines: list[str]) -> tuple[str, dict, dict] | None:
             continue
         if not in_block:
             continue
+        if line.strip() and not line.startswith(" "):
+            break  # the scaffold mapping ended
         stripped = line.strip()
         if stripped.startswith("preset:"):
             preset = _scalar(stripped)
@@ -151,9 +153,39 @@ def _parse_record_block(lines: list[str]) -> tuple[str, dict, dict] | None:
             variables = json.loads(stripped.split(":", 1)[1])
         elif stripped.startswith("manifest:"):
             manifest = json.loads(stripped.split(":", 1)[1])
+    return preset, variables, manifest
+
+
+def _parse_record_block(text: str) -> tuple[str, dict, dict] | None:
+    """Parse the scaffold record block; None when no record marker exists.
+
+    Only lines after the record marker are considered, so an unrelated
+    hand-written ``scaffold:`` section is never mistaken for the record.
+    A marker with malformed content raises :class:`UpgradeError` instead of
+    leaking a JSON traceback.
+    """
+    idx = text.find(_RECORD_MARKER)
+    if idx == -1:
+        return None
+
+    try:
+        preset, variables, manifest = _record_fields(text[idx:].splitlines())
+    except json.JSONDecodeError as e:
+        msg = (
+            "scaffold record in .claude/config.yaml is corrupted "
+            f"({e}). Fix the block or delete everything from the "
+            f"'{_RECORD_MARKER}' line down to fall back to migration."
+        )
+        raise UpgradeError(msg) from e
+
     if preset and variables is not None and manifest is not None:
         return preset, variables, manifest
-    return None
+    msg = (
+        "scaffold record in .claude/config.yaml is incomplete (needs preset, "
+        "variables, and manifest). Fix the block or delete everything from "
+        f"the '{_RECORD_MARKER}' line down to fall back to migration."
+    )
+    raise UpgradeError(msg)
 
 
 def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
@@ -220,12 +252,12 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
             "project-init (or the record was deleted)."
         )
         raise UpgradeError(msg)
-    lines = config_path.read_text(encoding="utf-8").splitlines()
-    parsed = _parse_record_block(lines)
+    text = config_path.read_text(encoding="utf-8")
+    parsed = _parse_record_block(text)
     if parsed is not None:
         preset_name, variables, manifest = parsed
         return preset_name, variables, manifest, False
-    preset_name, variables, manifest = _migrate_semantic_config(lines)
+    preset_name, variables, manifest = _migrate_semantic_config(text.splitlines())
     return preset_name, variables, manifest, True
 
 
@@ -284,6 +316,22 @@ def _copy_rendered(src: Path, dest: Path) -> None:
     shutil.copy2(src, dest)
 
 
+def _new_sibling(dest: Path, rendered: Path) -> Path:
+    """Pick the ``.new`` sibling path for a conflicted file.
+
+    An existing ``.new`` may hold a user's in-progress manual merge from the
+    previous upgrade — never clobber it. Reuse it only when its content
+    already equals the fresh render; otherwise take ``.new.1``, ``.new.2``, …
+    """
+    candidate = dest.parent / (dest.name + ".new")
+    rendered_bytes = rendered.read_bytes()
+    counter = 0
+    while candidate.exists() and candidate.read_bytes() != rendered_bytes:
+        counter += 1
+        candidate = dest.parent / (dest.name + f".new.{counter}")
+    return candidate
+
+
 def apply_drift(
     target: Path,
     staging: Path,
@@ -295,8 +343,7 @@ def apply_drift(
     for rel in report.new + report.changed:
         _copy_rendered(staging / rel, target / rel)
     for rel in report.conflicts:
-        sibling = target / rel.parent / (rel.name + ".new")
-        _copy_rendered(staging / rel, sibling)
+        _copy_rendered(staging / rel, _new_sibling(target / rel, staging / rel))
 
     # Targeted config.yaml updates: the human-readable version line, then the
     # scaffold record (variables + a manifest reflecting post-apply state).

@@ -83,6 +83,30 @@ class TestScaffoldRecord:
         assert rc == 1
         assert "not found" in capsys.readouterr().err
 
+    def test_corrupted_record_is_a_clean_error(self, tmp_path: Path, capsys):
+        """Malformed record JSON must not leak a traceback (PR #160 review)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        config = target / _CONFIG_REL
+        config.write_text(
+            _MANIFEST_LINE_RE.sub(r"\1{broken json", config.read_text(), count=1)
+        )
+        rc = main(["upgrade", str(target)])
+        assert rc == 1
+        assert "corrupted" in capsys.readouterr().err
+
+    def test_unrelated_scaffold_section_is_not_the_record(self, tmp_path: Path):
+        """Only the block after the marker is parsed (PR #160 review)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        config = target / _CONFIG_REL
+        text = config.read_text()
+        decoy = "scaffold:\n  variables: not json at all\n"
+        config.write_text(decoy + text)
+        preset, _, _, migrated = read_scaffold_record(target)
+        assert preset == "obsidian-only"
+        assert not migrated
+
 
 class TestUpgradeReport:
     def test_fresh_scaffold_reports_no_drift(self, tmp_path: Path, capsys):
@@ -199,6 +223,21 @@ class TestUpgradeApply:
         assert not migrated
         # Applied file is re-recorded with its fresh rendered hash.
         assert manifest["justfile"] == hashlib.sha256(justfile.read_bytes()).hexdigest()
+
+    def test_in_progress_new_sibling_is_never_clobbered(self, tmp_path: Path):
+        """A user-modified .new (manual merge in progress) survives re-apply
+        — the fresh render goes to .new.1 instead (PR #160 review)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        rendered_now = (target / "justfile").read_bytes()
+        (target / "justfile").write_bytes(b"# my local recipes\n")
+        assert main(["upgrade", str(target), "--apply"]) == 0
+
+        merge_in_progress = b"# half-merged result\n"
+        (target / "justfile.new").write_bytes(merge_in_progress)
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert (target / "justfile.new").read_bytes() == merge_in_progress
+        assert (target / "justfile.new.1").read_bytes() == rendered_now
 
     def test_conflicted_file_stays_unrecorded(self, tmp_path: Path):
         """A conflict keeps its .new sibling and is flagged again next run."""
