@@ -110,6 +110,14 @@ The wizard asks (interactive mode only):
 - Owner/team (`--owner`) — default CODEOWNERS owner, SECURITY contact, and LICENSE copyright holder (e.g. `@org/team`)
 - License (`--license mit|apache-2.0|proprietary|none`) — renders a LICENSE with the current year and the owner (or project name); `none` skips the file
 - Devcontainer (`--devcontainer`) — renders `.devcontainer/` for Codespaces, fresh clones, and remote agent containers (see below)
+- Toolchain pinning (`--mise`) — renders `mise.toml` pinning runtime/tool versions. Ownership rule: mise owns versions only; uv/bun own dependencies, just owns commands, `.env` owns environment
+- Editor config (`--vscode`) — renders `.vscode/extensions.json` + a minimal `settings.json` (format-on-save wired to the preset formatter); nothing personal, and the `.gitignore` shares only these two files
+
+Every preset also scaffolds the env/secret pattern: `.env.example`
+documents the variables and their loading order, `.env` is gitignored, and
+`.claude/docs/guides/secrets.md` covers when and how to escalate to an org
+secret manager (sops / 1Password CLI / Doppler) — none is installed, that
+choice is org-specific.
 
 Every preset also ships governance starters: `.github/CODEOWNERS`,
 `CONTRIBUTING.md` (setup, `just --list` command surface, branch/PR

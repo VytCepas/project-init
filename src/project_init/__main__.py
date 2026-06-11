@@ -87,6 +87,22 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--mise",
+        action="store_true",
+        help=(
+            "Render mise.toml pinning toolchain versions (mise owns versions "
+            "only; uv/bun own deps, just owns commands, .env owns environment)"
+        ),
+    )
+    p.add_argument(
+        "--vscode",
+        action="store_true",
+        help=(
+            "Render .vscode/extensions.json + minimal settings.json "
+            "(format-on-save wired to the preset formatter; nothing personal)"
+        ),
+    )
+    p.add_argument(
         "--devcontainer",
         action="store_true",
         help=(
@@ -299,8 +315,8 @@ def _select_preset(
 
 def _gather_inputs_interactive(
     default_name: str,
-) -> tuple[str, str, str, list[dict], str, str, bool]:
-    """Prompt for name, description, language, MCPs, owner, license, devcontainer."""
+) -> tuple[str, str, str, list[dict], str, str, bool, bool, bool]:
+    """Prompt for project basics, MCPs, governance, and opt-in overlays."""
     project_name = _prompt("Project name", default=default_name)
     project_description = _prompt("Description", default="")
     language = _prompt("Language (python/node/go/none)", default="none")
@@ -326,6 +342,10 @@ def _gather_inputs_interactive(
     devcontainer = Confirm.ask(
         "Add a devcontainer (Codespaces / remote agent sessions)?", default=False
     )
+    mise = Confirm.ask("Pin toolchain versions with mise (mise.toml)?", default=False)
+    vscode = Confirm.ask(
+        "Add shared VS Code config (extensions + format-on-save)?", default=False
+    )
     return (
         project_name,
         project_description,
@@ -334,6 +354,8 @@ def _gather_inputs_interactive(
         owner,
         license_choice,
         devcontainer,
+        mise,
+        vscode,
     )
 
 
@@ -420,6 +442,8 @@ def main(argv: list[str] | None = None) -> int:
         owner = args.owner
         license_choice = args.license
         devcontainer = args.devcontainer
+        mise = args.mise
+        vscode = args.vscode
     else:
         (
             project_name,
@@ -429,6 +453,8 @@ def main(argv: list[str] | None = None) -> int:
             owner,
             license_choice,
             devcontainer,
+            mise,
+            vscode,
         ) = _gather_inputs_interactive(default_name=target.name)
 
     is_lightrag = "lightrag" in preset.get("name", "")
@@ -462,6 +488,11 @@ def main(argv: list[str] | None = None) -> int:
         "go": "true" if language == "go" else "",
         "justfile": "true" if language != "none" else "",
         "devcontainer": "true" if devcontainer else "",
+        "mise": "true" if mise else "",
+        "vscode": "true" if vscode else "",
+        # Inverse flag: the template engine has no else-branch, and without
+        # --vscode the gitignore must keep personal .vscode/ fully ignored.
+        "vscode_off": "" if vscode else "true",
         "lightrag": "true" if is_lightrag else "",
         "obsidian": "true" if has_obsidian else "",
         "license_mit": "true" if license_choice == "mit" else "",

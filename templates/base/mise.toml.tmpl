@@ -1,0 +1,20 @@
+{{#if mise}}# mise.toml — toolchain version pinning (scaffolded by project-init).
+#
+# Ownership boundaries (do not blur them):
+#   mise  owns toolchain VERSIONS only
+#   uv/bun own dependencies
+#   just  owns commands (`just --list`)
+#   .env  owns environment variables
+# mise tasks and mise env features are deliberately NOT used here.
+#
+# Pins below are deliberately loose majors so a fresh scaffold works today;
+# tighten to exact versions once the team standardizes.
+
+[tools]
+just = "1"
+{{#if python}}python = "3.12"
+uv = "latest"
+{{/if python}}{{#if node}}bun = "1"
+{{/if node}}{{#if go}}go = "1.24"
+golangci-lint = "2"
+{{/if go}}{{/if mise}}

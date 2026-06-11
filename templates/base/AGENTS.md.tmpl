@@ -33,7 +33,8 @@ matches what you are about to do.
 {{#if lint_command}}- **Commands** — the `justfile` is the canonical command surface: `just --list` shows every recipe (`setup`, `lint`, `format`, `test`, `docs`, `ci`). Prefer `just <recipe>` over raw tool invocations so every agent and CI run the same commands.
 - **Lint** — `just lint` must pass before closing a task. The linter config enforces docstrings and complexity caps on project code — fix the code, don't loosen the gate.
 {{/if}}- **Docs** — follow the Diátaxis layout in [`docs/`](docs/) (see `docs/index.md`). Record architectural decisions with the `add_adr` skill.
-- **No secrets in code** — never hardcode API keys, tokens, or personal data. Use `os.environ['KEY']` or a `.env` file (gitignored).
+- **Ownership boundaries** — each tool owns exactly one concern: {{#if mise}}`mise` owns toolchain versions, {{/if mise}}uv/bun own dependencies, `just` owns commands, `.env` owns environment variables. Don't blur them (no mise tasks/env, no version pins in scripts, no commands outside the justfile).
+- **No secrets in code** — never hardcode API keys, tokens, or personal data. Copy `.env.example` to `.env` (gitignored) and load it explicitly; see `.claude/docs/guides/secrets.md` for the escalation path to org secret managers.
 - **Enforcement is agent-agnostic** — secret scanning (gitleaks) and lifecycle gating run as git hooks plus CI checks (`validate-pr`, `secret-scan`), binding every agent and human alike. Run `.claude/scripts/install_hooks.sh` once per clone to activate them.
 
 ## Claude Code specifics

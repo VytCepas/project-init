@@ -83,6 +83,38 @@ class TestCLIGovernanceFlags:
         assert "gov-cli. All rights reserved." in (target / "LICENSE").read_text()
 
 
+class TestCLIOverlayFlags:
+    """PI-140/PI-146: opt-in overlay flags render their files; defaults stay off."""
+
+    def _run(self, target: Path, *extra: str) -> int:
+        from project_init.__main__ import main
+
+        return main([
+            str(target),
+            "--non-interactive",
+            "--preset", "obsidian-only",
+            "--name", "overlay-cli",
+            "--description", "test",
+            "--language", "python",
+            *extra,
+        ])
+
+    def test_all_overlays_render(self, tmp_path: Path):
+        target = tmp_path / "p"
+        assert self._run(target, "--mise", "--vscode", "--devcontainer") == 0
+        assert (target / "mise.toml").exists()
+        assert (target / ".vscode" / "settings.json").exists()
+        assert (target / ".devcontainer" / "devcontainer.json").exists()
+
+    def test_default_scaffold_unchanged(self, tmp_path: Path):
+        target = tmp_path / "p"
+        assert self._run(target) == 0
+        assert not (target / "mise.toml").exists()
+        assert not (target / ".vscode").exists()
+        assert not (target / ".devcontainer").exists()
+        assert (target / ".env.example").exists(), "env pattern is always scaffolded"
+
+
 class TestCLINonInteractiveCommandVariables:
     """PI-16: CLI passes correct command variables based on --language."""
 

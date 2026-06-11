@@ -1,0 +1,18 @@
+# .env.example — template for local environment (scaffolded by project-init).
+#
+# Copy to .env (gitignored) and fill in real values: cp .env.example .env
+#
+# Loading order (first match wins):
+#   1. variables already exported in your shell
+#   2. .env, loaded by the tool itself — `uv run --env-file .env`, bun
+#      auto-loads .env, or direnv if your team uses it
+# Nothing here is loaded implicitly by the scaffold; tools opt in.
+#
+# Never commit .env: the pre-commit gitleaks scan and CI both enforce this.
+# For team secrets, see .claude/docs/guides/secrets.md (escalation paths).
+{{#if lightrag}}
+# LightRAG memory stack
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+{{/if lightrag}}
+# EXAMPLE_API_KEY=
