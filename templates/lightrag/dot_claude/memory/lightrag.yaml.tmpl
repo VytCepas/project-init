@@ -8,7 +8,7 @@ working_dir: .claude/memory/.lightrag
 
 llm:
   provider: anthropic
-  model: claude-sonnet-4-6
+  model: {{llm_model}}
 
 embedding:
   # Anthropic does not expose embedding APIs.
@@ -17,7 +17,7 @@ embedding:
   #   update the embedding_func in the scripts; no cloud key needed.
   # See https://github.com/hkuds/lightrag for all supported backends.
   provider: openai
-  model: text-embedding-3-small
+  model: {{embedding_model}}
 
 chunk:
   size: 1200
