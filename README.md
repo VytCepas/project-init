@@ -143,6 +143,30 @@ Edit and commit from inside WSL (`wsl` then `cd ~/projects/...`). Editing WSL fi
 **`Unknown preset 'foo'`**
 Run `project-init --help` and pick from `obsidian-only` or `obsidian-lightrag`. Custom presets go in `templates/presets/<name>.toml`.
 
+## Positioning in the ecosystem
+
+Where project-init sits relative to the (fast-moving) community landscape, so
+adopters know what this tool owns and where it defers:
+
+- **What this scaffolder owns**: whole-project setup (pyproject/CI/.gitignore),
+  preset composition with deterministic, tested rendering, and the integrated
+  GitHub lifecycle (DAG-enforced issue → branch → PR → review → merge). No
+  community plugin or scaffolder covers these.
+- **Knowledge-graph memory**: the community has consolidated around
+  [Graphify](https://github.com/safishamsi/graphify) for codebase knowledge
+  graphs. The LightRAG overlay here remains supported; a Graphify-based preset
+  is planned (#130).
+- **Distributing `.claude/` components**: the official
+  [Claude Code plugin marketplace](https://code.claude.com/docs/en/discover-plugins)
+  is the standard channel for hooks/skills/agents. Migrating the template
+  payloads to a plugin is planned (#129); the scaffolder will keep owning
+  project files.
+- **`AGENTS.md` vs `CLAUDE.md`**: Claude Code still reads only `CLAUDE.md`
+  ([anthropics/claude-code#34235](https://github.com/anthropics/claude-code/issues/34235)),
+  while most other tools read the `AGENTS.md` standard — which is why this
+  repo and scaffolded projects keep both, with a redirect between them
+  (inversion to AGENTS.md-canonical planned in #136).
+
 ## Further reading
 
 - [Using project-init in Your Project](docs/guides/using-project-init.md) — full workflow, day-to-day usage, customization, and troubleshooting
