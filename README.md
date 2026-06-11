@@ -40,7 +40,7 @@ that is cheap, but it is not natively so — be explicit about what each agent g
 |---|---|---|
 | **Native (Claude Code)** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring | Claude Code only |
 | **Instructions-only** | `AGENTS.md` / `GEMINI.md` redirect to the canonical `CLAUDE.md`; agents read conventions but **no hook fires and nothing is enforced** for them | Codex, Gemini CLI, Cursor, and other AGENTS.md-aware tools |
-| **Portable regardless** | Lifecycle scripts (plain bash), memory and vault (plain markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent by construction; git hooks bind once `install_hooks.sh` has run in the clone (server-side actions need branch protection) | Everything, including Ollama-based agents |
+| **Portable regardless** | Lifecycle scripts (plain bash), memory and vault (plain markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent by construction; git hooks bind once `.claude/scripts/install_hooks.sh` has run in the clone (server-side actions need branch protection) | Everything, including Ollama-based agents |
 
 Two honest caveats:
 
