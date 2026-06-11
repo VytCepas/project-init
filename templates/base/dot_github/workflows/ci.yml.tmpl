@@ -128,6 +128,24 @@ jobs:
           fi
 {{/if python}}
 
+  # ADR-007: agent-agnostic secret-scanning backstop. The pre-commit git hook
+  # gives fast local feedback but is fail-open; this job is the hard gate.
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history so leaked commits are caught, not just the latest diff
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # GITLEAKS_LICENSE is required only for organization-owned repos
+          # (free key from gitleaks.io). Personal accounts need no license.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
 # Optimization #3: Conditional job execution
 # Example configurations for different scenarios (see full details in CLAUDE.md):
 #

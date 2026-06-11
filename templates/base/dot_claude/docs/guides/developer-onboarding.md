@@ -7,8 +7,11 @@ scaffolded (see the project-init decision in PI-140).
 
 Everything repo-level (linting, commands, env examples) ships with the
 repository. The one per-clone step: run `.claude/scripts/install_hooks.sh`
-once to activate the `commit-msg` and `pre-push` git hooks — git does not
-enable repository hooks automatically.
+once to activate the `pre-commit` (gitleaks secret scan), `commit-msg`,
+and `pre-push` git hooks — git does not enable repository hooks
+automatically. Install [gitleaks](https://github.com/gitleaks/gitleaks#installing)
+for fast local secret scanning; without it the pre-commit scan is skipped
+and CI catches leaks instead.
 
 ## Global gitignore
 
@@ -67,3 +70,4 @@ git config --global commit.gpgsign true
 - [ ] Global git config applied (rebase pulls, pruning, identity)
 - [ ] Commit signing set up, if required
 - [ ] Repo hooks installed: run `.claude/scripts/install_hooks.sh` once per clone
+- [ ] gitleaks installed for the local pre-commit secret scan

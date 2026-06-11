@@ -128,7 +128,7 @@ Run `/session_summary` at the end of each session to record what was done and up
 
 Open `.claude/vault/` as the vault root in Obsidian to get wikilinks, graph view, and Templater templates for ADRs, session notes, design notes, and knowledge entries.
 
-`vault/log.md` is auto-appended by the `session_end` hook — a running operational log.
+Session notes land in `vault/sessions/` via `/session_summary` — a running operational log.
 
 Write an ADR for every non-obvious architectural decision. Future agents will understand why choices were made.
 
@@ -138,11 +138,15 @@ Wired in `.claude/settings.json`:
 
 | Hook | Trigger | Purpose |
 |------|---------|---------|
-| `secret-guard.py` | File writes | Blocks API keys and tokens from being committed |
-| `bash_safety_guard.sh` | Bash commands | Warns on risky patterns (`rm -rf`, force push) |
 | `pre_commit_gate.sh` | Pre-commit | Runs lint and format before every commit |
 | `github_command_guard.sh` | git/gh commands | Steers toward lifecycle scripts |
-| `session_end.sh` | Session end | Appends to `vault/log.md`, runs memory lint |
+
+Security enforcement is agent-agnostic (ADR-007): a gitleaks `pre-commit`
+git hook scans staged changes for secrets, `commit-msg`/`pre-push` git hooks
+gate the lifecycle (install once per clone with
+`.claude/scripts/install_hooks.sh`), and CI mirrors both with a
+`secret-scan` job and the `validate-pr` workflow. Claude-side guidance comes
+from the official `security-guidance` plugin, enabled in `settings.json`.
 
 ### Skills (Slash Commands)
 

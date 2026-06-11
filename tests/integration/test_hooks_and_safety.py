@@ -2,13 +2,28 @@ from __future__ import annotations
 
 import json
 import os
+import stat
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables, run_secret_guard
+from tests.helpers import make_variables
+
+
+def _run_hook(hook: Path, stdin: str = "", env: dict[str, str] | None = None):
+    import shutil
+
+    bash = shutil.which("bash") or "/bin/bash"
+    return subprocess.run(
+        [bash, str(hook)],
+        input=stdin,
+        capture_output=True,
+        text=True,
+        env=env if env is not None else os.environ.copy(),
+    )
 
 
 class TestHookExecutability:
@@ -42,178 +57,202 @@ class TestHookExecutability:
         assert ".sh" in content or "Shell" in content
 
 
-class TestSecretGuard:
-    """Verify secret-guard.py blocks real secrets and allows clean content."""
+class TestSecurityEnforcementMigration:
+    """ADR-007: custom safety hooks replaced by plugin + git/CI enforcement."""
 
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        scaffold(tmp_target, preset, make_variables())
+        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
 
-    @property
-    def _script(self) -> Path:
-        return self.target / ".claude" / "hooks" / "secret-guard.py"
+    def test_legacy_safety_hooks_removed(self):
+        hooks_dir = self.target / ".claude" / "hooks"
+        assert not (hooks_dir / "secret-guard.py").exists()
+        assert not (hooks_dir / "bash_safety_guard.sh").exists()
 
-    def test_script_exists(self):
-        assert self._script.is_file()
+    def test_settings_drops_legacy_hook_references(self):
+        content = (self.target / ".claude" / "settings.json").read_text()
+        assert "secret-guard" not in content
+        assert "bash_safety_guard" not in content
 
-    def test_script_has_valid_syntax(self):
-        import ast
-        ast.parse(self._script.read_text())
-
-    def test_settings_json_wires_secret_guard(self):
+    def test_settings_enables_security_guidance_plugin(self):
         data = json.loads((self.target / ".claude" / "settings.json").read_text())
-        pre = data["hooks"].get("PreToolUse", [])
-        matchers = [g["matcher"] for g in pre]
-        assert any("Write" in m for m in matchers)
+        assert data["enabledPlugins"]["security-guidance@claude-plugins-official"] is True
+        marketplace = data["extraKnownMarketplaces"]["claude-plugins-official"]
+        assert marketplace["source"] == {
+            "source": "github",
+            "repo": "anthropics/claude-plugins-official",
+        }
 
-    def test_blocks_anthropic_api_key_in_write(self):
-        fake_key = "sk-ant-api03-" + "A" * 95
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {"file_path": "/tmp/config.py", "content": f'api_key = "{fake_key}"'},
-        })
-        assert out is not None and out["decision"] == "block"
-        assert "Anthropic" in out["reason"]
+    def test_dag_workflow_hooks_unchanged(self):
+        """The genuinely custom workflow guards stay wired."""
+        hooks_dir = self.target / ".claude" / "hooks"
+        for name in (
+            "github_command_guard.sh",
+            "dag_workflow.py",
+            "pre_commit_gate.sh",
+            "post_edit_lint.sh",
+            "workflow_state_reminder.sh",
+        ):
+            assert (hooks_dir / name).is_file(), f"{name} must survive ADR-007"
 
-    def test_blocks_openai_api_key_in_edit(self):
-        fake_key = "sk-proj-" + "B" * 48
-        out = run_secret_guard(self._script, {
-            "tool_name": "Edit",
-            "tool_input": {"file_path": "/tmp/settings.py", "new_string": f"KEY = '{fake_key}'"},
-        })
-        assert out is not None and out["decision"] == "block"
+        data = json.loads((self.target / ".claude" / "settings.json").read_text())
+        commands = [
+            h["command"]
+            for groups in data["hooks"].values()
+            for group in groups
+            for h in group["hooks"]
+        ]
+        for wired in (
+            "github_command_guard.sh",
+            "pre_commit_gate.sh",
+            "post_edit_lint.sh",
+            "workflow_state_reminder.sh",
+        ):
+            assert any(wired in c for c in commands), f"{wired} must stay wired"
 
-    def test_blocks_aws_key_in_bash(self):
-        out = run_secret_guard(self._script, {
-            "tool_name": "Bash",
-            "tool_input": {"command": "export AWS_ACCESS_KEY_ID=AKIAZXBCDE12345678AB"},
-        })
-        assert out is not None and out["decision"] == "block"
-        assert "AWS" in out["reason"]
 
-    def test_blocks_private_key_material(self):
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "/tmp/key.pem",
-                "content": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----",
-            },
-        })
-        assert out is not None and out["decision"] == "block"
+class TestGitleaksPreCommitHook:
+    """ADR-007: secret scanning is a git pre-commit hook, fail-open locally."""
 
-    def test_blocks_ssn(self):
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {"file_path": "/tmp/data.py", "content": "ssn = '123-45-6789'"},
-        })
-        assert out is not None and out["decision"] == "block"
-        assert "Social Security" in out["reason"]
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = tmp_target
+        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        self.hook = self.target / ".github" / "hooks" / "pre-commit"
 
-    def test_allows_clean_python_file(self):
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {"file_path": "/tmp/hello.py", "content": "def hello():\n    return 'world'\n"},
-        })
-        assert out is None
+    def test_hook_exists_and_executable(self):
+        assert self.hook.is_file()
+        assert self.hook.stat().st_mode & 0o111
 
-    def test_allows_env_variable_reference(self):
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "/tmp/config.py",
-                "content": "import os\napi_key = os.environ['ANTHROPIC_API_KEY']\n",
-            },
-        })
-        assert out is None
+    def test_hook_scans_staged_changes(self):
+        content = self.hook.read_text()
+        assert "gitleaks git --pre-commit --staged" in content
 
-    def test_allows_env_example_file(self):
-        fake_key = "sk-ant-api03-" + "A" * 95
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "/project/.env.example",
-                "content": f"ANTHROPIC_API_KEY={fake_key}\n",
-            },
-        })
-        assert out is None
+    def test_fails_open_when_gitleaks_missing(self, tmp_path: Path):
+        """Without gitleaks the commit proceeds with a warning — CI is the backstop."""
+        empty_bin = tmp_path / "bin"
+        empty_bin.mkdir()
+        env = {"PATH": str(empty_bin), "HOME": os.environ.get("HOME", "/tmp")}
+        result = _run_hook(self.hook, env=env)
+        assert result.returncode == 0
+        assert "gitleaks not installed" in result.stderr
 
-    def test_allows_obvious_placeholder(self):
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "/tmp/readme.md",
-                "content": "Set ANTHROPIC_API_KEY=your_key_here in your .env file.\n",
-            },
-        })
-        assert out is None
+    def test_invokes_gitleaks_and_propagates_findings_exit(self, tmp_path: Path):
+        """With gitleaks on PATH the hook delegates and propagates its exit code."""
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        log = tmp_path / "args.log"
+        fake = fake_bin / "gitleaks"
+        fake.write_text(f'#!/bin/bash\necho "$@" > "{log}"\nexit 1\n')
+        fake.chmod(fake.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    def test_blocks_github_pat(self):
-        fake_token = "ghp_" + "C" * 36
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {"file_path": "/tmp/ci.py", "content": f"token = '{fake_token}'"},
-        })
-        assert out is not None and out["decision"] == "block"
+        env = os.environ.copy()
+        env["PATH"] = f"{fake_bin}:{env['PATH']}"
+        result = _run_hook(self.hook, env=env)
+        assert result.returncode == 1, "findings exit code must abort the commit"
+        assert "--staged" in log.read_text()
 
-    def test_claude_md_has_no_secrets_rule(self):
-        content = (self.target / "CLAUDE.md").read_text()
-        assert "secret" in content.lower() or "hardcode" in content.lower()
 
-    def test_blocks_home_directory_path(self):
-        home = os.environ.get("HOME", "/home/testuser")
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "/tmp/config.yaml",
-                "content": f"venv_path: {home}/projects/myapp/.venv",
-            },
-        })
-        assert out is not None and out["decision"] == "block"
-        assert "home" in out["reason"].lower() or "path" in out["reason"].lower()
+class TestPrePushLifecycleGate:
+    """ADR-007: pre-push enforces branch naming with the same rule as dag_workflow.py."""
 
-    def test_allows_relative_path(self):
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "/tmp/config.yaml",
-                "content": "venv_path: .venv/bin/python",
-            },
-        })
-        assert out is None
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = tmp_target
+        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        self.hook = self.target / ".github" / "hooks" / "pre-push"
 
-    def test_allows_home_path_in_bash_command(self):
-        """PI-101 regression: Bash commands referencing $HOME paths must not be blocked.
+    SHA = "a" * 40
+    ZERO = "0" * 40
 
-        Home-path detection is scoped to file tools (Write/Edit/MultiEdit) only.
-        Blocking Bash broke legitimate MCP config reads and tool invocations.
-        """
-        home = os.environ.get("HOME", "/home/testuser")
-        out = run_secret_guard(self._script, {
-            "tool_name": "Bash",
-            "tool_input": {"command": f"cat {home}/.claude/settings.json"},
-        })
-        assert out is None
+    def _push(self, remote_ref: str, local_sha: str | None = None):
+        line = f"refs/heads/x {local_sha or self.SHA} {remote_ref} {self.ZERO}\n"
+        return _run_hook(self.hook, stdin=line)
 
-    def test_still_blocks_home_path_in_write(self):
-        """Companion to PI-101: home-path detection remains active for Write."""
-        home = os.environ.get("HOME", "/home/testuser")
-        out = run_secret_guard(self._script, {
-            "tool_name": "Write",
-            "tool_input": {
-                "file_path": "/tmp/config.yaml",
-                "content": f"mcp_config: {home}/.claude/mcp.json",
-            },
-        })
-        assert out is not None and out["decision"] == "block"
+    def test_blocks_push_to_main(self):
+        result = self._push("refs/heads/main")
+        assert result.returncode == 1
+        assert "not allowed" in result.stdout
+
+    def test_blocks_push_to_master(self):
+        assert self._push("refs/heads/master").returncode == 1
+
+    def test_allows_issue_branch(self):
+        assert self._push("refs/heads/feat/PI-42-add-oauth-login").returncode == 0
+
+    def test_allows_nojira_branch(self):
+        assert self._push("refs/heads/chore/nojira-bump-dev-dependency").returncode == 0
+
+    def test_blocks_unconventional_branch_name(self):
+        result = self._push("refs/heads/wip-stuff")
+        assert result.returncode == 1
+        assert "naming convention" in result.stdout
+
+    def test_allows_deleting_misnamed_branch(self):
+        result = self._push("refs/heads/wip-stuff", local_sha=self.ZERO)
+        assert result.returncode == 0
+
+    def test_allows_tags(self):
+        line = f"refs/tags/v1.0.0 {self.SHA} refs/tags/v1.0.0 {self.ZERO}\n"
+        assert _run_hook(self.hook, stdin=line).returncode == 0
+
+
+class TestInstallHooks:
+    """install_hooks.sh wires all git-level enforcement into .git/hooks."""
+
+    def test_installs_all_enforcement_hooks(self, tmp_target: Path):
+        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        subprocess.run(
+            ["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True
+        )
+        result = subprocess.run(
+            ["bash", str(tmp_target / ".claude" / "scripts" / "install_hooks.sh")],
+            cwd=tmp_target,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        for name in ("pre-commit", "commit-msg", "pre-push"):
+            installed = tmp_target / ".git" / "hooks" / name
+            assert installed.is_file(), f"{name} not installed"
+            assert installed.stat().st_mode & 0o111, f"{name} not executable"
+
+
+class TestCiSecretScanMirror:
+    """ADR-007: the gitleaks scan is mirrored as a hard gate in scaffolded CI."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = tmp_target
+        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        self.ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+
+    def test_secret_scan_job_present(self):
+        assert "secret-scan:" in self.ci
+        assert "gitleaks/gitleaks-action@v3" in self.ci
+
+    def test_scans_full_history(self):
+        assert "fetch-depth: 0" in self.ci
+
+    def test_job_rendered_outside_language_conditionals(self, tmp_path: Path):
+        """secret-scan must survive a non-python scaffold too."""
+        target = tmp_path / "node-proj"
+        target.mkdir()
+        scaffold(
+            target,
+            load_preset("obsidian-only"),
+            make_variables(language="node", python="", node="true"),
+        )
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "secret-scan:" in ci
 
 
 class TestShellLineEndings:
     """Regression: shell hook scripts must be LF-only.
 
     Codex evaluation 2026-04-25 caught templates/base/dot_claude/hooks/
-    bash_safety_guard.sh shipping with CRLF endings, which made
+    shell scripts shipping with CRLF endings, which made
     `/usr/bin/env: 'bash\\r': No such file or directory` on Unix.
     """
 

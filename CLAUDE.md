@@ -2,7 +2,7 @@
 
 This repo is a **scaffolder**. It produces a `.claude/` layout inside *other* projects. Nothing here runs as a long-lived service.
 
-**Scaffolder source ≠ scaffolded project.** The hooks and scripts under `.claude/` here are development infrastructure *for this repo*. A project produced by running `project-init` (the output) gets a richer set of hooks from `templates/` — including safety hooks like `secret-guard.py`, `bash_safety_guard.sh`, and `pre_commit_gate.sh` that are absent here. If you see a script or skill referenced in `templates/` that does not exist under `.claude/` in this repo, that is expected.
+**Scaffolder source ≠ scaffolded project.** The hooks and scripts under `.claude/` here are development infrastructure *for this repo*. A project produced by running `project-init` (the output) gets a richer set of hooks from `templates/` — including `pre_commit_gate.sh` and git-level enforcement (gitleaks pre-commit secret scan, lifecycle pre-push gate; ADR-007) that are absent here. If you see a script or skill referenced in `templates/` that does not exist under `.claude/` in this repo, that is expected.
 
 This is the canonical instruction file for agents working in this repository. [AGENTS.md](AGENTS.md) and [GEMINI.md](GEMINI.md) intentionally redirect here to avoid duplicated rules.
 

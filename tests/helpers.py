@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import json
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 
@@ -59,15 +56,3 @@ def make_variables(**overrides: str) -> dict[str, str]:
     }
     defaults.update(overrides)
     return defaults
-
-
-def run_secret_guard(script: Path, payload: dict) -> dict | None:
-    """Run secret-guard.py with a JSON payload; return parsed stdout or None."""
-    result = subprocess.run(
-        [sys.executable, str(script)],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, f"secret-guard exited {result.returncode}: {result.stderr}"
-    return json.loads(result.stdout) if result.stdout.strip() else None

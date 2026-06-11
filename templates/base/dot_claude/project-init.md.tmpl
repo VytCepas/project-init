@@ -14,7 +14,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 
 1. **Start of session** — read [`memory/MEMORY.md`](memory/MEMORY.md), then check [`docs/adr/`](docs/adr/) for relevant decisions.
 2. **During work** — permanent decisions → [`docs/adr/`](docs/adr/); exploratory notes → [`vault/`](vault/); reusable facts → [`memory/`](memory/).
-3. **End of session** — `session_end` hook writes a session log to [`vault/sessions/`](vault/sessions/){{#if lightrag}}, LightRAG ingester indexes memory{{/if}}.
+3. **End of session** — run `/session_summary` to write a session log to [`vault/sessions/`](vault/sessions/){{#if lightrag}}, LightRAG ingester indexes memory{{/if}}.
 
 ## Tools
 
@@ -38,7 +38,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Agent | `reviewer` | code review specialist |
 | Agent | `researcher` | codebase explorer |
 
-Hooks run automatically via `settings.json`: `bash_safety_guard`, `github_command_guard`, `workflow_state_reminder`, `pre_commit_gate`, `post_edit_lint`{{#if obsidian}}, `session_end`{{/if}}.
+Hooks run automatically via `settings.json`: `github_command_guard`, `workflow_state_reminder`, `pre_commit_gate`, `post_edit_lint`. Secret scanning and lifecycle gating are enforced agent-agnostically by git hooks (gitleaks pre-commit, commit-msg, pre-push — installed via `.claude/scripts/install_hooks.sh`) and mirrored in CI; the `security-guidance` plugin provides Claude-side guidance.
 
 **Rules** (`.claude/rules/`): per-filetype conventions loaded automatically by Claude Code when you open a matching file.
 
