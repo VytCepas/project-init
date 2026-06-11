@@ -109,6 +109,7 @@ The wizard asks (interactive mode only):
 - Browser automation — Playwright (yes/no)
 - Owner/team (`--owner`) — default CODEOWNERS owner, SECURITY contact, and LICENSE copyright holder (e.g. `@org/team`)
 - License (`--license mit|apache-2.0|proprietary|none`) — renders a LICENSE with the current year and the owner (or project name); `none` skips the file
+- Devcontainer (`--devcontainer`) — renders `.devcontainer/` for Codespaces, fresh clones, and remote agent containers (see below)
 
 Every preset also ships governance starters: `.github/CODEOWNERS`,
 `CONTRIBUTING.md` (setup, `just --list` command surface, branch/PR
@@ -119,6 +120,22 @@ force-push) — unprotected default branches undermine the workflow
 enforcement everything else sets up.
 
 Your answers are recorded in `.claude/config.yaml`. Re-run any time — it reconciles, preserves existing project files, and never overwrites memory or vault notes. With `--strict`, templates are rendered and validated in a temporary directory first, then the validated scaffold files are merged into the target; strict mode is not a whole-directory replacement.
+
+### Remote and web agent sessions
+
+Scaffolded projects bootstrap themselves in ephemeral environments
+(Claude Code on the web, CI agents, fresh clones):
+
+- A **SessionStart hook** (`.claude/hooks/session_setup.sh`) syncs
+  dependencies when a session opens in a cold environment — `just setup`
+  when available, falling back to `uv sync` / `bun install` /
+  `go mod download`. Warm sessions are a no-op: a content stamp of the
+  dependency manifests short-circuits before any tool runs, and a failed
+  bootstrap warns without blocking the session.
+- The opt-in **`--devcontainer`** flag renders a minimal
+  `.devcontainer/` (Ubuntu base image; post-create installs `just` plus
+  the language toolchain and reuses the same bootstrap) — one consistent
+  environment for new colleagues, Codespaces, and agent containers.
 
 ## Example command
 
