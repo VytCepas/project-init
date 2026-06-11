@@ -148,7 +148,8 @@ Run `project-init --help` and pick from `obsidian-only` or `obsidian-lightrag`. 
 Where project-init sits relative to the (fast-moving) community landscape, so
 adopters know what this tool owns and where it defers:
 
-- **What this scaffolder owns**: whole-project setup (pyproject/CI/.gitignore),
+- **What this scaffolder owns**: project infrastructure files (CI workflows,
+  `.gitignore`, GitHub issue/PR templates and board automation),
   preset composition with deterministic, tested rendering, and the integrated
   GitHub lifecycle (DAG-enforced issue → branch → PR → review → merge). No
   community plugin or scaffolder covers these.
@@ -164,8 +165,9 @@ adopters know what this tool owns and where it defers:
 - **`AGENTS.md` vs `CLAUDE.md`**: Claude Code still reads only `CLAUDE.md`
   ([anthropics/claude-code#34235](https://github.com/anthropics/claude-code/issues/34235)),
   while most other tools read the `AGENTS.md` standard — which is why this
-  repo and scaffolded projects keep both, with a redirect between them
-  (inversion to AGENTS.md-canonical planned in #136).
+  repo and scaffolded projects keep both: today `AGENTS.md` (and `GEMINI.md`)
+  redirect readers to the canonical `CLAUDE.md`; inverting that so `AGENTS.md`
+  becomes canonical is planned in #136.
 
 ## Further reading
 
