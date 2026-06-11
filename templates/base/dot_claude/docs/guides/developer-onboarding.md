@@ -13,6 +13,21 @@ automatically. Install [gitleaks](https://github.com/gitleaks/gitleaks#installin
 for fast local secret scanning; without it the pre-commit scan is skipped
 and CI catches leaks instead.
 
+## Dependency updates (Renovate)
+
+The repo ships a `renovate.json` (weekly grouped updates, GitHub Actions
+pinned by digest, lockfile maintenance — managers activate automatically
+from the files present). Renovate PRs arrive as `[nojira][chore] …`, which
+the PR validators accept. One per-org step: install the
+[Renovate GitHub App](https://github.com/apps/renovate) on the repository.
+
+To centralize policy across an organization, replace the `extends` list
+with a shared preset and keep repo files minimal:
+
+```json
+{ "extends": ["github>your-org/renovate-config"] }
+```
+
 ## Global gitignore
 
 Keep OS and editor junk out of every repo you touch, without bloating each
