@@ -490,6 +490,9 @@ def main(argv: list[str] | None = None) -> int:
         "devcontainer": "true" if devcontainer else "",
         "mise": "true" if mise else "",
         "vscode": "true" if vscode else "",
+        # Inverse flag: the template engine has no else-branch, and without
+        # --vscode the gitignore must keep personal .vscode/ fully ignored.
+        "vscode_off": "" if vscode else "true",
         "lightrag": "true" if is_lightrag else "",
         "obsidian": "true" if has_obsidian else "",
         "license_mit": "true" if license_choice == "mit" else "",

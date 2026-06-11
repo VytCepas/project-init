@@ -24,11 +24,12 @@ __pycache__/
 # OS / editor
 .DS_Store
 *.swp
-# Scaffolded editor config (--vscode) is shared; everything else is personal.
+{{#if vscode}}# Scaffolded editor config (--vscode) is shared; the rest stays personal.
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
-.idea/
+{{/if vscode}}{{#if vscode_off}}.vscode/
+{{/if vscode_off}}.idea/
 
 # Secrets
 .env

@@ -78,18 +78,22 @@ class TestEnvPattern:
         assert "installs **none**" in guide, "manager choice stays org-specific"
 
 
+def _scaffold_vscode(target: Path, **overrides: str) -> Path:
+    return _scaffold(target, vscode="true", vscode_off="", **overrides)
+
+
 class TestVscodeOverlay:
     def test_absent_by_default(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
         assert not (target / ".vscode").exists()
 
     def test_minimal_files_only(self, tmp_path: Path):
-        target = _scaffold(tmp_path / "p", vscode="true")
+        target = _scaffold_vscode(tmp_path / "p")
         files = sorted(p.name for p in (target / ".vscode").iterdir())
         assert files == ["extensions.json", "settings.json"]
 
     def test_python_wires_ruff_format_on_save(self, tmp_path: Path):
-        target = _scaffold(tmp_path / "p", vscode="true")
+        target = _scaffold_vscode(tmp_path / "p")
         settings = json.loads((target / ".vscode" / "settings.json").read_text())
         assert settings["editor.formatOnSave"] is True
         assert settings["[python]"]["editor.defaultFormatter"] == "charliermarsh.ruff"
@@ -98,16 +102,24 @@ class TestVscodeOverlay:
         assert "anthropic.claude-code" in extensions["recommendations"]
 
     def test_go_recommends_go_extension(self, tmp_path: Path):
-        target = _scaffold(
-            tmp_path / "go", vscode="true", language="go", python="", go="true"
+        target = _scaffold_vscode(
+            tmp_path / "go", language="go", python="", go="true"
         )
         extensions = json.loads((target / ".vscode" / "extensions.json").read_text())
         assert "golang.go" in extensions["recommendations"]
         assert "charliermarsh.ruff" not in extensions["recommendations"]
 
     def test_gitignore_shares_only_scaffolded_files(self, tmp_path: Path):
-        target = _scaffold(tmp_path / "p", vscode="true")
+        target = _scaffold_vscode(tmp_path / "p")
         gitignore = (target / ".gitignore").read_text()
         assert ".vscode/*" in gitignore
         assert "!.vscode/extensions.json" in gitignore
         assert "!.vscode/settings.json" in gitignore
+
+    def test_gitignore_keeps_personal_vscode_ignored_by_default(self, tmp_path: Path):
+        """Without --vscode, no unignore rules may leak personal editor
+        config into git (PR #163 review)."""
+        target = _scaffold(tmp_path / "p")
+        gitignore = (target / ".gitignore").read_text()
+        assert "\n.vscode/\n" in gitignore
+        assert "!.vscode" not in gitignore
