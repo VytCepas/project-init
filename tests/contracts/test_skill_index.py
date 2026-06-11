@@ -93,14 +93,18 @@ class TestSkillFrontmatter:
                 fields[key.strip()] = value.strip()
         raise AssertionError(f"{path}: frontmatter never closed")
 
+    # Template skills and this repo's own skills both follow the standard.
+    _SKILL_ROOTS = (_SKILLS_DIR, _REPO_ROOT / ".claude" / "skills")
+
     def _skill_files(self):
-        for skill_dir in sorted(_SKILLS_DIR.iterdir()):
-            if not skill_dir.is_dir():
-                continue
-            for name in ("SKILL.md", "SKILL.md.tmpl"):
-                p = skill_dir / name
-                if p.exists():
-                    yield p
+        for root in self._SKILL_ROOTS:
+            for skill_dir in sorted(root.iterdir()):
+                if not skill_dir.is_dir():
+                    continue
+                for name in ("SKILL.md", "SKILL.md.tmpl"):
+                    p = skill_dir / name
+                    if p.exists():
+                        yield p
 
     def test_all_skills_have_name_and_description(self):
         for path in self._skill_files():
@@ -116,11 +120,15 @@ class TestSkillFrontmatter:
 
     def test_sub_skills_marked_not_user_invocable(self):
         """Skills documented as indirectly invoked must not be /command-visible."""
-        for skill in ("create_issue", "github_workflow"):
-            fm = self._frontmatter(_SKILLS_DIR / skill / "SKILL.md")
-            assert fm.get("user-invocable") == "false", (
-                f"{skill}: expected user-invocable: false"
-            )
+        for root in self._SKILL_ROOTS:
+            for skill in ("create_issue", "github_workflow"):
+                path = root / skill / "SKILL.md"
+                if not path.exists():
+                    continue
+                fm = self._frontmatter(path)
+                assert fm.get("user-invocable") == "false", (
+                    f"{path}: expected user-invocable: false"
+                )
 
     def test_audit_runs_in_forked_context(self):
         """Heavyweight scan isolates its context; findings land in a GitHub issue."""
