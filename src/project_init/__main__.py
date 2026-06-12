@@ -355,14 +355,18 @@ def _gather_inputs_interactive(
     vscode = Confirm.ask(
         "Add shared VS Code config (extensions + format-on-save)?", default=False
     )
-    agents_raw = _prompt(
-        "Agents to support (claude always; add codex/gemini/ollama, comma-separated)",
-        default="claude",
-    )
-    try:
-        agents = resolve_agents(agents_raw)
-    except ValueError:
-        agents = ["claude"]
+    while True:
+        agents_raw = _prompt(
+            "Agents to support (claude always; add codex/gemini/ollama, comma-separated)",
+            default="claude",
+        )
+        try:
+            agents = resolve_agents(agents_raw)
+            break
+        except ValueError as e:
+            from rich.console import Console
+
+            Console().print(f"[red]{e}[/red]")
     return (
         project_name,
         project_description,

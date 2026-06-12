@@ -45,6 +45,24 @@ class TestAgentSelection:
         with pytest.raises(ValueError, match="cursor"):
             resolve_agents("codex,cursor")
 
+    def test_wizard_reprompts_on_invalid_agents(self, monkeypatch, capsys):
+        """An invalid interactive selection must re-prompt, not silently
+        fall back to claude-only (PR #167 review)."""
+        import project_init.__main__ as cli
+
+        answers = iter(
+            ["proj", "desc", "python", "@owner", "none", "codex,cursor", "codex"]
+        )
+        monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
+        monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
+        monkeypatch.setattr(cli, "_choose_db_interactive", lambda: None)
+        monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
+        monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
+
+        result = cli._gather_inputs_interactive(default_name="proj")
+        assert result[-1] == ["claude", "codex"], "valid retry must be honored"
+        assert "unknown agent(s): cursor" in capsys.readouterr().out
+
     def test_only_codex_and_gemini_contribute_layers(self):
         assert agent_layers(["claude", "codex", "gemini", "ollama"]) == ["codex", "gemini"]
         assert agent_layers(["claude", "ollama"]) == []
