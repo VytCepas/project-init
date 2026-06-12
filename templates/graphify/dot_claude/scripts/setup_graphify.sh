@@ -23,7 +23,9 @@ else
 fi
 
 echo "Registering project-scoped skill + hook..."
-graphify install
+# --project writes under the repo (.claude/skills/graphify/) so the skill is
+# committable and teammates get it on clone; default scope is user-global.
+graphify install --project
 
 echo "Installing post-commit graph rebuild hook..."
 graphify hook install

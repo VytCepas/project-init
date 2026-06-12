@@ -28,7 +28,9 @@ class TestScaffoldGraphify:
         assert os.access(script, os.X_OK)
         content = script.read_text()
         assert "uv tool install graphifyy" in content
-        assert "graphify install" in content
+        assert "graphify install --project" in content, (
+            "default scope is user-global; --project makes the skill committable"
+        )
         assert "graphify hook install" in content
 
     def test_rule_file_directs_graph_first_lookup(self):
