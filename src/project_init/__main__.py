@@ -439,9 +439,8 @@ def _upgrade_main(argv: list[str]) -> int:
         "--no-plugin",
         action="store_true",
         help=(
-            "Copy hooks/skills into the project and wire them in settings "
-            "instead of relying on the project-init-workflow plugin "
-            "(offline / no-marketplace-trust fallback; ADR-010 cutover)"
+            "Switch the project to the no-plugin fallback on this upgrade: "
+            "re-render with copied hooks/skills + local settings wiring"
         ),
     )
     p.add_argument(
@@ -450,7 +449,9 @@ def _upgrade_main(argv: list[str]) -> int:
         help="Accepted for CLI symmetry — upgrade never prompts",
     )
     args = p.parse_args(argv)
-    return run_upgrade(Path(args.target).resolve(), apply=args.apply)
+    return run_upgrade(
+        Path(args.target).resolve(), apply=args.apply, no_plugin=args.no_plugin
+    )
 
 
 
@@ -581,7 +582,7 @@ def main(argv: list[str] | None = None) -> int:
     inputs = _resolve_inputs(args, parser, target)
     target.mkdir(parents=True, exist_ok=True)
     if inputs is None:
-        inputs = _gather_inputs_interactive(default_name=target.name) + (False,)
+        inputs = _gather_inputs_interactive(default_name=target.name) + (args.no_plugin,)
     (
         project_name,
         project_description,
