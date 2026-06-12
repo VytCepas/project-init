@@ -5,7 +5,7 @@ Destructive operations that bypass the git/CI boundary (cloud deletes,
 DROP DATABASE, terraform destroy, …) get:
 
 - ``ask``   in interactive sessions — a human confirms or rejects;
-- ``deny``  in fully autonomous sessions (``bypassPermissions``) — there is
+- ``block`` in fully autonomous sessions (``bypassPermissions``) — there is
   no human to ask, so the command is blocked outright.
 
 Escape hatch: ``safety.allow`` in ``.claude/config.yaml`` holds a JSON list
@@ -27,15 +27,20 @@ import re
 import sys
 from pathlib import Path
 
-# (pattern, label) — matched against the full command string.
+# (pattern, label) — matched against the full command string. ``_SEG``
+# tolerates global flags between the CLI name and the destructive verb
+# (e.g. `kubectl --context prod delete …`) while stopping at pipeline and
+# command separators; the cost is rare false positives on odd resource
+# names, which the ask/allowlist paths absorb cheaply.
+_SEG = r"[^|;&]*?"
 DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bterraform\s+(destroy|apply\s+.*-destroy)\b"), "terraform destroy"),
-    (re.compile(r"\bkubectl\s+delete\b"), "kubectl delete"),
-    (re.compile(r"\bhelm\s+(uninstall|delete)\b"), "helm uninstall"),
-    (re.compile(r"\baws\s+\S+\s+(delete|terminate|remove)\S*\b"), "aws delete/terminate"),
-    (re.compile(r"\baws\s+s3\s+(rb|rm\s+.*--recursive)\b"), "aws s3 bucket/recursive removal"),
-    (re.compile(r"\bgcloud\s+.*\bdelete\b"), "gcloud delete"),
-    (re.compile(r"\baz\s+\S+.*\bdelete\b"), "az delete"),
+    (re.compile(rf"\bkubectl\b{_SEG}\bdelete\b"), "kubectl delete"),
+    (re.compile(rf"\bhelm\b{_SEG}\b(uninstall|delete)\b"), "helm uninstall"),
+    (re.compile(rf"\baws\b{_SEG}\b(delete|terminate|remove)\S*\b"), "aws delete/terminate"),
+    (re.compile(rf"\baws\b{_SEG}\bs3\s+(rb\b|rm\b{_SEG}--recursive)"), "aws s3 bucket/recursive removal"),
+    (re.compile(rf"\bgcloud\b{_SEG}\bdelete\b"), "gcloud delete"),
+    (re.compile(rf"\baz\b{_SEG}\bdelete\b"), "az delete"),
     (re.compile(r"\bdrop\s+(table|database|schema)\b", re.IGNORECASE), "SQL DROP"),
     (re.compile(r"\btruncate\s+table\b", re.IGNORECASE), "SQL TRUNCATE"),
     (re.compile(r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)[a-zA-Z]*\s+(/(?!tmp\b)|~)"),
@@ -50,9 +55,24 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
 _AUTONOMOUS_MODES = {"bypassPermissions", "dangerouslySkipPermissions"}
 
 
+def _find_config(start: Path) -> Path | None:
+    """Walk up from *start* to the project's .claude/config.yaml, if any."""
+    for candidate in (start, *start.parents):
+        config = candidate / ".claude" / "config.yaml"
+        if config.is_file():
+            return config
+    return None
+
+
 def _allow_patterns(root: Path) -> list[re.Pattern[str]]:
-    """Read the safety.allow JSON list from .claude/config.yaml (fail-open)."""
-    config = root / ".claude" / "config.yaml"
+    """Read the safety.allow JSON list from .claude/config.yaml (fail-open).
+
+    *root* is the Bash tool's cwd, which may be a subdirectory after `cd` —
+    the config is located by walking up the tree.
+    """
+    config = _find_config(root)
+    if config is None:
+        return []
     try:
         in_safety = False
         for line in config.read_text(encoding="utf-8").splitlines():

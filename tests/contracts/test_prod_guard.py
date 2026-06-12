@@ -28,6 +28,11 @@ DESTRUCTIVE = [
     "rm -rf ~/projects",
     "gh repo delete VytCepas/project-init",
     "docker system prune -af",
+    # Global flags before the destructive verb (PR #174 review, P1).
+    "kubectl --context prod delete namespace prod",
+    "helm -n prod uninstall api",
+    "aws --profile prod s3 rb s3://prod-assets --force",
+    "aws --region eu-west-1 ec2 terminate-instances --instance-ids i-1",
 ]
 
 SAFE = [
@@ -92,6 +97,18 @@ class TestVerdicts:
         # Same verb without the allowed context is still blocked.
         other = "kubectl delete pod web --context prod"
         assert _run_hook(_payload(other, "bypassPermissions", tmp_path), tmp_path) is not None
+
+    def test_allowlist_honored_from_subdirectory(self, tmp_path: Path):
+        """Bash often runs after `cd` into a subdir — the guard walks up to
+        the project's config.yaml (PR #174 review)."""
+        config = tmp_path / ".claude" / "config.yaml"
+        config.parent.mkdir(parents=True)
+        config.write_text('safety:\n  allow: ["kubectl delete .* --context kind-dev"]\n')
+        subdir = tmp_path / "services" / "api"
+        subdir.mkdir(parents=True)
+        command = "kubectl delete pod web --context kind-dev"
+        payload = _payload(command, "bypassPermissions", subdir)
+        assert _run_hook(payload, subdir) is None
 
     def test_garbage_stdin_fails_open(self, tmp_path: Path):
         result = subprocess.run(
