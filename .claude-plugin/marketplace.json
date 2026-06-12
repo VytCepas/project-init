@@ -8,7 +8,7 @@
     {
       "name": "project-init-workflow",
       "source": "./plugins/project-init-workflow",
-      "description": "GitHub lifecycle skills and deterministic guard hooks for projects scaffolded by project-init (dual-shipped with scaffolded copies during the transition; see ADR-010)."
+      "description": "GitHub lifecycle skills and deterministic guard hooks for projects scaffolded by project-init — the default (plugin-first) payload; --no-plugin scaffolds copy the same files locally instead (ADR-010)."
     }
   ]
 }
