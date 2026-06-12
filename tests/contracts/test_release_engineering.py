@@ -89,3 +89,29 @@ class TestVersionConsistency:
         content = (_REPO_ROOT / "README.md").read_text()
         assert "PROJECT_INIT_REF" in content
         assert "adr-008" in content
+
+
+class TestPyPIPublishing:
+    """ADR-011: trusted publishing from the release workflow."""
+
+    def _workflow(self) -> str:
+        return (_REPO_ROOT / ".github" / "workflows" / "release.yml").read_text()
+
+    def test_publish_job_uses_trusted_publishing(self):
+        content = self._workflow()
+        assert "publish-pypi:" in content
+        assert "id-token: write" in content, "OIDC — no tokens to custody"
+        assert "pypa/gh-action-pypi-publish" in content
+        assert "name: pypi" in content, "environment gates the publisher"
+
+    def test_publish_runs_only_after_release(self):
+        content = self._workflow()
+        publish_section = content.split("publish-pypi:")[1]
+        assert "needs: release" in publish_section
+
+    def test_pyproject_has_pypi_metadata(self):
+        config = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text())
+        project = config["project"]
+        assert project["name"] == "project-init"
+        assert any("MIT License" in c for c in project["classifiers"])
+        assert project["urls"]["Repository"]

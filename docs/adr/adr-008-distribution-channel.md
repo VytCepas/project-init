@@ -1,6 +1,6 @@
 # ADR-008: Distribution stays git-based with tagged releases; PyPI deferred
 
-- Status: Accepted
+- Status: Superseded in part by ADR-011 (PyPI publishing added; git channel unchanged)
 - Date: 2026-06-11
 - Implements: distribution decision required by #144
 

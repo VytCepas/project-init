@@ -53,6 +53,13 @@ Two honest caveats:
 
 ## Install (one-time)
 
+Preferred — from PyPI (after the first published release):
+
+```bash
+uv tool install project-init   # or one-off: uvx project-init
+```
+
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
 ```

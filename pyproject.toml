@@ -11,6 +11,17 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Vytautas Čepas", email = "vyt.cepas.ve@gmail.com" }]
 keywords = ["claude-code", "agents", "scaffolding", "obsidian", "lightrag"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+    "Environment :: Console",
+]
 
 dependencies = [
     "rich>=13.7",
