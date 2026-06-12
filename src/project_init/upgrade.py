@@ -235,6 +235,7 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "format_command": fields.get("tooling.format_command", ""),
         "test_command": fields.get("tooling.test_command", ""),
         "lightrag": "true" if "lightrag" in stack else "",
+        "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "justfile": "true" if language != "none" else "",
         # Opt-in overlays (PI-146/PI-140) postdate pre-record configs:

@@ -103,7 +103,7 @@ The wizard asks (interactive mode only):
 
 - Project name / description
 - Language (Python/Node/Go/none) — drives `lint_command`, `format_command`, `test_command`
-- Memory stack — Obsidian-only or Obsidian + LightRAG
+- Memory stack — Obsidian-only, Obsidian + Graphify (recommended for code-heavy projects), or Obsidian + LightRAG (legacy)
 - Core MCPs (Context7)
 - Database MCP — none / Postgres / SQLite
 - Browser automation — Playwright (yes/no)
@@ -231,7 +231,7 @@ The hooks need `python3` on `PATH` (replaces the previous `jq` dependency). They
 Edit and commit from inside WSL (`wsl` then `cd ~/projects/...`). Editing WSL files from Git Bash on Windows mangles executable bits and line endings.
 
 **`Unknown preset 'foo'`**
-Run `project-init --help` and pick from `obsidian-only` or `obsidian-lightrag`. Custom presets go in `templates/presets/<name>.toml`.
+Run `project-init --help` and pick from `obsidian-only`, `obsidian-graphify`, or `obsidian-lightrag` (legacy; ADR-009). Custom presets go in `templates/presets/<name>.toml`.
 
 ## Positioning in the ecosystem
 
@@ -245,8 +245,8 @@ adopters know what this tool owns and where it defers:
   community plugin or scaffolder covers these.
 - **Knowledge-graph memory**: the community has consolidated around
   [Graphify](https://github.com/safishamsi/graphify) for codebase knowledge
-  graphs. The LightRAG overlay here remains supported; a Graphify-based preset
-  is planned (#130).
+  graphs. The `obsidian-graphify` preset wires it in (ADR-009); the
+  LightRAG overlay remains available as a legacy option.
 - **Distributing `.claude/` components**: the official
   [Claude Code plugin marketplace](https://code.claude.com/docs/en/discover-plugins)
   is the standard channel for hooks/skills/agents. Migrating the template

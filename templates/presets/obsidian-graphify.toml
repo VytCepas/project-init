@@ -1,0 +1,16 @@
+# Preset: Obsidian + Graphify memory stack (recommended for code-heavy projects)
+# Obsidian vault for humans; Graphify knowledge graph for agents (ADR-009).
+# Graphify is installed by the user via .claude/scripts/setup_graphify.sh —
+# the scaffolder only renders files.
+
+name = "obsidian-graphify"
+description = "Obsidian vault for humans, Graphify code knowledge graph for agents."
+
+layers = ["base", "obsidian", "graphify"]
+
+[vars]
+memory_stack = "obsidian-graphify"
+
+[scaffolded_project_dependencies.python]
+core = []
+dev = ["ruff"]
