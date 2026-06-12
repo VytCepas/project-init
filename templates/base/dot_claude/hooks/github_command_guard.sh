@@ -3,8 +3,8 @@
 # PreToolUse hook on Bash. Receives tool input JSON on stdin.
 #
 # All command-pattern matching, redirect rules, and DAG prerequisite checks
-# live in .claude/hooks/dag_workflow.py. Adding a new banned command means
-# editing COMMAND_RULES there, not this file.
+# live in dag_workflow.py next to this script. Adding a new banned command
+# means editing COMMAND_RULES there, not this file.
 
 set -euo pipefail
 

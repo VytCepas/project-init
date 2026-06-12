@@ -42,7 +42,7 @@ dag_state = os.environ.get("DAG_STATE", "").strip()
 state_block = f"\n\nCurrent DAG nodes:\n{dag_state}\n" if dag_state else ""
 
 context = (
-    "GitHub workflow rules (enforced by .claude/hooks/dag_workflow.py):\n"
+    "GitHub workflow rules (enforced by the dag_workflow.py guard hook):\n"
     "\n"
     "Lifecycle order (DAG):\n"
     "  issue.created -> branch.created -> branch.pushed -> pr.opened\n"
