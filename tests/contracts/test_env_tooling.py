@@ -57,7 +57,10 @@ class TestEnvPattern:
     @pytest.mark.parametrize("preset", ["obsidian-only", "obsidian-graphify"])
     def test_env_example_rendered_for_every_preset(self, tmp_path: Path, preset: str):
         target = tmp_path / preset
-        flags = {"graphify": "true" if "graphify" in preset else ""}
+        flags = {
+            "memory_stack": preset,
+            "graphify": "true" if "graphify" in preset else "",
+        }
         scaffold(target, load_preset(preset), make_variables(**flags), strict=True)
         example = (target / ".env.example").read_text()
         assert "Loading order" in example

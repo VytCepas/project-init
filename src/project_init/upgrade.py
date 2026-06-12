@@ -57,7 +57,7 @@ _REMOVED_PRESETS = {
     "obsidian-lightrag": {
         "successor": "obsidian-graphify",
         "note": (
-            "the obsidian-lightrag preset was removed in v0.3 (ADR-009) — "
+            "the obsidian-lightrag preset was removed (ADR-009) — "
             "re-rendering as obsidian-graphify. LightRAG files appear under "
             "'removed' (left in place); --apply records the migration."
         ),
