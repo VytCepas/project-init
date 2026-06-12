@@ -10,7 +10,7 @@
 set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
-  echo "Usage: push_wiki.sh <repo-slug> <wiki-source-file>" >&2
+  echo "Usage: push_wiki.sh <repo-slug> <wiki-source-file> [--prune <page.md> ...]" >&2
   exit 1
 fi
 
@@ -20,7 +20,12 @@ shift 2
 PRUNE_PAGES=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --prune) PRUNE_PAGES+=("$2"); shift 2 ;;
+    --prune)
+      if [[ $# -lt 2 || "$2" == --* ]]; then
+        echo "--prune requires a page name" >&2
+        exit 1
+      fi
+      PRUNE_PAGES+=("$2"); shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -33,7 +38,7 @@ git clone "https://github.com/${REPO_SLUG}.wiki.git" "$WIKI_DIR"
 cp "$SOURCE_FILE" "$WIKI_DIR/Home.md"
 
 cd "$WIKI_DIR"
-for page in "${PRUNE_PAGES[@]+"${PRUNE_PAGES[@]}"}"; do
+for page in "${PRUNE_PAGES[@]}"; do
   [[ -f "$page" ]] && git rm -q "$page" && echo "Pruned $page"
 done
 git add Home.md
