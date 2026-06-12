@@ -20,19 +20,19 @@ class TestCLI:
         assert rc == 0
         assert (tmp_target / ".claude" / "config.yaml").is_file()
 
-    def test_non_interactive_lightrag(self, tmp_target: Path):
+    def test_non_interactive_graphify(self, tmp_target: Path):
         from project_init.__main__ import main
 
         rc = main([
             str(tmp_target),
             "--non-interactive",
-            "--preset", "obsidian-lightrag",
-            "--name", "cli-lr",
-            "--description", "testing lightrag",
+            "--preset", "obsidian-graphify",
+            "--name", "cli-gr",
+            "--description", "testing graphify",
             "--language", "python",
         ])
         assert rc == 0
-        assert (tmp_target / ".claude" / "scripts" / "ingest_sessions.py").is_file()
+        assert (tmp_target / ".claude" / "scripts" / "setup_graphify.sh").is_file()
 
     def test_non_interactive_requires_flags(self):
         from project_init.__main__ import main
@@ -193,24 +193,3 @@ class TestCLINonInteractiveCommandVariables:
         assert 'test_command: "go test ./..."' in config
 
 
-class TestLLMModelFlags:
-    """PI-132: --llm-model / --embedding-model flow into lightrag.yaml."""
-
-    def test_model_flags_override_lightrag_yaml(self, tmp_target: Path):
-        from project_init.__main__ import main
-
-        rc = main([
-            str(tmp_target),
-            "--non-interactive",
-            "--preset", "obsidian-lightrag",
-            "--name", "cli-test",
-            "--description", "testing cli",
-            "--language", "python",
-            "--llm-model", "claude-opus-4-8",
-            "--embedding-model", "text-embedding-3-large",
-            "--strict",
-        ])
-        assert rc == 0
-        content = (tmp_target / ".claude" / "memory" / "lightrag.yaml").read_text()
-        assert "model: claude-opus-4-8" in content
-        assert "model: text-embedding-3-large" in content

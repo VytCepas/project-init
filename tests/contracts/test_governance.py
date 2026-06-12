@@ -22,7 +22,7 @@ def _scaffold(target: Path, **overrides: str) -> Path:
 
 
 class TestGovernanceFiles:
-    @pytest.mark.parametrize("preset", ["obsidian-only", "obsidian-lightrag"])
+    @pytest.mark.parametrize("preset", ["obsidian-only", "obsidian-graphify"])
     def test_rendered_for_every_preset(self, tmp_path: Path, preset: str):
         """CODEOWNERS, CONTRIBUTING, SECURITY ship with every preset."""
         target = tmp_path / preset

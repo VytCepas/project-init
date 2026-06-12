@@ -35,9 +35,3 @@ existing agent session, and AST extraction costs zero LLM tokens.
 (`GRAPH_REPORT.md`) is worth committing for reviewers; the JSON/HTML/cache
 are gitignored. Never hand-edit graph output — fix the code or the vault
 note instead.
-
-## Relation to the legacy LightRAG stack
-
-`obsidian-lightrag` remains available for existing projects but is legacy:
-it needs Anthropic + OpenAI keys and hand-rolled ingestion scripts.
-New projects should prefer this stack.

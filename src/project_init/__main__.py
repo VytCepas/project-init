@@ -63,16 +63,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Add Playwright browser-automation MCP",
     )
     p.add_argument(
-        "--llm-model",
-        default="claude-sonnet-4-6",
-        help="Anthropic model for lightrag.yaml (llm.provider is anthropic; LightRAG presets)",
-    )
-    p.add_argument(
-        "--embedding-model",
-        default="text-embedding-3-small",
-        help="OpenAI embedding model for lightrag.yaml (embedding.provider is openai)",
-    )
-    p.add_argument(
         "--license",
         choices=["mit", "apache-2.0", "proprietary", "none"],
         default="none",
@@ -513,7 +503,6 @@ def main(argv: list[str] | None = None) -> int:
     if extra_layers:
         preset = {**preset, "layers": list(preset["layers"]) + extra_layers}
 
-    is_lightrag = "lightrag" in preset.get("name", "")
     is_graphify = "graphify" in preset.get("name", "")
     has_obsidian = "obsidian" in preset.get("layers", [])
     lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(
@@ -560,15 +549,11 @@ def main(argv: list[str] | None = None) -> int:
         # Inverse flag: the template engine has no else-branch, and without
         # --vscode the gitignore must keep personal .vscode/ fully ignored.
         "vscode_off": "" if vscode else "true",
-        "lightrag": "true" if is_lightrag else "",
         "graphify": "true" if is_graphify else "",
         "obsidian": "true" if has_obsidian else "",
         "license_mit": "true" if license_choice == "mit" else "",
         "license_apache": "true" if license_choice == "apache-2.0" else "",
         "license_proprietary": "true" if license_choice == "proprietary" else "",
-        # LightRAG model selection (PI-132) — rendered into lightrag.yaml
-        "llm_model": args.llm_model,
-        "embedding_model": args.embedding_model,
     }
 
     try:

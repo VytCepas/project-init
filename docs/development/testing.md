@@ -22,7 +22,6 @@ Tests are grouped by directory and auto-marked in `tests/conftest.py`.
 | `tests/integration/` | `integration` | CLI calls, scaffolded hooks/scripts, git-backed memory linting, and fake-`gh` workflow behavior. |
 | `tests/smoke/` | `smoke` | Installed wheel/package smoke tests. |
 
-`optional_dependency` marks tests that need dependencies outside the default dev extra, such as `lightrag-hku`.
 
 ## What To Test
 

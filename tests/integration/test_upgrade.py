@@ -339,7 +339,7 @@ class TestMigration:
         assert (target / "justfile").read_bytes() == b"# edited under old version\n"
         assert (target / "justfile.new").exists()
 
-    @pytest.mark.parametrize("preset", ["obsidian-only", "obsidian-lightrag"])
+    @pytest.mark.parametrize("preset", ["obsidian-only", "obsidian-graphify"])
     def test_migrated_inputs_re_render_faithfully(self, tmp_path: Path, preset: str):
         """Semantic fields alone must reconstruct a drift-free render."""
         target = tmp_path / preset
@@ -369,3 +369,20 @@ class TestMigration:
         assert variables["language"] == "python"
         assert variables["python"] == "true"
         assert variables["lint_command"] == "uv run ruff check ."
+
+
+class TestRemovedPresets:
+    def test_lightrag_record_gives_actionable_error(self, tmp_path: Path, capsys):
+        """PI-172: a project recorded with the removed obsidian-lightrag
+        preset must get migration guidance, not 'unknown preset'."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        config = target / _CONFIG_REL
+        config.write_text(
+            config.read_text().replace("  preset: obsidian-only", "  preset: obsidian-lightrag")
+        )
+        rc = main(["upgrade", str(target)])
+        assert rc == 1
+        err = capsys.readouterr().err
+        assert "removed" in err
+        assert "obsidian-graphify" in err

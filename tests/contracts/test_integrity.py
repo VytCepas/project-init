@@ -14,15 +14,11 @@ class TestScaffoldIntegrity:
 
     def test_strict_mode_passes_for_both_presets(self, tmp_path: Path):
         """PI-17: strict scaffolding must succeed for every shipped preset."""
-        for preset_name, lightrag_flag in [
-            ("obsidian-only", ""),
-            ("obsidian-lightrag", "true"),
-        ]:
+        for preset_name in ["obsidian-only", "obsidian-graphify"]:
             target = tmp_path / preset_name
             preset = load_preset(preset_name)
             variables = make_variables(
                 memory_stack=preset_name,
-                lightrag=lightrag_flag,
             )
             scaffold(target, preset, variables, strict=True)
 
@@ -33,15 +29,11 @@ class TestScaffoldIntegrity:
         # Match {{...}} but not ${{...}} (GitHub Actions expression syntax)
         placeholder_re = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
         offenders: list[str] = []
-        for preset_name, lightrag_flag in [
-            ("obsidian-only", ""),
-            ("obsidian-lightrag", "true"),
-        ]:
+        for preset_name in ["obsidian-only", "obsidian-graphify"]:
             target = tmp_path / preset_name
             preset = load_preset(preset_name)
             variables = make_variables(
                 memory_stack=preset_name,
-                lightrag=lightrag_flag,
             )
             scaffold(target, preset, variables)
             for f in target.rglob("*"):
@@ -179,7 +171,7 @@ class TestTestSuiteOrganization:
         pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
         markers = "\n".join(pyproject["tool"]["pytest"]["ini_options"]["markers"])
 
-        for marker in ("unit", "contract", "integration", "smoke", "optional_dependency"):
+        for marker in ("unit", "contract", "integration", "smoke"):
             assert f"{marker}:" in markers
 
     def test_testing_docs_describe_directory_layout_and_markers(self):
@@ -187,6 +179,6 @@ class TestTestSuiteOrganization:
 
         for path in ("tests/unit/", "tests/contracts/", "tests/integration/", "tests/smoke/"):
             assert path in docs
-        for marker in ("unit", "contract", "integration", "smoke", "optional_dependency"):
+        for marker in ("unit", "contract", "integration", "smoke"):
             assert marker in docs
         assert "auto-marked in `tests/conftest.py`" in docs

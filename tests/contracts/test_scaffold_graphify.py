@@ -44,7 +44,6 @@ class TestScaffoldGraphify:
         ).read_text()
         assert "--obsidian" in guide
         assert "setup_graphify.sh" in guide
-        assert "legacy" in guide.lower()  # LightRAG relation stated
 
     def test_gitignore_keeps_report_tracked(self):
         gitignore = (self.target / ".gitignore").read_text()
@@ -63,16 +62,3 @@ class TestScaffoldGraphify:
     def test_no_lightrag_files(self):
         assert not (self.target / ".claude" / "scripts" / "ingest_sessions.py").exists()
         assert not (self.target / ".claude" / "memory" / "lightrag.yaml").exists()
-
-
-class TestLightragLegacy:
-    def test_preset_marked_legacy_but_functional(self, tmp_path: Path):
-        preset = load_preset("obsidian-lightrag")
-        assert "LEGACY" in preset["description"]
-        created = scaffold(
-            tmp_path / "p",
-            preset,
-            make_variables(memory_stack="obsidian-lightrag", lightrag="true"),
-        )
-        assert created, "legacy preset must still scaffold"
-        assert (tmp_path / "p" / ".claude" / "scripts" / "ingest_sessions.py").is_file()

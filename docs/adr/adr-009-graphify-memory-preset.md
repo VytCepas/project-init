@@ -1,6 +1,6 @@
 # ADR-009: Graphify becomes the recommended KG memory preset; LightRAG demoted to legacy
 
-- Status: Accepted
+- Status: Accepted (amended 2026-06-12: LightRAG overlay removed — see Consequences)
 - Date: 2026-06-12
 - Implements: evaluation required by #130
 
@@ -52,8 +52,10 @@ Scaffolder boundaries (unchanged by this ADR):
 ## Consequences
 
 - New projects get maintained KG memory with zero API-key setup.
-- The LightRAG overlay stays for existing projects; its preset description
-  and README mark it legacy. Removal is a future decision once
-  `obsidian-graphify` has real-world mileage.
+- ~~The LightRAG overlay stays for existing projects~~ **Amended
+  2026-06-12 (PI-172):** the owner confirmed the project has no users, so
+  the compatibility argument was void — the overlay, preset, and its CLI
+  flags were removed the same day Graphify landed. `project-init upgrade`
+  on a recorded `obsidian-lightrag` preset errors with migration guidance.
 - `memory.stack` gains the value `obsidian-graphify`; `project-init
   upgrade` maps memory stacks to preset names 1:1, so upgrades keep working.

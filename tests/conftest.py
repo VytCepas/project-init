@@ -30,5 +30,3 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         if marker_name:
             item.add_marker(getattr(pytest.mark, marker_name))
 
-        if "lightrag_scripts" in item.nodeid and "skipif" in item.keywords:
-            item.add_marker(pytest.mark.optional_dependency)

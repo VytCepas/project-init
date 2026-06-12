@@ -9,8 +9,8 @@ Templates live in `templates/` and are copied into target projects by the scaffo
 ```
 templates/
 ├── base/           # Always copied (every preset)
-├── obsidian/       # Overlay for obsidian-only and obsidian-lightrag presets
-├── lightrag/       # Overlay for obsidian-lightrag preset
+├── obsidian/       # Overlay for both Obsidian presets
+├── graphify/       # Overlay for the obsidian-graphify preset
 └── presets/        # TOML preset definitions
 ```
 
@@ -69,7 +69,7 @@ Strict mode renders all scaffold files into a temporary directory first. If vali
 | `python` | `"true"` if python, else `""` | conditional flag |
 | `node` | `"true"` if node, else `""` | conditional flag |
 | `go` | `"true"` if go, else `""` | conditional flag |
-| `lightrag` | `"true"` if lightrag preset, else `""` | conditional flag |
+| `graphify` | `"true"` if graphify preset, else `""` | conditional flag |
 | `obsidian` | `"true"` if obsidian layer, else `""` | conditional flag |
 
 ## Adding a new template variable

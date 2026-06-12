@@ -11,7 +11,7 @@ The scaffolder is a deterministic tool that generates `.claude/` layouts and con
 Templates are stored in `templates/` and copied into target projects:
 - `templates/base/` — Always included
 - `templates/obsidian/` — Obsidian-specific overlay
-- `templates/lightrag/` — LightRAG memory stack overlay
+- `templates/graphify/` — Graphify memory overlay
 - `templates/presets/` — TOML preset definitions
 
 ### Template Naming
