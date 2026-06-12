@@ -82,3 +82,18 @@ jobs:
           # Verify no surviving {{...}} placeholders (--strict already guarantees this)
           ! grep -rn '{{[a-z_]*}}' /tmp/smoke-target || (echo "Unrendered placeholders found"; exit 1)
           echo "OK - wheel smoke test passed"
+
+  # ADR-007 dogfood: the scaffolded projects get this job from ci.yml.tmpl,
+  # but this repo itself lacked it — full-history gitleaks scan on every PR.
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history so leaked commits are caught, not just the latest diff
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
