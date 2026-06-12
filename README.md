@@ -72,17 +72,17 @@ This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to 
 Pin a specific version, or opt into the unreleased development head:
 
 ```bash
-PROJECT_INIT_REF=v0.2.0 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
+PROJECT_INIT_REF=v0.3.0 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 PROJECT_INIT_REF=main   bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 ```
 
 Direct tool install without the slash command (any pinned tag):
 
 ```bash
-uv tool install git+https://github.com/VytCepas/project-init@v0.2.0
+uv tool install git+https://github.com/VytCepas/project-init@v0.3.0
 ```
 
-Distribution rationale: [ADR-008](docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
+Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
 
 ## Use
 
@@ -282,9 +282,9 @@ adopters know what this tool owns and where it defers:
 
 ## Further reading
 
-- [Using project-init in Your Project](docs/guides/using-project-init.md) — full workflow, day-to-day usage, customization, and troubleshooting
-- [Template System](docs/development/template-system.md) — how layers and variables work
-- [Contributing](docs/development/contributing.md) — how to contribute to project-init itself
+- [Using project-init in Your Project](https://github.com/VytCepas/project-init/blob/main/docs/guides/using-project-init.md) — full workflow, day-to-day usage, customization, and troubleshooting
+- [Template System](https://github.com/VytCepas/project-init/blob/main/docs/development/template-system.md) — how layers and variables work
+- [Contributing](https://github.com/VytCepas/project-init/blob/main/docs/development/contributing.md) — how to contribute to project-init itself
 
 ## Layout of this repo
 

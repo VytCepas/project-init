@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "project-init"
-version = "0.2.0"
+version = "0.3.0"
 description = "Scaffolder for agentic-development infrastructure inside any project"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -42,6 +42,9 @@ project-init = "project_init.__main__:main"
 
 [project.urls]
 Repository = "https://github.com/VytCepas/project-init"
+Documentation = "https://vytcepas.github.io/project-init/"
+Changelog = "https://github.com/VytCepas/project-init/releases"
+Issues = "https://github.com/VytCepas/project-init/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/project_init"]
