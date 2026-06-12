@@ -349,7 +349,7 @@ def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Pa
     preset = load_preset(preset_name)
     # Agent overlays (PI-137) are layers appended at scaffold time, not part
     # of the preset definition — re-derive them from the recorded agents.
-    agents = variables.get("agents", "claude")
+    agents = {a.strip() for a in variables.get("agents", "claude").split(",")}
     extra = [layer for layer in ("codex", "gemini") if layer in agents]
     if extra:
         preset = {**preset, "layers": list(preset["layers"]) + extra}

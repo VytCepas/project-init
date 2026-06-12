@@ -55,7 +55,7 @@ def hook_scripts() -> list[Path]:
 
 def _skill_description(skill_dir: Path) -> str:
     """First line of the SKILL.md frontmatter description."""
-    match = _DESCRIPTION_RE.search((skill_dir / "SKILL.md").read_text())
+    match = _DESCRIPTION_RE.search((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
     return match.group(1).strip() if match else skill_dir.name
 
 
@@ -87,7 +87,8 @@ def _sync_gemini_commands() -> list[str]:
             'prompt = """\n'
             f"Read .claude/skills/{skill_dir.name}/SKILL.md and follow its\n"
             "instructions exactly for this request: {{args}}\n"
-            '"""\n'
+            '"""\n',
+            encoding="utf-8",
         )
         synced.append(f"gemini:commands/{skill_dir.name}.toml")
     return synced
