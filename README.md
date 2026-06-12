@@ -249,9 +249,14 @@ adopters know what this tool owns and where it defers:
   LightRAG overlay remains available as a legacy option.
 - **Distributing `.claude/` components**: the official
   [Claude Code plugin marketplace](https://code.claude.com/docs/en/discover-plugins)
-  is the standard channel for hooks/skills/agents. Migrating the template
-  payloads to a plugin is planned (#129); the scaffolder will keep owning
-  project files.
+  is the standard channel for hooks/skills/agents. This repo doubles as a
+  marketplace (`.claude-plugin/marketplace.json`) shipping the
+  `project-init-workflow` plugin — the project-agnostic skills and guard
+  hooks, auto-update included. Scaffolded projects register the marketplace
+  in `settings.json`, so teammates get the plugin offered on first trust.
+  During the transition, scaffolds also keep file copies (the active
+  wiring) — see ADR-010 for the cutover plan; the scaffolder keeps owning
+  project files either way.
 - **`AGENTS.md` vs `CLAUDE.md`**: Claude Code still reads only `CLAUDE.md`
   ([anthropics/claude-code#34235](https://github.com/anthropics/claude-code/issues/34235)),
   while most other tools read the `AGENTS.md` standard — which is why this

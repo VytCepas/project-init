@@ -48,6 +48,7 @@ _MIGRATION_DEFAULTS = {
     "llm_model": "claude-sonnet-4-6",
     "embedding_model": "text-embedding-3-small",
     "project_init_url": "https://github.com/VytCepas/project-init",
+    "project_init_repo": "VytCepas/project-init",
 }
 
 _LANGUAGE_FLAGS = ("python", "node", "go")

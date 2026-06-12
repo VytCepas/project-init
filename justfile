@@ -24,3 +24,7 @@ docs:
 
 # what CI runs
 ci: lint test
+
+# sync the plugin payload from templates (PI-129)
+sync-plugin:
+    uv run python tools/sync_plugin.py
