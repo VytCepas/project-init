@@ -49,15 +49,30 @@ _MIGRATION_DEFAULTS = {
     "project_init_repo": "VytCepas/project-init",
 }
 
-# Presets that existed in earlier releases; upgrade gives an actionable
-# error instead of a raw "unknown preset" (PI-172, ADR-009).
+# Presets removed in earlier releases mapped to their successors; upgrade
+# auto-migrates the recorded inputs instead of erroring on "unknown preset"
+# (PI-172, ADR-009). Hand-editing the recorded JSON is not something we ask
+# users to do.
 _REMOVED_PRESETS = {
-    "obsidian-lightrag": (
-        "the obsidian-lightrag preset was removed in v0.3 (ADR-009). "
-        "Migrate to obsidian-graphify: change memory.stack and the recorded "
-        "preset in .claude/config.yaml, then re-run upgrade."
-    ),
+    "obsidian-lightrag": {
+        "successor": "obsidian-graphify",
+        "note": (
+            "the obsidian-lightrag preset was removed in v0.3 (ADR-009) — "
+            "re-rendering as obsidian-graphify. LightRAG files appear under "
+            "'removed' (left in place); --apply records the migration."
+        ),
+    },
 }
+
+
+def _migrate_removed_preset(preset_name: str, variables: dict) -> tuple[str, dict]:
+    """Rewrite recorded inputs for a removed preset onto its successor."""
+    successor = _REMOVED_PRESETS[preset_name]["successor"]
+    variables = dict(variables)
+    variables["memory_stack"] = successor
+    variables["graphify"] = "true" if "graphify" in successor else ""
+    variables.pop("lightrag", None)
+    return successor, variables
 
 _LANGUAGE_FLAGS = ("python", "node", "go")
 
@@ -503,8 +518,8 @@ def run_upgrade(target: Path, *, apply: bool) -> int:
         return 1
 
     if preset_name in _REMOVED_PRESETS:
-        sys.stderr.write(f"error: {_REMOVED_PRESETS[preset_name]}\n")
-        return 1
+        sys.stderr.write(f"note: {_REMOVED_PRESETS[preset_name]['note']}\n")
+        preset_name, variables = _migrate_removed_preset(preset_name, variables)
 
     from project_init import __version__
 

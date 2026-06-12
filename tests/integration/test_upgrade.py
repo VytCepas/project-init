@@ -372,17 +372,23 @@ class TestMigration:
 
 
 class TestRemovedPresets:
-    def test_lightrag_record_gives_actionable_error(self, tmp_path: Path, capsys):
-        """PI-172: a project recorded with the removed obsidian-lightrag
-        preset must get migration guidance, not 'unknown preset'."""
+    def test_lightrag_record_auto_migrates_to_graphify(self, tmp_path: Path, capsys):
+        """PI-172: a record naming the removed obsidian-lightrag preset
+        re-renders as obsidian-graphify with corrected variables — users are
+        never asked to hand-edit the recorded JSON (PR #173 review)."""
         target = tmp_path / "p"
         _scaffold(target)
         config = target / _CONFIG_REL
         config.write_text(
             config.read_text().replace("  preset: obsidian-only", "  preset: obsidian-lightrag")
         )
-        rc = main(["upgrade", str(target)])
-        assert rc == 1
-        err = capsys.readouterr().err
-        assert "removed" in err
-        assert "obsidian-graphify" in err
+        rc = main(["upgrade", str(target), "--apply"])
+        assert rc == 0
+        assert "re-rendering as obsidian-graphify" in capsys.readouterr().err
+        # Successor preset's overlay landed and the record was rewritten.
+        assert (target / ".claude" / "scripts" / "setup_graphify.sh").exists()
+        preset, variables, _, _ = read_scaffold_record(target)
+        assert preset == "obsidian-graphify"
+        assert variables["memory_stack"] == "obsidian-graphify"
+        assert variables["graphify"] == "true"
+        assert "lightrag" not in variables
