@@ -458,6 +458,7 @@ def main(argv: list[str] | None = None) -> int:
         ) = _gather_inputs_interactive(default_name=target.name)
 
     is_lightrag = "lightrag" in preset.get("name", "")
+    is_graphify = "graphify" in preset.get("name", "")
     has_obsidian = "obsidian" in preset.get("layers", [])
     lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(
         language, ("", "", "")
@@ -494,6 +495,7 @@ def main(argv: list[str] | None = None) -> int:
         # --vscode the gitignore must keep personal .vscode/ fully ignored.
         "vscode_off": "" if vscode else "true",
         "lightrag": "true" if is_lightrag else "",
+        "graphify": "true" if is_graphify else "",
         "obsidian": "true" if has_obsidian else "",
         "license_mit": "true" if license_choice == "mit" else "",
         "license_apache": "true" if license_choice == "apache-2.0" else "",
