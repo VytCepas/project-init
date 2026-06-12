@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _RECIPES = ("setup", "lint", "format", "test", "docs", "ci", "scan")
@@ -30,10 +30,10 @@ _COMMANDS = {
 def _scaffold_language(target: Path, language: str) -> Path:
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go")}
     lint, fmt, test = _COMMANDS.get(language, ("", "", ""))
-    variables = make_variables(
+    variables = fallback_variables(
         language=language, lint_command=lint, format_command=fmt, test_command=test, **flags
     )
-    scaffold(target, load_preset("obsidian-only"), variables)
+    scaffold(target, fallback_preset(), variables)
     return target
 
 

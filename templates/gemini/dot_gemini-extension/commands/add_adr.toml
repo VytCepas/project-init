@@ -1,5 +1,5 @@
 description = "Records an architectural decision as a new ADR in .claude/docs/adr/ using the MADR template. Use when a non-obvious design choice is made so future agents understand why."
 prompt = """
-Read .claude/skills/add_adr/SKILL.md and follow its
+Read .agents/skills/add_adr/SKILL.md and follow its
 instructions exactly for this request: {{args}}
 """

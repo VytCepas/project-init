@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 
 class TestNodeTemplate:
@@ -14,8 +14,8 @@ class TestNodeTemplate:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_path: Path):
         self.target = tmp_path / "node-proj"
-        preset = load_preset("obsidian-only")
-        variables = make_variables(
+        preset = fallback_preset()
+        variables = fallback_variables(
             language="node",
             python="",
             node="true",
@@ -63,8 +63,8 @@ class TestTemplateIdentifiers:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        scaffold(tmp_target, preset, make_variables(
+        preset = fallback_preset()
+        scaffold(tmp_target, preset, fallback_variables(
             project_init_url="https://github.com/example/project-init"
         ))
 
@@ -103,8 +103,8 @@ class TestScaffoldGitHubFiles:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        variables = make_variables()
+        preset = fallback_preset()
+        variables = fallback_variables()
         scaffold(tmp_target, preset, variables)
 
     def test_issue_template_bug_created(self):

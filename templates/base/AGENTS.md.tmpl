@@ -19,7 +19,7 @@ scripts, markdown skills, memory, and docs):
 ## Skills (load on demand)
 
 Before any GitHub action (create issue, branch, push, PR, merge), check
-[`.claude/skills/INDEX.md`](.claude/skills/INDEX.md) and load the relevant
+the available skills (plugin-provided in the default scaffold;{{#if no_plugin}} indexed in [`.claude/skills/INDEX.md`](.claude/skills/INDEX.md);{{/if no_plugin}} `/help` lists them) and load the relevant
 skill file. Skills are plain markdown (SKILL.md) — load only the one that
 matches what you are about to do.
 
@@ -29,7 +29,7 @@ matches what you are about to do.
 
 - **TDD** — write failing tests before any implementation.
 - **GitHub Projects** — work is tracked on the GitHub Projects board backed by GitHub Issues. Before starting non-trivial work, create or reference an issue.
-- **GitHub workflow** — for any push, PR, review, or merge action, load `.claude/skills/github_workflow/SKILL.md`. Quick ref: branch = `<type>/<KEY>-<n>-<slug>` | PR title = `type(KEY-N): desc` (no scope = no issue) | body includes `Closes #N`.
+- **GitHub workflow** — for any push, PR, review, or merge action, load the `github_workflow` skill{{#if no_plugin}} (`.claude/skills/github_workflow/SKILL.md`){{/if no_plugin}}. Quick ref: branch = `<type>/<KEY>-<n>-<slug>` | PR title = `type(KEY-N): desc` (no scope = no issue) | body includes `Closes #N`.
 {{#if lint_command}}- **Commands** — the `justfile` is the canonical command surface: `just --list` shows every recipe (`setup`, `lint`, `format`, `test`, `docs`, `ci`). Prefer `just <recipe>` over raw tool invocations so every agent and CI run the same commands.
 - **Lint** — `just lint` must pass before closing a task. The linter config enforces docstrings and complexity caps on project code — fix the code, don't loosen the gate.
 {{/if}}- **Docs** — follow the Diátaxis layout in [`docs/`](docs/) (see `docs/index.md`). Record architectural decisions with the `add_adr` skill.

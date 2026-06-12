@@ -122,6 +122,7 @@ The wizard asks (interactive mode only):
 - Browser automation — Playwright (yes/no)
 - Owner/team (`--owner`) — default CODEOWNERS owner, SECURITY contact, and LICENSE copyright holder (e.g. `@org/team`)
 - License (`--license mit|apache-2.0|proprietary|none`) — renders a LICENSE with the current year and the owner (or project name); `none` skips the file
+- No-plugin fallback (`--no-plugin`) — copies the shared hooks/skills into `.claude/` and wires them in `settings.json` instead of relying on the `project-init-workflow` plugin (offline / no-trust environments)
 - Devcontainer (`--devcontainer`) — renders `.devcontainer/` for Codespaces, fresh clones, and remote agent containers (see below)
 - Agents (`--agents claude,codex,gemini,ollama`) — which agents the project supports; default `claude`. Codex gets the shared skills at `.agents/skills/` plus the command guard via `.codex/hooks.json`; Gemini CLI gets a project extension (workflow `/commands` + guard; link once with `.claude/scripts/setup_gemini.sh`); Ollama-based agents are instructions-level only. Only the Claude path is functionally CI-tested — overlays are contract-tested on the rendered files
 - Toolchain pinning (`--mise`) — renders `mise.toml` pinning runtime/tool versions. Ownership rule: mise owns versions only; uv/bun own dependencies, just owns commands, `.env` owns environment
@@ -266,11 +267,12 @@ adopters know what this tool owns and where it defers:
   is the standard channel for hooks/skills/agents. This repo doubles as a
   marketplace (`.claude-plugin/marketplace.json`) shipping the
   `project-init-workflow` plugin — the project-agnostic skills and guard
-  hooks, auto-update included. Scaffolded projects register the marketplace
-  in `settings.json`, so teammates get the plugin offered on first trust.
-  During the transition, scaffolds also keep file copies (the active
-  wiring) — see ADR-010 for the cutover plan; the scaffolder keeps owning
-  project files either way.
+  hooks, auto-update included. Scaffolds are **plugin-first** (ADR-010
+  cutover): `settings.json` enables the plugin, and a hook or skill fix
+  shipped in the plugin reaches every project without re-scaffolding. The
+  `--no-plugin` flag restores file copies + local wiring for offline or
+  no-marketplace-trust environments; the scaffolder keeps owning project
+  files either way.
 - **`AGENTS.md` vs `CLAUDE.md`**: Claude Code still reads only `CLAUDE.md`
   ([anthropics/claude-code#34235](https://github.com/anthropics/claude-code/issues/34235)),
   while most other tools read the `AGENTS.md` standard — which is why this

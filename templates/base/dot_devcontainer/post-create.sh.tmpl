@@ -24,6 +24,8 @@ if ! command -v bun >/dev/null 2>&1; then
   export PATH="$HOME/.bun/bin:$PATH"
 fi
 {{/if node}}
-# Sync dependencies (stamps the environment so SessionStart stays fast).
-bash .claude/hooks/session_setup.sh
+# Sync dependencies. With --no-plugin scaffolds the SessionStart script is
+# local; plugin-mode containers bootstrap via just (the plugin hook stamps
+# the environment once a session opens).
+{{#if no_plugin}}bash .claude/hooks/session_setup.sh{{/if no_plugin}}{{#if plugin_mode}}command -v just >/dev/null 2>&1 && [ -f justfile ] && just setup || true{{/if plugin_mode}}
 {{/if devcontainer}}

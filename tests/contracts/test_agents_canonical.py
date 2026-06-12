@@ -80,7 +80,7 @@ class TestPortableReferencesResolve:
 
 
 class TestSkillNeutrality:
-    _SKILLS = Path(__file__).resolve().parents[2] / "templates" / "base" / "dot_claude" / "skills"
+    _SKILLS = Path(__file__).resolve().parents[2] / "templates" / "fallback" / "dot_claude" / "skills"
 
     def test_claude_specific_skills_are_marked(self):
         """Skills that manage Claude Code config must say so explicitly."""

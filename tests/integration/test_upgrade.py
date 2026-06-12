@@ -392,3 +392,30 @@ class TestRemovedPresets:
         assert variables["memory_stack"] == "obsidian-graphify"
         assert variables["graphify"] == "true"
         assert "lightrag" not in variables
+
+
+class TestPluginCutoverMigration:
+    def test_pre_cutover_record_backfills_fallback_mode(self, tmp_path: Path):
+        """PI-165: records written before the cutover lack plugin_mode/
+        no_plugin. The faithful backfill is fallback mode (those scaffolds
+        shipped the copies), so re-render keeps their files instead of
+        reporting the whole payload as removed."""
+        from project_init.scaffold import scaffold
+        from project_init.upgrade import write_scaffold_record
+        from tests.helpers import fallback_preset, fallback_variables
+
+        target = tmp_path / "p"
+        created = scaffold(target, fallback_preset(), fallback_variables(), strict=True)
+        variables = fallback_variables()
+        variables.pop("plugin_mode")
+        variables.pop("no_plugin")
+        write_scaffold_record(target, "obsidian-only", variables, created)
+
+        preset, recovered, _, _ = read_scaffold_record(target)
+        assert recovered["no_plugin"] == "true"
+        assert recovered["plugin_mode"] == ""
+        rc = main(["upgrade", str(target), "--apply"])
+        assert rc == 0
+        # The copied payload survives: still present, not flagged removed.
+        assert (target / ".claude" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()

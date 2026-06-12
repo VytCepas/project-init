@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 
 def _run_hook(hook: Path, stdin: str = "", env: dict[str, str] | None = None):
@@ -32,8 +32,8 @@ class TestHookExecutability:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        variables = make_variables()
+        preset = fallback_preset()
+        variables = fallback_variables()
         scaffold(tmp_target, preset, variables)
 
     @pytest.mark.skipif(sys.platform == "win32", reason="executable bits don't work on Windows")
@@ -63,7 +63,7 @@ class TestSecurityEnforcementMigration:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
 
     def test_legacy_safety_hooks_removed(self):
         hooks_dir = self.target / ".claude" / "hooks"
@@ -118,7 +118,7 @@ class TestGitleaksPreCommitHook:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
         self.hook = self.target / ".github" / "hooks" / "pre-commit"
 
     def test_hook_exists_and_executable(self):
@@ -160,7 +160,7 @@ class TestPrePushLifecycleGate:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
         self.hook = self.target / ".github" / "hooks" / "pre-push"
 
     SHA = "a" * 40
@@ -202,7 +202,7 @@ class TestInstallHooks:
     """install_hooks.sh wires all git-level enforcement into .git/hooks."""
 
     def test_installs_all_enforcement_hooks(self, tmp_target: Path):
-        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
         subprocess.run(
             ["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True
         )
@@ -225,7 +225,7 @@ class TestCiSecretScanMirror:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
         self.ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
 
     def test_secret_scan_job_present(self):
@@ -241,8 +241,8 @@ class TestCiSecretScanMirror:
         target.mkdir()
         scaffold(
             target,
-            load_preset("obsidian-only"),
-            make_variables(language="node", python="", node="true"),
+            fallback_preset(),
+            fallback_variables(language="node", python="", node="true"),
         )
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
         assert "secret-scan:" in ci

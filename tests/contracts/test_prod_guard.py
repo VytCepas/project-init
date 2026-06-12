@@ -12,7 +12,7 @@ from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_HOOK = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "prod_guard.py"
+_HOOK = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "hooks" / "prod_guard.py"
 
 DESTRUCTIVE = [
     "terraform destroy -auto-approve",
@@ -133,9 +133,13 @@ class TestVerdicts:
 
 
 class TestWiring:
-    def test_scaffolded_settings_wire_the_guard(self, tmp_path: Path):
+    def test_fallback_settings_wire_the_guard(self, tmp_path: Path):
+        """Default scaffolds get the guard from the plugin; --no-plugin
+        scaffolds wire the local copy."""
+        from tests.helpers import fallback_preset, fallback_variables
+
         target = tmp_path / "p"
-        scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
+        scaffold(target, fallback_preset(), fallback_variables(), strict=True)
         settings = json.loads((target / ".claude" / "settings.json").read_text())
         commands = [
             h["command"]

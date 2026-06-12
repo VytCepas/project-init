@@ -23,8 +23,8 @@ from the `security-guidance` plugin enabled in `settings.json`.
 
 **Manual invocation** (debugging or one-off runs only):
 ```bash
-bash .claude/hooks/pre_commit_gate.sh    # run lint gate manually
-bash .claude/hooks/post_edit_lint.sh     # run lint on last edited file
+just lint                                # the same gate the hooks enforce
+# (with --no-plugin scaffolds the hook scripts live in .claude/hooks/)
 ```
 
 Do not read hook scripts to understand their logic — descriptions above are sufficient. Only open a hook file if you are modifying it. To add a new hook, run the `add_hook` skill.

@@ -1,5 +1,5 @@
 description = "Show project status — git state, recent commits, open tasks, and memory summary"
 prompt = """
-Read .claude/skills/status/SKILL.md and follow its
+Read .agents/skills/status/SKILL.md and follow its
 instructions exactly for this request: {{args}}
 """

@@ -1,6 +1,6 @@
 # ADR-010: Same-repo plugin marketplace; dual-ship before template cutover
 
-- Status: Accepted
+- Status: Accepted (amended 2026-06-12: cutover executed in PI-165 — see addendum)
 - Date: 2026-06-12
 - Implements: distribution decision required by #129
 
@@ -53,3 +53,21 @@ when the copies drift, so the duplication cannot rot silently.
   `just sync-plugin` — enforced by CI, one command.
 - Plugin versioning starts at 0.1.0, independent of the scaffolder
   version; bump it when the payload changes behavior.
+
+## Addendum (2026-06-12, PI-165)
+
+The owner confirmed the project has no users, so the dual-ship transition
+window closed the same day it opened. Scaffolds are now **plugin-first**:
+
+- `enabledPlugins` includes `project-init-workflow@project-init`; the
+  duplicated hook wiring is gone from scaffolded `settings.json` (the
+  double-fire concern above is thereby resolved).
+- The shared payload moved to `templates/fallback/`, rendered only with
+  `--no-plugin` (offline/no-trust fallback) — templates/base keeps just
+  `dag_workflow.py` (the lifecycle scripts exec it) and project-specific
+  components.
+- `tools/sync_plugin.py` still derives the plugin and the Codex/Gemini
+  `.agents/skills` copies from the repo source of truth; direction did not
+  invert because the source stayed in `templates/`.
+- Upgrade backfills `no_plugin=true` for pre-cutover records, so existing
+  dual-ship projects re-render faithfully with their copies intact.

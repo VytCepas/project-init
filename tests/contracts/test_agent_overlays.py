@@ -13,7 +13,7 @@ from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_TEMPLATE_SKILLS = _REPO_ROOT / "templates" / "base" / "dot_claude" / "skills"
+_TEMPLATE_SKILLS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills"
 _CODEX_SKILLS = _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
 _GEMINI_COMMANDS = (
     _REPO_ROOT / "templates" / "gemini" / "dot_gemini-extension" / "commands"
@@ -79,13 +79,15 @@ class TestClaudeOnlyDefault:
 
 
 class TestCodexOverlay:
-    def test_skills_byte_identical_to_claude_skills(self, tmp_path: Path):
+    def test_skills_byte_identical_to_shared_source(self, tmp_path: Path):
+        """Plugin-mode scaffolds have no .claude/skills copies — the .agents
+        copies are compared against the shared source of truth."""
         target = _scaffold_agents(tmp_path / "p", "codex")
         rendered = sorted((target / ".agents" / "skills").glob("*/SKILL.md"))
         assert rendered, "codex overlay must ship skills"
         for skill in rendered:
-            counterpart = target / ".claude" / "skills" / skill.parent.name / "SKILL.md"
-            assert skill.read_bytes() == counterpart.read_bytes()
+            source = _TEMPLATE_SKILLS / skill.parent.name / "SKILL.md"
+            assert skill.read_bytes() == source.read_bytes()
 
     def test_hooks_json_wires_adapter(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "codex")
@@ -112,9 +114,11 @@ class TestGeminiOverlay:
         for command in commands:
             parsed = tomllib.loads(command.read_text())
             assert parsed["description"]
-            referenced = f".claude/skills/{command.stem}/SKILL.md"
+            referenced = f".agents/skills/{command.stem}/SKILL.md"
             assert referenced in parsed["prompt"]
-            assert (target / referenced).is_file()
+            assert (target / referenced).is_file(), (
+                "gemini layer must ship the .agents skills it points at"
+            )
 
     def test_hooks_use_gemini_dialect(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "gemini")

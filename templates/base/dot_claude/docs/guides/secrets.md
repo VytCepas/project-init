@@ -34,7 +34,7 @@ the documentation of record for *what* variables exist; the manager owns
 ## Credential separation (the actual prod-safety boundary)
 
 The `prod_guard` hook flags destructive commands (`terraform destroy`,
-`DROP DATABASE`, cloud deletes — see `.claude/hooks/prod_guard.py`), but a
+`DROP DATABASE`, cloud deletes — see the `prod_guard` hook), but a
 deny-list is a guardrail, not a guarantee (ADR-012). The guarantee is that
 **agent sessions never hold production credentials**:
 

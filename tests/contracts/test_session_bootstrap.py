@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 
 def _scaffold(target: Path, **overrides: str) -> Path:
-    scaffold(target, load_preset("obsidian-only"), make_variables(**overrides), strict=True)
+    scaffold(target, fallback_preset(), fallback_variables(**overrides), strict=True)
     return target
 
 

@@ -85,6 +85,7 @@ class TestInstalledWheel:
                 "--name", "wheel-smoke",
                 "--description", "test",
                 "--language", "python",
+                "--no-plugin",
                 "--strict",
             ],
             capture_output=True,
@@ -99,7 +100,8 @@ class TestInstalledWheel:
         # Essentials present.
         assert (scaffold_target / ".claude" / "config.yaml").is_file()
         assert (scaffold_target / "CLAUDE.md").is_file()
-        # Hooks kept executable bit through wheel packaging.
+        # --no-plugin copies the hook payload; the exec bit must survive
+        # wheel packaging (plugin-mode scaffolds copy only dag_workflow.py).
         for hook in [
             "post_edit_lint.sh",
             "pre_commit_gate.sh",

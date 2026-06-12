@@ -1,14 +1,17 @@
 """Sync shared skill/hook payloads derived from templates.
 
-Three destinations derive from templates/base/dot_claude (the source of
-truth until the #165 cutover):
+Source of truth after the PI-165 cutover: templates/fallback/dot_claude
+(shared skills + hook scripts; rendered into projects only with
+--no-plugin) plus dag_workflow.py which stays in base for the lifecycle
+scripts. Derived copies:
 
-- plugins/project-init-workflow/ (PI-129): plugin copy of every non-.tmpl
-  SKILL.md tree and hook script
-- templates/codex/dot_agents/skills/ (PI-137): Codex reads .agents/skills,
-  same SKILL.md format — byte-identical copies
-- templates/gemini/dot_gemini-extension/commands/ (PI-137): Gemini commands
-  are TOML; generated as thin pointers at the shared SKILL.md files
+- plugins/project-init-workflow/ (PI-129): the plugin payload — what
+  default (plugin-mode) scaffolds actually run
+- templates/codex/dot_agents/skills/ and templates/gemini/dot_agents/skills/
+  (PI-137): Codex/Gemini read .agents/skills — byte-identical copies so
+  those agents work even in plugin-mode scaffolds with no .claude/skills
+- templates/gemini/dot_gemini-extension/commands/ (PI-137): TOML pointers
+  at the .agents/skills copies
 
 Templated files (e.g. plan/SKILL.md.tmpl) are project-specific and stay
 scaffold-only.
@@ -27,8 +30,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_CLAUDE = REPO_ROOT / "templates" / "base" / "dot_claude"
+FALLBACK_CLAUDE = REPO_ROOT / "templates" / "fallback" / "dot_claude"
 PLUGIN_ROOT = REPO_ROOT / "plugins" / "project-init-workflow"
 CODEX_SKILLS = REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
+GEMINI_SKILLS = REPO_ROOT / "templates" / "gemini" / "dot_agents" / "skills"
 GEMINI_COMMANDS = (
     REPO_ROOT / "templates" / "gemini" / "dot_gemini-extension" / "commands"
 )
@@ -37,20 +42,26 @@ _DESCRIPTION_RE = re.compile(r"^description:\s*(.+)$", re.MULTILINE)
 
 
 def shared_skill_dirs() -> list[Path]:
-    """Template skill dirs whose SKILL.md is static (no .tmpl → shareable)."""
+    """Shared skill dirs (fallback layer is the source of truth)."""
     return sorted(
         p.parent
-        for p in (TEMPLATE_CLAUDE / "skills").glob("*/SKILL.md")
+        for p in (FALLBACK_CLAUDE / "skills").glob("*/SKILL.md")
     )
 
 
 def hook_scripts() -> list[Path]:
-    """All hook scripts; README stays template-side."""
-    return sorted(
+    """Shared hook scripts.
+
+    The fallback layer's scripts plus base dag_workflow.py (which stays
+    scaffolded — the lifecycle scripts exec it).
+    """
+    scripts = [
         p
-        for p in (TEMPLATE_CLAUDE / "hooks").iterdir()
+        for p in (FALLBACK_CLAUDE / "hooks").iterdir()
         if p.is_file() and p.suffix in {".sh", ".py"}
-    )
+    ]
+    scripts.append(TEMPLATE_CLAUDE / "hooks" / "dag_workflow.py")
+    return sorted(scripts)
 
 
 def _skill_description(skill_dir: Path) -> str:
@@ -59,14 +70,18 @@ def _skill_description(skill_dir: Path) -> str:
     return match.group(1).strip() if match else skill_dir.name
 
 
-def _sync_codex_skills() -> list[str]:
-    """Byte-identical SKILL.md trees for Codex's .agents/skills discovery."""
-    if CODEX_SKILLS.exists():
-        shutil.rmtree(CODEX_SKILLS)
+def _sync_agent_skills() -> list[str]:
+    """Byte-identical SKILL.md trees at .agents/skills for Codex and Gemini.
+
+    Each layer ships its own copy so either agent works standalone.
+    """
     synced = []
-    for skill_dir in shared_skill_dirs():
-        shutil.copytree(skill_dir, CODEX_SKILLS / skill_dir.name)
-        synced.append(f"codex:skills/{skill_dir.name}")
+    for label, dest in (("codex", CODEX_SKILLS), ("gemini", GEMINI_SKILLS)):
+        if dest.exists():
+            shutil.rmtree(dest)
+        for skill_dir in shared_skill_dirs():
+            shutil.copytree(skill_dir, dest / skill_dir.name)
+            synced.append(f"{label}:skills/{skill_dir.name}")
     return synced
 
 
@@ -85,7 +100,7 @@ def _sync_gemini_commands() -> list[str]:
         (GEMINI_COMMANDS / f"{skill_dir.name}.toml").write_text(
             f'description = "{description}"\n'
             'prompt = """\n'
-            f"Read .claude/skills/{skill_dir.name}/SKILL.md and follow its\n"
+            f"Read .agents/skills/{skill_dir.name}/SKILL.md and follow its\n"
             "instructions exactly for this request: {{args}}\n"
             '"""\n',
             encoding="utf-8",
@@ -119,7 +134,7 @@ def sync() -> list[str]:
         shutil.copy2(script, dest)
         synced.append(f"hooks/{script.name}")
 
-    synced += _sync_codex_skills()
+    synced += _sync_agent_skills()
     synced += _sync_gemini_commands()
     return synced
 

@@ -7,16 +7,16 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 
 class TestIssueMetadataScaffold:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        scaffold(tmp_target, preset, make_variables())
+        preset = fallback_preset()
+        scaffold(tmp_target, preset, fallback_variables())
 
     def test_issue_template_config_disables_blank_issues(self):
         content = (
@@ -104,8 +104,8 @@ class TestCreateIssueScript:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        scaffold(tmp_target, preset, make_variables())
+        preset = fallback_preset()
+        scaffold(tmp_target, preset, fallback_variables())
         self.script = self.target / ".claude" / "scripts" / "create_issue.sh"
 
     def test_help_documents_metadata_flags(self):
@@ -171,8 +171,8 @@ class TestCreateIssueSkill:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        scaffold(tmp_target, preset, make_variables())
+        preset = fallback_preset()
+        scaffold(tmp_target, preset, fallback_variables())
 
     def test_create_issue_skill_scaffolded(self):
         skill = self.target / ".claude" / "skills" / "create_issue" / "SKILL.md"
@@ -183,13 +183,13 @@ class TestCreateIssueSkill:
 
     def test_skill_index_references_create_issue_skill(self):
         content = (self.target / ".claude" / "skills" / "INDEX.md").read_text()
-        assert ".claude/skills/create_issue/SKILL.md" in content
+        assert "create_issue" in content
 
     def test_start_task_delegates_issue_creation_to_skill(self):
         content = (
             self.target / ".claude" / "skills" / "start_task" / "SKILL.md"
         ).read_text()
-        assert ".claude/skills/create_issue/SKILL.md" in content
+        assert "`create_issue` skill" in content, "must delegate to the create_issue skill"
 
     def test_nojira_pr_script_scaffolded(self):
         script = self.target / ".claude" / "scripts" / "create_nojira_pr.sh"
@@ -207,8 +207,8 @@ class TestGitHubWorkflowHooks:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        scaffold(tmp_target, preset, make_variables())
+        preset = fallback_preset()
+        scaffold(tmp_target, preset, fallback_variables())
 
     def _run_hook(self, name: str, command: str) -> dict[str, str] | None:
         hook = self.target / ".claude" / "hooks" / name
@@ -389,8 +389,8 @@ class TestCommitMsgHookFormats:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        scaffold(tmp_target, preset, make_variables())
+        preset = fallback_preset()
+        scaffold(tmp_target, preset, fallback_variables())
 
     def _run_commit_msg(self, message: str) -> int:
         hook = self.target / ".github" / "hooks" / "commit-msg"
