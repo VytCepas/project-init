@@ -53,6 +53,17 @@ Two honest caveats:
 
 ## Install (one-time)
 
+Two install paths — pick by how you'll invoke it:
+
+**CLI-only, from PyPI** (after the first published release; ADR-011). Gives
+you the `project-init` command — no `/project-init` slash command:
+
+```bash
+uv tool install project-init   # or one-off: uvx project-init .
+```
+
+**Full setup, from git** — adds the Claude Code slash command:
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
 ```
@@ -72,13 +83,13 @@ Direct tool install without the slash command (any pinned tag):
 uv tool install git+https://github.com/VytCepas/project-init@v0.2.0
 ```
 
-Distribution is git-only by design — see [ADR-008](docs/adr/adr-008-distribution-channel.md).
+Distribution rationale: [ADR-008](docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
 
 ## Use
 
 ### Option 1: Inside a Claude Code session (interactive)
 
-After installing, a `/project-init` slash command is available in any Claude Code session:
+After the **git install** (`install.sh`), a `/project-init` slash command is available in any Claude Code session:
 
 ```
 /project-init
@@ -87,6 +98,9 @@ After installing, a `/project-init` slash command is available in any Claude Cod
 This runs the interactive wizard in the current project directory. It asks for project name, language, memory stack, and MCPs — then scaffolds `.claude/` for you.
 
 ### Option 2: From a shell (non-interactive, for CI / scripts)
+
+With the PyPI install, plain `project-init . --non-interactive …` (or
+`uvx project-init . …`) works anywhere. With the git install:
 
 ```bash
 cd your-project
