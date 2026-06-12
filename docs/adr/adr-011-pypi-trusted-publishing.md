@@ -30,7 +30,8 @@ Publish every tagged release to PyPI from the existing `release.yml` via a
 - Authenticates via OIDC (`id-token: write`) against the `pypi`
   environment — protection rules can be added on the environment later.
 - Uses `pypa/gh-action-pypi-publish` (the canonical action; `release/v1`
-  per its own guidance, digest-pinned by Renovate like every other action).
+  per its own guidance — Renovate's `pinGitHubActionDigests` preset will
+  pin it to a digest on its next run, like every other action here).
 
 Install paths after this lands, in recommendation order:
 

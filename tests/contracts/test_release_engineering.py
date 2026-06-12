@@ -106,8 +106,16 @@ class TestPyPIPublishing:
 
     def test_publish_runs_only_after_release(self):
         content = self._workflow()
-        publish_section = content.split("publish-pypi:")[1]
+        assert "publish-pypi:" in content, "publish job missing from release.yml"
+        publish_section = content.split("publish-pypi:", 1)[1]
         assert "needs: release" in publish_section
+
+    def test_publish_job_can_check_out(self):
+        """Job-level permissions replace workflow-level ones — without
+        contents: read the checkout step loses repo access."""
+        content = self._workflow()
+        publish_section = content.split("publish-pypi:", 1)[1]
+        assert "contents: read" in publish_section
 
     def test_pyproject_has_pypi_metadata(self):
         config = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text())
