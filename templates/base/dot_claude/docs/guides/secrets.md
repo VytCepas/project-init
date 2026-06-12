@@ -31,6 +31,19 @@ org-specific. Whichever you pick, keep the contract: `.env.example` stays
 the documentation of record for *what* variables exist; the manager owns
 *values*.
 
+## Credential separation (the actual prod-safety boundary)
+
+The `prod_guard` hook flags destructive commands (`terraform destroy`,
+`DROP DATABASE`, cloud deletes — see `.claude/hooks/prod_guard.py`), but a
+deny-list is a guardrail, not a guarantee (ADR-012). The guarantee is that
+**agent sessions never hold production credentials**:
+
+- `.env` files used in agent sessions contain dev/staging values only.
+- Production credentials live in the secret manager and are injected
+  exclusively into review-gated CI deploy jobs — never into a local shell
+  an agent runs in.
+- A guard cannot delete what the session cannot reach.
+
 ## CI secrets
 
 Use the platform's mechanism (GitHub Actions secrets/environments), never

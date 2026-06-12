@@ -19,6 +19,12 @@ memory:
 mcps:
   installed: {{installed_mcps_yaml}}
 
+safety:
+  # prod_guard escape hatch: JSON list of regex patterns for commands the
+  # destructive-operation guard should never flag (e.g. a dev-cluster
+  # kubectl context). Keep it narrow.
+  allow: []
+
 tooling:
   lint_command: "{{lint_command}}"
   format_command: "{{format_command}}"
