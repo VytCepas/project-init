@@ -110,6 +110,15 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--no-plugin",
+        action="store_true",
+        help=(
+            "Copy hooks/skills into the project and wire them in settings "
+            "instead of relying on the project-init-workflow plugin "
+            "(offline / no-marketplace-trust fallback; ADR-010 cutover)"
+        ),
+    )
+    p.add_argument(
         "--non-interactive",
         action="store_true",
         help="Skip all prompts (requires --preset, --name, --description)",
@@ -427,89 +436,47 @@ def _upgrade_main(argv: list[str]) -> int:
         help="Apply non-conflicting changes; conflicts become .new siblings",
     )
     p.add_argument(
+        "--no-plugin",
+        action="store_true",
+        help=(
+            "Switch the project to the no-plugin fallback on this upgrade: "
+            "re-render with copied hooks/skills + local settings wiring"
+        ),
+    )
+    p.add_argument(
         "--non-interactive",
         action="store_true",
         help="Accepted for CLI symmetry — upgrade never prompts",
     )
     args = p.parse_args(argv)
-    return run_upgrade(Path(args.target).resolve(), apply=args.apply)
+    return run_upgrade(
+        Path(args.target).resolve(), apply=args.apply, no_plugin=args.no_plugin
+    )
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Run the scaffolding CLI; return the process exit code."""
-    argv = list(sys.argv[1:]) if argv is None else list(argv)
-    if argv[:1] == ["upgrade"]:
-        return _upgrade_main(argv[1:])
-    parser = _build_parser()
-    args = parser.parse_args(argv)
 
-    if args.non_interactive:
-        _require_non_interactive_args(args, parser)
-
-    target = Path(args.target).resolve()
-
-    # Select preset BEFORE creating the target directory — a typo'd --preset
-    # should fail without leaving an empty dir behind.
-    presets = list_presets()
-    if not presets:
-        sys.stderr.write("error: no presets found in templates/presets/\n")
-        return 1
-    preset = _select_preset(args, parser, presets)
-
-    # Validate non-interactive args BEFORE creating the target directory.
-    # PI-20: MCP validation must happen before mkdir so an invalid --mcps
-    # flag doesn't leave an empty target directory behind.
-    selected_mcps: list[dict] = []
-    if args.non_interactive:
-        try:
-            selected_mcps = _resolve_mcps_non_interactive(
-                args.mcps, args.db, args.browser
-            )
-        except ValueError as e:
-            parser.error(str(e))
-
-    target.mkdir(parents=True, exist_ok=True)
-
-    if args.non_interactive:
-        project_name = args.name
-        project_description = args.description
-        language = args.language or "none"
-        owner = args.owner
-        license_choice = args.license
-        devcontainer = args.devcontainer
-        mise = args.mise
-        vscode = args.vscode
-        try:
-            agents = resolve_agents(args.agents)
-        except ValueError as e:
-            parser.error(str(e))
-    else:
-        (
-            project_name,
-            project_description,
-            language,
-            selected_mcps,
-            owner,
-            license_choice,
-            devcontainer,
-            mise,
-            vscode,
-            agents,
-        ) = _gather_inputs_interactive(default_name=target.name)
-
-    # Agent overlays append to the preset's layers (PI-137). The preset dict
-    # is copied so the loaded definition stays pristine.
-    extra_layers = agent_layers(agents)
-    if extra_layers:
-        preset = {**preset, "layers": list(preset["layers"]) + extra_layers}
-
+def _build_variables(  # noqa: PLR0913 — one variable per wizard input
+    preset: dict,
+    *,
+    project_name: str,
+    project_description: str,
+    language: str,
+    selected_mcps: list[dict],
+    owner: str,
+    license_choice: str,
+    devcontainer: bool,
+    mise: bool,
+    vscode: bool,
+    agents: list[str],
+    no_plugin: bool,
+) -> dict[str, str]:
+    """Assemble the template render context from the resolved inputs."""
     is_graphify = "graphify" in preset.get("name", "")
     has_obsidian = "obsidian" in preset.get("layers", [])
     lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(
         language, ("", "", "")
     )
-
-    variables: dict[str, str] = {
+    return {
         "project_name": project_name,
         "project_description": project_description,
         "created_date": date.today().isoformat(),
@@ -544,6 +511,9 @@ def main(argv: list[str] | None = None) -> int:
         "ollama": "true" if "ollama" in agents else "",
         "multi_agent": "true" if ("codex" in agents or "gemini" in agents) else "",
         "other_agents": "true" if len(agents) > 1 else "",
+        # Plugin cutover (PI-165): inverse pair, same pattern as vscode_off.
+        "plugin_mode": "" if no_plugin else "true",
+        "no_plugin": "true" if no_plugin else "",
         "mise": "true" if mise else "",
         "vscode": "true" if vscode else "",
         # Inverse flag: the template engine has no else-branch, and without
@@ -555,6 +525,102 @@ def main(argv: list[str] | None = None) -> int:
         "license_apache": "true" if license_choice == "apache-2.0" else "",
         "license_proprietary": "true" if license_choice == "proprietary" else "",
     }
+
+
+
+def _resolve_inputs(args, parser, target: Path) -> tuple | None:
+    """Resolve all scaffold inputs from flags; None means prompt instead.
+
+    Validation errors call ``parser.error`` (exits) BEFORE the target dir is
+    created (PI-20), so a typo'd flag never leaves an empty dir behind.
+    """
+    if not args.non_interactive:
+        return None
+    try:
+        selected_mcps = _resolve_mcps_non_interactive(args.mcps, args.db, args.browser)
+        agents = resolve_agents(args.agents)
+    except ValueError as e:
+        parser.error(str(e))
+    return (
+        args.name,
+        args.description,
+        args.language or "none",
+        selected_mcps,
+        args.owner,
+        args.license,
+        args.devcontainer,
+        args.mise,
+        args.vscode,
+        agents,
+        args.no_plugin,
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the scaffolding CLI; return the process exit code."""
+    argv = list(sys.argv[1:]) if argv is None else list(argv)
+    if argv[:1] == ["upgrade"]:
+        return _upgrade_main(argv[1:])
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+
+    if args.non_interactive:
+        _require_non_interactive_args(args, parser)
+
+    target = Path(args.target).resolve()
+
+    # Select preset BEFORE creating the target directory — a typo'd --preset
+    # should fail without leaving an empty dir behind.
+    presets = list_presets()
+    if not presets:
+        sys.stderr.write("error: no presets found in templates/presets/\n")
+        return 1
+    preset = _select_preset(args, parser, presets)
+
+    # Validate non-interactive args BEFORE creating the target directory
+    # (PI-20: a bad flag must not leave an empty dir behind).
+    inputs = _resolve_inputs(args, parser, target)
+    target.mkdir(parents=True, exist_ok=True)
+    if inputs is None:
+        inputs = _gather_inputs_interactive(default_name=target.name) + (args.no_plugin,)
+    (
+        project_name,
+        project_description,
+        language,
+        selected_mcps,
+        owner,
+        license_choice,
+        devcontainer,
+        mise,
+        vscode,
+        agents,
+        no_plugin,
+    ) = inputs
+
+    # Agent overlays append to the preset's layers (PI-137); --no-plugin
+    # restores the shared hooks/skills copies via the fallback layer
+    # (PI-165, ADR-010 cutover). The preset dict is copied so the loaded
+    # definition stays pristine.
+    extra_layers = agent_layers(agents)
+    if no_plugin:
+        extra_layers = ["fallback", *extra_layers]
+    if extra_layers:
+        preset = {**preset, "layers": list(preset["layers"]) + extra_layers}
+
+    variables = _build_variables(
+        preset,
+        project_name=project_name,
+        project_description=project_description,
+        language=language,
+        selected_mcps=selected_mcps,
+        owner=owner,
+        license_choice=license_choice,
+        devcontainer=devcontainer,
+        mise=mise,
+        vscode=vscode,
+        agents=agents,
+        no_plugin=no_plugin,
+    )
 
     try:
         created = scaffold(target, preset, variables, strict=args.strict)

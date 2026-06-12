@@ -1,5 +1,5 @@
 description = "Summarizes the current session and saves it to the vault. Use at the end of a work session to record completed work, decisions made, and open items for the next session."
 prompt = """
-Read .claude/skills/session_summary/SKILL.md and follow its
+Read .agents/skills/session_summary/SKILL.md and follow its
 instructions exactly for this request: {{args}}
 """

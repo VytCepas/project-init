@@ -53,6 +53,10 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "ollama": "",
         "multi_agent": "",
         "other_agents": "",
+        # Matches the CLI default: plugin-first (PI-165). Tests exercising
+        # the copied payload use fallback_variables()/fallback_preset().
+        "plugin_mode": "true",
+        "no_plugin": "",
         "graphify": "",
         "obsidian": "true",
         "project_owner": "",
@@ -65,3 +69,16 @@ def make_variables(**overrides: str) -> dict[str, str]:
     }
     defaults.update(overrides)
     return defaults
+
+
+def fallback_variables(**overrides: str) -> dict[str, str]:
+    """Variables for a --no-plugin scaffold (copied hooks/skills + wiring)."""
+    return make_variables(plugin_mode="", no_plugin="true", **overrides)
+
+
+def fallback_preset(name: str = "obsidian-only") -> dict:
+    """Preset dict with the fallback layer appended, as --no-plugin does."""
+    from project_init.scaffold import load_preset
+
+    preset = load_preset(name)
+    return {**preset, "layers": [*preset["layers"], "fallback"]}

@@ -12,14 +12,14 @@ import stat
 import subprocess
 from pathlib import Path
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 _STAMP = ".claude/.session_setup_stamp"
 
 
 def _scaffold_python(target: Path) -> Path:
-    scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
+    scaffold(target, fallback_preset(), fallback_variables(), strict=True)
     # A scaffolded *user* project has its own dependency manifest.
     (target / "pyproject.toml").write_text(
         '[project]\nname = "fixture"\nversion = "0"\n'
@@ -110,8 +110,8 @@ class TestColdAndWarmStart:
         target = tmp_path / "p"
         scaffold(
             target,
-            load_preset("obsidian-only"),
-            make_variables(
+            fallback_preset(),
+            fallback_variables(
                 language="none", python="", justfile="",
                 lint_command="", format_command="", test_command="",
             ),

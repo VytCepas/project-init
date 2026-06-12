@@ -18,6 +18,7 @@ Before doing any GitHub issue, branch, push, PR, review, CI, or merge work, read
 ├── src/project_init/       # wizard CLI + scaffold engine
 ├── templates/
 │   ├── base/               # always copied into target projects
+│   ├── fallback/           # shared hooks/skills — rendered only with --no-plugin (ADR-010)
 │   ├── obsidian/           # overlay for both Obsidian-* presets
 │   ├── graphify/           # overlay for Obsidian+Graphify preset
 │   └── presets/            # toml preset definitions

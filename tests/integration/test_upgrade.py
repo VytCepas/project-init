@@ -392,3 +392,66 @@ class TestRemovedPresets:
         assert variables["memory_stack"] == "obsidian-graphify"
         assert variables["graphify"] == "true"
         assert "lightrag" not in variables
+
+
+class TestPluginCutoverMigration:
+    def test_pre_cutover_record_backfills_fallback_mode(self, tmp_path: Path):
+        """PI-165: records written before the cutover lack plugin_mode/
+        no_plugin. The faithful backfill is fallback mode (those scaffolds
+        shipped the copies), so re-render keeps their files instead of
+        reporting the whole payload as removed."""
+        from project_init.scaffold import scaffold
+        from project_init.upgrade import write_scaffold_record
+        from tests.helpers import fallback_preset, fallback_variables
+
+        target = tmp_path / "p"
+        created = scaffold(target, fallback_preset(), fallback_variables(), strict=True)
+        variables = fallback_variables()
+        variables.pop("plugin_mode")
+        variables.pop("no_plugin")
+        write_scaffold_record(target, "obsidian-only", variables, created)
+
+        preset, recovered, _, _ = read_scaffold_record(target)
+        assert recovered["no_plugin"] == "true"
+        assert recovered["plugin_mode"] == ""
+        rc = main(["upgrade", str(target), "--apply"])
+        assert rc == 0
+        # The copied payload survives: still present, not flagged removed.
+        assert (target / ".claude" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
+
+
+class TestNoPluginSwitch:
+    def test_upgrade_no_plugin_switches_to_fallback(self, tmp_path: Path, capsys):
+        """`upgrade --no-plugin --apply` converts a plugin-mode project to
+        the copied-payload fallback (PR #175 review)."""
+        target = tmp_path / "p"
+        _scaffold(target)  # default: plugin mode, no copies
+        assert not (target / ".claude" / "hooks" / "pre_commit_gate.sh").exists()
+
+        rc = main(["upgrade", str(target), "--no-plugin", "--apply"])
+        assert rc == 0
+        assert "switching to the no-plugin fallback" in capsys.readouterr().err
+        assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
+        assert (target / ".claude" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        # The mode is recorded, so plain upgrades stay in fallback mode.
+        _, variables, _, _ = read_scaffold_record(target)
+        assert variables["no_plugin"] == "true"
+        assert main(["upgrade", str(target)]) == 0
+
+
+class TestInteractiveNoPlugin:
+    def test_wizard_path_honors_no_plugin_flag(self, tmp_path: Path, monkeypatch):
+        """--no-plugin without --non-interactive must not be silently
+        dropped (PR #175 review)."""
+        import project_init.__main__ as cli
+
+        canned = (
+            "proj", "desc", "python", [], "", "none", False, False, False, ["claude"],
+        )
+        monkeypatch.setattr(cli, "_gather_inputs_interactive", lambda **kw: canned)
+        target = tmp_path / "p"
+        assert cli.main([str(target), "--no-plugin", "--preset", "obsidian-only"]) == 0
+        assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
+        settings = (target / ".claude" / "settings.json").read_text()
+        assert "project-init-workflow" not in settings

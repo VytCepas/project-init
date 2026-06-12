@@ -66,13 +66,14 @@ jobs:
             --name smoke \
             --description "wheel smoke test" \
             --language python \
+            --no-plugin \
             --strict
           # Verify essentials exist
           test -f /tmp/smoke-target/.claude/config.yaml
           test -f /tmp/smoke-target/.claude/project-init.md
           test -f /tmp/smoke-target/CLAUDE.md
           test -f /tmp/smoke-target/AGENTS.md
-          # Verify hook executable bits survived packaging
+          # --no-plugin copies the hook payload; exec bits must survive packaging
           test -x /tmp/smoke-target/.claude/hooks/post_edit_lint.sh
           test -x /tmp/smoke-target/.claude/hooks/pre_commit_gate.sh
           # Git-level enforcement hooks (ADR-007) survived packaging

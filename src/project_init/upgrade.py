@@ -273,6 +273,10 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "ollama": "",
         "multi_agent": "",
         "other_agents": "",
+        # Pre-cutover scaffolds shipped the file copies (ADR-010), so the
+        # faithful backfill is the fallback mode, not plugin mode.
+        "plugin_mode": "",
+        "no_plugin": "true",
         # Governance (PI-145) postdates pre-record configs: those projects
         # were scaffolded without a license or owner, so these are faithful.
         "project_owner": "",
@@ -321,6 +325,9 @@ def _backfill_variables(variables: dict) -> dict:
         "ollama": "",
         "multi_agent": "",
         "other_agents": "",
+        # Records written before the cutover (ADR-010) shipped file copies.
+        "plugin_mode": "",
+        "no_plugin": "true",
         "project_owner": "",
         "license": "none",
         "license_mit": "",
@@ -372,6 +379,8 @@ def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Pa
     # of the preset definition — re-derive them from the recorded agents.
     agents = {a.strip() for a in variables.get("agents", "claude").split(",")}
     extra = [layer for layer in ("codex", "gemini") if layer in agents]
+    if variables.get("no_plugin"):
+        extra = ["fallback", *extra]
     if extra:
         preset = {**preset, "layers": list(preset["layers"]) + extra}
     return scaffold(staging, preset, variables, strict=True)
@@ -507,8 +516,13 @@ def _print_report(report: DriftReport, applied: bool) -> None:
         console.print("\nRun [bold]project-init upgrade --apply[/bold] to apply.")
 
 
-def run_upgrade(target: Path, *, apply: bool) -> int:
-    """Entry point for the upgrade subcommand; returns a process exit code."""
+def run_upgrade(target: Path, *, apply: bool, no_plugin: bool = False) -> int:
+    """Entry point for the upgrade subcommand; returns a process exit code.
+
+    *no_plugin* switches the project to the fallback mode on this run:
+    the re-render carries copied hooks/skills and local settings wiring,
+    surfacing as new/changed files in the report.
+    """
     import sys
 
     try:
@@ -520,6 +534,13 @@ def run_upgrade(target: Path, *, apply: bool) -> int:
     if preset_name in _REMOVED_PRESETS:
         sys.stderr.write(f"note: {_REMOVED_PRESETS[preset_name]['note']}\n")
         preset_name, variables = _migrate_removed_preset(preset_name, variables)
+
+    if no_plugin and not variables.get("no_plugin"):
+        sys.stderr.write(
+            "note: switching to the no-plugin fallback — copied hooks/skills "
+            "and local wiring will appear as new/changed files.\n"
+        )
+        variables = {**variables, "no_plugin": "true", "plugin_mode": ""}
 
     from project_init import __version__
 

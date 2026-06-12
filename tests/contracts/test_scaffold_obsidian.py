@@ -4,16 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 
 class TestScaffoldObsidianOnly:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
-        variables = make_variables(memory_stack="obsidian-only")
+        preset = fallback_preset()
+        variables = fallback_variables(memory_stack="obsidian-only")
         self.created = scaffold(tmp_target, preset, variables)
 
     def test_creates_claude_dir(self):
@@ -264,8 +264,8 @@ class TestScaffoldObsidianOnly:
 
 class TestIdempotency:
     def test_preserves_user_memory_files(self, tmp_target: Path):
-        preset = load_preset("obsidian-only")
-        variables = make_variables()
+        preset = fallback_preset()
+        variables = fallback_variables()
 
         scaffold(tmp_target, preset, variables)
 
@@ -279,8 +279,8 @@ class TestIdempotency:
         assert custom.read_text() == "user content"
 
     def test_preserves_user_vault_files(self, tmp_target: Path):
-        preset = load_preset("obsidian-only")
-        variables = make_variables()
+        preset = fallback_preset()
+        variables = fallback_variables()
 
         scaffold(tmp_target, preset, variables)
 
@@ -292,11 +292,11 @@ class TestIdempotency:
         assert custom.read_text() == "my decision"
 
     def test_overwrites_config_on_rerun(self, tmp_target: Path):
-        preset = load_preset("obsidian-only")
-        variables = make_variables(project_name="first")
+        preset = fallback_preset()
+        variables = fallback_variables(project_name="first")
         scaffold(tmp_target, preset, variables)
 
-        variables2 = make_variables(project_name="second")
+        variables2 = fallback_variables(project_name="second")
         scaffold(tmp_target, preset, variables2)
 
         content = (tmp_target / ".claude" / "config.yaml").read_text()

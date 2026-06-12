@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_HOOK = REPO_ROOT / ".claude" / "hooks" / "dag_workflow.py"
@@ -373,7 +373,7 @@ class TestScaffoldedTemplate:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        scaffold(tmp_target, load_preset("obsidian-only"), make_variables())
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
 
     def test_dag_workflow_py_in_scaffolded_hooks(self):
         assert (self.target / ".claude" / "hooks" / "dag_workflow.py").is_file()

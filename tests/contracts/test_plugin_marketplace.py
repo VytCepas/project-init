@@ -13,6 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MARKETPLACE = _REPO_ROOT / ".claude-plugin" / "marketplace.json"
 _PLUGIN_ROOT = _REPO_ROOT / "plugins" / "project-init-workflow"
 _TEMPLATE_CLAUDE = _REPO_ROOT / "templates" / "base" / "dot_claude"
+_FALLBACK_CLAUDE = _REPO_ROOT / "templates" / "fallback" / "dot_claude"
 
 
 class TestMarketplaceManifest:
@@ -77,7 +78,7 @@ class TestPluginPayloadInSync:
     def test_shared_skills_in_sync(self):
         template_skills = {
             p.parent.name: p
-            for p in (_TEMPLATE_CLAUDE / "skills").glob("*/SKILL.md")
+            for p in (_FALLBACK_CLAUDE / "skills").glob("*/SKILL.md")
         }
         plugin_skills = {
             p.parent.name: p
@@ -92,9 +93,12 @@ class TestPluginPayloadInSync:
     def test_hook_scripts_in_sync(self):
         template_hooks = {
             p.name: p
-            for p in (_TEMPLATE_CLAUDE / "hooks").iterdir()
+            for p in (_FALLBACK_CLAUDE / "hooks").iterdir()
             if p.suffix in {".sh", ".py"}
         }
+        template_hooks["dag_workflow.py"] = (
+            _TEMPLATE_CLAUDE / "hooks" / "dag_workflow.py"
+        )
         plugin_hooks = {
             p.name: p
             for p in (_PLUGIN_ROOT / "hooks").iterdir()
@@ -108,10 +112,9 @@ class TestPluginPayloadInSync:
 
 
 class TestScaffoldedSettingsWiring:
-    def test_marketplace_offered_but_plugin_not_enabled(self, tmp_path: Path):
-        """ADR-010 dual-ship: marketplace registered (plugin offered on
-        trust); plugin NOT enabled — copies are the active wiring, and
-        enabling both would double-fire every hook."""
+    def test_default_is_plugin_first(self, tmp_path: Path):
+        """PI-165 cutover: the plugin is enabled and no duplicate hook
+        wiring remains in settings — double-fire is impossible."""
         target = tmp_path / "p"
         scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
         settings = json.loads((target / ".claude" / "settings.json").read_text())
@@ -119,9 +122,30 @@ class TestScaffoldedSettingsWiring:
             settings["extraKnownMarketplaces"]["project-init"]["source"]["repo"]
             == "example/project-init"
         ), "slug comes from the project_init_repo variable, never hardcoded"
-        assert not any(
-            "project-init-workflow" in key for key in settings["enabledPlugins"]
-        )
+        assert settings["enabledPlugins"]["project-init-workflow@project-init"] is True
+        assert "hooks" not in settings, "plugin provides the hook wiring"
+        # No payload copies in plugin mode (dag_workflow.py stays: scripts exec it).
+        assert not (target / ".claude" / "skills" / "github_workflow").exists()
+        assert not (target / ".claude" / "hooks" / "pre_commit_gate.sh").exists()
+        assert (target / ".claude" / "hooks" / "dag_workflow.py").is_file()
+
+    def test_no_plugin_restores_copies_and_wiring(self, tmp_path: Path):
+        """--no-plugin: full copies + settings wiring, plugin not enabled."""
+        from tests.helpers import fallback_preset, fallback_variables
+
+        target = tmp_path / "p"
+        scaffold(target, fallback_preset(), fallback_variables(), strict=True)
+        settings = json.loads((target / ".claude" / "settings.json").read_text())
+        assert "project-init-workflow@project-init" not in settings["enabledPlugins"]
+        commands = [
+            h["command"]
+            for entries in settings["hooks"].values()
+            for entry in entries
+            for h in entry["hooks"]
+        ]
+        assert any("pre_commit_gate.sh" in c for c in commands)
+        assert (target / ".claude" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert (target / ".claude" / "hooks" / "prod_guard.py").is_file()
 
 
 class TestSyncTool:
@@ -135,16 +159,20 @@ class TestSyncTool:
         fake_root = tmp_path / "repo"
         fake_templates = fake_root / "templates" / "base" / "dot_claude"
         shutil.copytree(_TEMPLATE_CLAUDE, fake_templates)
+        fake_fallback = fake_root / "templates" / "fallback" / "dot_claude"
+        shutil.copytree(_FALLBACK_CLAUDE, fake_fallback)
         fake_plugin = fake_root / "plugins" / "project-init-workflow"
         shutil.copytree(_PLUGIN_ROOT, fake_plugin)
 
         monkeypatch.setattr(sync_plugin, "TEMPLATE_CLAUDE", fake_templates)
+        monkeypatch.setattr(sync_plugin, "FALLBACK_CLAUDE", fake_fallback)
         monkeypatch.setattr(sync_plugin, "PLUGIN_ROOT", fake_plugin)
         # Keep the derived overlay sources out of this test's blast radius.
         monkeypatch.setattr(sync_plugin, "CODEX_SKILLS", fake_root / "codex-skills")
+        monkeypatch.setattr(sync_plugin, "GEMINI_SKILLS", fake_root / "gemini-skills")
         monkeypatch.setattr(sync_plugin, "GEMINI_COMMANDS", fake_root / "gemini-cmds")
 
-        (fake_templates / "hooks" / "pre_commit_gate.sh").unlink()
+        (fake_fallback / "hooks" / "pre_commit_gate.sh").unlink()
         sync_plugin.sync()
 
         assert not (fake_plugin / "hooks" / "pre_commit_gate.sh").exists()

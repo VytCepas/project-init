@@ -24,7 +24,7 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 2. **Check for existing issue and PR** — run `gh issue list` and `gh pr list`. If an issue already exists, use its number. If a draft PR already exists for that issue, use it — do **not** create a second PR. Skip to step 5.
 
-3. **Create the issue** — load `.claude/skills/create_issue/SKILL.md` and follow it. It gathers priority, area, size, references, dependencies, and acceptance criteria before running:
+3. **Create the issue** — load the `create_issue` skill and follow it. It gathers priority, area, size, references, dependencies, and acceptance criteria before running:
    ```bash
    ISSUE_NUMBER=$(.claude/scripts/create_issue.sh <type> "<title>" --priority <priority> --area "<area>" --size <size> --acceptance "<criterion>")
    echo "Created issue #$ISSUE_NUMBER"
@@ -38,7 +38,7 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 5. **Proceed** — only begin implementation after the scripts have run successfully.
 
-6. **When ready to merge** — load `.claude/skills/github_workflow/SKILL.md` for the
+6. **When ready to merge** — load the `github_workflow` skill for the
    full push → promote → monitor/merge lifecycle and review-cycle protocol.
 
 ## Rules

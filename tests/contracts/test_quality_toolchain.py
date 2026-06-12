@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go")}
-    scaffold(target, load_preset("obsidian-only"), make_variables(language=language, **flags))
+    scaffold(target, fallback_preset(), fallback_variables(language=language, **flags))
     return target
 
 
@@ -132,8 +132,8 @@ class TestNoLanguage:
         flags = {lang: "" for lang in ("python", "node", "go")}
         created = scaffold(
             tmp_target,
-            load_preset("obsidian-only"),
-            make_variables(language="none", **flags),
+            fallback_preset(),
+            fallback_variables(language="none", **flags),
             strict=True,
         )
         assert Path("ruff.toml") not in created

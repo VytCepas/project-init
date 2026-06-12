@@ -59,7 +59,8 @@ class TestREADMEExampleCommand:
         assert (target / "CLAUDE.md").is_file()
         assert (target / "AGENTS.md").is_file()
 
-        # Verify hook executable bits
-        assert (target / ".claude" / "hooks" / "post_edit_lint.sh").is_file()
-        assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
+        # Plugin-first default (PI-165): payload comes from the plugin, only
+        # the script-library hook is copied.
+        assert (target / ".claude" / "hooks" / "dag_workflow.py").is_file()
+        assert not (target / ".claude" / "hooks" / "post_edit_lint.sh").exists()
         assert (target / ".github" / "hooks" / "pre-commit").is_file()
