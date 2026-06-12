@@ -470,6 +470,8 @@ def main(argv: list[str] | None = None) -> int:
         "created_date": date.today().isoformat(),
         "project_init_version": __version__,
         "project_init_url": __repo_url__,
+        # owner/name slug for the same-repo plugin marketplace (ADR-010)
+        "project_init_repo": __repo_url__.removeprefix("https://github.com/"),
         "language": language,
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": format_installed_mcps(selected_mcps),

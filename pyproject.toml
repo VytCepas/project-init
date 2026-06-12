@@ -61,6 +61,8 @@ max-complexity = 10
 # target the code a project ships. Scaffolded ruff.toml mirrors this.
 ".claude/**" = ["D", "C901", "PLR0912", "PLR0913", "PLR0915"]
 "templates/**" = ["D", "C901", "PLR0912", "PLR0913", "PLR0915"]
+# Synced byte-for-byte from templates/ by tools/sync_plugin.py (ADR-010).
+"plugins/**" = ["D", "C901", "PLR0912", "PLR0913", "PLR0915"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

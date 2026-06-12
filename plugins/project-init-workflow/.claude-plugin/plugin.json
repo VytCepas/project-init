@@ -1,0 +1,14 @@
+{
+  "name": "project-init-workflow",
+  "displayName": "project-init Workflow",
+  "version": "0.1.0",
+  "description": "GitHub lifecycle skills and deterministic guard hooks from project-init: issue->branch->PR->review->merge workflow, commit gating, and session bootstrap.",
+  "author": {
+    "name": "Vytautas Čepas",
+    "url": "https://github.com/VytCepas"
+  },
+  "repository": "https://github.com/VytCepas/project-init",
+  "license": "MIT",
+  "keywords": ["workflow", "github", "hooks", "scaffolding"],
+  "hooks": "./hooks/hooks.json"
+}

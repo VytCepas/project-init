@@ -277,6 +277,49 @@ class TestUpgradeApply:
         assert (target / "justfile.new").exists()
 
 
+class TestRecordBackfill:
+    def test_old_record_missing_new_variables_still_upgrades(self, tmp_path: Path):
+        """A record written before newer template variables existed must not
+        fail strict re-rendering (PR #166 review, P1). Simulated by stripping
+        post-PI-142 variables from the recorded JSON."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        config = target / _CONFIG_REL
+        text = config.read_text()
+        m = re.search(r"^(  variables: )(.*)$", text, re.MULTILINE)
+        assert m
+        variables = json.loads(m.group(2))
+        for newer in (
+            "project_init_repo", "project_owner", "license", "license_holder",
+            "license_mit", "license_apache", "license_proprietary",
+            "created_year", "justfile", "devcontainer", "mise", "vscode",
+            "vscode_off", "graphify",
+        ):
+            variables.pop(newer, None)
+        config.write_text(
+            text[: m.start()] + m.group(1) + json.dumps(variables, sort_keys=True) + text[m.end() :]
+        )
+
+        rc = main(["upgrade", str(target)])
+        assert rc == 0, "backfilled defaults must keep strict re-render working"
+
+    def test_backfill_derives_repo_slug_from_recorded_url(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold(target)
+        config = target / _CONFIG_REL
+        text = config.read_text()
+        m = re.search(r"^(  variables: )(.*)$", text, re.MULTILINE)
+        variables = json.loads(m.group(2))
+        variables.pop("project_init_repo", None)
+        config.write_text(
+            text[: m.start()] + m.group(1) + json.dumps(variables, sort_keys=True) + text[m.end() :]
+        )
+
+        _, recovered, _, _ = read_scaffold_record(target)
+        url = recovered["project_init_url"]
+        assert recovered["project_init_repo"] == url.removeprefix("https://github.com/")
+
+
 class TestMigration:
     def test_pre_record_config_upgrades_with_conflicts(self, tmp_path: Path, capsys):
         """Configs from before the scaffold record existed still upgrade."""
