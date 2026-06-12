@@ -45,11 +45,34 @@ _VERSION_LINE_RE = re.compile(r"^(\s*project_init_version:\s*).*$", re.MULTILINE
 # Variables that pre-record config files cannot recover; filled with the
 # scaffolder's defaults during migration (see read_scaffold_record).
 _MIGRATION_DEFAULTS = {
-    "llm_model": "claude-sonnet-4-6",
-    "embedding_model": "text-embedding-3-small",
     "project_init_url": "https://github.com/VytCepas/project-init",
     "project_init_repo": "VytCepas/project-init",
 }
+
+# Presets removed in earlier releases mapped to their successors; upgrade
+# auto-migrates the recorded inputs instead of erroring on "unknown preset"
+# (PI-172, ADR-009). Hand-editing the recorded JSON is not something we ask
+# users to do.
+_REMOVED_PRESETS = {
+    "obsidian-lightrag": {
+        "successor": "obsidian-graphify",
+        "note": (
+            "the obsidian-lightrag preset was removed (ADR-009) — "
+            "re-rendering as obsidian-graphify. LightRAG files appear under "
+            "'removed' (left in place); --apply records the migration."
+        ),
+    },
+}
+
+
+def _migrate_removed_preset(preset_name: str, variables: dict) -> tuple[str, dict]:
+    """Rewrite recorded inputs for a removed preset onto its successor."""
+    successor = _REMOVED_PRESETS[preset_name]["successor"]
+    variables = dict(variables)
+    variables["memory_stack"] = successor
+    variables["graphify"] = "true" if "graphify" in successor else ""
+    variables.pop("lightrag", None)
+    return successor, variables
 
 _LANGUAGE_FLAGS = ("python", "node", "go")
 
@@ -235,7 +258,6 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "lint_command": fields.get("tooling.lint_command", ""),
         "format_command": fields.get("tooling.format_command", ""),
         "test_command": fields.get("tooling.test_command", ""),
-        "lightrag": "true" if "lightrag" in stack else "",
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "justfile": "true" if language != "none" else "",
@@ -283,7 +305,6 @@ def _backfill_variables(variables: dict) -> dict:
 
     derived: dict[str, str] = {
         "project_init_repo": url.removeprefix("https://github.com/"),
-        "lightrag": "true" if "lightrag" in stack else "",
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "justfile": "true" if language != "none" else "",
@@ -495,6 +516,10 @@ def run_upgrade(target: Path, *, apply: bool) -> int:
     except UpgradeError as e:
         sys.stderr.write(f"error: {e}\n")
         return 1
+
+    if preset_name in _REMOVED_PRESETS:
+        sys.stderr.write(f"note: {_REMOVED_PRESETS[preset_name]['note']}\n")
+        preset_name, variables = _migrate_removed_preset(preset_name, variables)
 
     from project_init import __version__
 

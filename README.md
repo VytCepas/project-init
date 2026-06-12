@@ -19,14 +19,13 @@ Inside any target project:
     ├── skills/ agents/ hooks/ scripts/ rules/
     ├── memory/
     │   ├── MEMORY.md        # grep-able memory index
-    │   └── .lightrag/       # optional KG index (if chosen)
     └── vault/               # Obsidian vault (humans)
         ├── decisions/ design/ sessions/ knowledge/
 ```
 
 Principles:
 - **One folder, `.claude/`**, for everything agentic. Project root stays clean.
-- **Obsidian vault for humans, LightRAG (optional) for agents** — separated on disk.
+- **Obsidian vault for humans, Graphify (optional) for agents** — separated on disk.
 - **Deterministic-first** — hooks and scripts are bash/python. LLM calls only where generative.
 - **Claude-first, portable core** — built and tested for Claude Code; other agents get instructions, not enforcement. See [Agent support tiers](#agent-support-tiers).
 - **`bun` and `uv` only** — no `npm`/`npx`/`pip`/`venv` anywhere in scaffolded projects.
@@ -117,7 +116,7 @@ The wizard asks (interactive mode only):
 
 - Project name / description
 - Language (Python/Node/Go/none) — drives `lint_command`, `format_command`, `test_command`
-- Memory stack — Obsidian-only, Obsidian + Graphify (recommended for code-heavy projects), or Obsidian + LightRAG (legacy)
+- Memory stack — Obsidian-only or Obsidian + Graphify (recommended for code-heavy projects)
 - Core MCPs (Context7)
 - Database MCP — none / Postgres / SQLite
 - Browser automation — Playwright (yes/no)
@@ -246,7 +245,7 @@ The hooks need `python3` on `PATH` (replaces the previous `jq` dependency). They
 Edit and commit from inside WSL (`wsl` then `cd ~/projects/...`). Editing WSL files from Git Bash on Windows mangles executable bits and line endings.
 
 **`Unknown preset 'foo'`**
-Run `project-init --help` and pick from `obsidian-only`, `obsidian-graphify`, or `obsidian-lightrag` (legacy; ADR-009). Custom presets go in `templates/presets/<name>.toml`.
+Run `project-init --help` and pick from `obsidian-only` or `obsidian-graphify` (ADR-009). Custom presets go in `templates/presets/<name>.toml`.
 
 ## Positioning in the ecosystem
 
@@ -261,7 +260,7 @@ adopters know what this tool owns and where it defers:
 - **Knowledge-graph memory**: the community has consolidated around
   [Graphify](https://github.com/safishamsi/graphify) for codebase knowledge
   graphs. The `obsidian-graphify` preset wires it in (ADR-009); the
-  LightRAG overlay remains available as a legacy option.
+  hand-rolled LightRAG overlay was removed once Graphify landed (PI-172).
 - **Distributing `.claude/` components**: the official
   [Claude Code plugin marketplace](https://code.claude.com/docs/en/discover-plugins)
   is the standard channel for hooks/skills/agents. This repo doubles as a
@@ -294,8 +293,8 @@ project-init/
 ├── src/project_init/         # wizard CLI + scaffold engine
 ├── templates/
 │   ├── base/                 # always copied
-│   ├── obsidian/             # Obsidian-only + Obsidian+LightRAG overlay
-│   ├── lightrag/             # LightRAG overlay
+│   ├── obsidian/             # Obsidian vault overlay (both presets)
+│   ├── graphify/             # Graphify memory overlay
 │   └── presets/              # toml preset definitions
 ├── examples/                 # sample scaffolded outputs
 └── tests/                    # focused pytest modules by behavior area

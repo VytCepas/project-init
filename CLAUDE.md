@@ -19,7 +19,7 @@ Before doing any GitHub issue, branch, push, PR, review, CI, or merge work, read
 ├── templates/
 │   ├── base/               # always copied into target projects
 │   ├── obsidian/           # overlay for both Obsidian-* presets
-│   ├── lightrag/           # overlay for Obsidian+LightRAG preset
+│   ├── graphify/           # overlay for Obsidian+Graphify preset
 │   └── presets/            # toml preset definitions
 └── tests/                  # focused pytest modules by behavior area
 ```
@@ -87,6 +87,6 @@ After creating a skill, add an entry to `.claude/skills/INDEX.md` so it is disco
 - No LLM calls from the scaffolder itself
 - No long-running service
 - No database (beyond what preset projects may install)
-- Memory ingestion ships as scripts inside the LightRAG overlay
-  (`templates/lightrag/dot_claude/scripts/`) — they run inside scaffolded
+- Graphify setup ships as a user-run script inside the graphify overlay
+  (`templates/graphify/dot_claude/scripts/`) — it runs inside scaffolded
   projects, not as part of this repo's runtime.

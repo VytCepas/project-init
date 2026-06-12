@@ -14,9 +14,9 @@ Bare-bones Claude Code setup with basic `.claude/` infrastructure.
 
 Includes Obsidian vault configuration and note-taking setup.
 
-### Obsidian + LightRAG
+### Obsidian + Graphify
 
-Adds LightRAG memory stack integration for agent cross-project memory.
+Adds a Graphify code knowledge graph for agent context (ADR-009).
 
 ## Preset Structure
 
@@ -28,7 +28,7 @@ description = "What this preset does"
 [preset.template-layers]
 base = true
 obsidian = true  # optional
-lightrag = true  # optional
+graphify = true  # optional
 
 [preset.customizations]
 # Custom variables and substitutions

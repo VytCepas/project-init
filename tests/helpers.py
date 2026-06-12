@@ -4,14 +4,6 @@ import shutil
 from pathlib import Path
 
 
-def lightrag_available() -> bool:
-    try:
-        import lightrag  # noqa: F401
-        return True
-    except ImportError:
-        return False
-
-
 def find_uv() -> str | None:
     """Locate the `uv` binary. `uv run pytest` strips uv from PATH, so check
     common install locations as a fallback."""
@@ -61,11 +53,8 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "ollama": "",
         "multi_agent": "",
         "other_agents": "",
-        "lightrag": "",
         "graphify": "",
         "obsidian": "true",
-        "llm_model": "claude-sonnet-4-6",
-        "embedding_model": "text-embedding-3-small",
         "project_owner": "",
         "license": "none",
         "license_holder": "my-project",

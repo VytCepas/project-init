@@ -42,13 +42,10 @@ type: user | feedback | project | reference
 
 - `memory/` = small structured facts, agent-curated, fast to grep.
 - `vault/` = human-authored documentation (Obsidian). Larger, richer.
-- `memory/.lightrag/` (if installed) = vector + KG index over both `memory/` and `vault/` for semantic retrieval.
 
-## LightRAG (if present)
+## Graphify (if present)
 
-If this project was scaffolded with the `obsidian-lightrag` preset, `.claude/rules/lightrag.md` is available. It documents two scripts:
-
-- **Ingest:** `.claude/scripts/ingest_sessions.py` — indexes `memory/` and `vault/sessions/` into the KG.
-- **Query:** `.claude/scripts/query_memory.py "<question>"` — semantic search over the indexed knowledge.
-
-Run ingest after adding new session notes or memory files.
+If this project was scaffolded with the `obsidian-graphify` preset,
+`.claude/rules/graphify.md` documents the code knowledge graph: query
+`graphify-out/graph.json` before grepping, rebuilt per commit. One-time
+setup: `.claude/scripts/setup_graphify.sh`.

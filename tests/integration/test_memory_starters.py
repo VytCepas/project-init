@@ -15,7 +15,7 @@ class TestMemoryStarterFiles:
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
         preset = load_preset("obsidian-only")
-        variables = make_variables(memory_stack="obsidian-only", lightrag="")
+        variables = make_variables(memory_stack="obsidian-only")
         scaffold(tmp_target, preset, variables)
 
     def test_project_context_exists(self):
@@ -77,7 +77,7 @@ class TestVaultStarterContent:
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
         preset = load_preset("obsidian-only")
-        variables = make_variables(memory_stack="obsidian-only", lightrag="")
+        variables = make_variables(memory_stack="obsidian-only")
         scaffold(tmp_target, preset, variables)
 
     def test_log_md_exists(self):
@@ -124,7 +124,7 @@ class TestObsidianConfig:
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
         preset = load_preset("obsidian-only")
-        variables = make_variables(memory_stack="obsidian-only", lightrag="")
+        variables = make_variables(memory_stack="obsidian-only")
         scaffold(tmp_target, preset, variables)
 
     def test_obsidian_dir_exists(self):
@@ -167,7 +167,7 @@ class TestLintMemoryScript:
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
         preset = load_preset("obsidian-only")
-        variables = make_variables(memory_stack="obsidian-only", lightrag="")
+        variables = make_variables(memory_stack="obsidian-only")
         scaffold(tmp_target, preset, variables)
 
     def test_lint_script_exists(self):
@@ -221,27 +221,3 @@ class TestLintMemoryScript:
         )
         assert result.returncode == 1
         assert "user_role.md" in result.stderr
-
-
-class TestLightRAGIncremental:
-    @pytest.fixture(autouse=True)
-    def _scaffold(self, tmp_target: Path):
-        self.target = tmp_target
-        preset = load_preset("obsidian-lightrag")
-        variables = make_variables(memory_stack="obsidian-lightrag", lightrag="true")
-        scaffold(tmp_target, preset, variables)
-
-    def test_ingest_script_has_full_flag(self):
-        content = (self.target / ".claude" / "scripts" / "ingest_sessions.py").read_text()
-        assert "--full" in content
-
-    def test_ingest_script_has_hash_tracking(self):
-        content = (self.target / ".claude" / "scripts" / "ingest_sessions.py").read_text()
-        assert "ingested.json" in content
-        assert "sha256" in content
-
-    def test_lightrag_adr_000_has_lightrag_note(self):
-        content = (
-            self.target / ".claude" / "vault" / "decisions" / "adr-000-project-setup.md"
-        ).read_text()
-        assert "LightRAG" in content

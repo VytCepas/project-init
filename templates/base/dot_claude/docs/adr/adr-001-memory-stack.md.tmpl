@@ -9,22 +9,11 @@
 
 ## Decision
 
-{{#if lightrag}}
-Two-layer memory stack:
-
-- **`.claude/vault/`** (Obsidian) — human-authored notes, session logs, exploratory content
-- **`.claude/memory/.lightrag/`** (LightRAG) — vector-indexed agent memory, queryable by AI
-
-LightRAG indexes session logs and vault notes so agents can retrieve relevant context without reading every file.
-{{/if lightrag}}
-{{#if obsidian}}
-Single-layer memory:
-
 - **`.claude/vault/`** (Obsidian) — human-authored notes, session logs, exploratory content
 - **`.claude/memory/`** — flat markdown facts for quick agent recall
-
+{{#if graphify}}- **`graphify-out/`** (Graphify) — queryable code knowledge graph, rebuilt per commit; agents query it before grepping
+{{/if graphify}}
 Obsidian provides a local app for humans; agents read markdown files directly.
-{{/if obsidian}}
 
 ## Consequences
 

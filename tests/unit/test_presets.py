@@ -10,7 +10,7 @@ class TestListPresets:
         presets = list_presets()
         names = {p["name"] for p in presets}
         assert "obsidian-only" in names
-        assert "obsidian-lightrag" in names
+        assert "obsidian-graphify" in names
 
     def test_presets_have_required_keys(self):
         for p in list_presets():

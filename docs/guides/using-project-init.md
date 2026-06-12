@@ -43,7 +43,7 @@ Available flags:
 
 | Flag | Values | Default |
 |------|--------|---------|
-| `--preset` | `obsidian-only`, `obsidian-lightrag` | (asked interactively) |
+| `--preset` | `obsidian-only`, `obsidian-graphify` | (asked interactively) |
 | `--language` | `python`, `node`, `go`, `none` | `none` |
 | `--mcps` | `context7` (comma-separated) | none |
 | `--db` | `none`, `postgres`, `sqlite` | `none` |
@@ -57,9 +57,9 @@ Available flags:
 | Preset | When to use |
 |--------|-------------|
 | **obsidian-only** | Small to medium projects. Plain markdown vault, no external APIs needed. Human-friendly and agent-readable. |
-| **obsidian-lightrag** | Larger, longer-running projects (15+ devs, 18+ months). Adds a LightRAG knowledge graph agents can query semantically. Requires `ANTHROPIC_API_KEY` + `OPENAI_API_KEY`. |
+| **obsidian-graphify** | Code-heavy projects. Adds a Graphify code knowledge graph agents query before grepping. No API keys for IDE use (ADR-009). |
 
-Start with `obsidian-only` when in doubt. Upgrade later by re-running with `--preset obsidian-lightrag` — it merges without overwriting your existing memory or vault content.
+Start with `obsidian-only` when in doubt. Upgrade later by re-running with `--preset obsidian-graphify` — it merges without overwriting your existing memory or vault content.
 
 ---
 
@@ -164,19 +164,16 @@ Use `/start_task` before any non-trivial work — one issue, one branch, one PR 
 
 ---
 
-## 6. LightRAG (Optional — Larger Projects)
+## 6. Graphify (Optional — Code-Heavy Projects)
 
-If you chose `obsidian-lightrag`:
+If you chose `obsidian-graphify`, run the one-time setup and build the graph:
 
 ```bash
-# Ingest vault + memory into knowledge graph
-uv run .claude/scripts/ingest_sessions.py
-
-# Query the graph
-uv run .claude/scripts/query_memory.py "What were the key decisions about auth?"
+.claude/scripts/setup_graphify.sh   # installs the CLI, skill, and post-commit hook
+# then inside your agent: /graphify .
 ```
 
-Ingestion is manual by design — you control when API calls happen. Requires `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`.
+The graph rebuilds incrementally per commit; agents query `graphify-out/graph.json` before grepping (see `.claude/rules/graphify.md`). No API keys needed for IDE use.
 
 ---
 

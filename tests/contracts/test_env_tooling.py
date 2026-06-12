@@ -54,16 +54,17 @@ class TestMiseOverlay:
 
 
 class TestEnvPattern:
-    @pytest.mark.parametrize("preset", ["obsidian-only", "obsidian-lightrag"])
+    @pytest.mark.parametrize("preset", ["obsidian-only", "obsidian-graphify"])
     def test_env_example_rendered_for_every_preset(self, tmp_path: Path, preset: str):
         target = tmp_path / preset
-        flags = {"lightrag": "true" if "lightrag" in preset else ""}
+        flags = {
+            "memory_stack": preset,
+            "graphify": "true" if "graphify" in preset else "",
+        }
         scaffold(target, load_preset(preset), make_variables(**flags), strict=True)
         example = (target / ".env.example").read_text()
         assert "Loading order" in example
         assert "Never commit .env" in example
-        if "lightrag" in preset:
-            assert "ANTHROPIC_API_KEY=" in example
 
     def test_env_is_gitignored(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")

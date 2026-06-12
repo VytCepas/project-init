@@ -13,7 +13,7 @@ class TestScaffoldObsidianOnly:
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
         preset = load_preset("obsidian-only")
-        variables = make_variables(memory_stack="obsidian-only", lightrag="")
+        variables = make_variables(memory_stack="obsidian-only")
         self.created = scaffold(tmp_target, preset, variables)
 
     def test_creates_claude_dir(self):
@@ -228,14 +228,6 @@ class TestScaffoldObsidianOnly:
     def test_agents_md_has_tdd_rule(self):
         content = (self.target / "AGENTS.md").read_text()
         assert "TDD" in content or "test" in content.lower()
-
-    def test_no_lightrag_files(self):
-        assert not (self.target / ".claude" / "scripts" / "ingest_sessions.py").exists()
-        assert not (self.target / ".claude" / "scripts" / "query_memory.py").exists()
-
-    def test_lightrag_rule_excluded(self):
-        # LightRAG rule file ships with the lightrag overlay only
-        assert not (self.target / ".claude" / "rules" / "lightrag.md").exists()
 
     def test_python_rule_file_present(self):
         rule = self.target / ".claude" / "rules" / "python.md"
