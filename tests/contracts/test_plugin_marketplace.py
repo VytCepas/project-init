@@ -122,3 +122,27 @@ class TestScaffoldedSettingsWiring:
         assert not any(
             "project-init-workflow" in key for key in settings["enabledPlugins"]
         )
+
+
+class TestSyncTool:
+    def test_sync_removes_stale_hook_scripts(self, tmp_path: Path, monkeypatch):
+        """A renamed/deleted template hook must disappear from the plugin on
+        re-sync, while plugin-authored hooks.json survives (PR #166 review)."""
+        import shutil
+
+        import tools.sync_plugin as sync_plugin
+
+        fake_root = tmp_path / "repo"
+        fake_templates = fake_root / "templates" / "base" / "dot_claude"
+        shutil.copytree(_TEMPLATE_CLAUDE, fake_templates)
+        fake_plugin = fake_root / "plugins" / "project-init-workflow"
+        shutil.copytree(_PLUGIN_ROOT, fake_plugin)
+
+        monkeypatch.setattr(sync_plugin, "TEMPLATE_CLAUDE", fake_templates)
+        monkeypatch.setattr(sync_plugin, "PLUGIN_ROOT", fake_plugin)
+
+        (fake_templates / "hooks" / "pre_commit_gate.sh").unlink()
+        sync_plugin.sync()
+
+        assert not (fake_plugin / "hooks" / "pre_commit_gate.sh").exists()
+        assert (fake_plugin / "hooks" / "hooks.json").exists()

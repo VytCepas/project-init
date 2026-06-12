@@ -261,6 +261,47 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
     return preset_name, variables, {}
 
 
+def _backfill_variables(variables: dict) -> dict:
+    """Fill variables introduced after *variables* were recorded.
+
+    A record written by an older scaffolder version lacks any template
+    variable added since; strict re-rendering would then fail on the
+    surviving placeholder. Derive what we can from the recorded values and
+    default the rest to their "off" state — faithful, since the feature
+    did not exist when the project was scaffolded.
+    """
+    v = dict(variables)
+    language = v.get("language", "none")
+    stack = v.get("memory_stack", "obsidian-only")
+    url = v.get("project_init_url", _MIGRATION_DEFAULTS["project_init_url"])
+
+    derived: dict[str, str] = {
+        "project_init_repo": url.removeprefix("https://github.com/"),
+        "lightrag": "true" if "lightrag" in stack else "",
+        "graphify": "true" if "graphify" in stack else "",
+        "obsidian": "true" if "obsidian" in stack else "",
+        "justfile": "true" if language != "none" else "",
+        "license_holder": v.get("project_owner") or v.get("project_name", ""),
+        "created_year": v.get("created_date", "").split("-")[0],
+        "vscode_off": "" if v.get("vscode") else "true",
+        # Opt-in features default off — they postdate the record.
+        "devcontainer": "",
+        "mise": "",
+        "vscode": "",
+        "project_owner": "",
+        "license": "none",
+        "license_mit": "",
+        "license_apache": "",
+        "license_proprietary": "",
+        **_MIGRATION_DEFAULTS,
+    }
+    for flag in _LANGUAGE_FLAGS:
+        derived[flag] = "true" if language == flag else ""
+    for key, value in derived.items():
+        v.setdefault(key, value)
+    return v
+
+
 def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
     """Return (preset_name, variables, manifest, migrated) for *target*."""
     config_path = target / _CONFIG_REL
@@ -274,9 +315,9 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
     parsed = _parse_record_block(text)
     if parsed is not None:
         preset_name, variables, manifest = parsed
-        return preset_name, variables, manifest, False
+        return preset_name, _backfill_variables(variables), manifest, False
     preset_name, variables, manifest = _migrate_semantic_config(text.splitlines())
-    return preset_name, variables, manifest, True
+    return preset_name, _backfill_variables(variables), manifest, True
 
 
 def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:

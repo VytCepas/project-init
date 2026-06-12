@@ -52,6 +52,12 @@ def sync() -> list[str]:
 
     hooks_dest = PLUGIN_ROOT / "hooks"
     hooks_dest.mkdir(parents=True, exist_ok=True)
+    # Remove stale scripts (renamed/deleted upstream) but keep hooks.json —
+    # the wiring is plugin-authored, not synced from templates.
+    wanted = {script.name for script in hook_scripts()}
+    for existing in hooks_dest.iterdir():
+        if existing.suffix in {".sh", ".py"} and existing.name not in wanted:
+            existing.unlink()
     for script in hook_scripts():
         dest = hooks_dest / script.name
         shutil.copy2(script, dest)
