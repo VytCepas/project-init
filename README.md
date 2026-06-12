@@ -308,4 +308,4 @@ All milestones (PI-1 through PI-18) are shipped. v0.1.0 released. Track future w
 
 ## License
 
-MIT
+Apache-2.0 — see [LICENSE](https://github.com/VytCepas/project-init/blob/main/LICENSE).
