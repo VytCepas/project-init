@@ -1,0 +1,5 @@
+description = "Save a fact to project memory for future sessions"
+prompt = """
+Read .claude/skills/save_memory/SKILL.md and follow its
+instructions exactly for this request: {{args}}
+"""

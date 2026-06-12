@@ -114,6 +114,37 @@ class TestCLIOverlayFlags:
         assert not (target / ".devcontainer").exists()
         assert (target / ".env.example").exists(), "env pattern is always scaffolded"
 
+    def test_agents_flag_renders_overlays(self, tmp_path: Path):
+        target = tmp_path / "p"
+        assert self._run(target, "--agents", "codex,gemini,ollama") == 0
+        assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert (target / ".codex" / "hooks.json").is_file()
+        assert (target / ".gemini-extension" / "gemini-extension.json").is_file()
+        assert (target / ".claude" / "hooks" / "agent_guard_adapter.py").is_file()
+
+    def test_agents_default_is_claude_only(self, tmp_path: Path):
+        target = tmp_path / "p"
+        assert self._run(target) == 0
+        assert not (target / ".agents").exists()
+        assert not (target / ".codex").exists()
+        assert not (target / ".gemini-extension").exists()
+
+    def test_unknown_agent_rejected(self, tmp_path: Path):
+        with pytest.raises(SystemExit):
+            self._run(tmp_path / "p", "--agents", "claude,cursor")
+
+    def test_upgrade_re_renders_agent_overlays(self, tmp_path: Path):
+        """The recorded agents list restores overlay layers on re-render —
+        a codex-scaffolded project upgrades drift-free."""
+        from project_init.__main__ import main
+
+        target = tmp_path / "p"
+        assert self._run(target, "--agents", "codex") == 0
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert (target / ".codex" / "hooks.json").is_file()
+        # No spurious .new conflicts from the overlay files.
+        assert not list(target.rglob("*.new"))
+
 
 class TestCLINonInteractiveCommandVariables:
     """PI-16: CLI passes correct command variables based on --language."""

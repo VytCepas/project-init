@@ -1,0 +1,18 @@
+{{#if gemini}}{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "run_shell_command",
+        "hooks": [
+          {
+            "name": "github-command-guard",
+            "type": "command",
+            "command": "python3 .claude/hooks/agent_guard_adapter.py gemini",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}
+{{/if gemini}}

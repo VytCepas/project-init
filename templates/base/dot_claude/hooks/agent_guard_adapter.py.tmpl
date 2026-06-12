@@ -1,0 +1,64 @@
+{{#if multi_agent}}#!/usr/bin/env python3
+"""Adapt non-Claude agent hook payloads for the shared dag_workflow guard.
+
+Codex (PreToolUse via .codex/hooks.json) and Gemini CLI (BeforeTool via the
+project extension) reuse the same COMMAND_RULES enforcement Claude Code gets
+from github_command_guard.sh. Payloads differ slightly per agent, so this
+shim extracts the shell command, feeds a Claude-shaped payload into
+dag_workflow.py guard, and translates the verdict to the caller's dialect:
+
+  codex  -> {"decision": "block", ...} (Codex accepts Claude's shape)
+  gemini -> {"decision": "deny",  ...}
+
+Fail-open by design: on any parse error the command proceeds — git hooks
+and CI remain the real enforcement boundary (ADR-007).
+
+Usage (wired by the scaffolded hook configs): agent_guard_adapter.py <dialect>
+"""
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+
+def _extract_command(payload: dict) -> str:
+    tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
+    command = tool_input.get("command") or tool_input.get("cmd") or ""
+    if isinstance(command, list):
+        command = " ".join(str(part) for part in command)
+    return str(command)
+
+
+def main() -> int:
+    dialect = sys.argv[1] if len(sys.argv) > 1 else "codex"
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except json.JSONDecodeError:
+        return 0
+    command = _extract_command(payload)
+    if not command:
+        return 0
+
+    guard = Path(__file__).with_name("dag_workflow.py")
+    proc = subprocess.run(
+        [sys.executable, str(guard), "guard"],
+        input=json.dumps({"tool_input": {"command": command}}),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        verdict = json.loads(proc.stdout.strip() or "null")
+    except json.JSONDecodeError:
+        return 0
+    if isinstance(verdict, dict) and verdict.get("decision") == "block":
+        if dialect == "gemini":
+            verdict = {"decision": "deny", "reason": verdict.get("reason", "")}
+        sys.stdout.write(json.dumps(verdict))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+{{/if multi_agent}}

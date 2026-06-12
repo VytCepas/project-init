@@ -1,0 +1,17 @@
+{{#if codex}}{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/agent_guard_adapter.py codex",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+{{/if codex}}

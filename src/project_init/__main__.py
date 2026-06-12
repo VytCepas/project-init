@@ -87,6 +87,15 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--agents",
+        default="claude",
+        help=(
+            "Comma-separated agents the project supports: claude (always "
+            "included), codex, gemini, ollama. Codex/Gemini get native "
+            "wiring overlays; ollama is instructions-level only (PI-137)"
+        ),
+    )
+    p.add_argument(
         "--mise",
         action="store_true",
         help=(
@@ -315,7 +324,7 @@ def _select_preset(
 
 def _gather_inputs_interactive(
     default_name: str,
-) -> tuple[str, str, str, list[dict], str, str, bool, bool, bool]:
+) -> tuple[str, str, str, list[dict], str, str, bool, bool, bool, list[str]]:
     """Prompt for project basics, MCPs, governance, and opt-in overlays."""
     project_name = _prompt("Project name", default=default_name)
     project_description = _prompt("Description", default="")
@@ -346,6 +355,14 @@ def _gather_inputs_interactive(
     vscode = Confirm.ask(
         "Add shared VS Code config (extensions + format-on-save)?", default=False
     )
+    agents_raw = _prompt(
+        "Agents to support (claude always; add codex/gemini/ollama, comma-separated)",
+        default="claude",
+    )
+    try:
+        agents = resolve_agents(agents_raw)
+    except ValueError:
+        agents = ["claude"]
     return (
         project_name,
         project_description,
@@ -356,7 +373,31 @@ def _gather_inputs_interactive(
         devcontainer,
         mise,
         vscode,
+        agents,
     )
+
+
+_VALID_AGENTS = ("claude", "codex", "gemini", "ollama")
+# Agents whose native wiring ships as a template layer; ollama is
+# instructions-level only (canonical AGENTS.md + portable scripts, PI-137).
+_AGENT_LAYERS = ("codex", "gemini")
+
+
+def resolve_agents(raw: str) -> list[str]:
+    """Parse/validate an --agents value; claude is always included first."""
+    selected = [a.strip().lower() for a in raw.split(",") if a.strip()]
+    unknown = [a for a in selected if a not in _VALID_AGENTS]
+    if unknown:
+        msg = f"unknown agent(s): {', '.join(unknown)}. Valid: {', '.join(_VALID_AGENTS)}"
+        raise ValueError(msg)
+    ordered = ["claude"]
+    ordered += [a for a in _VALID_AGENTS if a != "claude" and a in selected]
+    return ordered
+
+
+def agent_layers(agents: list[str]) -> list[str]:
+    """Template layers contributed by the selected agents."""
+    return [a for a in _AGENT_LAYERS if a in agents]
 
 
 # Per-language tooling commands (PI-16): (lint, format, test). Empty strings
@@ -444,6 +485,10 @@ def main(argv: list[str] | None = None) -> int:
         devcontainer = args.devcontainer
         mise = args.mise
         vscode = args.vscode
+        try:
+            agents = resolve_agents(args.agents)
+        except ValueError as e:
+            parser.error(str(e))
     else:
         (
             project_name,
@@ -455,7 +500,14 @@ def main(argv: list[str] | None = None) -> int:
             devcontainer,
             mise,
             vscode,
+            agents,
         ) = _gather_inputs_interactive(default_name=target.name)
+
+    # Agent overlays append to the preset's layers (PI-137). The preset dict
+    # is copied so the loaded definition stays pristine.
+    extra_layers = agent_layers(agents)
+    if extra_layers:
+        preset = {**preset, "layers": list(preset["layers"]) + extra_layers}
 
     is_lightrag = "lightrag" in preset.get("name", "")
     is_graphify = "graphify" in preset.get("name", "")
@@ -491,6 +543,14 @@ def main(argv: list[str] | None = None) -> int:
         "go": "true" if language == "go" else "",
         "justfile": "true" if language != "none" else "",
         "devcontainer": "true" if devcontainer else "",
+        # Multi-agent support (PI-137): the agents list drives overlay layers
+        # on upgrade re-render; per-agent flags gate conditional blocks.
+        "agents": ",".join(agents),
+        "codex": "true" if "codex" in agents else "",
+        "gemini": "true" if "gemini" in agents else "",
+        "ollama": "true" if "ollama" in agents else "",
+        "multi_agent": "true" if ("codex" in agents or "gemini" in agents) else "",
+        "other_agents": "true" if len(agents) > 1 else "",
         "mise": "true" if mise else "",
         "vscode": "true" if vscode else "",
         # Inverse flag: the template engine has no else-branch, and without
