@@ -93,3 +93,18 @@ git config --global commit.gpgsign true
 - [ ] Commit signing set up, if required
 - [ ] Repo hooks installed: run `.claude/scripts/install_hooks.sh` once per clone
 - [ ] gitleaks installed for the local pre-commit secret scan
+
+## Multi-agent support tiers
+
+Only the Claude Code path is functionally CI-tested; treat other agents as
+best-effort. If the project was scaffolded with extra agents (`--agents`):
+
+| Agent | What you get | Setup per clone |
+|---|---|---|
+| Claude Code | full tier: hooks, skills, settings | none (plus `install_hooks.sh` like everyone) |
+| Codex | shared skills at `.agents/skills/`, command guard via `.codex/hooks.json` | none |
+| Gemini CLI | workflow /commands + command guard from the project extension | `.claude/scripts/setup_gemini.sh` |
+| Ollama-based (Aider, Goose, …) | AGENTS.md instructions, portable scripts, markdown memory | none |
+
+The git hooks and CI checks are the real enforcement boundary for every
+agent — agent-side hooks are fast-feedback guardrails only.

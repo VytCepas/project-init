@@ -1,0 +1,5 @@
+description = "Review staged or recent changes for bugs, style issues, and missed edge cases"
+prompt = """
+Read .claude/skills/review/SKILL.md and follow its
+instructions exactly for this request: {{args}}
+"""

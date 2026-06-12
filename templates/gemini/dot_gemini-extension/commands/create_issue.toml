@@ -1,0 +1,5 @@
+description = "Creates a GitHub Issue with typed labels and structured planning metadata via create_issue.sh. Sub-skill invoked by start_task — do not call directly; use /start_task instead."
+prompt = """
+Read .claude/skills/create_issue/SKILL.md and follow its
+instructions exactly for this request: {{args}}
+"""

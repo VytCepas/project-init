@@ -1,0 +1,5 @@
+description = "Creates a new slash command (skill) that users can invoke with /name. Use when asked to add a command, automate a repeatable workflow step, or expose a task as a /name shortcut."
+prompt = """
+Read .claude/skills/add_command/SKILL.md and follow its
+instructions exactly for this request: {{args}}
+"""

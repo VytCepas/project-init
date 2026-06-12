@@ -245,6 +245,12 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "mise": "",
         "vscode": "",
         "vscode_off": "true",
+        "agents": "claude",
+        "codex": "",
+        "gemini": "",
+        "ollama": "",
+        "multi_agent": "",
+        "other_agents": "",
         # Governance (PI-145) postdates pre-record configs: those projects
         # were scaffolded without a license or owner, so these are faithful.
         "project_owner": "",
@@ -288,6 +294,12 @@ def _backfill_variables(variables: dict) -> dict:
         "devcontainer": "",
         "mise": "",
         "vscode": "",
+        "agents": "claude",
+        "codex": "",
+        "gemini": "",
+        "ollama": "",
+        "multi_agent": "",
+        "other_agents": "",
         "project_owner": "",
         "license": "none",
         "license_mit": "",
@@ -335,6 +347,12 @@ def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:
 
 def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Path]:
     preset = load_preset(preset_name)
+    # Agent overlays (PI-137) are layers appended at scaffold time, not part
+    # of the preset definition — re-derive them from the recorded agents.
+    agents = {a.strip() for a in variables.get("agents", "claude").split(",")}
+    extra = [layer for layer in ("codex", "gemini") if layer in agents]
+    if extra:
+        preset = {**preset, "layers": list(preset["layers"]) + extra}
     return scaffold(staging, preset, variables, strict=True)
 
 
