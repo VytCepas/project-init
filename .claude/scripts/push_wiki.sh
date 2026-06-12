@@ -22,10 +22,13 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --prune)
       if [[ $# -lt 2 || "$2" == --* ]]; then
-        echo "--prune requires a page name" >&2
+        echo "--prune requires at least one page name" >&2
         exit 1
       fi
-      PRUNE_PAGES+=("$2"); shift 2 ;;
+      shift
+      while [[ $# -gt 0 && "$1" != --* ]]; do
+        PRUNE_PAGES+=("$1"); shift
+      done ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
