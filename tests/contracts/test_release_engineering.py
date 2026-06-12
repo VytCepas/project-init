@@ -121,5 +121,5 @@ class TestPyPIPublishing:
         config = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text())
         project = config["project"]
         assert project["name"] == "project-init"
-        assert any("MIT License" in c for c in project["classifiers"])
+        assert any("Apache Software License" in c for c in project["classifiers"])
         assert project["urls"]["Repository"]

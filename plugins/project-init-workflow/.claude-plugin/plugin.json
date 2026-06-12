@@ -8,7 +8,12 @@
     "url": "https://github.com/VytCepas"
   },
   "repository": "https://github.com/VytCepas/project-init",
-  "license": "MIT",
-  "keywords": ["workflow", "github", "hooks", "scaffolding"],
+  "license": "Apache-2.0",
+  "keywords": [
+    "workflow",
+    "github",
+    "hooks",
+    "scaffolding"
+  ],
   "hooks": "./hooks/hooks.json"
 }

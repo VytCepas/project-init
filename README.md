@@ -304,8 +304,8 @@ project-init/
 
 ## Status
 
-All milestones (PI-1 through PI-18) are shipped. v0.1.0 released. Track future work in [GitHub Issues](https://github.com/VytCepas/project-init/issues).
+Actively developed; v0.3.0 is the first PyPI release. Track work in [GitHub Issues](https://github.com/VytCepas/project-init/issues).
 
 ## License
 
-MIT
+Apache-2.0 — see [LICENSE](https://github.com/VytCepas/project-init/blob/main/LICENSE).
