@@ -83,13 +83,55 @@ class TestFirstScaffoldProtectsExistingFiles:
         assert _run(target) == 0
         assert not list(target.rglob("*.new"))
 
+    def test_rerun_before_merge_keeps_protecting(self, tmp_path: Path):
+        """PI-179 (review): a re-run before the user merges a `.new` sibling must
+        keep protecting the file — the data-loss path must not move to run 2."""
+        target = tmp_path / "proj"
+        target.mkdir()
+        (target / "CLAUDE.md").write_text("# USER ORIGINAL - unmerged\n")
+
+        assert _run(target) == 0  # first run records config.yaml + writes .new
+        assert "USER ORIGINAL" in (target / "CLAUDE.md").read_text()
+        assert (target / "CLAUDE.md.new").is_file()
+
+        # Second run while the .new is still pending: config.yaml now exists, but
+        # the unresolved sibling must keep CLAUDE.md protected, not clobber it.
+        assert _run(target) == 0
+        assert "USER ORIGINAL" in (target / "CLAUDE.md").read_text()
+
+    def test_multi_agent_scaffold_has_no_spurious_new_siblings(self, tmp_path: Path):
+        """PI-179 (review): cross-layer path collisions (e.g. .agents/skills/*
+        in both codex and gemini overlays) must NOT be mistaken for user files —
+        later layers legitimately overwrite earlier ones with no `.new`."""
+        target = tmp_path / "proj"
+        rc = main(
+            [
+                str(target),
+                "--non-interactive",
+                "--preset",
+                "obsidian-graphify",
+                "--name",
+                "ma",
+                "--description",
+                "t",
+                "--language",
+                "python",
+                "--agents",
+                "claude,codex,gemini,ollama",
+                "--no-plugin",
+            ]
+        )
+        assert rc == 0
+        spurious = list(target.rglob("*.new"))
+        assert not spurious, f"layer overwrites must not create siblings: {spurious}"
+
 
 class TestStrictModeProtection:
     def test_strict_scaffold_protects_existing_file(self, tmp_path: Path):
         target = tmp_path / "proj"
         target.mkdir()
         (target / "CLAUDE.md").write_text("# user owned\n")
-        conflicts: list[Path] = []
+        conflicts: list[tuple[Path, Path]] = []
 
         scaffold(
             target,
@@ -101,7 +143,8 @@ class TestStrictModeProtection:
 
         assert (target / "CLAUDE.md").read_text() == "# user owned\n"
         assert (target / "CLAUDE.md.new").is_file()
-        assert Path("CLAUDE.md") in conflicts
+        # conflicts records (original, actual-sibling) pairs (PI-179 review).
+        assert (Path("CLAUDE.md"), Path("CLAUDE.md.new")) in conflicts
 
     def test_no_conflicts_list_keeps_overwrite_behavior(self, tmp_path: Path):
         """Without a conflicts list, scaffold() keeps the old overwrite behavior."""

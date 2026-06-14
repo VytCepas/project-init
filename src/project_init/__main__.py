@@ -272,18 +272,18 @@ def _print_summary(target: Path, created: list[Path], preset_name: str) -> None:
     console.print()
 
 
-def _print_conflicts(target: Path, conflicts: list[Path]) -> None:
-    """Warn that pre-existing files were kept; renders landed as .new siblings."""
+def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
+    """Warn that user-owned files were kept; renders landed as .new siblings."""
     from rich.console import Console
     from rich.panel import Panel
 
     console = Console()
     body = (
         "Your existing files were [bold]not overwritten[/bold]. The new "
-        "project-init version of each was written alongside as a [bold].new[/bold]"
-        " sibling — review and merge what you want, then delete the sibling:\n\n"
+        "project-init version of each was written alongside as a sibling — "
+        "review and merge what you want, then delete the sibling:\n\n"
     )
-    body += "\n".join(f"  {rel}  →  {rel}.new" for rel in sorted(conflicts))
+    body += "\n".join(f"  {original}  →  {sibling}" for original, sibling in sorted(conflicts))
     console.print(Panel(body, title="Existing files preserved", border_style="yellow"))
     console.print()
 
@@ -635,13 +635,11 @@ def main(argv: list[str] | None = None) -> int:
         no_plugin=no_plugin,
     )
 
-    # First scaffold into a project = no recorded config yet. In that case,
-    # protect any pre-existing user files from being clobbered (PI-179); a
-    # re-run (config present) keeps the existing refresh-managed-files behavior.
-    # Passing a conflicts list turns on first-scaffold protection (PI-179);
-    # None on a re-run keeps refresh-in-place for project-init-managed files.
-    first_scaffold = not (target / ".claude" / "config.yaml").exists()
-    conflicts: list[Path] | None = [] if first_scaffold else None
+    # Overwrite protection (PI-179): scaffold() decides per file whether it is
+    # user-owned (first scaffold, or an unresolved `.new` sibling still pending)
+    # and writes a `.new` sibling rather than clobbering it. Always pass the list
+    # so a re-run before the user merges a prior conflict stays protected too.
+    conflicts: list[tuple[Path, Path]] = []
     try:
         created = scaffold(target, preset, variables, strict=args.strict, conflicts=conflicts)
     except TemplateRenderError as e:
@@ -655,7 +653,7 @@ def main(argv: list[str] | None = None) -> int:
     write_scaffold_record(target, preset["name"], variables, created)
     _print_summary(target, created, preset["name"])
     if conflicts:
-        _print_conflicts(target, conflicts)
+        _print_conflicts(conflicts)
     _print_mcp_commands(selected_mcps)
     return 0
 

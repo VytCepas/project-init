@@ -36,9 +36,9 @@ ci: lint test
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
 
-# install dependencies
+# install the lint/format gate toolchain (eslint.config.mjs imports these)
 setup:
-    bun install
+    bun add -d eslint typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc @biomejs/biome
 
 # lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs)
 lint:

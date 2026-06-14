@@ -91,6 +91,15 @@ class TestJustfilePerLanguage:
         assert "biome format" in _recipe_body(text, "format")
         assert "bun run" not in text, "node recipes must not indirect through package.json scripts"
 
+    def test_node_setup_installs_lint_toolchain(self, tmp_path: Path):
+        """PI-180 (review): `bunx eslint .` needs the config's imported plugins,
+        so `setup` must install the gate toolchain or lint fails out of the box."""
+        target = _scaffold_language(tmp_path / "n", "node")
+        body = _recipe_body((target / "justfile").read_text(), "setup")
+        assert "bun add" in body
+        for pkg in ("eslint", "typescript-eslint", "@biomejs/biome"):
+            assert pkg in body, f"setup must install {pkg}"
+
     def test_no_justfile_for_language_none(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "none")
         assert not (target / "justfile").exists()
