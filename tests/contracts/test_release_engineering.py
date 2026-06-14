@@ -6,6 +6,7 @@ ref resolution, and version consistency across the package.
 
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
@@ -25,11 +26,14 @@ class TestReleaseWorkflow:
         content = self._workflow()
         assert "uv build" in content
         assert "softprops/action-gh-release@v3" in content
-        # Upload only the build artifacts. A bare `files: dist/*` also globs the
-        # tracked dist/.gitignore and attaches it as a stray asset (PI-183).
+        # Upload only the build artifacts. A bare `dist/*` also globs the tracked
+        # dist/.gitignore and attaches it as a stray asset (PI-183). Guard against
+        # any `dist/*` that is not a specific artifact, regardless of trailing
+        # whitespace/comment/EOF.
         assert "dist/*.whl" in content
         assert "dist/*.tar.gz" in content
-        assert "files: dist/*\n" not in content, "bare dist/* uploads dist/.gitignore"
+        bare = re.findall(r"dist/\*(?!\.(?:whl|tar\.gz))", content)
+        assert not bare, f"release must not bare-glob dist/* (PI-183): {bare}"
 
     def test_changelog_generated_from_latest_tag(self):
         content = self._workflow()

@@ -50,9 +50,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          # Only the build artifacts — a bare `dist/*` also globs the tracked
-          # dist/.gitignore and uploads it as a stray `default.gitignore` asset
-          # (PI-183).
+          # Only the build artifacts — an unscoped glob also picks up the
+          # tracked dist/.gitignore and uploads it as a stray
+          # `default.gitignore` asset (PI-183).
           files: |
             dist/*.whl
             dist/*.tar.gz
