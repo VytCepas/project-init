@@ -34,3 +34,7 @@ logs/
 !.claude/scripts
 !.claude/settings.json
 .codex
+
+# coverage data
+.coverage
+.coverage.*

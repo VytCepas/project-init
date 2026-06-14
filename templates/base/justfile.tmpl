@@ -14,13 +14,13 @@ lint:
 format:
     uv run ruff format .
 
-# run the test suite
+# run the test suite (xdist pulled in on demand so -n works without declaring it)
 test:
-    uv run pytest -n auto --tb=short -q
+    uv run --with pytest-xdist pytest -n auto --tb=short -q
 
-# tests with the coverage gate (what CI runs when pytest-cov is installed)
+# tests with the coverage gate (what CI runs)
 test-cov:
-    uv run pytest -n auto --tb=short -q --cov --cov-fail-under=70
+    uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov --cov-fail-under=70
 
 # serve the docs site locally
 docs:
@@ -36,17 +36,17 @@ ci: lint test
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
 
-# install dependencies
+# install the lint/format gate toolchain (eslint.config.mjs imports these)
 setup:
-    bun install
+    bun add -d eslint typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc @biomejs/biome
 
 # lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs)
 lint:
-    bun run lint
+    bunx eslint .
 
-# auto-format project code
+# auto-format project code (Biome is the formatter; eslint owns the gates)
 format:
-    bun run format
+    bunx @biomejs/biome format --write .
 
 # run the test suite
 test:

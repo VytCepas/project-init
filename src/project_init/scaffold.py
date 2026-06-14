@@ -64,6 +64,7 @@ def _render(text: str, variables: dict[str, str]) -> str:
     looping until no block remains (unclosed markers survive for strict mode
     to flag).
     """
+
     def _replace_block(m: re.Match) -> str:
         key = m.group(1)
         return m.group(2) if variables.get(key) else ""
@@ -93,6 +94,76 @@ def _should_preserve(rel_path: Path, target: Path) -> bool:
     if rel_path.name in _ALWAYS_OVERWRITE:
         return False
     return any(part in _PRESERVE_DIRS for part in rel_path.parts)
+
+
+def _rendered_bytes(src: Path, variables: dict[str, str], is_template: bool) -> bytes | None:
+    """Return the bytes scaffolding would write for *src*, or None if skipped.
+
+    Mirrors :func:`_emit_file`'s content rules without touching the filesystem,
+    so callers can compare against an existing file before deciding to write.
+    """
+    if is_template:
+        rendered = _render(src.read_text(encoding="utf-8"), variables)
+        if not rendered.strip():
+            return None
+        return rendered.encode("utf-8")
+    return src.read_bytes()
+
+
+def _write_bytes(dest: Path, content: bytes, src: Path) -> None:
+    """Write *content* to *dest*, preserving *src*'s executable bit."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(content)
+    if src.stat().st_mode & 0o111:
+        dest.chmod(dest.stat().st_mode | 0o111)
+
+
+def _new_sibling(dest: Path, content: bytes) -> Path:
+    """Pick a ``.new`` sibling path for a file we must not overwrite (PI-179).
+
+    Mirrors the upgrade conflict convention: an existing ``.new`` may hold a
+    user's in-progress merge, so reuse it only when its content already equals
+    the fresh render; otherwise take ``.new.1``, ``.new.2``, …
+    """
+    candidate = dest.parent / (dest.name + ".new")
+    counter = 0
+    while candidate.exists() and candidate.read_bytes() != content:
+        counter += 1
+        candidate = dest.parent / (dest.name + f".new.{counter}")
+    return candidate
+
+
+def _has_pending_sibling(dest: Path) -> bool:
+    """True if an unresolved ``.new``/``.new.N`` sibling already exists for *dest*.
+
+    A pending sibling means a prior scaffold preserved this file and the user
+    has not merged it yet, so a re-run must keep protecting it (PI-179).
+    """
+    base = dest.name + ".new"
+    return (dest.parent / base).exists() or any(
+        p.name.startswith(base + ".") for p in dest.parent.glob(dest.name + ".new.*")
+    )
+
+
+def _protected_as_sibling(
+    src: Path, dest: Path, variables: dict[str, str], is_template: bool, *, first: bool
+) -> Path | None:
+    """Write the fresh render beside *dest* instead of overwriting it (PI-179).
+
+    Returns the ``.new`` sibling path written when *dest* is a user-owned file
+    that must be protected — i.e. it exists with content differing from the
+    render, and either this is the *first* scaffold or an unresolved sibling
+    from an earlier run is still pending (so a re-run does not clobber a file
+    the user has not merged). Returns None when the normal write should proceed.
+    """
+    if not dest.exists() or not (first or _has_pending_sibling(dest)):
+        return None
+    content = _rendered_bytes(src, variables, is_template)
+    if content is None or dest.read_bytes() == content:
+        return None
+    sibling = _new_sibling(dest, content)
+    _write_bytes(sibling, content, src)
+    return sibling
 
 
 def _output_rel_path(src: Path, layer_dir: Path) -> tuple[Path, bool]:
@@ -145,9 +216,8 @@ def _validate_no_placeholders(rendered_files: list[tuple[Path, str]]) -> None:
         for match in _ANY_PLACEHOLDER_RE.finditer(content):
             offenders.append(f"{rel_path}: {match.group()}")
     if offenders:
-        msg = (
-            "strict mode: unrendered placeholders survived scaffolding:\n  "
-            + "\n  ".join(offenders)
+        msg = "strict mode: unrendered placeholders survived scaffolding:\n  " + "\n  ".join(
+            offenders
         )
         raise TemplateRenderError(msg)
 
@@ -165,10 +235,22 @@ def _iter_layer_files(layers: list[str]):
             yield src, layer_dir
 
 
-def _commit_staged(work_dir: Path, target: Path, staged: list[Path]) -> list[Path]:
+def _commit_staged(
+    work_dir: Path,
+    target: Path,
+    staged: list[Path],
+    *,
+    first: bool = False,
+    conflicts: list[tuple[Path, Path]] | None = None,
+) -> list[Path]:
     """Copy validated files from the strict-mode staging dir into *target*.
 
     Honors rerun idempotency: user-owned memory/vault files are not overwritten.
+    When a *conflicts* list is passed (protection, PI-179), a user-owned file
+    with different content is kept and the fresh render lands as a ``.new``
+    sibling. A file is user-owned on the *first* scaffold, or on any run while an
+    unresolved sibling from an earlier run is still pending. Each protected file
+    is recorded as ``(original_rel, sibling_rel)``.
     """
     created: list[Path] = []
     target.mkdir(parents=True, exist_ok=True)
@@ -178,6 +260,12 @@ def _commit_staged(work_dir: Path, target: Path, staged: list[Path]) -> list[Pat
         src = work_dir / rel_path
         dest = target / rel_path
         dest.parent.mkdir(parents=True, exist_ok=True)
+        protect = conflicts is not None and (first or _has_pending_sibling(dest))
+        if protect and dest.exists() and dest.read_bytes() != src.read_bytes():
+            sibling = _new_sibling(dest, src.read_bytes())
+            shutil.copy2(src, sibling)
+            conflicts.append((rel_path, sibling.relative_to(target)))
+            continue
         shutil.copy2(src, dest)
         created.append(rel_path)
     return created
@@ -189,6 +277,7 @@ def scaffold(
     variables: dict[str, str],
     *,
     strict: bool = False,
+    conflicts: list[tuple[Path, Path]] | None = None,
 ) -> list[Path]:
     """Copy + render template layers into *target*. Return created file paths.
 
@@ -201,12 +290,24 @@ def scaffold(
 
     In strict mode, all output is written to a temporary directory first.
     Only on successful validation are rendered files committed to target.
+
+    Passing a *conflicts* list turns on overwrite protection (PI-179): a
+    user-owned file whose content differs from the fresh render is never
+    overwritten — the render is written as a ``<file>.new`` sibling and the pair
+    ``(original_rel, sibling_rel)`` is appended to *conflicts*. A file counts as
+    user-owned on the first scaffold (no recorded ``config.yaml``) or, on any
+    later run, while an unresolved sibling from an earlier run is still pending —
+    so a re-run never clobbers a file the user has not merged yet. memory/vault
+    preservation is unchanged either way.
     """
     import uuid
+
+    first_scaffold = not (target / ".claude" / "config.yaml").exists()
 
     layers: list[str] = preset["layers"]
     created: list[Path] = []
     staged: list[Path] = []
+    written: set[Path] = set()  # paths this run has emitted (later layers may overwrite)
     rendered_files: list[tuple[Path, str]] = []  # for strict-mode scan
 
     # For strict mode: write to temp, validate, then copy into target.
@@ -229,20 +330,39 @@ def scaffold(
             if not strict and _should_preserve(rel_path, target):
                 continue
 
+            # Overwrite protection (non-strict; strict handles it at commit time
+            # in _commit_staged): never clobber a user-owned file — write the
+            # render as a `.new` sibling instead (PI-179). Skip when an earlier
+            # layer of THIS run already wrote the path: later layers legitimately
+            # overwrite earlier ones, that is not a user file. work_dir == target
+            # in non-strict mode, so dest is the real file.
+            if (
+                not strict
+                and conflicts is not None
+                and rel_path not in written
+                and (
+                    sibling := _protected_as_sibling(
+                        src, work_dir / rel_path, variables, is_template, first=first_scaffold
+                    )
+                )
+                is not None
+            ):
+                conflicts.append((rel_path, rel_path.parent / sibling.name))
+                continue
+
             rendered = _emit_file(src, work_dir / rel_path, variables, is_template)
             if rendered is None:
                 continue
             if is_template and strict:
                 rendered_files.append((rel_path, rendered))
-
-            if strict:
-                staged.append(rel_path)
-            else:
-                created.append(rel_path)
+            (staged if strict else created).append(rel_path)
+            written.add(rel_path)
 
         if strict:
             _validate_no_placeholders(rendered_files)
-            created = _commit_staged(work_dir, target, staged)
+            created = _commit_staged(
+                work_dir, target, staged, first=first_scaffold, conflicts=conflicts
+            )
             shutil.rmtree(work_dir)
 
     except Exception:
