@@ -28,7 +28,9 @@ Publish every tagged release to PyPI from the existing `release.yml` via a
 
 - Runs only after the GitHub Release job succeeds (`needs: release`).
 - Authenticates via OIDC (`id-token: write`) against the `pypi`
-  environment — protection rules can be added on the environment later.
+  environment, which is restricted to `v*` tags so only a tagged release
+  can deploy to it (PI-184); a required reviewer can be added later if a
+  manual approval gate before each publish is wanted.
 - Uses `pypa/gh-action-pypi-publish` (the canonical action; `release/v1`
   per its own guidance — Renovate's `pinGitHubActionDigests` preset will
   pin it to a digest on its next run, like every other action here).
@@ -45,6 +47,9 @@ Before the first publish, register the *pending publisher* on pypi.org
 (Account → Publishing): project `project-init`, owner `VytCepas`,
 repository `project-init`, workflow `release.yml`, environment `pypi`.
 The first tagged release after that claims the name.
+
+Done for v0.3.0 (#171): the publisher is registered, the `pypi`
+environment exists and is tag-restricted, and v0.3.0 is live on PyPI.
 
 ## Consequences
 

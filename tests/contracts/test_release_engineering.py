@@ -25,7 +25,11 @@ class TestReleaseWorkflow:
         content = self._workflow()
         assert "uv build" in content
         assert "softprops/action-gh-release@v3" in content
-        assert "files: dist/*" in content
+        # Upload only the build artifacts. A bare `files: dist/*` also globs the
+        # tracked dist/.gitignore and attaches it as a stray asset (PI-183).
+        assert "dist/*.whl" in content
+        assert "dist/*.tar.gz" in content
+        assert "files: dist/*\n" not in content, "bare dist/* uploads dist/.gitignore"
 
     def test_changelog_generated_from_latest_tag(self):
         content = self._workflow()
