@@ -45,6 +45,8 @@ Variables are defined by the wizard (`src/project_init/__main__.py`) and passed 
 
 Re-running the wizard merges scaffold files into the target project. It does not delete unrelated project files, and it does not overwrite files in `memory/` or `vault/` (user content). `README.md` files inside those dirs are always refreshed.
 
+On the **first** scaffold (no `.claude/config.yaml` recorded yet), `main()` passes `protect_existing=True`: any pre-existing file whose content differs from the fresh render is kept, and the render is written as a `<file>.new` sibling (the same conflict convention `project-init upgrade` uses), with the conflicting paths reported to the user. This prevents a first run from silently clobbering a hand-written `CLAUDE.md` or `.claude/settings.json`. On a re-run the recorded config is present, so project-init-managed files are refreshed in place while `memory/`/`vault/` stay user-owned.
+
 ## Strict mode
 
 `--strict` raises `TemplateRenderError` if any `{{...}}` placeholder survives rendering. Used in CI smoke tests to catch missing variables.

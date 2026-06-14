@@ -272,6 +272,22 @@ def _print_summary(target: Path, created: list[Path], preset_name: str) -> None:
     console.print()
 
 
+def _print_conflicts(target: Path, conflicts: list[Path]) -> None:
+    """Warn that pre-existing files were kept; renders landed as .new siblings."""
+    from rich.console import Console
+    from rich.panel import Panel
+
+    console = Console()
+    body = (
+        "Your existing files were [bold]not overwritten[/bold]. The new "
+        "project-init version of each was written alongside as a [bold].new[/bold]"
+        " sibling — review and merge what you want, then delete the sibling:\n\n"
+    )
+    body += "\n".join(f"  {rel}  →  {rel}.new" for rel in sorted(conflicts))
+    console.print(Panel(body, title="Existing files preserved", border_style="yellow"))
+    console.print()
+
+
 def _print_mcp_commands(selected: list[dict]) -> None:
     """Print the bare claude mcp add commands for the chosen MCPs."""
     if not selected:
@@ -351,9 +367,7 @@ def _gather_inputs_interactive(
         "Add a devcontainer (Codespaces / remote agent sessions)?", default=False
     )
     mise = Confirm.ask("Pin toolchain versions with mise (mise.toml)?", default=False)
-    vscode = Confirm.ask(
-        "Add shared VS Code config (extensions + format-on-save)?", default=False
-    )
+    vscode = Confirm.ask("Add shared VS Code config (extensions + format-on-save)?", default=False)
     while True:
         agents_raw = _prompt(
             "Agents to support (claude always; add codex/gemini/ollama, comma-separated)",
@@ -408,7 +422,9 @@ def agent_layers(agents: list[str]) -> list[str]:
 # {{#if python}}/{{#if node}}/etc.
 _LANGUAGE_COMMANDS: dict[str, tuple[str, str, str]] = {
     "python": ("uv run ruff check .", "uv run ruff format .", "uv run pytest"),
-    "node": ("bun run lint", "bun run format", "bun test"),
+    # node recipes call the tools directly (PI-180): a freshly scaffolded
+    # project has no package.json scripts to back `bun run lint`/`format`.
+    "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
     "go": ("golangci-lint run", "gofmt -w .", "go test ./..."),
 }
 
@@ -449,10 +465,7 @@ def _upgrade_main(argv: list[str]) -> int:
         help="Accepted for CLI symmetry — upgrade never prompts",
     )
     args = p.parse_args(argv)
-    return run_upgrade(
-        Path(args.target).resolve(), apply=args.apply, no_plugin=args.no_plugin
-    )
-
+    return run_upgrade(Path(args.target).resolve(), apply=args.apply, no_plugin=args.no_plugin)
 
 
 def _build_variables(  # noqa: PLR0913 — one variable per wizard input
@@ -473,9 +486,7 @@ def _build_variables(  # noqa: PLR0913 — one variable per wizard input
     """Assemble the template render context from the resolved inputs."""
     is_graphify = "graphify" in preset.get("name", "")
     has_obsidian = "obsidian" in preset.get("layers", [])
-    lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(
-        language, ("", "", "")
-    )
+    lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(language, ("", "", ""))
     return {
         "project_name": project_name,
         "project_description": project_description,
@@ -493,9 +504,12 @@ def _build_variables(  # noqa: PLR0913 — one variable per wizard input
         "test_command": test_command,
         # Governance (PI-145). license_holder falls back to the project name
         # so a LICENSE rendered without --owner still has a copyright line.
+        # The leading "@" is required for CODEOWNERS (project_owner) but is a
+        # GitHub-handle artifact in a legal copyright notice, so strip it for
+        # the license holder only (PI-181).
         "project_owner": owner,
         "license": license_choice,
-        "license_holder": owner or project_name,
+        "license_holder": (owner or project_name).removeprefix("@"),
         "created_year": date.today().strftime("%Y"),
         # Conditional block flags (truthy/falsy strings).
         "python": "true" if language == "python" else "",
@@ -525,7 +539,6 @@ def _build_variables(  # noqa: PLR0913 — one variable per wizard input
         "license_apache": "true" if license_choice == "apache-2.0" else "",
         "license_proprietary": "true" if license_choice == "proprietary" else "",
     }
-
 
 
 def _resolve_inputs(args, parser, target: Path) -> tuple | None:
@@ -622,8 +635,15 @@ def main(argv: list[str] | None = None) -> int:
         no_plugin=no_plugin,
     )
 
+    # First scaffold into a project = no recorded config yet. In that case,
+    # protect any pre-existing user files from being clobbered (PI-179); a
+    # re-run (config present) keeps the existing refresh-managed-files behavior.
+    # Passing a conflicts list turns on first-scaffold protection (PI-179);
+    # None on a re-run keeps refresh-in-place for project-init-managed files.
+    first_scaffold = not (target / ".claude" / "config.yaml").exists()
+    conflicts: list[Path] | None = [] if first_scaffold else None
     try:
-        created = scaffold(target, preset, variables, strict=args.strict)
+        created = scaffold(target, preset, variables, strict=args.strict, conflicts=conflicts)
     except TemplateRenderError as e:
         sys.stderr.write(f"error: {e}\n")
         return 2
@@ -634,6 +654,8 @@ def main(argv: list[str] | None = None) -> int:
 
     write_scaffold_record(target, preset["name"], variables, created)
     _print_summary(target, created, preset["name"])
+    if conflicts:
+        _print_conflicts(target, conflicts)
     _print_mcp_commands(selected_mcps)
     return 0
 

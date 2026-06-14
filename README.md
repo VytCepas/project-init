@@ -142,7 +142,7 @@ baseline branch protection (require CI green, require PR review, block
 force-push) — unprotected default branches undermine the workflow
 enforcement everything else sets up.
 
-Your answers are recorded in `.claude/config.yaml`. Re-run any time — it reconciles, preserves existing project files, and never overwrites memory or vault notes. With `--strict`, templates are rendered and validated in a temporary directory first, then the validated scaffold files are merged into the target; strict mode is not a whole-directory replacement.
+Your answers are recorded in `.claude/config.yaml`. On the **first** scaffold into a project that already has files, your existing files are never clobbered: when a generated file (e.g. a hand-written `CLAUDE.md`) would differ, the new render is written alongside as a `<file>.new` sibling for you to merge, and the run prints which files were preserved. On a **re-run** (config already present) it refreshes the files project-init manages and never overwrites your `memory/` or `vault/` notes. With `--strict`, templates are rendered and validated in a temporary directory first, then the validated scaffold files are merged into the target; strict mode is not a whole-directory replacement.
 
 ### Remote and web agent sessions
 

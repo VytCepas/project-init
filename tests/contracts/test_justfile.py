@@ -22,7 +22,7 @@ _RECIPES = ("setup", "lint", "format", "test", "docs", "ci", "scan")
 # Mirrors _LANGUAGE_COMMANDS in __main__.py: empty commands for language=none.
 _COMMANDS = {
     "python": ("uv run ruff check .", "uv run ruff format .", "uv run pytest"),
-    "node": ("bun run lint", "bun run format", "bun test"),
+    "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
     "go": ("golangci-lint run", "gofmt -w .", "go test ./..."),
 }
 
@@ -47,8 +47,8 @@ class TestJustfilePerLanguage:
     @pytest.mark.parametrize(
         ("language", "lint_cmd", "test_cmd"),
         [
-            ("python", "uv run ruff check .", "uv run pytest"),
-            ("node", "bun run lint", "bun test"),
+            ("python", "uv run ruff check .", "pytest -n auto"),
+            ("node", "bunx eslint .", "bun test"),
             ("go", "golangci-lint run", "go test ./..."),
         ],
     )
@@ -71,6 +71,25 @@ class TestJustfilePerLanguage:
         target = _scaffold_language(tmp_path / "p", "python")
         text = (target / "justfile").read_text()
         assert "--cov-fail-under" in _recipe_body(text, "test-cov")
+
+    def test_python_test_recipe_is_self_contained(self, tmp_path: Path):
+        """PI-180: `-n auto` needs pytest-xdist; pull it in on demand so a
+        freshly scaffolded project that never declared it can still run tests."""
+        target = _scaffold_language(tmp_path / "p", "python")
+        text = (target / "justfile").read_text()
+        for recipe in ("test", "test-cov"):
+            body = _recipe_body(text, recipe)
+            assert "-n auto" in body
+            assert "--with pytest-xdist" in body, f"{recipe} must not require a declared xdist"
+
+    def test_node_recipes_do_not_rely_on_package_json_scripts(self, tmp_path: Path):
+        """PI-180: `bun run lint`/`format` fail ("Script not found") with no
+        package.json; recipes must call the tools directly instead."""
+        target = _scaffold_language(tmp_path / "n", "node")
+        text = (target / "justfile").read_text()
+        assert "bunx eslint" in _recipe_body(text, "lint")
+        assert "biome format" in _recipe_body(text, "format")
+        assert "bun run" not in text, "node recipes must not indirect through package.json scripts"
 
     def test_no_justfile_for_language_none(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "none")
