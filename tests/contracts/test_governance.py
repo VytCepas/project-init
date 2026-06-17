@@ -125,3 +125,16 @@ class TestBranchProtectionBootstrap:
         script = _SETUP_GITHUB.read_text()
         assert '"CI / Lint and test"' in script
         assert '"CI / Secret scan (gitleaks)"' in script
+
+
+def test_superseded_adrs_note_adr_006():
+    """PI-193: ADR-003/005's PR-title rule was superseded by ADR-006; their
+    Status line must say so rather than read a bare 'Accepted'."""
+    for name in ("adr-003-github-native-workflow.md", "adr-005-github-pr-board-workflow.md"):
+        adr = (_REPO_ROOT / "docs" / "adr" / name).read_text()
+        status = next(
+            (line for line in adr.splitlines() if line.startswith("**Status:**")),
+            None,
+        )
+        assert status is not None, f"{name} has no **Status:** line"
+        assert "ADR-006" in status, f"{name} status must note the ADR-006 supersession"
