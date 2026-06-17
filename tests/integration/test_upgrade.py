@@ -445,11 +445,26 @@ class TestInteractiveNoPlugin:
         """--no-plugin without --non-interactive must not be silently
         dropped (PR #175 review)."""
         import project_init.__main__ as cli
+        from project_init.__main__ import ScaffoldInputs
 
-        canned = (
-            "proj", "desc", "python", [], "", "none", False, False, False, ["claude"],
-        )
-        monkeypatch.setattr(cli, "_gather_inputs_interactive", lambda **kw: canned)
+        def _fake_gather(**kw):
+            # Respect the no_plugin main forwards, so this still tests that the
+            # --no-plugin flag reaches the scaffold via the interactive path.
+            return ScaffoldInputs(
+                project_name="proj",
+                project_description="desc",
+                language="python",
+                selected_mcps=[],
+                owner="",
+                license_choice="none",
+                devcontainer=False,
+                mise=False,
+                vscode=False,
+                agents=["claude"],
+                no_plugin=kw["no_plugin"],
+            )
+
+        monkeypatch.setattr(cli, "_gather_inputs_interactive", _fake_gather)
         target = tmp_path / "p"
         assert cli.main([str(target), "--no-plugin", "--preset", "obsidian-only"]) == 0
         assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()

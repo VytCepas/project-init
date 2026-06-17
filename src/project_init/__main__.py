@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
@@ -22,6 +23,28 @@ from project_init.scaffold import (
     overlay_layers,
     scaffold,
 )
+
+
+@dataclass(frozen=True)
+class ScaffoldInputs:
+    """The resolved wizard inputs as one named record (PI-190).
+
+    Replaces an 11-element positional tuple that was built and unpacked by hand
+    across the interactive, non-interactive, and main paths — where a field
+    reorder silently mis-mapped values with no error.
+    """
+
+    project_name: str
+    project_description: str
+    language: str
+    selected_mcps: list[dict]
+    owner: str
+    license_choice: str
+    devcontainer: bool
+    mise: bool
+    vscode: bool
+    agents: list[str]
+    no_plugin: bool
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -338,9 +361,7 @@ def _select_preset(
     return _choose_preset_interactive(presets)
 
 
-def _gather_inputs_interactive(
-    default_name: str,
-) -> tuple[str, str, str, list[dict], str, str, bool, bool, bool, list[str]]:
+def _gather_inputs_interactive(default_name: str, *, no_plugin: bool) -> ScaffoldInputs:
     """Prompt for project basics, MCPs, governance, and opt-in overlays."""
     project_name = _prompt("Project name", default=default_name)
     project_description = _prompt("Description", default="")
@@ -381,17 +402,18 @@ def _gather_inputs_interactive(
             from rich.console import Console
 
             Console().print(f"[red]{e}[/red]")
-    return (
-        project_name,
-        project_description,
-        language,
-        selected_mcps,
-        owner,
-        license_choice,
-        devcontainer,
-        mise,
-        vscode,
-        agents,
+    return ScaffoldInputs(
+        project_name=project_name,
+        project_description=project_description,
+        language=language,
+        selected_mcps=selected_mcps,
+        owner=owner,
+        license_choice=license_choice,
+        devcontainer=devcontainer,
+        mise=mise,
+        vscode=vscode,
+        agents=agents,
+        no_plugin=no_plugin,
     )
 
 
@@ -466,22 +488,19 @@ def _upgrade_main(argv: list[str]) -> int:
     return run_upgrade(Path(args.target).resolve(), apply=args.apply, no_plugin=args.no_plugin)
 
 
-def _build_variables(  # noqa: PLR0913 — one variable per wizard input
-    preset: dict,
-    *,
-    project_name: str,
-    project_description: str,
-    language: str,
-    selected_mcps: list[dict],
-    owner: str,
-    license_choice: str,
-    devcontainer: bool,
-    mise: bool,
-    vscode: bool,
-    agents: list[str],
-    no_plugin: bool,
-) -> dict[str, str]:
+def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
     """Assemble the template render context from the resolved inputs."""
+    project_name = inputs.project_name
+    project_description = inputs.project_description
+    language = inputs.language
+    selected_mcps = inputs.selected_mcps
+    owner = inputs.owner
+    license_choice = inputs.license_choice
+    devcontainer = inputs.devcontainer
+    mise = inputs.mise
+    vscode = inputs.vscode
+    agents = inputs.agents
+    no_plugin = inputs.no_plugin
     is_graphify = "graphify" in preset.get("name", "")
     has_obsidian = "obsidian" in preset.get("layers", [])
     lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(language, ("", "", ""))
@@ -539,7 +558,7 @@ def _build_variables(  # noqa: PLR0913 — one variable per wizard input
     }
 
 
-def _resolve_inputs(args, parser, target: Path) -> tuple | None:
+def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
     """Resolve all scaffold inputs from flags; None means prompt instead.
 
     Validation errors call ``parser.error`` (exits) BEFORE the target dir is
@@ -552,18 +571,18 @@ def _resolve_inputs(args, parser, target: Path) -> tuple | None:
         agents = resolve_agents(args.agents)
     except ValueError as e:
         parser.error(str(e))
-    return (
-        args.name,
-        args.description,
-        args.language or "none",
-        selected_mcps,
-        args.owner,
-        args.license,
-        args.devcontainer,
-        args.mise,
-        args.vscode,
-        agents,
-        args.no_plugin,
+    return ScaffoldInputs(
+        project_name=args.name,
+        project_description=args.description,
+        language=args.language or "none",
+        selected_mcps=selected_mcps,
+        owner=args.owner,
+        license_choice=args.license,
+        devcontainer=args.devcontainer,
+        mise=args.mise,
+        vscode=args.vscode,
+        agents=agents,
+        no_plugin=args.no_plugin,
     )
 
 
@@ -593,43 +612,17 @@ def main(argv: list[str] | None = None) -> int:
     inputs = _resolve_inputs(args, parser, target)
     target.mkdir(parents=True, exist_ok=True)
     if inputs is None:
-        inputs = _gather_inputs_interactive(default_name=target.name) + (args.no_plugin,)
-    (
-        project_name,
-        project_description,
-        language,
-        selected_mcps,
-        owner,
-        license_choice,
-        devcontainer,
-        mise,
-        vscode,
-        agents,
-        no_plugin,
-    ) = inputs
+        inputs = _gather_inputs_interactive(default_name=target.name, no_plugin=args.no_plugin)
 
     # Agent overlays append to the preset's layers (PI-137); --no-plugin
     # restores the shared hooks/skills copies via the fallback layer
     # (PI-165, ADR-010 cutover). The preset dict is copied so the loaded
     # definition stays pristine.
-    extra_layers = overlay_layers(agents, no_plugin=no_plugin)
+    extra_layers = overlay_layers(inputs.agents, no_plugin=inputs.no_plugin)
     if extra_layers:
         preset = {**preset, "layers": list(preset["layers"]) + extra_layers}
 
-    variables = _build_variables(
-        preset,
-        project_name=project_name,
-        project_description=project_description,
-        language=language,
-        selected_mcps=selected_mcps,
-        owner=owner,
-        license_choice=license_choice,
-        devcontainer=devcontainer,
-        mise=mise,
-        vscode=vscode,
-        agents=agents,
-        no_plugin=no_plugin,
-    )
+    variables = _build_variables(preset, inputs)
 
     # Overwrite protection (PI-179): scaffold() decides per file whether it is
     # user-owned (first scaffold, or an unresolved `.new` sibling still pending)
@@ -650,7 +643,7 @@ def main(argv: list[str] | None = None) -> int:
     _print_summary(target, created, preset["name"])
     if conflicts:
         _print_conflicts(conflicts)
-    _print_mcp_commands(selected_mcps)
+    _print_mcp_commands(inputs.selected_mcps)
     return 0
 
 
