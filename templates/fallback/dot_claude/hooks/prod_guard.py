@@ -65,7 +65,11 @@ def _find_config(start: Path) -> Path | None:
 
 
 def _allow_patterns(root: Path) -> list[re.Pattern[str]]:
-    """Read the safety.allow JSON list from .claude/config.yaml (fail-open).
+    """Read the safety.allow list from .claude/config.yaml (fail-open).
+
+    Accepts both an inline JSON list (``allow: ["a", "b"]``) and a multi-line
+    YAML list (``allow:`` on its own line followed by ``- "a"`` items). The
+    inline-only parser silently dropped the natural YAML form to ``[]`` (PI-187).
 
     *root* is the Bash tool's cwd, which may be a subdirectory after `cd` —
     the config is located by walking up the tree.
@@ -73,22 +77,34 @@ def _allow_patterns(root: Path) -> list[re.Pattern[str]]:
     config = _find_config(root)
     if config is None:
         return []
+    patterns: list[str] = []
     try:
         in_safety = False
+        in_allow = False
         for line in config.read_text(encoding="utf-8").splitlines():
             if line.startswith("safety:"):
                 in_safety = True
                 continue
-            if in_safety:
-                if line.strip() and not line.startswith(" "):
-                    break
-                stripped = line.strip()
-                if stripped.startswith("allow:"):
-                    raw = stripped.split(":", 1)[1].strip()
-                    return [re.compile(p) for p in json.loads(raw)]
+            if not in_safety:
+                continue
+            if line.strip() and not line.startswith((" ", "\t")):
+                break  # a column-0 key ends the safety block
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if in_allow and stripped.startswith("- "):
+                patterns.append(stripped[2:].strip().strip("\"'"))
+                continue
+            in_allow = False
+            if stripped.startswith("allow:"):
+                raw = stripped.split(":", 1)[1].strip()
+                if raw:
+                    patterns.extend(json.loads(raw))  # inline JSON list
+                else:
+                    in_allow = True  # multi-line YAML list follows
+        return [re.compile(p) for p in patterns if p]
     except (OSError, json.JSONDecodeError, re.error):
-        pass
-    return []
+        return []
 
 
 def evaluate(command: str, permission_mode: str, allow: list[re.Pattern[str]]) -> dict | None:

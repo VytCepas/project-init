@@ -110,6 +110,20 @@ class TestVerdicts:
         payload = _payload(command, "bypassPermissions", subdir)
         assert _run_hook(payload, subdir) is None
 
+    def test_allowlist_multiline_yaml_suppresses_flag(self, tmp_path: Path):
+        """PI-187: a multi-line YAML allow list must work, not just inline JSON
+        — the old parser silently dropped it to []."""
+        config = tmp_path / ".claude" / "config.yaml"
+        config.parent.mkdir(parents=True)
+        config.write_text(
+            'safety:\n  allow:\n    - "kubectl delete .* --context kind-dev"\n'
+        )
+        command = "kubectl delete pod web --context kind-dev"
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+        # A verb not on the list is still blocked.
+        other = "kubectl delete pod web --context prod"
+        assert _run_hook(_payload(other, "bypassPermissions", tmp_path), tmp_path) is not None
+
     def test_garbage_stdin_fails_open(self, tmp_path: Path):
         result = subprocess.run(
             ["python3", str(_HOOK)],
