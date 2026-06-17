@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -49,6 +50,12 @@ def test_root_monitor_pr_checks_merge_exit_code():
     content = (REPO_ROOT / ".claude" / "scripts" / "monitor_pr.sh").read_text()
     assert "_run_gh" in content, "root monitor_pr.sh is stale (missing _run_gh)"
     assert '--delete-branch 2>&1 | grep -v "^$" || true' not in content
+    # Every merge must route through the _run_gh wrapper (which checks the exit
+    # code); a direct `gh pr merge "$PR_NUMBER"` could echo false success with
+    # slightly different spacing/flags and slip past the loose check (PI-203 review).
+    assert "_run_gh pr merge" in content, "merges must route through _run_gh"
+    direct = re.findall(r'(?<!_run_)gh pr merge "\$PR_NUMBER"', content)
+    assert not direct, f"direct un-wrapped merge invocation(s): {direct}"
 
 
 class TestFilesPresent:
