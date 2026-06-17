@@ -67,9 +67,14 @@ class TestREADMEExampleCommand:
 
 
 def test_readme_layout_has_no_phantom_examples_dir():
-    """PI-194: the README repo-layout listed examples/ which doesn't exist
-    (it was removed per #24); the docs and tree must stay in sync."""
+    """PI-194: guard against a phantom examples/ reference anywhere in README.md.
+
+    The README previously mentioned an examples/ directory (removed per #24) that
+    never existed on disk. This test scans the entire README — not just the
+    repo-layout section — and fails if any "examples/" reference appears without a
+    matching examples/ directory, keeping the docs and tree in sync.
+    """
     repo = Path(__file__).resolve().parents[2]
-    readme = (repo / "README.md").read_text()
+    readme = (repo / "README.md").read_text(encoding="utf-8")
     if "examples/" in readme:
         assert (repo / "examples").is_dir(), "README references examples/ but it doesn't exist"
