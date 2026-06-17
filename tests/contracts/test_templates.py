@@ -182,6 +182,13 @@ class TestScaffoldGitHubFiles:
         assert "gh pr merge" in content
         assert "gh pr checks" in content
         assert "--json" in content  # uses json polling, not --watch, to suppress noise
+
+    def test_monitor_pr_ci_wait_is_bounded(self):
+        """PI-186: the CI-wait loop must time out and fail closed, not hang
+        forever on a required check that never registers."""
+        content = (self.target / ".claude" / "scripts" / "monitor_pr.sh").read_text()
+        assert "CI_TIMEOUT" in content
+        assert "CI_ELAPSED" in content
         assert "--delete-branch" in content
         assert "reviewDecision" in content
         assert "Waiting for reviewer" in content

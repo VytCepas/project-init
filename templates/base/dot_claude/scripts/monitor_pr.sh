@@ -147,13 +147,28 @@ _has_review_activity() {
 # Guard: if checks haven't registered yet (empty list), keep polling.
 # An empty list is indistinguishable from "all done" without this guard,
 # which caused premature merges before CI even started.
+# Bounded wait (PI-186): a required check that never leaves PENDING/EXPECTED
+# (e.g. a workflow that never triggers on this branch) must not hang the
+# script — and any autonomous caller — forever. Fail closed on timeout.
+CI_TIMEOUT=900
+CI_ELAPSED=0
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
   CHECK_COUNT=$(echo "$CHECKS" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
-  [ "$CHECK_COUNT" -eq 0 ] && { sleep 10; continue; }
-  PENDING=$(_count_pending "$CHECKS")
-  [ "$PENDING" -eq 0 ] && break
+  if [ "$CHECK_COUNT" -gt 0 ] && [ "$(_count_pending "$CHECKS")" -eq 0 ]; then
+    break
+  fi
+  if [ "$CI_ELAPSED" -ge "$CI_TIMEOUT" ]; then
+    echo "PR #$PR_NUMBER: CI did not settle within ${CI_TIMEOUT}s. Still pending:"
+    echo "$CHECKS" | python3 -c "import json,sys
+for c in json.load(sys.stdin):
+    if c.get('name') != 'review/decision' and c.get('state') in ('PENDING','IN_PROGRESS','EXPECTED'):
+        print('  -', c.get('name'))" 2>/dev/null || true
+    echo "Re-run once the check registers, or investigate why it never started."
+    exit 1
+  fi
   sleep 10
+  CI_ELAPSED=$((CI_ELAPSED + 10))
 done
 
 FAIL_CODE=0
