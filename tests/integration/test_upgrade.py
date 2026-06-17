@@ -95,6 +95,20 @@ class TestScaffoldRecord:
         assert rc == 1
         assert "corrupted" in capsys.readouterr().err
 
+    def test_wrong_typed_record_is_a_clean_error(self, tmp_path: Path, capsys):
+        """PI-197: a record field that is valid JSON but the wrong type (e.g.
+        ``manifest: []``) must raise a clean UpgradeError, not an
+        AttributeError from a later ``manifest.get(...)``."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        config = target / _CONFIG_REL
+        config.write_text(_MANIFEST_LINE_RE.sub(r"\1[]", config.read_text(), count=1))
+        rc = main(["upgrade", str(target)])
+        assert rc == 1
+        err = capsys.readouterr().err
+        assert "malformed" in err
+        assert "Traceback" not in err
+
     def test_unrelated_scaffold_section_is_not_the_record(self, tmp_path: Path):
         """Only the block after the marker is parsed (PR #160 review)."""
         target = tmp_path / "p"

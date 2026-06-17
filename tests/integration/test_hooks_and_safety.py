@@ -218,6 +218,31 @@ class TestInstallHooks:
             assert installed.is_file(), f"{name} not installed"
             assert installed.stat().st_mode & 0o111, f"{name} not executable"
 
+    def test_symlinked_destination_is_replaced_not_clobbered(self, tmp_target: Path):
+        """PI-204: when .git/hooks/<hook> is a symlink (e.g. a hooks manager),
+        install must replace the link, not write through to its referent."""
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
+        subprocess.run(
+            ["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True
+        )
+        referent = tmp_target / "shared-pre-commit"
+        referent.write_text("USER SHARED HOOK - DO NOT CLOBBER\n")
+        dst = tmp_target / ".git" / "hooks" / "pre-commit"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.symlink_to(referent)
+
+        result = subprocess.run(
+            ["bash", str(tmp_target / ".claude" / "scripts" / "install_hooks.sh")],
+            cwd=tmp_target,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        # The user's shared file must be untouched ...
+        assert referent.read_text() == "USER SHARED HOOK - DO NOT CLOBBER\n"
+        # ... and the destination is now a real file (the project's hook).
+        assert dst.is_file() and not dst.is_symlink()
+
 
 class TestCiSecretScanMirror:
     """ADR-007: the gitleaks scan is mirrored as a hard gate in scaffolded CI."""

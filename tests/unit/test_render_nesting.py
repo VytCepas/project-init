@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from project_init.scaffold import _render
+from pathlib import Path
+
+import pytest
+
+from project_init.scaffold import TemplateRenderError, _render, scaffold
+from tests.helpers import make_variables
 
 
 class TestNestedConditionals:
@@ -33,3 +38,39 @@ class TestNestedConditionals:
     def test_unclosed_block_survives_for_strict_mode(self):
         text = "{{#if a}}no closer"
         assert _render(text, {"a": "true"}) == "{{#if a}}no closer"
+
+    def test_mismatched_close_tag_is_not_rendered(self):
+        """PI-205: a closing tag whose name differs from the opener must not be
+        treated as a valid block — the markers survive (strict mode then flags
+        them) rather than silently gating on the opener and ignoring the typo."""
+        text = "{{#if python}}X{{/if node}}"
+        assert _render(text, {"python": "true", "node": ""}) == text
+        # A matching close (or no name) still renders normally.
+        assert _render("{{#if python}}X{{/if python}}", {"python": "true"}) == "X"
+        assert _render("{{#if python}}X{{/if}}", {"python": "true"}) == "X"
+
+    def test_mismatched_close_tag_raises_in_strict_scaffold(self, tmp_path: Path):
+        """PI-205 acceptance criterion (end-to-end): because a mismatched close
+        tag survives rendering (above), a real strict scaffold of a template
+        containing it raises TemplateRenderError instead of silently gating on
+        the opener and shipping the typo (PI-205 review)."""
+        import project_init.scaffold as sm
+
+        fake_dir = tmp_path / "mismatch-layer"
+        (fake_dir / "dot_claude").mkdir(parents=True)
+        (fake_dir / "dot_claude" / "typo.md.tmpl").write_text(
+            "{{#if python}}body{{/if node}}\n"
+        )
+        original = sm._TEMPLATES_DIR
+        sm._TEMPLATES_DIR = fake_dir.parent
+        try:
+            with pytest.raises(TemplateRenderError) as excinfo:
+                scaffold(
+                    tmp_path / "out",
+                    {"name": "fake", "layers": ["mismatch-layer"]},
+                    make_variables(python="true"),
+                    strict=True,
+                )
+            assert "typo.md" in str(excinfo.value)
+        finally:
+            sm._TEMPLATES_DIR = original

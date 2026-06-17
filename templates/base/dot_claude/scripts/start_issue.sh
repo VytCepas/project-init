@@ -102,6 +102,11 @@ if [ "$MAX_SLUG" -lt 12 ]; then
 fi
 SLUG="${SLUG:0:$MAX_SLUG}"
 SLUG="${SLUG%-}"   # trim trailing dash if truncated mid-word
+# A title with no alphanumerics (e.g. "!!!") collapses to an empty slug, so the
+# branch would be `feat/PI-42-` — pushed and PR'd before validate-pr.yml rejects
+# it for a slug that doesn't start with [a-z0-9]. Fall back to a stable slug so
+# no malformed branch is created (PI-206).
+[ -z "$SLUG" ] && SLUG="issue"
 BRANCH="${TYPE}/${PREFIX}${SLUG}"
 
 echo "Branch: $BRANCH"
