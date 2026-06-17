@@ -48,9 +48,13 @@ def list_presets() -> list[dict]:
 
 def load_preset(name: str) -> dict:
     """Load a single preset by name (e.g. 'obsidian-only')."""
-    path = _TEMPLATES_DIR / "presets" / f"{name}.toml"
-    if not path.exists():
-        available = [p.stem for p in (_TEMPLATES_DIR / "presets").glob("*.toml")]
+    presets_dir = _TEMPLATES_DIR / "presets"
+    path = presets_dir / f"{name}.toml"
+    # A preset name is a bare stem, never a path — reject traversal so a value
+    # like `--preset ../../x` can't read a .toml outside presets/ (PI-188).
+    safe_name = bool(name) and not ({"/", "\\"} & set(name)) and ".." not in name
+    if not safe_name or path.resolve().parent != presets_dir.resolve() or not path.exists():
+        available = [p.stem for p in sorted(presets_dir.glob("*.toml"))]
         msg = f"Unknown preset {name!r}. Available: {', '.join(available)}"
         raise ValueError(msg)
     with path.open("rb") as f:
