@@ -17,6 +17,8 @@ jobs:
       - name: Validate PR workflow metadata
         env:
           GH_TOKEN: ${{ github.token }}
+          # gh needs the repo to resolve `gh issue view` without a checkout (PI-210).
+          GH_REPO: ${{ github.repository }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_BRANCH: ${{ github.event.pull_request.head.ref }}

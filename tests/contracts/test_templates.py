@@ -125,6 +125,15 @@ class TestScaffoldGitHubFiles:
     def test_validate_pr_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "validate-pr.yml").is_file()
 
+    def test_validate_pr_sets_gh_repo(self):
+        """PI-210: `gh issue view` resolves the repo via GH_REPO, no checkout."""
+        content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
+        # Assert the value is wired to github.repository — not just the key present,
+        # and not commented out. A commented line keeps its leading "#" after strip(),
+        # so exact-line membership is a real regression guard for PI-210.
+        env_lines = {line.strip() for line in content.splitlines()}
+        assert "GH_REPO: ${{ github.repository }}" in env_lines
+
     def test_board_automation_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
 
