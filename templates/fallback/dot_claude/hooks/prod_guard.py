@@ -64,6 +64,15 @@ def _find_config(start: Path) -> Path | None:
     return None
 
 
+def _unquote(value: str) -> str:
+    """Strip one pair of matching surrounding quotes, leaving mismatched or
+    single quotes intact so ``'foo"`` is not silently corrupted (PI-187 review).
+    """
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
+
+
 def _allow_patterns(root: Path) -> list[re.Pattern[str]]:
     """Read the safety.allow list from .claude/config.yaml (fail-open).
 
@@ -93,13 +102,19 @@ def _allow_patterns(root: Path) -> list[re.Pattern[str]]:
             if not stripped or stripped.startswith("#"):
                 continue
             if in_allow and stripped.startswith("- "):
-                patterns.append(stripped[2:].strip().strip("\"'"))
+                patterns.append(_unquote(stripped[2:].strip()))
                 continue
             in_allow = False
             if stripped.startswith("allow:"):
                 raw = stripped.split(":", 1)[1].strip()
                 if raw:
-                    patterns.extend(json.loads(raw))  # inline JSON list
+                    parsed = json.loads(raw)  # inline JSON list
+                    # A non-list allow (JSON string/object/number) must not be
+                    # iterated character-by-character into an over-permissive
+                    # allowlist or crash the guard — ignore it and keep
+                    # guarding (PI-187 review).
+                    if isinstance(parsed, list):
+                        patterns.extend(p for p in parsed if isinstance(p, str))
                 else:
                     in_allow = True  # multi-line YAML list follows
         return [re.compile(p) for p in patterns if p]

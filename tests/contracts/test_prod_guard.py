@@ -145,6 +145,18 @@ class TestVerdicts:
         )
         assert verdict is not None, "broken allowlist must not disable the guard"
 
+    def test_scalar_inline_allow_does_not_overpermit(self, tmp_path: Path):
+        """A scalar `allow:` (valid JSON string/object, not a list) must not be
+        iterated character-by-character into an allowlist whose single-char
+        patterns silently suppress every command (PI-187 review)."""
+        config = tmp_path / ".claude" / "config.yaml"
+        config.parent.mkdir(parents=True)
+        config.write_text('safety:\n  allow: "terraform destroy"\n')
+        verdict = _run_hook(
+            _payload("terraform destroy", "bypassPermissions", tmp_path), tmp_path
+        )
+        assert verdict is not None, "a scalar allow must not disable the guard"
+
 
 class TestWiring:
     def test_fallback_settings_wire_the_guard(self, tmp_path: Path):
