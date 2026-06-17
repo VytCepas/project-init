@@ -151,10 +151,24 @@ class TestScaffoldGitHubFiles:
 
     def test_ci_does_not_hardcode_python_version(self):
         """PI-208: a pinned Python version drifts below requires-python; let uv
-        resolve the project's interpreter from .python-version/requires-python."""
+        resolve the project's interpreter from .python-version/requires-python.
+
+        Version-agnostic (Copilot review): guards against *any* hardcoded pin,
+        not just 3.12, so reintroducing 3.13 or `uv python install <x>` also
+        fails. A version matrix (list or ${{ matrix.* }} reference) stays
+        allowed — neither matches a bare scalar literal.
+        """
+        import re
+
         content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
-        assert 'python-version: "3.12"' not in content
-        assert "uv python install 3.12" not in content
+        # No `uv python install <version>` for any version.
+        assert not re.search(r"uv python install \d", content), (
+            "CI must not run `uv python install <version>` (PI-208)"
+        )
+        # No literal `python-version:` scalar pin for any version.
+        assert not re.search(r"""python-version:\s*["']?\d""", content), (
+            "CI must not hard-pin python-version to a literal (PI-208)"
+        )
 
     def test_pull_request_template_created(self):
         assert (self.target / ".github" / "pull_request_template.md").is_file()
