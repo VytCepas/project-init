@@ -24,6 +24,10 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      # No actions/checkout in this job (it only needs API access); pin the repo
+      # so every `gh` call (e.g. `gh issue view`) works checkout-free instead of
+      # failing on a missing git remote (PI-234).
+      GH_REPO: ${{ github.repository }}
       OWNER: ${{ github.repository_owner }}
       REPO_NAME: ${{ github.event.repository.name }}
       PROJECT_NUMBER: 1

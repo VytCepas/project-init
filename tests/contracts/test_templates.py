@@ -129,10 +129,12 @@ class TestScaffoldGitHubFiles:
         assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
 
     def test_board_automation_tolerates_personal_accounts(self):
-        """PI-207: the user+organization project query errors on one path; the
-        lookup must tolerate that so the jq fallback selects whichever applies."""
+        """PI-207/PI-234: the user+organization project query errors on one path
+        (tolerate it so the jq fallback selects whichever applies), and the
+        checkout-free job must pin the repo so gh calls work without a remote."""
         content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
         assert "2>/dev/null || true)" in content
+        assert "GH_REPO:" in content
 
     def test_review_status_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "review-status.yml").is_file()
