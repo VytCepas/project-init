@@ -132,5 +132,9 @@ def test_superseded_adrs_note_adr_006():
     Status line must say so rather than read a bare 'Accepted'."""
     for name in ("adr-003-github-native-workflow.md", "adr-005-github-pr-board-workflow.md"):
         adr = (_REPO_ROOT / "docs" / "adr" / name).read_text()
-        status = next(line for line in adr.splitlines() if line.startswith("**Status:**"))
+        status = next(
+            (line for line in adr.splitlines() if line.startswith("**Status:**")),
+            None,
+        )
+        assert status is not None, f"{name} has no **Status:** line"
         assert "ADR-006" in status, f"{name} status must note the ADR-006 supersession"
