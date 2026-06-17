@@ -67,6 +67,21 @@ class TestAgentSelection:
         assert agent_layers(["claude", "codex", "gemini", "ollama"]) == ["codex", "gemini"]
         assert agent_layers(["claude", "ollama"]) == []
 
+    def test_overlay_layers_is_the_single_source(self):
+        """PI-189: scaffold and upgrade derive overlay layers from one helper,
+        which accepts a list or a comma-string and prepends fallback."""
+        from project_init.scaffold import overlay_layers
+
+        assert overlay_layers(["claude", "codex"], no_plugin=False) == ["codex"]
+        assert overlay_layers("claude,codex,gemini", no_plugin=False) == ["codex", "gemini"]
+        assert overlay_layers(["claude"], no_plugin=True) == ["fallback"]
+        assert overlay_layers("claude,gemini", no_plugin=True) == ["fallback", "gemini"]
+        assert overlay_layers(["claude", "ollama"], no_plugin=False) == []
+        # agent_layers is now a thin delegator to the shared helper.
+        assert agent_layers(["claude", "codex"]) == overlay_layers(
+            ["claude", "codex"], no_plugin=False
+        )
+
 
 class TestClaudeOnlyDefault:
     def test_no_agent_overlay_files(self, tmp_path: Path):
