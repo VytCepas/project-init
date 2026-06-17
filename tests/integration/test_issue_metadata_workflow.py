@@ -149,11 +149,17 @@ class TestCreateIssueScript:
         content = self.script.read_text()
         assert "label missing" in content.lower() or "missing label" in content.lower()
 
-    def test_project_fields_not_written_to_body(self):
+    def test_project_fields_written_to_body_and_synced(self):
+        """PI-201: planning fields go in the body (so issue-validation.yml and
+        the issue forms agree, and the issue is self-contained for agents) AND
+        are mirrored to the project board."""
         content = self.script.read_text()
-        # Priority/Size/Agent ready/Confidence go to project board, not the body
-        assert "Priority:" not in content.split("## Metadata")[1].split("sync_project_fields")[0]
-        # Confirm the sync function exists instead
+        metadata_block = content.split("## Metadata")[1].split("sync_project_fields")[0]
+        assert "Priority: $PRIORITY" in metadata_block
+        assert "Size: $SIZE" in metadata_block
+        assert "Agent ready: $AGENT_READY" in metadata_block
+        assert "Confidence: $CONFIDENCE" in metadata_block
+        # ... and still mirrored to the board.
         assert "sync_project_fields" in content
         assert "updateProjectV2ItemFieldValue" in content
 
@@ -235,6 +241,24 @@ class TestGitHubWorkflowHooks:
 
     def test_github_command_guard_blocks_raw_pr_merge_auto(self):
         out = self._run_hook("github_command_guard.sh", "gh pr merge 42 --auto")
+        assert out is not None and out["decision"] == "block"
+
+    def test_github_command_guard_blocks_gh_api_merge_with_flags(self):
+        """PI-198: a `--method PUT` before the endpoint (the natural way to
+        merge via gh api) must not bypass the merge guard."""
+        out = self._run_hook(
+            "github_command_guard.sh",
+            "gh api --method PUT repos/o/r/pulls/42/merge",
+        )
+        assert out is not None and out["decision"] == "block"
+
+    def test_github_command_guard_blocks_gh_api_merge_with_jq_pipe(self):
+        """PI-198 review: a pipe inside a quoted flag (e.g. `--jq '.a|.b'`) before
+        the endpoint must not let a `gh api .../merge` slip past the guard."""
+        out = self._run_hook(
+            "github_command_guard.sh",
+            "gh api --jq '.a|.b' --method PUT repos/o/r/pulls/42/merge",
+        )
         assert out is not None and out["decision"] == "block"
 
     def test_github_command_guard_blocks_raw_pr_create(self):

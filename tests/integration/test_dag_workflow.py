@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -40,6 +41,21 @@ def _run_guard(payload: dict, cwd: Path | None = None) -> dict | None:
     )
     assert proc.returncode == 0, f"guard exited {proc.returncode}: {proc.stderr}"
     return json.loads(proc.stdout) if proc.stdout.strip() else None
+
+
+def test_root_monitor_pr_checks_merge_exit_code():
+    """PI-203: the repo's own monitor_pr.sh must check the merge exit code
+    (via _run_gh) and not report false success — it had gone stale, piping the
+    merge through `| grep -v "^$" || true` and echoing "Merged" unconditionally."""
+    content = (REPO_ROOT / ".claude" / "scripts" / "monitor_pr.sh").read_text()
+    assert "_run_gh" in content, "root monitor_pr.sh is stale (missing _run_gh)"
+    assert '--delete-branch 2>&1 | grep -v "^$" || true' not in content
+    # Every merge must route through the _run_gh wrapper (which checks the exit
+    # code); a direct `gh pr merge "$PR_NUMBER"` could echo false success with
+    # slightly different spacing/flags and slip past the loose check (PI-203 review).
+    assert "_run_gh pr merge" in content, "merges must route through _run_gh"
+    direct = re.findall(r'(?<!_run_)gh pr merge "\$PR_NUMBER"', content)
+    assert not direct, f"direct un-wrapped merge invocation(s): {direct}"
 
 
 class TestFilesPresent:
@@ -406,6 +422,13 @@ class TestPushForceWithLease:
     def test_refuses_force_on_main(self, dag):
         assert dag.cmd_push("main", 0, force=True) == 1
         assert dag.cmd_push("master", 0, force=True) == 1
+
+    def test_refuses_nonforce_push_to_main(self, dag, capsys):
+        """PI-202: refuse main/master for ANY push, not only force-pushes —
+        otherwise push_branch.sh run on main bypasses the direct-push guard."""
+        assert dag.cmd_push("main", 0) == 1
+        assert dag.cmd_push("master", 0) == 1
+        assert "refusing to push" in capsys.readouterr().err
 
     def test_force_with_lease_pushes_rebased_branch(self, tmp_path: Path):
         remote = tmp_path / "origin.git"

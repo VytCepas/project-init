@@ -1,7 +1,7 @@
 #!/bin/bash
 # Create a GitHub issue with typed labels and planning metadata.
-# Priority, Size, Agent ready, and Confidence are set directly on the
-# GitHub Project v2 board — not written to the issue body.
+# Priority, Size, Agent ready, and Confidence are written into the issue body
+# (so the issue is self-contained) and mirrored to the GitHub Project v2 board.
 #
 # Usage:
 #   .claude/scripts/create_issue.sh <type> "Short description" [metadata flags]
@@ -27,10 +27,10 @@ Types:
   feat  fix  chore  docs  test
 
 Options:
-  --priority high|medium|low           Set Priority on the project board
-  --size XS|S|M|L|XL                   Set Size on the project board
-  --agent-ready Yes|No                 Set Agent ready on the project board
-  --confidence high|medium|low|unknown Set Confidence on the project board
+  --priority high|medium|low           Set Priority (issue body + project board)
+  --size XS|S|M|L|XL                   Set Size (issue body + project board)
+  --agent-ready Yes|No                 Set Agent ready (issue body + project board)
+  --confidence high|medium|low|unknown Set Confidence (issue body + project board)
   --area VALUE                         Record affected area in body metadata
   --scale epic|task                    Mark as epic (parent) or task (leaf); adds scale label
   --parent VALUE                       Link new issue as sub-issue of VALUE
@@ -50,9 +50,11 @@ Sub-issues:
 
 Metadata model:
   GitHub labels: type and scale when labels exist or can be created.
-  GitHub Project fields: priority, size, agent-ready, confidence (set directly via GraphQL).
-  Markdown body: area, scale, parent, references, dependencies, acceptance criteria,
+  Markdown body (self-contained source of truth): priority, size, agent-ready,
+  confidence, area, scale, parent, references, dependencies, acceptance criteria,
   Definition of Ready, and Definition of Done.
+  GitHub Project fields: priority, size, agent-ready, and confidence are also
+  mirrored to the board via GraphQL so they stay sortable/filterable for humans.
 
 Missing label fallback:
   If a label is missing and cannot be created, issue creation continues without
@@ -296,6 +298,13 @@ write_bullets() {
   echo "## Metadata"
   echo
   echo "- Type: $TYPE"
+  # PI-201: planning fields live in the body (so issue-validation.yml and the
+  # issue forms agree, and an agent reading the issue needs no board query);
+  # they are ALSO mirrored to the project board below for human sorting/filter.
+  [ -n "$PRIORITY" ]    && echo "- Priority: $PRIORITY"
+  [ -n "$SIZE" ]        && echo "- Size: $SIZE"
+  [ -n "$AGENT_READY" ] && echo "- Agent ready: $AGENT_READY"
+  [ -n "$CONFIDENCE" ]  && echo "- Confidence: $CONFIDENCE"
   [ -n "$SCALE" ] && echo "- Scale: $SCALE"
   [ -n "$AREA" ] && echo "- Area: $AREA"
   if [ -n "$PARENT" ]; then
@@ -307,17 +316,23 @@ write_bullets() {
   if [ -n "$MILESTONE" ]; then
     echo "- Milestone: $MILESTONE"
   fi
+  # Always emit these sections (PI-201): issue-validation.yml requires them in
+  # the body; "None" satisfies the check when the agent passed nothing.
+  echo
+  echo "## References"
+  echo
   if [ "${#REFERENCES[@]}" -gt 0 ]; then
-    echo
-    echo "## References"
-    echo
     write_bullets "None" "${REFERENCES[@]}"
+  else
+    echo "- None"
   fi
+  echo
+  echo "## Dependencies"
+  echo
   if [ "${#DEPENDENCIES[@]}" -gt 0 ]; then
-    echo
-    echo "## Dependencies"
-    echo
     write_bullets "None" "${DEPENDENCIES[@]}"
+  else
+    echo "- None"
   fi
   echo
   echo "## Acceptance criteria"
@@ -381,9 +396,10 @@ ISSUE_URL=$(gh issue create "${CREATE_ARGS[@]}" "${LABEL_ARGS[@]}")
 ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
 
 # ---------------------------------------------------------------------------
-# Set Priority / Size / Agent ready / Confidence directly on the GitHub
-# Project v2 board. These are not written to the issue body — the board is
-# the authoritative location for these fields.
+# Mirror Priority / Size / Agent ready / Confidence to the GitHub Project v2
+# board. They are also written into the issue body above (PI-201) so the issue
+# is self-contained and passes issue-validation.yml; the board copy makes them
+# sortable/filterable for humans.
 # PROJECT_NUMBER defaults to 1; override with the env var if needed.
 # ---------------------------------------------------------------------------
 sync_project_fields() {

@@ -46,6 +46,22 @@ class TestCLI:
         assert rc == 0
         assert (tmp_target / ".claude" / "scripts" / "setup_graphify.sh").is_file()
 
+    def test_interactive_abort_at_prompt_leaves_no_dir(self, tmp_path: Path, monkeypatch):
+        """PI-199: a Ctrl-C (or error) at an interactive prompt must not leave
+        an empty target dir behind — input is gathered before the dir exists."""
+        from project_init import __main__
+
+        target = tmp_path / "aborted-proj"
+
+        def boom(**_kw):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(__main__, "_gather_inputs_interactive", boom)
+        with pytest.raises(KeyboardInterrupt):
+            # Interactive (no --non-interactive); --preset skips the preset prompt.
+            __main__.main([str(target), "--preset", "obsidian-only"])
+        assert not target.exists()
+
     def test_non_interactive_requires_flags(self):
         from project_init.__main__ import main
 

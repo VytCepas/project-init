@@ -244,7 +244,11 @@ COMMAND_RULES: list[tuple[re.Pattern[str], str | None, str]] = [
         "Direct pushes to main/master are blocked. Open a feature branch and PR.",
     ),
     (
-        re.compile(r"\bgh\s+api\s+repos/[^/\s]+/[^/\s]+/pulls/\d+/merge\b"),
+        # `[^&;]*?` allows flags between `gh api` and the endpoint (a real merge
+        # needs `--method PUT`/`-X PUT`, often written before the path). `|` is NOT
+        # excluded: a pipe inside a quoted flag (e.g. `--jq '.a|.b'`) must not let a
+        # merge slip past the guard — only `;`/`&` end the command segment (PI-198).
+        re.compile(r"\bgh\s+api\b[^&;]*?repos/[^/\s]+/[^/\s]+/pulls/\d+/merge\b"),
         "pr.merged",
         "Use .claude/scripts/monitor_pr.sh <pr> --merge instead of `gh api .../merge` so CI and review gates are honored.",
     ),
@@ -380,8 +384,12 @@ def cmd_push(branch: str | None, max_retries: int, *, force: bool = False) -> in
     if not branch:
         sys.stderr.write("push: no current branch\n")
         return 1
-    if force and branch in ("main", "master"):
-        sys.stderr.write("push: refusing to force-push main/master\n")
+    if branch in ("main", "master"):
+        # Refuse main/master for ANY push, not only force-pushes — otherwise
+        # running push_branch.sh while on main bypasses the direct-push guard,
+        # since the internal `git push` subprocess is invisible to the
+        # PreToolUse hook (PI-202).
+        sys.stderr.write("push: refusing to push main/master directly — open a feature branch + PR\n")
         return 1
 
     code, sha_out = _git(["rev-parse", branch])

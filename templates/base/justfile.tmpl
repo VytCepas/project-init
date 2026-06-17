@@ -18,7 +18,7 @@ format:
 test:
     uv run --with pytest-xdist pytest -n auto --tb=short -q
 
-# tests with the coverage gate (what CI runs)
+# tests with the coverage gate (CI runs this when pytest-cov is installed)
 test-cov:
     uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov --cov-fail-under=70
 

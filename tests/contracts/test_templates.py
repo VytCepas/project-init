@@ -125,8 +125,44 @@ class TestScaffoldGitHubFiles:
     def test_validate_pr_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "validate-pr.yml").is_file()
 
+    def test_validate_pr_sets_gh_repo(self):
+        """PI-210: `gh issue view` resolves the repo via GH_REPO, no checkout."""
+        content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
+        # Assert the value is wired to github.repository — not just the key present,
+        # and not commented out. A commented line keeps its leading "#" after strip(),
+        # so exact-line membership is a real regression guard for PI-210.
+        env_lines = {line.strip() for line in content.splitlines()}
+        assert "GH_REPO: ${{ github.repository }}" in env_lines
+
     def test_board_automation_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
+
+    def test_board_automation_tolerates_personal_accounts(self):
+        """PI-207/PI-234: the user+organization project query errors on one path
+        (tolerate it so the jq fallback selects whichever applies), and the
+        checkout-free job must pin the repo so gh calls work without a remote."""
+        content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
+        lines = content.splitlines()
+        # Target the specific PROJECT_DATA assignment instead of matching the
+        # error-suppression substring anywhere in the file (brittle to harmless
+        # whitespace/formatting changes): locate the multi-line `gh api graphql`
+        # command substitution and capture it through the line that closes it.
+        starts = [
+            i for i, line in enumerate(lines) if line.lstrip().startswith("PROJECT_DATA=")
+        ]
+        assert starts, "board-automation.yml must assign PROJECT_DATA from a gh query"
+        start = starts[0]
+        ends = [i for i, line in enumerate(lines[start:], start) if "|| true" in line]
+        assert ends, "the PROJECT_DATA assignment must close with an error-tolerant guard"
+        assignment = "\n".join(lines[start : ends[0] + 1])
+        # The query must hit the Projects API and tolerate the errors path a
+        # personal (user-owned) account produces on the organization(...) branch,
+        # so the jq fallback can still select whichever path applies. (PI-207)
+        assert "gh api graphql" in assignment
+        assert "projectV2" in assignment
+        assert "2>/dev/null" in assignment
+        assert "|| true" in assignment
+        assert "GH_REPO:" in content
 
     def test_review_status_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "review-status.yml").is_file()
@@ -154,6 +190,27 @@ class TestScaffoldGitHubFiles:
         content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
         assert "uv sync --group dev" in content
         assert "uv sync --extra dev" not in content
+
+    def test_ci_does_not_hardcode_python_version(self):
+        """PI-208: a pinned Python version drifts below requires-python; let uv
+        resolve the project's interpreter from .python-version/requires-python.
+
+        Version-agnostic (Copilot review): guards against *any* hardcoded pin,
+        not just 3.12, so reintroducing 3.13 or `uv python install <x>` also
+        fails. A version matrix (list or ${{ matrix.* }} reference) stays
+        allowed — neither matches a bare scalar literal.
+        """
+        import re
+
+        content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        # No `uv python install <version>` for any version.
+        assert not re.search(r"uv python install \d", content), (
+            "CI must not run `uv python install <version>` (PI-208)"
+        )
+        # No literal `python-version:` scalar pin for any version.
+        assert not re.search(r"""python-version:\s*["']?\d""", content), (
+            "CI must not hard-pin python-version to a literal (PI-208)"
+        )
 
     def test_pull_request_template_created(self):
         assert (self.target / ".github" / "pull_request_template.md").is_file()
@@ -188,6 +245,17 @@ class TestScaffoldGitHubFiles:
         assert "gh pr merge" in content
         assert "gh pr checks" in content
         assert "--json" in content  # uses json polling, not --watch, to suppress noise
+
+    def test_monitor_pr_ci_wait_is_bounded(self):
+        """PI-186: the CI-wait loop must time out and fail closed, not hang
+        forever on a required check that never registers."""
+        content = (self.target / ".claude" / "scripts" / "monitor_pr.sh").read_text()
+        assert "CI_TIMEOUT=" in content, "CI_TIMEOUT must be assigned a value"
+        # Assert the real bounding logic, not just the variable names — the loop
+        # must compare elapsed vs timeout and increment elapsed, so the test fails
+        # if the guard is dropped while the declarations linger (PI-186 review).
+        assert '[ "$CI_ELAPSED" -ge "$CI_TIMEOUT" ]' in content, "missing timeout guard"
+        assert "CI_ELAPSED=$((CI_ELAPSED +" in content, "missing elapsed increment"
         assert "--delete-branch" in content
         assert "reviewDecision" in content
         assert "Waiting for reviewer" in content

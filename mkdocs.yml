@@ -20,11 +20,21 @@ theme:
 
 nav:
   - Home: README.md
+  - Guide:
+    - Using project-init: guides/using-project-init.md
   - Architecture Decisions:
     - Overview: adr/adr-001-scaffolder-design.md
     - dot_ prefix convention: adr/adr-002-dotglob-template-convention.md
     - GitHub-native workflow: adr/adr-003-github-native-workflow.md
     - Obsidian + docs integration: adr/adr-004-obsidian-docs-integration.md
+    - PR & board lifecycle: adr/adr-005-github-pr-board-workflow.md
+    - Conventional commit titles: adr/adr-006-conventional-commit-titles.md
+    - Security enforcement layers: adr/adr-007-security-enforcement-layers.md
+    - Distribution channel: adr/adr-008-distribution-channel.md
+    - Graphify memory preset: adr/adr-009-graphify-memory-preset.md
+    - Plugin marketplace dual-ship: adr/adr-010-plugin-marketplace-dual-ship.md
+    - PyPI trusted publishing: adr/adr-011-pypi-trusted-publishing.md
+    - Prod-safety guard: adr/adr-012-prod-safety-guard.md
   - Development:
     - Template system: development/template-system.md
     - Testing: development/testing.md
