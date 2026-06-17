@@ -590,12 +590,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     preset = _select_preset(args, parser, presets)
 
-    # Validate non-interactive args BEFORE creating the target directory
-    # (PI-20: a bad flag must not leave an empty dir behind).
+    # Validate non-interactive args / gather interactive input BEFORE creating
+    # the target directory (PI-20, PI-199: a bad flag OR a Ctrl-C at an
+    # interactive prompt must not leave an empty dir behind).
     inputs = _resolve_inputs(args, parser, target)
-    target.mkdir(parents=True, exist_ok=True)
     if inputs is None:
         inputs = _gather_inputs_interactive(default_name=target.name) + (args.no_plugin,)
+    target.mkdir(parents=True, exist_ok=True)
     (
         project_name,
         project_description,
