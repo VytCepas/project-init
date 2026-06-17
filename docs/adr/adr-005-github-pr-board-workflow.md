@@ -1,7 +1,7 @@
 # ADR-005: GitHub PR and board lifecycle workflow
 
 **Date:** 2026-04-27
-**Status:** Accepted
+**Status:** Accepted — superseded in part by [ADR-006](adr-006-conventional-commit-titles.md) (the PR/commit title format)
 
 ## Context
 
