@@ -149,6 +149,13 @@ class TestScaffoldGitHubFiles:
         assert "actions/checkout@v4" not in content
         assert "astral-sh/setup-uv@v3" not in content
 
+    def test_ci_does_not_hardcode_python_version(self):
+        """PI-208: a pinned Python version drifts below requires-python; let uv
+        resolve the project's interpreter from .python-version/requires-python."""
+        content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert 'python-version: "3.12"' not in content
+        assert "uv python install 3.12" not in content
+
     def test_pull_request_template_created(self):
         assert (self.target / ".github" / "pull_request_template.md").is_file()
 
