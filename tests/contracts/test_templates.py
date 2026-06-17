@@ -125,6 +125,11 @@ class TestScaffoldGitHubFiles:
     def test_validate_pr_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "validate-pr.yml").is_file()
 
+    def test_validate_pr_sets_gh_repo(self):
+        """PI-210: `gh issue view` resolves the repo via GH_REPO, no checkout."""
+        content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
+        assert "GH_REPO:" in content
+
     def test_board_automation_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
 
