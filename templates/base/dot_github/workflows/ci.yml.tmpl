@@ -13,9 +13,79 @@ permissions:
   pull-requests: write
 
 jobs:
+{{#if python}}
+  # PI-214: derive the test matrix from requires-python at runtime, so the
+  # version floor can never drift from what the project itself declares (a
+  # hardcoded matrix would reintroduce the PI-208 drift). This job reads
+  # requires-python and emits every supported version that satisfies it;
+  # lint-and-test then fans out across them. KNOWN is the only maintained
+  # list — the *ceiling* set enumerated up to; bump it (or let Renovate) when
+  # a new CPython is released. The floor is always taken from requires-python.
+  python-matrix:
+    name: Resolve Python matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      versions: ${{ steps.resolve.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+
+      - name: Resolve versions satisfying requires-python
+        id: resolve
+        run: |
+          uv run --no-project --with packaging python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import tomllib
+
+          from packaging.specifiers import SpecifierSet
+
+          # Maintained ceiling set — every CPython this template is willing to
+          # test. The floor comes from requires-python (below), never from here.
+          KNOWN = ["3.11", "3.12", "3.13", "3.14"]
+
+          spec = ""
+          pyproject = pathlib.Path("pyproject.toml")
+          if pyproject.is_file():
+              try:
+                  data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+                  spec = data.get("project", {}).get("requires-python", "") or ""
+              except (tomllib.TOMLDecodeError, OSError):
+                  spec = ""
+
+          if spec:
+              allowed = SpecifierSet(spec)
+              versions = [v for v in KNOWN if allowed.contains(v + ".0")]
+          else:
+              # No declared floor yet (e.g. a fresh scaffold) — test the full set.
+              versions = list(KNOWN)
+          if not versions:
+              # requires-python excludes every KNOWN version — fall back to the
+              # newest so CI still runs instead of erroring on an empty matrix.
+              versions = [KNOWN[-1]]
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write("versions=" + json.dumps(versions) + "\n")
+          print("requires-python:", spec or "(none) -> full KNOWN set")
+          print("matrix:", versions)
+          PY
+{{/if python}}
+
   lint-and-test:
     name: Lint and test
     runs-on: ubuntu-24.04
+{{#if python}}
+    needs: python-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ${{ fromJSON(needs.python-matrix.outputs.versions) }}
+{{/if python}}
     steps:
       - uses: actions/checkout@v6
 
@@ -24,11 +94,13 @@ jobs:
         uses: astral-sh/setup-uv@v8.1.0
         with:
           version: "0.11.7"
+          # Pin this job to the matrix version (PI-214). Not the PI-208 drift:
+          # every matrix entry is >= the requires-python floor by construction
+          # (see the python-matrix job), so the floor can't drift below what
+          # the project declares.
+          python-version: ${{ matrix.python-version }}
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
-          # No python-version pin (PI-208): `uv sync` installs the version the
-          # project requires (.python-version / requires-python), so CI never
-          # drifts below the floor. Add a matrix here to test multiple versions.
 
       # CI invokes the same justfile recipes agents and humans use (PI-139),
       # so the command surface is defined exactly once.

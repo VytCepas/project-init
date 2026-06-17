@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -55,6 +57,13 @@ class TestNodeTemplate:
             content = (self.target / ".claude" / "hooks" / hook).read_text()
             assert "node_modules/.bin/eslint" not in content
             assert "bunx eslint" in content
+
+    def test_no_python_matrix_job_in_node_template(self):
+        # PI-214: the runtime version-matrix machinery is python-only; node
+        # scaffolds must not carry the python-matrix job or its consumers.
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "python-matrix:" not in ci
+        assert "fromJSON(needs.python-matrix" not in ci
 
 
 class TestTemplateIdentifiers:
@@ -212,6 +221,20 @@ class TestScaffoldGitHubFiles:
             "CI must not hard-pin python-version to a literal (PI-208)"
         )
 
+    def test_ci_resolves_python_matrix_from_requires_python(self):
+        """PI-214: a setup job derives the version matrix from requires-python
+        at runtime, and lint-and-test fans out over the result — so the floor
+        is read from the project's own declaration and cannot drift (unlike a
+        hardcoded matrix, which PI-208 warned against)."""
+        content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        # The resolver job reads requires-python and filters with packaging.
+        assert "python-matrix:" in content
+        assert "requires-python" in content
+        assert "SpecifierSet" in content
+        # lint-and-test consumes the resolved versions as its matrix.
+        assert "fromJSON(needs.python-matrix.outputs.versions)" in content
+        assert "python-version: ${{ matrix.python-version }}" in content
+
     def test_pull_request_template_created(self):
         assert (self.target / ".github" / "pull_request_template.md").is_file()
 
@@ -356,3 +379,70 @@ def test_project_validate_pr_workflow_accepts_project_keys():
     assert "[A-Z]" in content  # generic project key pattern
     assert "nojira" in content
     assert "feat|fix|chore|docs|test" in content
+
+
+class TestPythonMatrixResolution:
+    """PI-214 (Definition of Done): the matrix must be derived from
+    requires-python and must never include a version below the declared floor.
+
+    Rather than re-implement the resolver, these tests extract the *actual*
+    inline script shipped in ci.yml and execute it — so the regression guard
+    tracks the real behavior, not a copy that could silently diverge.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _resolver(self, tmp_target: Path):
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
+        ci = (tmp_target / ".github" / "workflows" / "ci.yml").read_text()
+        self.resolver = self._extract_resolver(ci)
+
+    @staticmethod
+    def _extract_resolver(ci_yaml: str) -> str:
+        """Pull the heredoc'd Python between `<<'PY'` and its `PY` terminator."""
+        lines = ci_yaml.splitlines()
+        start = next(i for i, ln in enumerate(lines) if ln.rstrip().endswith("<<'PY'"))
+        end = next(
+            i for i, ln in enumerate(lines[start + 1 :], start + 1) if ln.strip() == "PY"
+        )
+        return textwrap.dedent("\n".join(lines[start + 1 : end]))
+
+    def _resolve(self, requires_python, tmp_path, monkeypatch) -> list[str]:
+        """Run the shipped resolver against a synthetic pyproject.toml and return
+        the matrix it would emit. `requires_python=None` omits the key entirely."""
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        body = '[project]\nname = "x"\n'
+        if requires_python is not None:
+            body += f'requires-python = "{requires_python}"\n'
+        (proj / "pyproject.toml").write_text(body)
+        out = tmp_path / "gh_output"
+        out.write_text("")
+        monkeypatch.chdir(proj)
+        monkeypatch.setenv("GITHUB_OUTPUT", str(out))
+        exec(compile(self.resolver, "<ci-resolver>", "exec"), {})  # noqa: S102
+        line = next(
+            ln for ln in out.read_text().splitlines() if ln.startswith("versions=")
+        )
+        return json.loads(line.split("=", 1)[1])
+
+    def test_floor_excludes_lower_versions(self, tmp_path, monkeypatch):
+        versions = self._resolve(">=3.13", tmp_path, monkeypatch)
+        assert versions == ["3.13", "3.14"]
+        assert "3.12" not in versions and "3.11" not in versions
+
+    def test_low_floor_includes_more(self, tmp_path, monkeypatch):
+        versions = self._resolve(">=3.11", tmp_path, monkeypatch)
+        assert versions[0] == "3.11"
+        assert "3.14" in versions
+
+    def test_upper_bound_respected(self, tmp_path, monkeypatch):
+        versions = self._resolve(">=3.11,<3.13", tmp_path, monkeypatch)
+        assert versions == ["3.11", "3.12"]
+
+    def test_missing_requires_python_falls_back_to_full_set(self, tmp_path, monkeypatch):
+        versions = self._resolve(None, tmp_path, monkeypatch)
+        assert versions == ["3.11", "3.12", "3.13", "3.14"]
+
+    def test_no_satisfying_version_falls_back_to_newest(self, tmp_path, monkeypatch):
+        versions = self._resolve(">=3.99", tmp_path, monkeypatch)
+        assert versions == ["3.14"]
