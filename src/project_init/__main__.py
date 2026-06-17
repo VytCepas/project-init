@@ -19,6 +19,7 @@ from project_init.scaffold import (
     TemplateRenderError,
     list_presets,
     load_preset,
+    overlay_layers,
     scaffold,
 )
 
@@ -395,9 +396,6 @@ def _gather_inputs_interactive(
 
 
 _VALID_AGENTS = ("claude", "codex", "gemini", "ollama")
-# Agents whose native wiring ships as a template layer; ollama is
-# instructions-level only (canonical AGENTS.md + portable scripts, PI-137).
-_AGENT_LAYERS = ("codex", "gemini")
 
 
 def resolve_agents(raw: str) -> list[str]:
@@ -413,8 +411,8 @@ def resolve_agents(raw: str) -> list[str]:
 
 
 def agent_layers(agents: list[str]) -> list[str]:
-    """Template layers contributed by the selected agents."""
-    return [a for a in _AGENT_LAYERS if a in agents]
+    """Template layers contributed by the selected agents (no fallback)."""
+    return overlay_layers(agents, no_plugin=False)
 
 
 # Per-language tooling commands (PI-16): (lint, format, test). Empty strings
@@ -615,9 +613,7 @@ def main(argv: list[str] | None = None) -> int:
     # restores the shared hooks/skills copies via the fallback layer
     # (PI-165, ADR-010 cutover). The preset dict is copied so the loaded
     # definition stays pristine.
-    extra_layers = agent_layers(agents)
-    if no_plugin:
-        extra_layers = ["fallback", *extra_layers]
+    extra_layers = overlay_layers(agents, no_plugin=no_plugin)
     if extra_layers:
         preset = {**preset, "layers": list(preset["layers"]) + extra_layers}
 

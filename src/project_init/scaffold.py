@@ -71,6 +71,25 @@ def load_preset(name: str) -> dict:
         return tomllib.load(f)
 
 
+# Agents whose native wiring ships as a template layer (PI-137); ollama is
+# instructions-level only. Single source for scaffold + upgrade (PI-189).
+_AGENT_LAYERS = ("codex", "gemini")
+
+
+def overlay_layers(agents: str | list[str], *, no_plugin: bool) -> list[str]:
+    """Extra template layers appended to a preset beyond its base definition.
+
+    The per-agent overlays (PI-137), prefixed with the ``fallback`` layer when
+    plugins are off. One source for both the scaffolder and the ``upgrade``
+    re-render, so they can never derive a different layer set (PI-189).
+    """
+    chosen = {a.strip() for a in (agents.split(",") if isinstance(agents, str) else agents)}
+    extra = [a for a in _AGENT_LAYERS if a in chosen]
+    if no_plugin:
+        extra = ["fallback", *extra]
+    return extra
+
+
 def _render(text: str, variables: dict[str, str]) -> str:
     """Replace {{var}} placeholders and process {{#if var}}...{{/if var}} blocks.
 

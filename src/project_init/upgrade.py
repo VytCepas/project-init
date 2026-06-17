@@ -33,7 +33,14 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from project_init.scaffold import _PRESERVE_DIRS, _RECORD_MARKER, load_preset, scaffold
+from project_init.scaffold import (
+    _PRESERVE_DIRS,
+    _RECORD_MARKER,
+    _new_sibling,
+    load_preset,
+    overlay_layers,
+    scaffold,
+)
 
 _CONFIG_REL = Path(".claude/config.yaml")
 _VERSION_LINE_RE = re.compile(r"^(\s*project_init_version:\s*).*$", re.MULTILINE)
@@ -372,12 +379,13 @@ def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:
 
 def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Path]:
     preset = load_preset(preset_name)
-    # Agent overlays (PI-137) are layers appended at scaffold time, not part
-    # of the preset definition — re-derive them from the recorded agents.
-    agents = {a.strip() for a in variables.get("agents", "claude").split(",")}
-    extra = [layer for layer in ("codex", "gemini") if layer in agents]
-    if variables.get("no_plugin"):
-        extra = ["fallback", *extra]
+    # Agent overlays (PI-137) are layers appended at scaffold time, not part of
+    # the preset definition — re-derive them from the recorded agents via the
+    # same helper the scaffolder uses, so upgrade can't render a different layer
+    # set (PI-189).
+    extra = overlay_layers(
+        variables.get("agents", "claude"), no_plugin=bool(variables.get("no_plugin"))
+    )
     if extra:
         preset = {**preset, "layers": list(preset["layers"]) + extra}
     return scaffold(staging, preset, variables, strict=True)
@@ -420,22 +428,6 @@ def _copy_rendered(src: Path, dest: Path) -> None:
     shutil.copy2(src, dest)
 
 
-def _new_sibling(dest: Path, rendered: Path) -> Path:
-    """Pick the ``.new`` sibling path for a conflicted file.
-
-    An existing ``.new`` may hold a user's in-progress manual merge from the
-    previous upgrade — never clobber it. Reuse it only when its content
-    already equals the fresh render; otherwise take ``.new.1``, ``.new.2``, …
-    """
-    candidate = dest.parent / (dest.name + ".new")
-    rendered_bytes = rendered.read_bytes()
-    counter = 0
-    while candidate.exists() and candidate.read_bytes() != rendered_bytes:
-        counter += 1
-        candidate = dest.parent / (dest.name + f".new.{counter}")
-    return candidate
-
-
 def apply_drift(
     target: Path,
     staging: Path,
@@ -447,7 +439,7 @@ def apply_drift(
     for rel in report.new + report.changed:
         _copy_rendered(staging / rel, target / rel)
     for rel in report.conflicts:
-        _copy_rendered(staging / rel, _new_sibling(target / rel, staging / rel))
+        _copy_rendered(staging / rel, _new_sibling(target / rel, (staging / rel).read_bytes()))
 
     # Targeted config.yaml updates: the human-readable version line, then the
     # scaffold record (variables + a manifest reflecting post-apply state).
