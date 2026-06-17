@@ -31,7 +31,17 @@ class TestLoadPreset:
 
     @pytest.mark.parametrize(
         "evil",
-        ["../../etc/passwd", "..", "a/b", "foo/../bar", "/etc/passwd", ""],
+        [
+            "../../etc/passwd",
+            "..",
+            "a/b",
+            "foo/../bar",
+            "/etc/passwd",
+            "",
+            # Windows-style separators: the guard rejects backslash too (PI-188).
+            "..\\..\\etc\\passwd",
+            "a\\b",
+        ],
     )
     def test_load_preset_rejects_path_traversal(self, evil):
         """PI-188: --preset must be a bare stem; a path must not read a .toml
