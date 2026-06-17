@@ -55,6 +55,20 @@ class TestFirstScaffoldProtectsExistingFiles:
         assert "PRECIOUS SETTINGS" in (target / ".claude" / "settings.json").read_text()
         assert (target / ".claude" / "settings.json.new").is_file()
 
+    def test_pre_existing_config_without_record_still_protects(self, tmp_path: Path):
+        """PI-196: a .claude/config.yaml lacking the scaffold record marker
+        (hand-written or left by another tool) must not be mistaken for a prior
+        project-init run — the first scaffold must still protect user files."""
+        target = tmp_path / "proj"
+        (target / ".claude").mkdir(parents=True)
+        (target / ".claude" / "config.yaml").write_text("project_key: MINE\n")
+        (target / "CLAUDE.md").write_text("# MY CUSTOM INSTRUCTIONS - DO NOT LOSE\n")
+
+        assert _run(target) == 0
+
+        assert (target / "CLAUDE.md").read_text() == "# MY CUSTOM INSTRUCTIONS - DO NOT LOSE\n"
+        assert (target / "CLAUDE.md.new").is_file()
+
     def test_fresh_dir_has_no_new_siblings(self, tmp_path: Path):
         target = tmp_path / "proj"
         assert _run(target) == 0
