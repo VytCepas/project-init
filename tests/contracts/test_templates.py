@@ -185,6 +185,12 @@ class TestScaffoldGitHubFiles:
         assert "actions/checkout@v4" not in content
         assert "astral-sh/setup-uv@v3" not in content
 
+    def test_ci_syncs_dev_dependency_group(self):
+        """PI-209: align the CI dev install with `uv add --dev` (PEP 735 groups)."""
+        content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "uv sync --group dev" in content
+        assert "uv sync --extra dev" not in content
+
     def test_ci_does_not_hardcode_python_version(self):
         """PI-208: a pinned Python version drifts below requires-python; let uv
         resolve the project's interpreter from .python-version/requires-python.

@@ -82,6 +82,14 @@ class TestJustfilePerLanguage:
             assert "-n auto" in body
             assert "--with pytest-xdist" in body, f"{recipe} must not require a declared xdist"
 
+    def test_python_setup_uses_dependency_group(self, tmp_path: Path):
+        """PI-209: dev deps live in [dependency-groups] (what `uv add --dev`
+        writes), so `setup` must `uv sync --group dev`, not `--extra dev`."""
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "setup")
+        assert "uv sync --group dev" in body
+        assert "--extra dev" not in body
+
     def test_node_recipes_do_not_rely_on_package_json_scripts(self, tmp_path: Path):
         """PI-180: `bun run lint`/`format` fail ("Script not found") with no
         package.json; recipes must call the tools directly instead."""

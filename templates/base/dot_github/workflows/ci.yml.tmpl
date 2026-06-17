@@ -146,7 +146,7 @@ jobs:
       # uv sync installs the project's required Python (.python-version /
       # requires-python) — no version to drift (PI-208).
       - name: Sync dev dependencies
-        run: uv sync --extra dev
+        run: uv sync --group dev
 
       # Check if integration tests directory exists before running
       # This prevents masking real test failures with "No integration tests" message
@@ -171,7 +171,7 @@ jobs:
   #     - uses: astral-sh/setup-uv@v8.1.0
   #       with:
   #         version: "0.11.7"
-  #     - run: uv sync --extra dev
+  #     - run: uv sync --group dev
   #     - run: uv run mutmut run
   # (also add to the top-level `on:` block:)
   #   schedule:
