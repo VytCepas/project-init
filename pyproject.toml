@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "project-init"
-version = "0.3.0"
+version = "0.4.0"
 description = "Scaffolder for agentic-development infrastructure inside any project"
 readme = "README.md"
 requires-python = ">=3.11"
