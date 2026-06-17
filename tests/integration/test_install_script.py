@@ -28,10 +28,18 @@ def test_install_sh_writes_slash_command_with_stubs(tmp_path: Path):
     bindir = tmp_path / "bin"
     bindir.mkdir()
     # Stub the external tools so the bootstrap runs without network or installs.
-    for tool in ("uv", "git"):
-        stub = bindir / tool
-        stub.write_text("#!/usr/bin/env bash\nexit 0\n")
-        stub.chmod(0o755)
+    # uv is a pure no-op; git minimally emulates `clone <url> <dest>` by creating
+    # <dest>/.git, so install.sh runs against a real clone directory instead of an
+    # all-no-op stub that hides whether the clone path actually ran (PI-195 review).
+    (bindir / "uv").write_text("#!/usr/bin/env bash\nexit 0\n")
+    (bindir / "uv").chmod(0o755)
+    git_stub = bindir / "git"
+    git_stub.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [ "$1" = clone ]; then mkdir -p "${@: -1}/.git"; fi\n'
+        "exit 0\n"
+    )
+    git_stub.chmod(0o755)
 
     env = {
         "HOME": str(home),
@@ -43,6 +51,8 @@ def test_install_sh_writes_slash_command_with_stubs(tmp_path: Path):
         ["bash", str(_INSTALL_SH)], capture_output=True, text=True, env=env
     )
     assert result.returncode == 0, result.stdout + result.stderr
+    # The clone branch must have run (not the "update existing clone" path).
+    assert (tmp_path / "install" / ".git").is_dir(), "install.sh must clone into INSTALL_DIR"
 
     cmd = home / ".claude" / "commands" / "project-init.md"
     assert cmd.is_file(), "install.sh must write the /project-init slash command"
