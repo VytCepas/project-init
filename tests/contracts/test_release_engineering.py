@@ -105,8 +105,12 @@ class TestDocsNavCompleteness:
 
     def test_all_adrs_in_mkdocs_nav(self):
         nav = (_REPO_ROOT / "mkdocs.yml").read_text()
-        for adr in sorted((_REPO_ROOT / "docs" / "adr").glob("adr-0*.md")):
-            assert adr.name in nav, f"{adr.name} missing from mkdocs.yml nav"
+        # Glob adr-*.md (not adr-0*) so coverage survives past adr-100, and assert
+        # the exact nav path so an unrelated mention can't satisfy it (PI-192 review).
+        adrs = sorted((_REPO_ROOT / "docs" / "adr").glob("adr-*.md"))
+        assert adrs, "no ADRs found — check the glob/path"
+        for adr in adrs:
+            assert f"adr/{adr.name}" in nav, f"{adr.name} missing from mkdocs.yml nav"
 
     def test_usage_guide_in_mkdocs_nav(self):
         nav = (_REPO_ROOT / "mkdocs.yml").read_text()
