@@ -443,6 +443,12 @@ class TestPythonMatrixResolution:
         versions = self._resolve(None, tmp_path, monkeypatch)
         assert versions == ["3.11", "3.12", "3.13", "3.14"]
 
+    def test_malformed_requires_python_falls_back_to_full_set(self, tmp_path, monkeypatch):
+        # Copilot review on #238: a present-but-invalid specifier must not crash
+        # the job (InvalidSpecifier) — it falls back to the full KNOWN set.
+        versions = self._resolve("not-a-version", tmp_path, monkeypatch)
+        assert versions == ["3.11", "3.12", "3.13", "3.14"]
+
     def test_no_satisfying_version_falls_back_to_newest(self, tmp_path, monkeypatch):
         versions = self._resolve(">=3.99", tmp_path, monkeypatch)
         assert versions == ["3.14"]
