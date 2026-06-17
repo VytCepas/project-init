@@ -1,7 +1,7 @@
 #!/bin/bash
 # Create a GitHub issue with typed labels and planning metadata.
-# Priority, Size, Agent ready, and Confidence are set directly on the
-# GitHub Project v2 board — not written to the issue body.
+# Priority, Size, Agent ready, and Confidence are written into the issue body
+# (so the issue is self-contained) and mirrored to the GitHub Project v2 board.
 #
 # Usage:
 #   .claude/scripts/create_issue.sh <type> "Short description" [metadata flags]
@@ -27,10 +27,10 @@ Types:
   feat  fix  chore  docs  test
 
 Options:
-  --priority high|medium|low           Set Priority on the project board
-  --size XS|S|M|L|XL                   Set Size on the project board
-  --agent-ready Yes|No                 Set Agent ready on the project board
-  --confidence high|medium|low|unknown Set Confidence on the project board
+  --priority high|medium|low           Set Priority (issue body + project board)
+  --size XS|S|M|L|XL                   Set Size (issue body + project board)
+  --agent-ready Yes|No                 Set Agent ready (issue body + project board)
+  --confidence high|medium|low|unknown Set Confidence (issue body + project board)
   --area VALUE                         Record affected area in body metadata
   --scale epic|task                    Mark as epic (parent) or task (leaf); adds scale label
   --parent VALUE                       Link new issue as sub-issue of VALUE
@@ -50,9 +50,11 @@ Sub-issues:
 
 Metadata model:
   GitHub labels: type and scale when labels exist or can be created.
-  GitHub Project fields: priority, size, agent-ready, confidence (set directly via GraphQL).
-  Markdown body: area, scale, parent, references, dependencies, acceptance criteria,
+  Markdown body (self-contained source of truth): priority, size, agent-ready,
+  confidence, area, scale, parent, references, dependencies, acceptance criteria,
   Definition of Ready, and Definition of Done.
+  GitHub Project fields: priority, size, agent-ready, and confidence are also
+  mirrored to the board via GraphQL so they stay sortable/filterable for humans.
 
 Missing label fallback:
   If a label is missing and cannot be created, issue creation continues without
