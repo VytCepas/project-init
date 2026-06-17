@@ -202,12 +202,13 @@ def _parse_record_block(text: str) -> tuple[str, dict, dict] | None:
         )
         raise UpgradeError(msg) from e
 
-    if preset and variables is not None and manifest is not None:
+    if preset and isinstance(variables, dict) and isinstance(manifest, dict):
         return preset, variables, manifest
     msg = (
-        "scaffold record in .claude/config.yaml is incomplete (needs preset, "
-        "variables, and manifest). Fix the block or delete everything from "
-        f"the '{_RECORD_MARKER}' line down to fall back to migration."
+        "scaffold record in .claude/config.yaml is incomplete or malformed "
+        "(needs preset, plus variables and manifest as JSON objects). Fix the "
+        f"block or delete everything from the '{_RECORD_MARKER}' line down to "
+        "fall back to migration."
     )
     raise UpgradeError(msg)
 
