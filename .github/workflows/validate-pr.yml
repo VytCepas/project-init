@@ -62,3 +62,18 @@ jobs:
             echo "ERROR: PR body must include 'Closes #<number>' to auto-close the linked issue"
             exit 1
           fi
+
+          # Verify the title scope key number is among the Closes numbers — a
+          # `type(PI-N): ...` PR must `Closes #N` (PI-N maps to issue #N), so it
+          # can't auto-close an unrelated issue (PI-200).
+          TITLE_KEY_NUM=$(echo "$PR_TITLE" | sed -nE 's/.*\([A-Z][A-Z0-9]*-([0-9]+)\).*/\1/p')
+          if [ -n "$TITLE_KEY_NUM" ]; then
+            CLOSES_NUMS=$(echo "$PR_BODY" | grep -oiE 'closes\s+#[0-9]+' | grep -oE '[0-9]+' || true)
+            if echo "$CLOSES_NUMS" | grep -qx "$TITLE_KEY_NUM"; then
+              echo "Closes #$TITLE_KEY_NUM matches the title scope key"
+            else
+              echo "ERROR: title scope key (#$TITLE_KEY_NUM) is not among the Closes numbers: $(echo $CLOSES_NUMS | tr '\n' ' ')"
+              echo "A 'type(KEY-$TITLE_KEY_NUM): ...' PR must 'Closes #$TITLE_KEY_NUM' — PI-N maps to issue #N."
+              exit 1
+            fi
+          fi
