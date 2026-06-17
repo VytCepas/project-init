@@ -26,7 +26,9 @@ jobs:
           version: "0.11.7"
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
-          python-version: "3.12"
+          # No python-version pin (PI-208): `uv sync` installs the version the
+          # project requires (.python-version / requires-python), so CI never
+          # drifts below the floor. Add a matrix here to test multiple versions.
 
       # CI invokes the same justfile recipes agents and humans use (PI-139),
       # so the command surface is defined exactly once.
@@ -141,9 +143,8 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
 
-      - name: Set up Python
-        run: uv python install 3.12
-
+      # uv sync installs the project's required Python (.python-version /
+      # requires-python) — no version to drift (PI-208).
       - name: Sync dev dependencies
         run: uv sync --extra dev
 
