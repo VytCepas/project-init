@@ -32,7 +32,12 @@ for hook_file in "$GIT_HOOKS_SRC"/*; do
     echo "  Backed up existing $hook_name"
   fi
 
-  # Create symlink (or copy if symlinks not available)
+  # If the destination is a symlink (e.g. a hooks manager like husky), remove
+  # the link first so we replace it rather than writing through `cp` to its
+  # referent and clobbering a shared file outside .git/hooks (PI-204).
+  [ -L "$hook_dst" ] && rm -f "$hook_dst"
+
+  # Copy the project hook into place.
   if cp -P "$hook_file" "$hook_dst" 2>/dev/null; then
     chmod +x "$hook_dst"
   else
