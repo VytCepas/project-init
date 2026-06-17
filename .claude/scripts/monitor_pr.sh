@@ -16,10 +16,10 @@
 #
 # Full lifecycle for agents:
 #   1. .claude/scripts/monitor_pr.sh <n> --merge
-#   2. Exit 2 → review comments printed → read and address them, push
+#   2. Exit 2 -> review comments printed -> read and address them, push
 #   3. Re-run with --review-cycle 1
-#   4. Exit 2 again → address remaining comments, push
-#   5. Re-run with --review-cycle 2 → admin-merge fires if still blocked
+#   4. Exit 2 again -> address remaining comments, push
+#   5. Re-run with --review-cycle 2 -> admin-merge fires if still blocked
 #
 # Review cycle policy:
 #   Two fix cycles are required before admin-merge is allowed. This ensures
@@ -61,8 +61,8 @@ _count_pending() {
   echo "$1" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-# Exclude review/decision — it is a derived commit status that only appears after a review
-# is submitted. We detect review state directly via reviewDecision below.
+# Exclude review/decision; it is a derived commit status that only appears
+# after a review event. We detect review state directly via reviewDecision.
 print(sum(1 for c in data if c.get('name') != 'review/decision' and c.get('state') in ('PENDING', 'IN_PROGRESS', 'EXPECTED')))
 "
 }
@@ -101,15 +101,35 @@ _print_review_comments() {
   echo "  Full PR: $(gh pr view "$PR_NUMBER" --json url -q '.url' 2>/dev/null || true)"
 }
 
-_admin_merge() {
-  GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --admin 2>&1 | grep -v "^$" || true
-  echo "Merged PR #$PR_NUMBER (admin)"
+_run_gh() {
+  local output
+  local status
+
+  set +e
+  output=$(GH_PROMPT_DISABLED=1 gh "$@" 2>&1)
+  status=$?
+  set -e
+
+  if [ -n "$output" ]; then
+    printf '%s\n' "$output" | grep -v "^$" || true
+  fi
+
+  return "$status"
 }
 
-# Query the PR's aggregate review decision directly — source of truth regardless of
-# whether the review/decision commit status has been posted yet.
+_admin_merge() {
+  if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --admin; then
+    echo "Merged PR #$PR_NUMBER (admin)"
+  else
+    echo "ERROR: admin merge failed for PR #$PR_NUMBER" >&2
+    return 1
+  fi
+}
+
+# Query the PR's aggregate review decision directly — source of truth regardless
+# of whether the review/decision commit status has been posted yet.
 # Returns: APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | (empty = no review policy)
-# Returns UNKNOWN on API failure — callers must treat this as fail-closed (do not merge).
+# Returns UNKNOWN on API failure — callers must treat this as fail-closed.
 _get_review_decision() {
   gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""' 2>/dev/null || echo "UNKNOWN"
 }
@@ -126,14 +146,28 @@ _has_review_activity() {
 # --- Wait for all CI checks (excludes review/decision commit status) ---
 # Guard: if checks haven't registered yet (empty list), keep polling.
 # An empty list is indistinguishable from "all done" without this guard,
-# which caused #104 to merge before CI even started.
+# which caused premature merges before CI even started. Bounded by CI_TIMEOUT
+# so a required check that never registers can't hang the script — and any
+# autonomous caller — forever; fail closed on timeout (PI-186/PI-203).
+CI_TIMEOUT=900
+CI_ELAPSED=0
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
   CHECK_COUNT=$(echo "$CHECKS" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
-  [ "$CHECK_COUNT" -eq 0 ] && { sleep 10; continue; }
-  PENDING=$(_count_pending "$CHECKS")
-  [ "$PENDING" -eq 0 ] && break
+  if [ "$CHECK_COUNT" -gt 0 ] && [ "$(_count_pending "$CHECKS")" -eq 0 ]; then
+    break
+  fi
+  if [ "$CI_ELAPSED" -ge "$CI_TIMEOUT" ]; then
+    echo "PR #$PR_NUMBER: CI did not settle within ${CI_TIMEOUT}s. Still pending:"
+    echo "$CHECKS" | python3 -c "import json,sys
+for c in json.load(sys.stdin):
+    if c.get('name') != 'review/decision' and c.get('state') in ('PENDING','IN_PROGRESS','EXPECTED'):
+        print('  -', c.get('name'))" 2>/dev/null || true
+    echo "Re-run once the check registers, or investigate why it never started."
+    exit 1
+  fi
   sleep 10
+  CI_ELAPSED=$((CI_ELAPSED + 10))
 done
 
 FAIL_CODE=0
@@ -151,14 +185,14 @@ if [ "$NO_REVIEW" -eq 1 ] && [ "$MODE" = "--merge" ]; then
   _admin_merge; exit 0
 fi
 
-# --- Wait up to 6 min for a reviewer to act (bounded replacement for the original infinite wait) ---
-# We query reviewDecision directly so this works even before the review/decision commit
-# status is created (which only happens after the first review event fires review-status.yml).
+# --- Wait up to 6 min for a reviewer to act ---
+# Query reviewDecision directly so this works before review-status.yml creates
+# the derived review/decision commit status.
 REVIEW_TIMEOUT=360
 REVIEW_ELAPSED=0
 REVIEW_DECISION=$(_get_review_decision)
 if [ "$MODE" = "--merge" ] && [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ] && [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
-  echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — force-merging with admin override."
+  echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — skipping reviewer wait and force-merging with admin override."
   _admin_merge; exit 0
 fi
 
@@ -176,17 +210,14 @@ while { [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UN
     echo "  Review comments detected — proceeding without waiting for formal approval."
     break
   fi
-  # Refresh CHECKS too so late-arriving CI failures are caught
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
 done
 
-# Fail closed: if reviewDecision could not be fetched, do not merge
 if [ "$REVIEW_DECISION" = "UNKNOWN" ]; then
   echo "ERROR: could not fetch reviewDecision for PR #$PR_NUMBER — cannot verify review state." >&2
   exit 2
 fi
 
-# Handle review outcome
 if [ "$REVIEW_DECISION" = "CHANGES_REQUESTED" ]; then
   echo "Review/decision failed on PR #$PR_NUMBER (cycle $REVIEW_CYCLE/$MAX_REVIEW_CYCLES):"
   _print_review_comments
@@ -227,20 +258,24 @@ PR_URL=$(gh pr view "$PR_NUMBER" --json url -q '.url')
 echo "PR #$PR_NUMBER passed: $PR_URL"
 
 if [ "$MODE" = "--merge" ]; then
-  # Check merge state: CLEAN = mergeable now, BLOCKED = review/branch protection gating
   MERGE_STATE=$(gh pr view "$PR_NUMBER" --json mergeStateStatus -q '.mergeStateStatus' 2>/dev/null || echo "UNKNOWN")
 
   if [ "$MERGE_STATE" = "CLEAN" ] || [ "$MERGE_STATE" = "UNSTABLE" ]; then
-    GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch 2>&1 | grep -v "^$" || true
-    echo "Merged PR #$PR_NUMBER"
+    if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
+      echo "Merged PR #$PR_NUMBER"
+    else
+      echo "ERROR: merge failed for PR #$PR_NUMBER" >&2
+      exit 1
+    fi
   elif [ "$MERGE_STATE" = "BLOCKED" ]; then
-    # CI passed but review protection is the only gate — admin merge (owner bypass)
     echo "PR is blocked by review protection — merging with admin override."
     _admin_merge
   else
-    # Unknown state — try direct first, fall back to --auto
-    if ! GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch 2>/dev/null; then
-      GH_PROMPT_DISABLED=1 gh pr merge "$PR_NUMBER" --squash --delete-branch --auto 2>&1 | grep -v "^$" || true
+    if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
+      if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --auto; then
+        echo "ERROR: could not merge or enable auto-merge for PR #$PR_NUMBER" >&2
+        exit 1
+      fi
       echo "Auto-merge enabled for PR #$PR_NUMBER — will merge once all requirements are met."
     else
       echo "Merged PR #$PR_NUMBER"
