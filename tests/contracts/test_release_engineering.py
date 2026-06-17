@@ -99,6 +99,20 @@ class TestVersionConsistency:
         assert "adr-008" in content
 
 
+class TestDocsNavCompleteness:
+    """PI-192: every ADR and the usage guide must be reachable from the docs
+    nav — they kept silently falling off as new ADRs were added."""
+
+    def test_all_adrs_in_mkdocs_nav(self):
+        nav = (_REPO_ROOT / "mkdocs.yml").read_text()
+        for adr in sorted((_REPO_ROOT / "docs" / "adr").glob("adr-0*.md")):
+            assert adr.name in nav, f"{adr.name} missing from mkdocs.yml nav"
+
+    def test_usage_guide_in_mkdocs_nav(self):
+        nav = (_REPO_ROOT / "mkdocs.yml").read_text()
+        assert "guides/using-project-init.md" in nav
+
+
 class TestPyPIPublishing:
     """ADR-011: trusted publishing from the release workflow."""
 
