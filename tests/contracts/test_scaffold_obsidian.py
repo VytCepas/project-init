@@ -175,6 +175,15 @@ class TestScaffoldObsidianOnly:
         assert 'BRANCH="${TYPE}/${PREFIX}${SLUG}"' in content
         assert "<issue_type>/<project_abbr>-<issue_number>-<kebab-slug>" in content
 
+    def test_start_issue_sh_handles_empty_slug(self):
+        """PI-206: a non-alphanumeric title must not yield a slug-less branch
+        like `feat/PI-42-` that gets pushed before validation rejects it."""
+        content = (self.target / ".claude" / "scripts" / "start_issue.sh").read_text()
+        guard_idx = content.find('-z "$SLUG"')
+        branch_idx = content.find('BRANCH="${TYPE}/${PREFIX}${SLUG}"')
+        assert guard_idx != -1, "empty-slug fallback missing"
+        assert guard_idx < branch_idx, "empty-slug fallback must precede the branch name"
+
     def test_project_init_md_has_script_commands(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
         assert "create_issue.sh" in content
