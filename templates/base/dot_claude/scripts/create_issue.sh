@@ -296,6 +296,13 @@ write_bullets() {
   echo "## Metadata"
   echo
   echo "- Type: $TYPE"
+  # PI-201: planning fields live in the body (so issue-validation.yml and the
+  # issue forms agree, and an agent reading the issue needs no board query);
+  # they are ALSO mirrored to the project board below for human sorting/filter.
+  [ -n "$PRIORITY" ]    && echo "- Priority: $PRIORITY"
+  [ -n "$SIZE" ]        && echo "- Size: $SIZE"
+  [ -n "$AGENT_READY" ] && echo "- Agent ready: $AGENT_READY"
+  [ -n "$CONFIDENCE" ]  && echo "- Confidence: $CONFIDENCE"
   [ -n "$SCALE" ] && echo "- Scale: $SCALE"
   [ -n "$AREA" ] && echo "- Area: $AREA"
   if [ -n "$PARENT" ]; then
@@ -307,17 +314,23 @@ write_bullets() {
   if [ -n "$MILESTONE" ]; then
     echo "- Milestone: $MILESTONE"
   fi
+  # Always emit these sections (PI-201): issue-validation.yml requires them in
+  # the body; "None" satisfies the check when the agent passed nothing.
+  echo
+  echo "## References"
+  echo
   if [ "${#REFERENCES[@]}" -gt 0 ]; then
-    echo
-    echo "## References"
-    echo
     write_bullets "None" "${REFERENCES[@]}"
+  else
+    echo "- None"
   fi
+  echo
+  echo "## Dependencies"
+  echo
   if [ "${#DEPENDENCIES[@]}" -gt 0 ]; then
-    echo
-    echo "## Dependencies"
-    echo
     write_bullets "None" "${DEPENDENCIES[@]}"
+  else
+    echo "- None"
   fi
   echo
   echo "## Acceptance criteria"
@@ -381,9 +394,10 @@ ISSUE_URL=$(gh issue create "${CREATE_ARGS[@]}" "${LABEL_ARGS[@]}")
 ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
 
 # ---------------------------------------------------------------------------
-# Set Priority / Size / Agent ready / Confidence directly on the GitHub
-# Project v2 board. These are not written to the issue body — the board is
-# the authoritative location for these fields.
+# Mirror Priority / Size / Agent ready / Confidence to the GitHub Project v2
+# board. They are also written into the issue body above (PI-201) so the issue
+# is self-contained and passes issue-validation.yml; the board copy makes them
+# sortable/filterable for humans.
 # PROJECT_NUMBER defaults to 1; override with the env var if needed.
 # ---------------------------------------------------------------------------
 sync_project_fields() {

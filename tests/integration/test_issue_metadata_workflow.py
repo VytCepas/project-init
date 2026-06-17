@@ -149,11 +149,17 @@ class TestCreateIssueScript:
         content = self.script.read_text()
         assert "label missing" in content.lower() or "missing label" in content.lower()
 
-    def test_project_fields_not_written_to_body(self):
+    def test_project_fields_written_to_body_and_synced(self):
+        """PI-201: planning fields go in the body (so issue-validation.yml and
+        the issue forms agree, and the issue is self-contained for agents) AND
+        are mirrored to the project board."""
         content = self.script.read_text()
-        # Priority/Size/Agent ready/Confidence go to project board, not the body
-        assert "Priority:" not in content.split("## Metadata")[1].split("sync_project_fields")[0]
-        # Confirm the sync function exists instead
+        metadata_block = content.split("## Metadata")[1].split("sync_project_fields")[0]
+        assert "Priority: $PRIORITY" in metadata_block
+        assert "Size: $SIZE" in metadata_block
+        assert "Agent ready: $AGENT_READY" in metadata_block
+        assert "Confidence: $CONFIDENCE" in metadata_block
+        # ... and still mirrored to the board.
         assert "sync_project_fields" in content
         assert "updateProjectV2ItemFieldValue" in content
 
