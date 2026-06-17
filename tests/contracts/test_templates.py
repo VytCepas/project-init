@@ -128,6 +128,33 @@ class TestScaffoldGitHubFiles:
     def test_board_automation_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
 
+    def test_board_automation_tolerates_personal_accounts(self):
+        """PI-207/PI-234: the user+organization project query errors on one path
+        (tolerate it so the jq fallback selects whichever applies), and the
+        checkout-free job must pin the repo so gh calls work without a remote."""
+        content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
+        lines = content.splitlines()
+        # Target the specific PROJECT_DATA assignment instead of matching the
+        # error-suppression substring anywhere in the file (brittle to harmless
+        # whitespace/formatting changes): locate the multi-line `gh api graphql`
+        # command substitution and capture it through the line that closes it.
+        starts = [
+            i for i, line in enumerate(lines) if line.lstrip().startswith("PROJECT_DATA=")
+        ]
+        assert starts, "board-automation.yml must assign PROJECT_DATA from a gh query"
+        start = starts[0]
+        ends = [i for i, line in enumerate(lines[start:], start) if "|| true" in line]
+        assert ends, "the PROJECT_DATA assignment must close with an error-tolerant guard"
+        assignment = "\n".join(lines[start : ends[0] + 1])
+        # The query must hit the Projects API and tolerate the errors path a
+        # personal (user-owned) account produces on the organization(...) branch,
+        # so the jq fallback can still select whichever path applies. (PI-207)
+        assert "gh api graphql" in assignment
+        assert "projectV2" in assignment
+        assert "2>/dev/null" in assignment
+        assert "|| true" in assignment
+        assert "GH_REPO:" in content
+
     def test_review_status_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "review-status.yml").is_file()
 
