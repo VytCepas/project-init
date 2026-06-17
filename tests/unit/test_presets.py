@@ -28,3 +28,23 @@ class TestLoadPreset:
     def test_load_unknown_preset_raises(self):
         with pytest.raises(ValueError, match="Unknown preset"):
             load_preset("nonexistent")
+
+    @pytest.mark.parametrize(
+        "evil",
+        [
+            "../../etc/passwd",
+            "..",
+            "a/b",
+            "foo/../bar",
+            "/etc/passwd",
+            "",
+            # Windows-style separators: the guard rejects backslash too (PI-188).
+            "..\\..\\etc\\passwd",
+            "a\\b",
+        ],
+    )
+    def test_load_preset_rejects_path_traversal(self, evil):
+        """PI-188: --preset must be a bare stem; a path must not read a .toml
+        outside presets/."""
+        with pytest.raises(ValueError, match="Unknown preset"):
+            load_preset(evil)
