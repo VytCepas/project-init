@@ -298,7 +298,6 @@ project-init/
 │   ├── obsidian/             # Obsidian vault overlay (both presets)
 │   ├── graphify/             # Graphify memory overlay
 │   └── presets/              # toml preset definitions
-├── examples/                 # sample scaffolded outputs
 └── tests/                    # focused pytest modules by behavior area
 ```
 
