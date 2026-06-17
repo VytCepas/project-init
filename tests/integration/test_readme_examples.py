@@ -64,3 +64,17 @@ class TestREADMEExampleCommand:
         assert (target / ".claude" / "hooks" / "dag_workflow.py").is_file()
         assert not (target / ".claude" / "hooks" / "post_edit_lint.sh").exists()
         assert (target / ".github" / "hooks" / "pre-commit").is_file()
+
+
+def test_readme_layout_has_no_phantom_examples_dir():
+    """PI-194: guard against a phantom examples/ reference anywhere in README.md.
+
+    The README previously mentioned an examples/ directory (removed per #24) that
+    never existed on disk. This test scans the entire README — not just the
+    repo-layout section — and fails if any "examples/" reference appears without a
+    matching examples/ directory, keeping the docs and tree in sync.
+    """
+    repo = Path(__file__).resolve().parents[2]
+    readme = (repo / "README.md").read_text(encoding="utf-8")
+    if "examples/" in readme:
+        assert (repo / "examples").is_dir(), "README references examples/ but it doesn't exist"
