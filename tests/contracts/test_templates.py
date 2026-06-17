@@ -187,8 +187,12 @@ class TestScaffoldGitHubFiles:
         """PI-186: the CI-wait loop must time out and fail closed, not hang
         forever on a required check that never registers."""
         content = (self.target / ".claude" / "scripts" / "monitor_pr.sh").read_text()
-        assert "CI_TIMEOUT" in content
-        assert "CI_ELAPSED" in content
+        assert "CI_TIMEOUT=" in content, "CI_TIMEOUT must be assigned a value"
+        # Assert the real bounding logic, not just the variable names — the loop
+        # must compare elapsed vs timeout and increment elapsed, so the test fails
+        # if the guard is dropped while the declarations linger (PI-186 review).
+        assert '[ "$CI_ELAPSED" -ge "$CI_TIMEOUT" ]' in content, "missing timeout guard"
+        assert "CI_ELAPSED=$((CI_ELAPSED +" in content, "missing elapsed increment"
         assert "--delete-branch" in content
         assert "reviewDecision" in content
         assert "Waiting for reviewer" in content
