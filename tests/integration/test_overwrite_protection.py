@@ -8,8 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from project_init.__main__ import main
-from project_init.scaffold import scaffold
-from tests.helpers import fallback_preset, fallback_variables
+from project_init.scaffold import load_preset, scaffold
+from tests.helpers import fallback_preset, fallback_variables, make_variables
 
 
 def _run(target: Path, *extra: str) -> int:
@@ -44,6 +44,39 @@ class TestFirstScaffoldProtectsExistingFiles:
         sibling = target / "CLAUDE.md.new"
         assert sibling.is_file()
         assert "DO NOT LOSE" not in sibling.read_text()
+
+    def test_unreadable_config_marker_is_treated_as_first_scaffold(
+        self, tmp_path: Path, monkeypatch
+    ):
+        """A config.yaml that exists but raises on read (permissions, or removed
+        between the exists() check and the read) must not abort the scaffold — it
+        is treated as unrecorded, so a pre-existing user file is preserved with a
+        .new sibling rather than clobbered (PI-196 review)."""
+        target = tmp_path / "proj"
+        (target / ".claude").mkdir(parents=True)
+        (target / ".claude" / "config.yaml").write_text("safety:\n  allow: []\n")
+        (target / "CLAUDE.md").write_text("# KEEP ME\n")
+
+        real_read_text = Path.read_text
+
+        def flaky_read_text(self, *args, **kwargs):
+            if self.name == "config.yaml" and self.parent.name == ".claude":
+                raise PermissionError("simulated unreadable config")
+            return real_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", flaky_read_text)
+
+        conflicts: list = []
+        scaffold(
+            target,
+            load_preset("obsidian-only"),
+            make_variables(),
+            strict=True,
+            conflicts=conflicts,
+        )
+        # First-scaffold path taken despite the unreadable marker.
+        assert (target / "CLAUDE.md").read_text() == "# KEEP ME\n"
+        assert (target / "CLAUDE.md.new").is_file()
 
     def test_existing_settings_json_is_preserved(self, tmp_path: Path):
         target = tmp_path / "proj"

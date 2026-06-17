@@ -278,6 +278,21 @@ def _commit_staged(
     return created
 
 
+def _has_scaffold_record(config_file: Path) -> bool:
+    """Return True if .claude/config.yaml carries the scaffold record marker.
+
+    A read failure (permissions, or the file removed between the check and the
+    read) is treated as "no record" so overwrite protection stays on and user
+    files are preserved rather than aborting the scaffold (PI-196 review).
+    """
+    try:
+        return config_file.exists() and (
+            _RECORD_MARKER in config_file.read_text(encoding="utf-8", errors="ignore")
+        )
+    except OSError:
+        return False
+
+
 def scaffold(
     target: Path,
     preset: dict,
@@ -314,10 +329,7 @@ def scaffold(
     # config.yaml must still count as a first scaffold so existing user files are
     # protected as `.new` siblings rather than silently overwritten (PI-196).
     _config_file = target / ".claude" / "config.yaml"
-    first_scaffold = not (
-        _config_file.exists()
-        and _RECORD_MARKER in _config_file.read_text(encoding="utf-8", errors="ignore")
-    )
+    first_scaffold = not _has_scaffold_record(_config_file)
 
     layers: list[str] = preset["layers"]
     created: list[Path] = []
