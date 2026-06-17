@@ -380,8 +380,12 @@ def cmd_push(branch: str | None, max_retries: int, *, force: bool = False) -> in
     if not branch:
         sys.stderr.write("push: no current branch\n")
         return 1
-    if force and branch in ("main", "master"):
-        sys.stderr.write("push: refusing to force-push main/master\n")
+    if branch in ("main", "master"):
+        # Refuse main/master for ANY push, not only force-pushes — otherwise
+        # running push_branch.sh while on main bypasses the direct-push guard,
+        # since the internal `git push` subprocess is invisible to the
+        # PreToolUse hook (PI-202).
+        sys.stderr.write("push: refusing to push main/master directly — open a feature branch + PR\n")
         return 1
 
     code, sha_out = _git(["rev-parse", branch])

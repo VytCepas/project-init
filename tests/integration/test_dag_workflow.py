@@ -407,6 +407,13 @@ class TestPushForceWithLease:
         assert dag.cmd_push("main", 0, force=True) == 1
         assert dag.cmd_push("master", 0, force=True) == 1
 
+    def test_refuses_nonforce_push_to_main(self, dag, capsys):
+        """PI-202: refuse main/master for ANY push, not only force-pushes —
+        otherwise push_branch.sh run on main bypasses the direct-push guard."""
+        assert dag.cmd_push("main", 0) == 1
+        assert dag.cmd_push("master", 0) == 1
+        assert "refusing to push" in capsys.readouterr().err
+
     def test_force_with_lease_pushes_rebased_branch(self, tmp_path: Path):
         remote = tmp_path / "origin.git"
         subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
