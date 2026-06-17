@@ -149,6 +149,12 @@ class TestScaffoldGitHubFiles:
         assert "actions/checkout@v4" not in content
         assert "astral-sh/setup-uv@v3" not in content
 
+    def test_ci_syncs_dev_dependency_group(self):
+        """PI-209: align the CI dev install with `uv add --dev` (PEP 735 groups)."""
+        content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "uv sync --group dev" in content
+        assert "uv sync --extra dev" not in content
+
     def test_pull_request_template_created(self):
         assert (self.target / ".github" / "pull_request_template.md").is_file()
 

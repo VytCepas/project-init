@@ -2,9 +2,9 @@
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
 
-# install/sync dev dependencies
+# install/sync dev dependencies (PEP 735 dependency-group; add tools with `uv add --dev`)
 setup:
-    uv sync --extra dev
+    uv sync --group dev
 
 # lint project code (docstring + complexity gates per ruff.toml)
 lint:
