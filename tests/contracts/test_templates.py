@@ -128,6 +128,12 @@ class TestScaffoldGitHubFiles:
     def test_board_automation_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "board-automation.yml").is_file()
 
+    def test_board_automation_tolerates_personal_accounts(self):
+        """PI-207: the user+organization project query errors on one path; the
+        lookup must tolerate that so the jq fallback selects whichever applies."""
+        content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
+        assert "2>/dev/null || true)" in content
+
     def test_review_status_workflow_created(self):
         assert (self.target / ".github" / "workflows" / "review-status.yml").is_file()
 

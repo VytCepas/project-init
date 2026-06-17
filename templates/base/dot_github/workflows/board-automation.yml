@@ -118,9 +118,15 @@ jobs:
                   }
                 }
               }
-            }' -f owner="$OWNER" -F number="$PROJECT_NUMBER")
+            }' -f owner="$OWNER" -F number="$PROJECT_NUMBER" 2>/dev/null || true)
 
-          PROJECT=$(echo "$PROJECT_DATA" | jq -c '.data.user.projectV2 // .data.organization.projectV2 // empty')
+          # A personal (user-owned) account errors on the organization(...) path
+          # (and an org errors on the user(...) path); gh exits non-zero whenever
+          # the response carries an `errors` array, even though valid data.user /
+          # data.organization is still on stdout. Tolerate that so the jq fallback
+          # below can select whichever path applies. Total failures leave
+          # PROJECT_DATA empty -> PROJECT_ID empty -> graceful skip. (PI-207)
+          PROJECT=$(echo "$PROJECT_DATA" | jq -c '.data.user.projectV2 // .data.organization.projectV2 // empty' 2>/dev/null || true)
           PROJECT_ID=$(echo "$PROJECT" | jq -r '.id // empty')
 
           if [ -z "$PROJECT_ID" ]; then
