@@ -237,6 +237,15 @@ class TestGitHubWorkflowHooks:
         out = self._run_hook("github_command_guard.sh", "gh pr merge 42 --auto")
         assert out is not None and out["decision"] == "block"
 
+    def test_github_command_guard_blocks_gh_api_merge_with_flags(self):
+        """PI-198: a `--method PUT` before the endpoint (the natural way to
+        merge via gh api) must not bypass the merge guard."""
+        out = self._run_hook(
+            "github_command_guard.sh",
+            "gh api --method PUT repos/o/r/pulls/42/merge",
+        )
+        assert out is not None and out["decision"] == "block"
+
     def test_github_command_guard_blocks_raw_pr_create(self):
         out = self._run_hook(
             "github_command_guard.sh",

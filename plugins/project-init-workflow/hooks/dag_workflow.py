@@ -244,7 +244,10 @@ COMMAND_RULES: list[tuple[re.Pattern[str], str | None, str]] = [
         "Direct pushes to main/master are blocked. Open a feature branch and PR.",
     ),
     (
-        re.compile(r"\bgh\s+api\s+repos/[^/\s]+/[^/\s]+/pulls/\d+/merge\b"),
+        # `[^&|;]*?` allows flags between `gh api` and the endpoint (a real merge
+        # needs `--method PUT`/`-X PUT`, often written before the path) without
+        # crossing a command separator (PI-198).
+        re.compile(r"\bgh\s+api\b[^&|;]*?repos/[^/\s]+/[^/\s]+/pulls/\d+/merge\b"),
         "pr.merged",
         "Use .claude/scripts/monitor_pr.sh <pr> --merge instead of `gh api .../merge` so CI and review gates are honored.",
     ),
