@@ -18,8 +18,11 @@ _VAR_RE = re.compile(r"\{\{(\w+)\}\}")
 # Matches an INNERMOST conditional block — the tempered dot forbids another
 # opener inside the body. _render loops to a fixpoint, so nested
 # {{#if outer}}...{{#if inner}}...{{/if}}...{{/if}} resolves inside-out.
+# A named closing tag must match the opener via the \1 backreference, so
+# {{#if x}}...{{/if y}} does NOT match — it's left unrendered (strict mode then
+# flags it) instead of silently gating on x and ignoring the typo'd y (PI-205).
 _BLOCK_RE = re.compile(
-    r"\{\{#if\s+(\w+)\}\}((?:(?!\{\{#if\s).)*?)\{\{/if(?:\s+\w+)?\}\}",
+    r"\{\{#if\s+(\w+)\}\}((?:(?!\{\{#if\s).)*?)\{\{/if(?:\s+\1)?\}\}",
     re.DOTALL,
 )
 # Used by strict mode to detect unrendered handlebars-style markers.

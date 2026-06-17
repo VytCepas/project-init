@@ -33,3 +33,13 @@ class TestNestedConditionals:
     def test_unclosed_block_survives_for_strict_mode(self):
         text = "{{#if a}}no closer"
         assert _render(text, {"a": "true"}) == "{{#if a}}no closer"
+
+    def test_mismatched_close_tag_is_not_rendered(self):
+        """PI-205: a closing tag whose name differs from the opener must not be
+        treated as a valid block — the markers survive (strict mode then flags
+        them) rather than silently gating on the opener and ignoring the typo."""
+        text = "{{#if python}}X{{/if node}}"
+        assert _render(text, {"python": "true", "node": ""}) == text
+        # A matching close (or no name) still renders normally.
+        assert _render("{{#if python}}X{{/if python}}", {"python": "true"}) == "X"
+        assert _render("{{#if python}}X{{/if}}", {"python": "true"}) == "X"
