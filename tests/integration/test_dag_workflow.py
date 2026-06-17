@@ -42,6 +42,15 @@ def _run_guard(payload: dict, cwd: Path | None = None) -> dict | None:
     return json.loads(proc.stdout) if proc.stdout.strip() else None
 
 
+def test_root_monitor_pr_checks_merge_exit_code():
+    """PI-203: the repo's own monitor_pr.sh must check the merge exit code
+    (via _run_gh) and not report false success — it had gone stale, piping the
+    merge through `| grep -v "^$" || true` and echoing "Merged" unconditionally."""
+    content = (REPO_ROOT / ".claude" / "scripts" / "monitor_pr.sh").read_text()
+    assert "_run_gh" in content, "root monitor_pr.sh is stale (missing _run_gh)"
+    assert '--delete-branch 2>&1 | grep -v "^$" || true' not in content
+
+
 class TestFilesPresent:
     def test_source_hook_exists(self):
         assert SOURCE_HOOK.is_file()
