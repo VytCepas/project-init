@@ -63,17 +63,31 @@ jobs:
             exit 1
           fi
 
+          # Extract the issue key from the title scope, e.g. fix(PI-7): ... -> PI-7.
+          TITLE_KEY=$(echo "$PR_TITLE" | sed -nE 's/.*\(([A-Z][A-Z0-9]*-[0-9]+)\).*/\1/p')
+          TITLE_KEY_NUM=$(echo "$TITLE_KEY" | grep -oE '[0-9]+$' || true)
+
+          # Defense in depth: when the branch is *also* issue-linked, its key must
+          # match the title scope key. Otherwise a PR on branch fix/PI-99-* with
+          # title fix(PI-1): ... + body "Closes #1" passes every other check while
+          # closing the wrong issue off the wrong branch (PI-200 review).
+          BRANCH_KEY_NUM=$(echo "$PR_BRANCH" | sed -nE 's#^(feat|fix|chore|docs|test)/[A-Z][A-Z0-9]*-([0-9]+)-.*#\2#p')
+          if [ -n "$TITLE_KEY_NUM" ] && [ -n "$BRANCH_KEY_NUM" ] && [ "$TITLE_KEY_NUM" != "$BRANCH_KEY_NUM" ]; then
+            echo "ERROR: branch issue key (#$BRANCH_KEY_NUM) and title scope key ($TITLE_KEY -> #$TITLE_KEY_NUM) reference different issues."
+            echo "Rename the branch or fix the title so both point at the same issue."
+            exit 1
+          fi
+
           # Verify the title scope key number is among the Closes numbers — a
-          # `type(PI-N): ...` PR must `Closes #N` (PI-N maps to issue #N), so it
+          # type(PI-N): ... PR must Closes #N (PI-N maps to issue #N), so it
           # can't auto-close an unrelated issue (PI-200).
-          TITLE_KEY_NUM=$(echo "$PR_TITLE" | sed -nE 's/.*\([A-Z][A-Z0-9]*-([0-9]+)\).*/\1/p')
           if [ -n "$TITLE_KEY_NUM" ]; then
             CLOSES_NUMS=$(echo "$PR_BODY" | grep -oiE 'closes\s+#[0-9]+' | grep -oE '[0-9]+' || true)
             if echo "$CLOSES_NUMS" | grep -qx "$TITLE_KEY_NUM"; then
-              echo "Closes #$TITLE_KEY_NUM matches the title scope key"
+              echo "Closes #$TITLE_KEY_NUM matches the title scope key $TITLE_KEY"
             else
-              echo "ERROR: title scope key (#$TITLE_KEY_NUM) is not among the Closes numbers: $(echo $CLOSES_NUMS | tr '\n' ' ')"
-              echo "A 'type(KEY-$TITLE_KEY_NUM): ...' PR must 'Closes #$TITLE_KEY_NUM' — PI-N maps to issue #N."
+              echo "ERROR: title scope key $TITLE_KEY (#$TITLE_KEY_NUM) is not among the Closes numbers: $(echo $CLOSES_NUMS | tr '\n' ' ')"
+              echo "A '$TITLE_KEY' PR must 'Closes #$TITLE_KEY_NUM' — PI-N maps to issue #N."
               exit 1
             fi
           fi
