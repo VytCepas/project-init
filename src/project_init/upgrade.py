@@ -80,6 +80,33 @@ def _migrate_removed_preset(preset_name: str, variables: dict) -> tuple[str, dic
 _LANGUAGE_FLAGS = ("python", "node", "go")
 
 
+def _overlay_off_defaults() -> dict[str, str]:
+    """Opt-in overlay + governance variables in their "off" state (PI-190).
+
+    Records predating these features (PI-137/PI-145/PI-146, ADR-010 cutover)
+    re-render faithfully with them off. One source so migration and backfill
+    can't disagree on the ~16 keys they otherwise hand-built identically.
+    """
+    return {
+        "devcontainer": "",
+        "mise": "",
+        "vscode": "",
+        "agents": "claude",
+        "codex": "",
+        "gemini": "",
+        "ollama": "",
+        "multi_agent": "",
+        "other_agents": "",
+        "plugin_mode": "",
+        "no_plugin": "true",
+        "project_owner": "",
+        "license": "none",
+        "license_mit": "",
+        "license_apache": "",
+        "license_proprietary": "",
+    }
+
+
 class UpgradeError(Exception):
     """Raised when the project cannot be upgraded (missing/invalid config)."""
 
@@ -265,30 +292,12 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "justfile": "true" if language != "none" else "",
-        # Opt-in overlays (PI-146/PI-140) postdate pre-record configs:
-        # faithful as off.
-        "devcontainer": "",
-        "mise": "",
-        "vscode": "",
+        # Opt-in overlays + governance postdate pre-record configs — faithful as
+        # off; shared with backfill (PI-190). A pre-record config also predates
+        # vscode, so vscode_off is simply on.
+        **_overlay_off_defaults(),
         "vscode_off": "true",
-        "agents": "claude",
-        "codex": "",
-        "gemini": "",
-        "ollama": "",
-        "multi_agent": "",
-        "other_agents": "",
-        # Pre-cutover scaffolds shipped the file copies (ADR-010), so the
-        # faithful backfill is the fallback mode, not plugin mode.
-        "plugin_mode": "",
-        "no_plugin": "true",
-        # Governance (PI-145) postdates pre-record configs: those projects
-        # were scaffolded without a license or owner, so these are faithful.
-        "project_owner": "",
-        "license": "none",
         "license_holder": fields.get("project.name", ""),
-        "license_mit": "",
-        "license_apache": "",
-        "license_proprietary": "",
         "created_year": fields.get("project.created", "").split("-")[0],
         **_MIGRATION_DEFAULTS,
     }
@@ -319,24 +328,9 @@ def _backfill_variables(variables: dict) -> dict:
         "license_holder": v.get("project_owner") or v.get("project_name", ""),
         "created_year": v.get("created_date", "").split("-")[0],
         "vscode_off": "" if v.get("vscode") else "true",
-        # Opt-in features default off — they postdate the record.
-        "devcontainer": "",
-        "mise": "",
-        "vscode": "",
-        "agents": "claude",
-        "codex": "",
-        "gemini": "",
-        "ollama": "",
-        "multi_agent": "",
-        "other_agents": "",
-        # Records written before the cutover (ADR-010) shipped file copies.
-        "plugin_mode": "",
-        "no_plugin": "true",
-        "project_owner": "",
-        "license": "none",
-        "license_mit": "",
-        "license_apache": "",
-        "license_proprietary": "",
+        # Opt-in overlays + governance default off — they postdate the record;
+        # shared with migration (PI-190).
+        **_overlay_off_defaults(),
         **_MIGRATION_DEFAULTS,
     }
     for flag in _LANGUAGE_FLAGS:
