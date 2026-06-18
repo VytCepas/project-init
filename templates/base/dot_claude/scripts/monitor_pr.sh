@@ -28,6 +28,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/gh_host.sh"
+
 PR_NUMBER="${1:-}"
 MODE="${2:-}"
 REVIEW_CYCLE=0
@@ -118,6 +122,15 @@ _run_gh() {
 }
 
 _admin_merge() {
+  # Hard enforcement must bind under the org profile (ADR-013/#251): admin-merge
+  # bypasses the server-side rules, so it is refused — use auto-merge / the merge
+  # queue under the required checks instead. gh_profile comes from gh_host.sh.
+  if [ "$(gh_profile)" = "org" ]; then
+    echo "ERROR: admin-merge is refused under the org profile (#251) — hard" >&2
+    echo "  enforcement must bind. Use auto-merge or the merge queue under the" >&2
+    echo "  required checks, or resolve the blocking review/checks." >&2
+    return 1
+  fi
   if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --admin; then
     echo "Merged PR #$PR_NUMBER (admin)"
   else
