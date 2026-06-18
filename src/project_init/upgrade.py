@@ -99,6 +99,8 @@ def _overlay_off_defaults() -> dict[str, str]:
         "other_agents": "",
         "plugin_mode": "",
         "no_plugin": "true",
+        "profile": "individual",
+        "enforcement": "advisory",
         "project_owner": "",
         "license": "none",
         "license_mit": "",
@@ -529,6 +531,10 @@ def run_upgrade(target: Path, *, apply: bool, no_plugin: bool = False) -> int:
 
     variables = dict(variables)
     variables["project_init_version"] = __version__
+    # Backfill profile/enforcement for pre-#247 records so the strict re-render
+    # (config.yaml.tmpl references {{profile}}) never crashes on old projects.
+    variables.setdefault("profile", "individual")
+    variables.setdefault("enforcement", "advisory")
 
     staging_root = Path(tempfile.mkdtemp(prefix="project-init-upgrade-"))
     staging = staging_root / "render"

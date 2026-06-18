@@ -45,6 +45,7 @@ class ScaffoldInputs:
     vscode: bool
     agents: list[str]
     no_plugin: bool
+    profile: str
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -143,6 +144,16 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--profile",
+        choices=["individual", "standalone", "org"],
+        default=None,
+        help=(
+            "Distribution profile (ADR-013): individual (default — plugin-first, "
+            "track upstream, advisory), standalone (copied-in, owner-driven, "
+            "pinned), org (fork source-of-truth, hard enforcement)"
+        ),
+    )
+    p.add_argument(
         "--non-interactive",
         action="store_true",
         help="Skip all prompts (requires --preset, --name, --description)",
@@ -233,6 +244,23 @@ def _choose_browser_interactive() -> bool:
     return Confirm.ask("\nAdd Playwright (browser automation)?", default=False)
 
 
+def _choose_profile_interactive() -> str:
+    """Present the three distribution profiles and what each bundles (#247)."""
+    from rich.console import Console
+    from rich.prompt import IntPrompt
+
+    console = Console()
+    console.print("\n[bold]Distribution profile[/bold] (ADR-013):")
+    for i, name in enumerate(_PROFILES, 1):
+        console.print(f"  [cyan]{i}[/cyan]. {name} — {_PROFILE_SUMMARY[name]}")
+    console.print()
+    choice = IntPrompt.ask("Choose a profile", default=1)
+    if choice < 1 or choice > len(_PROFILES):
+        console.print("[red]Invalid choice. Using individual.[/red]")
+        choice = 1
+    return _PROFILES[choice - 1]
+
+
 def _resolve_mcps_non_interactive(
     mcps_arg: str,
     db_arg: str,
@@ -294,6 +322,26 @@ def _print_summary(target: Path, created: list[Path], preset_name: str) -> None:
     console.print()
     console.print(Panel(body.rstrip(), title="project-init", border_style="green"))
     console.print()
+
+
+def _print_profile_notice(profile: str, *, no_plugin: bool) -> None:
+    """Surface the resolved profile and its egress posture (#247).
+
+    Called on the non-interactive path so a default is never applied silently:
+    it states the profile, the delivery/egress state, and the enforcement mode.
+    """
+    from rich.console import Console
+
+    delivery = (
+        "copied-in, no external marketplace"
+        if no_plugin
+        else "plugin-first, external official marketplace enabled (network egress)"
+    )
+    Console().print(
+        f"[cyan]Profile:[/cyan] {profile} — {_PROFILE_SUMMARY[profile]}\n"
+        f"[cyan]Delivery:[/cyan] {delivery}; "
+        f"[cyan]enforcement:[/cyan] {_profile_enforcement(profile)}"
+    )
 
 
 def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
@@ -361,8 +409,12 @@ def _select_preset(
     return _choose_preset_interactive(presets)
 
 
-def _gather_inputs_interactive(default_name: str, *, no_plugin: bool) -> ScaffoldInputs:
-    """Prompt for project basics, MCPs, governance, and opt-in overlays."""
+def _gather_inputs_interactive(
+    default_name: str, *, no_plugin: bool, profile: str | None
+) -> ScaffoldInputs:
+    """Prompt for the profile, project basics, MCPs, governance, and overlays."""
+    resolved_profile = profile or _choose_profile_interactive()
+    no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
     project_name = _prompt("Project name", default=default_name)
     project_description = _prompt("Description", default="")
     language = _prompt("Language (python/node/go/none)", default="none")
@@ -414,6 +466,7 @@ def _gather_inputs_interactive(default_name: str, *, no_plugin: bool) -> Scaffol
         vscode=vscode,
         agents=agents,
         no_plugin=no_plugin,
+        profile=resolved_profile,
     )
 
 
@@ -435,6 +488,41 @@ def resolve_agents(raw: str) -> list[str]:
 def agent_layers(agents: list[str]) -> list[str]:
     """Template layers contributed by the selected agents (no fallback)."""
     return overlay_layers(agents, no_plugin=False)
+
+
+_PROFILES = ("individual", "standalone", "org")
+
+# One-line summary of what each profile bundles — shown at selection time and in
+# the non-interactive notice so the choice is never silent (ADR-013, #247).
+_PROFILE_SUMMARY = {
+    "individual": (
+        "plugin-first (external official marketplace), track upstream, advisory "
+        "enforcement — today's default"
+    ),
+    "standalone": (
+        "copied-in (no external marketplace), owner-driven pinned updates, "
+        "advisory enforcement"
+    ),
+    "org": (
+        "fork as source-of-truth, host-adaptive delivery, hard (server-side) "
+        "enforcement"
+    ),
+}
+
+
+def _profile_delivery_no_plugin(profile: str, explicit_no_plugin: bool) -> bool:
+    """Resolve copied-in vs plugin delivery for a profile.
+
+    ``standalone`` is copied-in by definition; ``individual``/``org`` default to
+    plugin delivery (``org``'s copied-in-on-EMU is decided host-side, #248). An
+    explicit ``--no-plugin`` always forces copied-in.
+    """
+    return explicit_no_plugin or profile == "standalone"
+
+
+def _profile_enforcement(profile: str) -> str:
+    """Profile-derived enforcement default (the enforcing behavior lands in #251)."""
+    return "hard" if profile == "org" else "advisory"
 
 
 # Per-language tooling commands (PI-16): (lint, format, test). Empty strings
@@ -542,6 +630,10 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "ollama": "true" if "ollama" in agents else "",
         "multi_agent": "true" if ("codex" in agents or "gemini" in agents) else "",
         "other_agents": "true" if len(agents) > 1 else "",
+        # Distribution profile (ADR-013, #247): recorded + drives the delivery
+        # and enforcement defaults. The enforcing behavior lands in #251.
+        "profile": inputs.profile,
+        "enforcement": _profile_enforcement(inputs.profile),
         # Plugin cutover (PI-165): inverse pair, same pattern as vscode_off.
         "plugin_mode": "" if no_plugin else "true",
         "no_plugin": "true" if no_plugin else "",
@@ -571,6 +663,9 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         agents = resolve_agents(args.agents)
     except ValueError as e:
         parser.error(str(e))
+    profile = args.profile or "individual"
+    no_plugin = _profile_delivery_no_plugin(profile, args.no_plugin)
+    _print_profile_notice(profile, no_plugin=no_plugin)
     return ScaffoldInputs(
         project_name=args.name,
         project_description=args.description,
@@ -582,7 +677,8 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         mise=args.mise,
         vscode=args.vscode,
         agents=agents,
-        no_plugin=args.no_plugin,
+        no_plugin=no_plugin,
+        profile=profile,
     )
 
 
@@ -612,7 +708,9 @@ def main(argv: list[str] | None = None) -> int:
     # interactive prompt must not leave an empty dir behind).
     inputs = _resolve_inputs(args, parser, target)
     if inputs is None:
-        inputs = _gather_inputs_interactive(default_name=target.name, no_plugin=args.no_plugin)
+        inputs = _gather_inputs_interactive(
+            default_name=target.name, no_plugin=args.no_plugin, profile=args.profile
+        )
     target.mkdir(parents=True, exist_ok=True)
 
     # Agent overlays append to the preset's layers (PI-137); --no-plugin

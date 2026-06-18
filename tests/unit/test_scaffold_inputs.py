@@ -36,7 +36,8 @@ def test_resolve_inputs_none_when_interactive():
 
 def test_scaffold_inputs_is_frozen():
     si = ScaffoldInputs(
-        "n", "d", "python", [], "", "none", False, False, False, ["claude"], False
+        "n", "d", "python", [], "", "none", False, False, False, ["claude"], False,
+        "individual",
     )
     with pytest.raises(dataclasses.FrozenInstanceError):
         si.project_name = "x"  # type: ignore[misc]
