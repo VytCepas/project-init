@@ -683,12 +683,39 @@ def _print_addition_gate(groups: dict, undecided: set) -> None:
     )
 
 
-def _print_addition_summary(groups: dict, gate: dict) -> None:
-    """Summarize addition groups and their accept/decline/undecided status."""
+def _parse_version(value: str | None) -> tuple[int, int, int] | None:
+    """Parse a leading ``X.Y.Z`` (optional ``v`` prefix) into a tuple."""
+    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", value or "")
+    return (int(m[1]), int(m[2]), int(m[3])) if m else None
+
+
+def _describe_version_span(prev: str | None, current: str | None) -> str:
+    """Human description of the version span an upgrade crosses (#250)."""
+    p, c = _parse_version(prev), _parse_version(current)
+    if not p or not c or p == c:
+        return ""
+    if c < p:
+        return f"v{prev} → v{current} (downgrade)"
+    level = "major" if c[0] > p[0] else "minor" if c[1] > p[1] else "patch"
+    return f"v{prev} → v{current} ({level} update)"
+
+
+def _print_addition_summary(groups: dict, gate: dict, span: str = "") -> None:
+    """Frame addition groups as opt-in recommendations (#249/#250).
+
+    Pull-and-recommend: new additions are surfaced with the version span they
+    arrived in and are *never* auto-applied — the owner adopts or skips each.
+    """
     from rich.console import Console
 
     console = Console()
-    console.print("\n[bold]addition groups[/bold] (#249):")
+    header = "recommended additions" if span else "addition groups"
+    suffix = f" — {span}" if span else ""
+    console.print(f"\n[bold]{header}{suffix}[/bold] (#250):")
+    console.print(
+        "[dim]Recommendations only — adopt with --accept-new, skip with "
+        "--decline-new; never auto-applied.[/dim]"
+    )
     for gid in sorted(groups):
         if gid in gate["declined_now"]:
             status = "declined"
@@ -779,7 +806,11 @@ def run_upgrade(
             _write_declined(target, gate["declined_map"])
         _print_report(report, applied=apply)
         if groups:
-            _print_addition_summary(groups, gate)
+            span = _describe_version_span(
+                variables.get("project_init_version_prev"),
+                variables.get("project_init_version"),
+            )
+            _print_addition_summary(groups, gate, span)
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
     return 0
