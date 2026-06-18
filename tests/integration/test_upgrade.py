@@ -118,6 +118,24 @@ class TestDirtyTreeGuard:
         assert rc == 0
         assert "repository" in capsys.readouterr().out
 
+    def test_undo_hint_scoped_to_subdir_target(self, tmp_path: Path, capsys):
+        # Target is a clean subdir of a repo with a dirty *sibling*: the guard
+        # passes (subtree clean), but the undo hint must scope to the target so
+        # following it can't discard the sibling's edits (#242 review).
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        self._git(repo, "init", "-q")
+        sub = repo / "proj"
+        _scaffold(sub)
+        self._git(repo, "add", "-A")
+        self._git(repo, "commit", "-q", "-m", "init")
+        sibling = repo / "sibling.txt"
+        sibling.write_text("dirty sibling edit\n")  # outside the target subtree
+        rc = main(["upgrade", str(sub), "--apply"])
+        assert rc == 0  # subdir is clean → guard passes despite the dirty sibling
+        assert "git -C" in capsys.readouterr().out  # undo hint scoped to target
+        assert sibling.read_text() == "dirty sibling edit\n"  # sibling untouched
+
 
 class TestScaffoldRecord:
     def test_record_written_and_round_trips(self, tmp_path: Path):

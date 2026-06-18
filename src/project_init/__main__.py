@@ -631,7 +631,7 @@ def _upgrade_main(argv: list[str]) -> int:
     git_status = None
     if args.apply:
         git_status = _git_worktree_status(target)
-        blocked = _enforce_clean_tree(git_status, allow_dirty=args.allow_dirty)
+        blocked = _enforce_clean_tree(git_status, allow_dirty=args.allow_dirty, target=target)
         if blocked is not None:
             return blocked
 
@@ -643,7 +643,7 @@ def _upgrade_main(argv: list[str]) -> int:
         decline_new=args.decline_new,
     )
     if args.apply and rc == 0:
-        _print_undo_hint(git_status)
+        _print_undo_hint(git_status, target)
     return rc
 
 

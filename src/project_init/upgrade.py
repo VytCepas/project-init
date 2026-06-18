@@ -765,12 +765,32 @@ def _git_worktree_status(target: Path) -> str | None:
     return status.stdout
 
 
-def _enforce_clean_tree(status: str | None, *, allow_dirty: bool) -> int | None:
+def _git_prefix(target: Path) -> str:
+    """Return ``git`` for an in-place target, else ``git -C <target>``.
+
+    Printed restore/diff/commit hints must act on the upgraded subtree only —
+    the guard checks the target with ``-- .``, so a clean subdir can pass even
+    when sibling paths in the wider repo are dirty (#242 review). A bare
+    ``git restore .`` from the repo root would then discard those untouched
+    siblings; the ``-C <target>`` form keeps each command scoped to what the
+    upgrade actually changed.
+    """
+    try:
+        if target == Path.cwd():
+            return "git"
+    except OSError:
+        pass
+    return f"git -C {target}"
+
+
+def _enforce_clean_tree(status: str | None, *, allow_dirty: bool, target: Path) -> int | None:
     """Gate ``--apply`` on a clean work tree (#242); print guidance.
 
     Return an exit code to abort with, or None to proceed. A clean tree means
     the apply lands as the only uncommitted change, so it is trivially
-    reviewable and revertible (see _print_undo_hint).
+    reviewable and revertible (see _print_undo_hint). Printed git commands are
+    scoped to *target* so they never touch dirty repo siblings the guard left
+    alone.
     """
     from rich.console import Console
 
@@ -792,39 +812,43 @@ def _enforce_clean_tree(status: str | None, *, allow_dirty: bool) -> int | None:
             "[bold]git diff[/bold]."
         )
         return None
+    gx = _git_prefix(target)
     console.print(
         "[bold red]Upgrade blocked[/bold red] — the git work tree has "
         "uncommitted changes. Commit or stash them first so the upgrade lands "
         "as a single, reviewable, revertible diff:\n"
-        "  [bold]git add -A && git commit[/bold]   (or [bold]git stash[/bold])\n"
+        f"  [bold]{gx} add . && {gx} commit[/bold]   (or [bold]{gx} stash[/bold])\n"
         "then re-run [bold]project-init upgrade --apply[/bold]. Override with "
         "[bold]--force[/bold] (not recommended)."
     )
     return _DIRTY_TREE_EXIT
 
 
-def _print_undo_hint(status: str | None) -> None:
+def _print_undo_hint(status: str | None, target: Path) -> None:
     """Show how to review or revert a just-applied upgrade (#242).
 
     *status* is the pre-apply work-tree state from _git_worktree_status: a clean
-    tree (``""``) makes a blanket ``git restore`` safe; a dirty tree means
+    tree (``""``) makes a scoped ``git restore`` safe; a dirty tree means
     --force was used and the upgrade is intermixed with the user's earlier
-    edits, so only a review hint is shown. None (not git) prints nothing.
+    edits, so only a review hint is shown. None (not git) prints nothing. Git
+    commands are scoped to *target* so the restore can't touch dirty repo
+    siblings the guard left alone.
     """
     from rich.console import Console
 
     console = Console()
     if status is None:
         return
+    gx = _git_prefix(target)
     if not status.strip():
         console.print(
-            "\n[dim]↩ Undo this upgrade:[/dim] review with [bold]git diff[/bold], "
-            "then discard edits with [bold]git restore .[/bold] and delete any "
-            "newly added files listed by [bold]git status[/bold]."
+            f"\n[dim]↩ Undo this upgrade:[/dim] review with [bold]{gx} diff[/bold], "
+            f"then discard edits with [bold]{gx} restore .[/bold] and delete any "
+            f"newly added files listed by [bold]{gx} status[/bold]."
         )
     else:
         console.print(
-            "\n[dim]↩ Review this upgrade with [bold]git diff[/bold][/dim] — it is "
+            f"\n[dim]↩ Review this upgrade with [bold]{gx} diff[/bold][/dim] — it is "
             "intermixed with your earlier uncommitted changes, so do not "
             "blanket-restore."
         )
