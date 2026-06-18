@@ -523,10 +523,7 @@ _PROFILE_SUMMARY = {
         "advisory enforcement (external official marketplace still enabled — "
         "full no-egress is the org mode, #258)"
     ),
-    "org": (
-        "fork as source-of-truth, host-adaptive delivery, hard (server-side) "
-        "enforcement"
-    ),
+    "org": ("fork as source-of-truth, host-adaptive delivery, hard (server-side) enforcement"),
 }
 
 
@@ -559,7 +556,12 @@ _LANGUAGE_COMMANDS: dict[str, tuple[str, str, str]] = {
 
 def _upgrade_main(argv: list[str]) -> int:
     """Parse and run the `project-init upgrade` subcommand (PI-142)."""
-    from project_init.upgrade import run_upgrade
+    from project_init.upgrade import (
+        _enforce_clean_tree,
+        _git_worktree_status,
+        _print_undo_hint,
+        run_upgrade,
+    )
 
     p = argparse.ArgumentParser(
         prog="project-init upgrade",
@@ -609,14 +611,40 @@ def _upgrade_main(argv: list[str]) -> int:
             "--apply unless it changes materially ('all' declines every new group)"
         ),
     )
+    p.add_argument(
+        "--force",
+        "--allow-dirty",
+        action="store_true",
+        dest="allow_dirty",
+        help=(
+            "Apply onto a dirty git work tree, bypassing the clean-tree guard "
+            "(#242). Not recommended — the upgrade is then intermixed with your "
+            "uncommitted edits in git diff. (--allow-dirty is an alias.)"
+        ),
+    )
     args = p.parse_args(argv)
-    return run_upgrade(
-        Path(args.target).resolve(),
+    target = Path(args.target).resolve()
+
+    # Clean-tree guard (#242): refuse --apply on a dirty git work tree so the
+    # upgrade lands as one revertible diff. A CLI-layer precondition — kept out
+    # of run_upgrade so programmatic callers manage their own safety.
+    git_status = None
+    if args.apply:
+        git_status = _git_worktree_status(target)
+        blocked = _enforce_clean_tree(git_status, allow_dirty=args.allow_dirty, target=target)
+        if blocked is not None:
+            return blocked
+
+    rc = run_upgrade(
+        target,
         apply=args.apply,
         no_plugin=args.no_plugin,
         accept_new=args.accept_new,
         decline_new=args.decline_new,
     )
+    if args.apply and rc == 0:
+        _print_undo_hint(git_status, target)
+    return rc
 
 
 def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
@@ -745,9 +773,7 @@ def _preset_main(argv: list[str]) -> int:
         description="Author company presets (inheritance, compat markers) — #252.",
     )
     sub = p.add_subparsers(dest="cmd", required=True)
-    new = sub.add_parser(
-        "new", help="Generate a starter company preset that extends a base preset"
-    )
+    new = sub.add_parser("new", help="Generate a starter company preset that extends a base preset")
     new.add_argument("name", help="New preset name (bare stem, e.g. acme-backend)")
     new.add_argument("--extends", required=True, help="Base preset to extend")
     new.add_argument("--description", default="", help="One-line description")

@@ -29,6 +29,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -83,6 +84,7 @@ def _migrate_removed_preset(preset_name: str, variables: dict) -> tuple[str, dic
     variables["graphify"] = "true" if "graphify" in successor else ""
     variables.pop("lightrag", None)
     return successor, variables
+
 
 _LANGUAGE_FLAGS = ("python", "node", "go")
 
@@ -398,9 +400,7 @@ def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Pa
     return scaffold(staging, preset, variables, strict=True)
 
 
-def compute_drift(
-    target: Path, staging: Path, rendered: list[Path], manifest: dict
-) -> DriftReport:
+def compute_drift(target: Path, staging: Path, rendered: list[Path], manifest: dict) -> DriftReport:
     """Compare the staged re-render against the project tree."""
     report = DriftReport(rendered=list(rendered))
     rendered_set = {rel.as_posix() for rel in rendered}
@@ -496,9 +496,7 @@ def apply_drift(
     config_path = target / _CONFIG_REL
     if config_path.exists():
         text = config_path.read_text(encoding="utf-8")
-        text = _VERSION_LINE_RE.sub(
-            rf"\g<1>{variables['project_init_version']}", text, count=1
-        )
+        text = _VERSION_LINE_RE.sub(rf"\g<1>{variables['project_init_version']}", text, count=1)
         text = _ensure_observability_fields(text, variables)
         config_path.write_text(text, encoding="utf-8")
 
@@ -507,8 +505,7 @@ def apply_drift(
     applied = [
         rel
         for rel in report.rendered
-        if (target / rel).is_file()
-        and (target / rel).read_bytes() == (staging / rel).read_bytes()
+        if (target / rel).is_file() and (target / rel).read_bytes() == (staging / rel).read_bytes()
     ]
     write_scaffold_record(target, preset_name, variables, applied)
 
@@ -728,8 +725,132 @@ def _print_addition_summary(groups: dict, gate: dict, span: str = "") -> None:
             status = "undecided"
         group = groups[gid]
         console.print(
-            f"  [cyan]{gid}[/cyan] [{status}] — {group['rationale']} "
-            f"({len(group['paths'])} files)"
+            f"  [cyan]{gid}[/cyan] [{status}] — {group['rationale']} ({len(group['paths'])} files)"
+        )
+
+
+# --- Clean-tree guard for --apply (#242) -----------------------------------
+
+# Exit code when --apply is blocked by a dirty git work tree. Distinct from the
+# addition-consent gate (2) so callers can tell the two preconditions apart.
+_DIRTY_TREE_EXIT = 3
+
+
+def _git_worktree_status(target: Path) -> str | None:
+    """Return *target*'s porcelain work-tree status, or None when not under git.
+
+    ``""`` means a clean subtree, a non-empty string means dirty, and None means
+    *target* is not inside a git work tree (or git is unavailable) — callers
+    read None as "cannot guard, and no git-based undo to offer". Scoped to
+    *target* (``-- .``) so unrelated changes elsewhere in a monorepo do not
+    block an upgrade that only writes here.
+    """
+    try:
+        inside = subprocess.run(
+            ["git", "-C", str(target), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None  # git not installed
+    if inside.returncode != 0 or inside.stdout.strip() != "true":
+        return None
+    status = subprocess.run(
+        ["git", "-C", str(target), "status", "--porcelain", "--", "."],
+        capture_output=True,
+        text=True,
+    )
+    if status.returncode != 0:
+        return None
+    return status.stdout
+
+
+def _git_prefix(target: Path) -> str:
+    """Return ``git`` for an in-place target, else ``git -C <target>``.
+
+    Printed restore/diff/commit hints must act on the upgraded subtree only —
+    the guard checks the target with ``-- .``, so a clean subdir can pass even
+    when sibling paths in the wider repo are dirty (#242 review). A bare
+    ``git restore .`` from the repo root would then discard those untouched
+    siblings; the ``-C <target>`` form keeps each command scoped to what the
+    upgrade actually changed.
+    """
+    try:
+        if target == Path.cwd():
+            return "git"
+    except OSError:
+        pass
+    return f"git -C {target}"
+
+
+def _enforce_clean_tree(status: str | None, *, allow_dirty: bool, target: Path) -> int | None:
+    """Gate ``--apply`` on a clean work tree (#242); print guidance.
+
+    Return an exit code to abort with, or None to proceed. A clean tree means
+    the apply lands as the only uncommitted change, so it is trivially
+    reviewable and revertible (see _print_undo_hint). Printed git commands are
+    scoped to *target* so they never touch dirty repo siblings the guard left
+    alone.
+    """
+    from rich.console import Console
+
+    console = Console()
+    if status is None:
+        console.print(
+            "[yellow]note:[/yellow] target is not a git repository, or git "
+            "status could not be determined — applying without a clean-tree "
+            "guard and no git-based undo. If it should be a git repo, "
+            "initialize and commit first."
+        )
+        return None
+    if not status.strip():
+        return None
+    if allow_dirty:
+        console.print(
+            "[yellow]--force:[/yellow] proceeding on a dirty work tree; "
+            "your uncommitted changes and the upgrade will be intermixed in "
+            "[bold]git diff[/bold]."
+        )
+        return None
+    gx = _git_prefix(target)
+    console.print(
+        "[bold red]Upgrade blocked[/bold red] — the git work tree has "
+        "uncommitted changes. Commit or stash them first so the upgrade lands "
+        "as a single, reviewable, revertible diff:\n"
+        f"  [bold]{gx} add . && {gx} commit[/bold]   (or [bold]{gx} stash[/bold])\n"
+        "then re-run [bold]project-init upgrade --apply[/bold]. Override with "
+        "[bold]--force[/bold] (not recommended)."
+    )
+    return _DIRTY_TREE_EXIT
+
+
+def _print_undo_hint(status: str | None, target: Path) -> None:
+    """Show how to review or revert a just-applied upgrade (#242).
+
+    *status* is the pre-apply work-tree state from _git_worktree_status: a clean
+    tree (``""``) makes a scoped ``git restore`` safe; a dirty tree means
+    --force was used and the upgrade is intermixed with the user's earlier
+    edits, so only a review hint is shown. None (not git) prints nothing. Git
+    commands are scoped to *target* so the restore can't touch dirty repo
+    siblings the guard left alone.
+    """
+    from rich.console import Console
+
+    console = Console()
+    if status is None:
+        return
+    gx = _git_prefix(target)
+    if not status.strip():
+        console.print(
+            f"\n[dim]↩ Undo this upgrade:[/dim] review with [bold]{gx} diff[/bold], "
+            f"then discard edits with [bold]{gx} restore .[/bold] and delete any "
+            f"newly added files listed by [bold]{gx} status[/bold]."
+        )
+    else:
+        console.print(
+            f"\n[dim]↩ Review this upgrade with [bold]{gx} diff[/bold][/dim] — it is "
+            "intermixed with your earlier uncommitted changes, so do not "
+            "blanket-restore."
         )
 
 
@@ -746,6 +867,9 @@ def run_upgrade(
     *no_plugin* switches the project to the fallback mode on this run:
     the re-render carries copied hooks/skills and local settings wiring,
     surfacing as new/changed files in the report.
+
+    The clean-tree guard and post-apply undo hint (#242) live in the CLI layer
+    (_upgrade_main), not here, so programmatic callers manage their own safety.
     """
     import sys
 
