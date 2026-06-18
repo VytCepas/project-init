@@ -108,6 +108,8 @@ def _overlay_off_defaults() -> dict[str, str]:
         "no_plugin": "true",
         "profile": "individual",
         "enforcement": "advisory",
+        "no_egress": "",
+        "egress_ok": "true",
         "project_owner": "",
         "license": "none",
         "license_mit": "",

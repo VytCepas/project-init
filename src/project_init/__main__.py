@@ -47,6 +47,7 @@ class ScaffoldInputs:
     agents: list[str]
     no_plugin: bool
     profile: str
+    no_egress: bool = False
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -152,6 +153,15 @@ def _build_parser() -> argparse.ArgumentParser:
             "Distribution profile (ADR-013): individual (default — plugin-first, "
             "track upstream, advisory), standalone (copied-in, owner-driven, "
             "pinned), org (fork source-of-truth, hard enforcement)"
+        ),
+    )
+    p.add_argument(
+        "--no-egress",
+        action="store_true",
+        help=(
+            "Org no-egress mode: omit the external official marketplace "
+            "(claude-plugins-official) and its plugins from scaffolded settings "
+            "(ADR-013, #258). The project-init/fork marketplace is kept"
         ),
     )
     p.add_argument(
@@ -325,26 +335,25 @@ def _print_summary(target: Path, created: list[Path], preset_name: str) -> None:
     console.print()
 
 
-def _print_profile_notice(profile: str, *, no_plugin: bool) -> None:
-    """Surface the resolved profile and its egress posture (#247).
+def _print_profile_notice(profile: str, *, no_plugin: bool, no_egress: bool) -> None:
+    """Surface the resolved profile and its egress posture (#247/#258).
 
     Called on the non-interactive path so a default is never applied silently:
-    it states the profile, the delivery/egress state, and the enforcement mode.
+    it states the profile, the delivery, the egress posture, and enforcement.
     """
     from rich.console import Console
 
-    # Honest egress: --no-plugin only copies project-init's own payload locally;
-    # the external official marketplace stays enabled in every mode until the
-    # org no-egress mode (#258) disables it.
-    delivery = (
-        "project-init copied in locally; external official marketplace still "
-        "enabled (network egress)"
-        if no_plugin
-        else "plugin-first; external official marketplace enabled (network egress)"
+    delivery = "project-init copied in locally" if no_plugin else "plugin-first"
+    # --no-plugin only copies project-init's own payload; the external official
+    # marketplace stays enabled until no-egress mode (#258) omits it.
+    egress = (
+        "external official marketplace disabled (no egress)"
+        if no_egress
+        else "external official marketplace enabled (network egress)"
     )
     Console().print(
         f"[cyan]Profile:[/cyan] {profile} — {_PROFILE_SUMMARY[profile]}\n"
-        f"[cyan]Delivery:[/cyan] {delivery}; "
+        f"[cyan]Delivery:[/cyan] {delivery}; {egress}; "
         f"[cyan]enforcement:[/cyan] {_profile_enforcement(profile)}"
     )
 
@@ -415,7 +424,7 @@ def _select_preset(
 
 
 def _gather_inputs_interactive(
-    default_name: str, *, no_plugin: bool, profile: str | None
+    default_name: str, *, no_plugin: bool, profile: str | None, no_egress: bool = False
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays."""
     resolved_profile = profile or _choose_profile_interactive()
@@ -472,6 +481,7 @@ def _gather_inputs_interactive(
         agents=agents,
         no_plugin=no_plugin,
         profile=resolved_profile,
+        no_egress=no_egress,
     )
 
 
@@ -646,6 +656,10 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         # and enforcement defaults. The enforcing behavior lands in #251.
         "profile": inputs.profile,
         "enforcement": _profile_enforcement(inputs.profile),
+        # No-egress mode (#258): omit the external official marketplace. egress_ok
+        # is the inverse flag the template gates on (the engine has no else-branch).
+        "no_egress": "true" if inputs.no_egress else "",
+        "egress_ok": "" if inputs.no_egress else "true",
         # Plugin cutover (PI-165): inverse pair, same pattern as vscode_off.
         "plugin_mode": "" if no_plugin else "true",
         "no_plugin": "true" if no_plugin else "",
@@ -677,7 +691,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         parser.error(str(e))
     profile = args.profile or "individual"
     no_plugin = _profile_delivery_no_plugin(profile, args.no_plugin)
-    _print_profile_notice(profile, no_plugin=no_plugin)
+    _print_profile_notice(profile, no_plugin=no_plugin, no_egress=args.no_egress)
     return ScaffoldInputs(
         project_name=args.name,
         project_description=args.description,
@@ -691,6 +705,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         agents=agents,
         no_plugin=no_plugin,
         profile=profile,
+        no_egress=args.no_egress,
     )
 
 
@@ -721,7 +736,10 @@ def main(argv: list[str] | None = None) -> int:
     inputs = _resolve_inputs(args, parser, target)
     if inputs is None:
         inputs = _gather_inputs_interactive(
-            default_name=target.name, no_plugin=args.no_plugin, profile=args.profile
+            default_name=target.name,
+            no_plugin=args.no_plugin,
+            profile=args.profile,
+            no_egress=args.no_egress,
         )
     target.mkdir(parents=True, exist_ok=True)
 

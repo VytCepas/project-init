@@ -4,22 +4,22 @@
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70"
   },
   "extraKnownMarketplaces": {
-    "claude-plugins-official": {
+    {{#if egress_ok}}"claude-plugins-official": {
       "source": {
         "source": "github",
         "repo": "anthropics/claude-plugins-official"
       }
     },
-    "project-init": {
+    {{/if egress_ok}}"project-init": {
       "source": {
         {{#if project_init_github}}"source": "github", "repo": "{{project_init_repo}}"{{/if project_init_github}}{{#if project_init_enterprise}}"source": "git", "url": "{{project_init_repo_url}}"{{/if project_init_enterprise}}
       }
     }
   },
   "enabledPlugins": {
-    "security-guidance@claude-plugins-official": true,
+    {{#if egress_ok}}"security-guidance@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true{{#if plugin_mode}},
-    "project-init-workflow@project-init": true{{/if plugin_mode}}
+    {{/if plugin_mode}}{{/if egress_ok}}{{#if plugin_mode}}"project-init-workflow@project-init": true{{/if plugin_mode}}
   }{{#if no_plugin}},
   "hooks": {
     "SessionStart": [
