@@ -22,6 +22,7 @@ nav:
   - Home: README.md
   - Guide:
     - Using project-init: guides/using-project-init.md
+    - Org fork lifecycle (runbook): guides/org-fork-lifecycle.md
   - Architecture Decisions:
     - Overview: adr/adr-001-scaffolder-design.md
     - dot_ prefix convention: adr/adr-002-dotglob-template-convention.md
