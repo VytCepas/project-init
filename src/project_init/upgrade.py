@@ -37,10 +37,12 @@ from pathlib import Path
 from project_init.scaffold import (
     _PRESERVE_DIRS,
     _RECORD_MARKER,
+    _matches_preserve_glob,
     _new_sibling,
     load_preset,
     marketplace_source_vars,
     overlay_layers,
+    read_preserve_globs,
     scaffold,
 )
 
@@ -146,8 +148,10 @@ def _hash_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _is_preserved(rel: Path) -> bool:
-    return any(part in _PRESERVE_DIRS for part in rel.parts)
+def _is_preserved(rel: Path, preserve_globs: list[str] | None = None) -> bool:
+    if any(part in _PRESERVE_DIRS for part in rel.parts):
+        return True
+    return _matches_preserve_glob(rel, preserve_globs or [])
 
 
 def _strip_record(text: str) -> str:
@@ -174,9 +178,10 @@ def write_scaffold_record(
     if not config_path.exists():
         return
 
+    preserve_globs = read_preserve_globs(target)
     manifest: dict[str, str] = {}
     for rel in sorted(set(created)):
-        if rel == _CONFIG_REL or _is_preserved(rel):
+        if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
             continue
         path = target / rel
         if path.is_file():
@@ -404,9 +409,10 @@ def compute_drift(target: Path, staging: Path, rendered: list[Path], manifest: d
     """Compare the staged re-render against the project tree."""
     report = DriftReport(rendered=list(rendered))
     rendered_set = {rel.as_posix() for rel in rendered}
+    preserve_globs = read_preserve_globs(target)
 
     for rel in sorted(rendered):
-        if rel == _CONFIG_REL or _is_preserved(rel):
+        if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
             continue
         new_bytes = (staging / rel).read_bytes()
         dest = target / rel
@@ -425,8 +431,13 @@ def compute_drift(target: Path, staging: Path, rendered: list[Path], manifest: d
         report.diffs[rel] = diff
 
     for rel_str in sorted(manifest):
-        if rel_str not in rendered_set and (target / rel_str).exists():
-            report.removed.append(Path(rel_str))
+        rel = Path(rel_str)
+        if (
+            rel_str not in rendered_set
+            and (target / rel_str).exists()
+            and not _is_preserved(rel, preserve_globs)
+        ):
+            report.removed.append(rel)
     return report
 
 

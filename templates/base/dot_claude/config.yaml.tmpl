@@ -34,6 +34,11 @@ tooling:
   format_command: "{{format_command}}"
   test_command: "{{test_command}}"
 
+# Extra files never overwritten or reported as drift on `upgrade` (and on
+# `project-init` re-runs) (#243): a single-line JSON array of globs.
+# memory/ and vault/ are always preserved.
+# preserve: ["ci.yml", "justfile", "docs/*.md"]
+
 updates:
   # Addition-group consent state (#249): IDs the owner has declined are stored
   # here and suppressed on future `upgrade --apply` unless the upstream addition

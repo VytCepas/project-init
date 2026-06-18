@@ -137,6 +137,67 @@ class TestDirtyTreeGuard:
         assert sibling.read_text() == "dirty sibling edit\n"  # sibling untouched
 
 
+class TestConfigPreserveList:
+    """#243: config.yaml `preserve:` globs are honored by scaffold + upgrade."""
+
+    @staticmethod
+    def _add_preserve(target: Path, globs: list[str]) -> None:
+        config = target / _CONFIG_REL
+        config.write_text(f"preserve: {json.dumps(globs)}\n" + config.read_text())
+
+    def test_preserve_excludes_from_drift(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._add_preserve(target, ["justfile"])
+        (target / "justfile").write_text("user owns this\n")
+        assert main(["upgrade", str(target)]) == 0
+        assert "No drift" in capsys.readouterr().out  # justfile excluded
+
+    def test_unpreserved_edit_still_drifts(self, tmp_path: Path, capsys):
+        # Control: the same edit without a preserve entry IS reported as drift.
+        target = tmp_path / "p"
+        _scaffold(target)
+        (target / "justfile").write_text("user owns this\n")
+        assert main(["upgrade", str(target)]) == 0
+        assert "No drift" not in capsys.readouterr().out
+
+    def test_glob_pattern_preserves(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._add_preserve(target, ["just*"])  # glob, not an exact name
+        (target / "justfile").write_text("user owns this\n")
+        assert main(["upgrade", str(target)]) == 0
+        assert "No drift" in capsys.readouterr().out
+
+    def test_preserved_file_untouched_on_apply(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._add_preserve(target, ["justfile"])
+        (target / "justfile").write_text("user owns this\n")
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert (target / "justfile").read_text() == "user owns this\n"
+        assert not list(target.glob("justfile.new*"))
+
+    def test_scaffold_honors_preserve_on_rerun(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._add_preserve(target, ["justfile"])
+        (target / "justfile").write_text("user owns this\n")
+        _scaffold(target)  # re-scaffold the same target
+        assert (target / "justfile").read_text() == "user owns this\n"
+        assert not list(target.glob("justfile.new*"))
+
+    def test_glob_char_class_preserves(self, tmp_path: Path, capsys):
+        # A glob with an fnmatch character class contains ']' — the parser must
+        # capture the whole JSON array, not stop at the first ']' (PR #295 review).
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._add_preserve(target, ["just[f]ile"])
+        (target / "justfile").write_text("user owns this\n")
+        assert main(["upgrade", str(target)]) == 0
+        assert "No drift" in capsys.readouterr().out
+
+
 class TestScaffoldRecord:
     def test_record_written_and_round_trips(self, tmp_path: Path):
         target = tmp_path / "p"
