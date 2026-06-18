@@ -40,6 +40,7 @@ nav:
   - Development:
     - Template system: development/template-system.md
     - Testing: development/testing.md
+    - Measurement methodology: development/measurement-methodology.md
     - Build reproducibility: development/build-reproducibility.md
     - Enterprise GitHub support matrix: development/enterprise-github-support-matrix.md
     - Enforcement classification: development/enforcement-classification.md
