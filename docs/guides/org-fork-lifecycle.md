@@ -6,8 +6,8 @@
 > plumbing). It exists early so those tickets validate against a real path instead of
 > baking unvalidated assumptions.
 
-For *why* the model is shaped this way, see **ADR-013** (distribution & governance) and
-the [Enterprise GitHub support matrix](../development/enterprise-github-support-matrix.md).
+For *why* the model is shaped this way, see [ADR-013](../adr/adr-013-distribution-governance-model.md)
+(distribution & governance) and the [Enterprise GitHub support matrix](../development/enterprise-github-support-matrix.md).
 This runbook covers the **`org`** profile only; `individual` and `standalone` users do
 not need a fork.
 
@@ -33,8 +33,8 @@ prerequisites (forking of private/internal repos defaults to *disallow*).
 ## Stage 2 — Customize
 
 - Select `--profile org` (recorded in `.claude/config.yaml`).
-- Choose delivery: marketplace with a **full git URL** on github.com/GHES; **copied-in
-  (`--no-plugin`)** on EMU/GHE.com.
+- Choose delivery: marketplace (`owner/repo` shorthand on github.com, **full git URL** on
+  GHES); **copied-in (`--no-plugin`)** on EMU/GHE.com.
 - Apply a company preset; for locked-down orgs, enable no-egress via
   `managed-settings.json`.
 
