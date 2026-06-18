@@ -8,6 +8,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/gh_host.sh"
+
 if [[ $# -lt 2 ]]; then
   echo "Usage: push_wiki.sh <repo-slug> <wiki-source-file>" >&2
   exit 1
@@ -19,7 +23,7 @@ WIKI_DIR="$(mktemp -d)"
 trap 'rm -rf "$WIKI_DIR"' EXIT
 
 echo "Cloning wiki for $REPO_SLUG..."
-git clone "https://github.com/${REPO_SLUG}.wiki.git" "$WIKI_DIR"
+git clone "$(gh_web_base)/${REPO_SLUG}.wiki.git" "$WIKI_DIR"
 
 cp "$SOURCE_FILE" "$WIKI_DIR/Home.md"
 
