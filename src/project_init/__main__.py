@@ -612,12 +612,14 @@ def _upgrade_main(argv: list[str]) -> int:
         ),
     )
     p.add_argument(
+        "--force",
         "--allow-dirty",
         action="store_true",
+        dest="allow_dirty",
         help=(
-            "Bypass the clean-tree guard and run --apply on a work tree with "
-            "uncommitted changes (#242). Not recommended — the upgrade is then "
-            "intermixed with your edits in git diff"
+            "Apply onto a dirty git work tree, bypassing the clean-tree guard "
+            "(#242). Not recommended — the upgrade is then intermixed with your "
+            "uncommitted edits in git diff. (--allow-dirty is an alias.)"
         ),
     )
     args = p.parse_args(argv)

@@ -777,16 +777,17 @@ def _enforce_clean_tree(status: str | None, *, allow_dirty: bool) -> int | None:
     console = Console()
     if status is None:
         console.print(
-            "[yellow]note:[/yellow] target is not a git repository — applying "
-            "without a clean-tree guard; no git-based undo will be offered. "
-            "Consider committing first."
+            "[yellow]note:[/yellow] target is not a git repository, or git "
+            "status could not be determined — applying without a clean-tree "
+            "guard and no git-based undo. If it should be a git repo, "
+            "initialize and commit first."
         )
         return None
     if not status.strip():
         return None
     if allow_dirty:
         console.print(
-            "[yellow]--allow-dirty:[/yellow] proceeding on a dirty work tree; "
+            "[yellow]--force:[/yellow] proceeding on a dirty work tree; "
             "your uncommitted changes and the upgrade will be intermixed in "
             "[bold]git diff[/bold]."
         )
@@ -797,7 +798,7 @@ def _enforce_clean_tree(status: str | None, *, allow_dirty: bool) -> int | None:
         "as a single, reviewable, revertible diff:\n"
         "  [bold]git add -A && git commit[/bold]   (or [bold]git stash[/bold])\n"
         "then re-run [bold]project-init upgrade --apply[/bold]. Override with "
-        "[bold]--allow-dirty[/bold] (not recommended)."
+        "[bold]--force[/bold] (not recommended)."
     )
     return _DIRTY_TREE_EXIT
 
@@ -807,7 +808,7 @@ def _print_undo_hint(status: str | None) -> None:
 
     *status* is the pre-apply work-tree state from _git_worktree_status: a clean
     tree (``""``) makes a blanket ``git restore`` safe; a dirty tree means
-    --allow-dirty was used and the upgrade is intermixed with the user's earlier
+    --force was used and the upgrade is intermixed with the user's earlier
     edits, so only a review hint is shown. None (not git) prints nothing.
     """
     from rich.console import Console

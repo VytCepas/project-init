@@ -98,7 +98,14 @@ class TestDirtyTreeGuard:
         assert rc == 3
         assert "blocked" in capsys.readouterr().out.lower()
 
-    def test_allow_dirty_bypasses_guard(self, tmp_path: Path):
+    def test_force_bypasses_guard(self, tmp_path: Path):
+        target = tmp_path / "p"
+        self._committed_scaffold(target)
+        (target / "justfile").write_text("user edit\n")
+        # --force is the issue-specified flag (#242).
+        assert main(["upgrade", str(target), "--apply", "--force"]) == 0
+
+    def test_allow_dirty_alias_bypasses_guard(self, tmp_path: Path):
         target = tmp_path / "p"
         self._committed_scaffold(target)
         (target / "justfile").write_text("user edit\n")
