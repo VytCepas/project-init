@@ -54,7 +54,8 @@ resolve_ref() {
     # github.com), then pick the REST API base. POSIX ERE has no lazy quantifier,
     # so strip the .git suffix separately.
     local host slug api_base tag
-    host=$(printf '%s\n' "$REPO_URL" | sed -nE 's#^(https?://|git@)([^/:]+).*#\2#p')
+    # Strip scheme/userinfo/path/port so https://, ssh://, and git@ forms all work.
+    host=$(printf '%s\n' "$REPO_URL" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#^[^@/]*@##; s#[/:].*$##')
     slug=$(printf '%s\n' "$REPO_URL" | sed -nE 's#.*[/:]([^/]+/[^/]+)$#\1#p')
     slug="${slug%.git}"
     # API base: explicit override wins; github.com & *.ghe.com use api.<host>;

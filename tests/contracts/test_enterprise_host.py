@@ -7,6 +7,8 @@ hold at runtime via the gh_host.sh helper rather than via template variables.
 
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 
 from project_init.scaffold import load_preset, scaffold
@@ -69,3 +71,55 @@ class TestHostHelperIsScaffolded:
         target = tmp_path / "p"
         scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
         assert (target / ".claude" / "scripts" / "gh_host.sh").exists()
+
+
+def _run_bash(snippet: str, *, cwd: Path | None = None, env_extra: dict | None = None) -> str:
+    """Source gh_host.sh and run a snippet against the real helper. Host env vars
+    are cleared so each case exercises the intended resolution path."""
+    env = {k: v for k, v in os.environ.items() if k not in ("PROJECT_INIT_HOST", "GH_HOST")}
+    if env_extra:
+        env.update(env_extra)
+    result = subprocess.run(
+        ["bash", "-c", f'. "{_GH_HOST}"; {snippet}'],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+class TestGhHostParsing:
+    """Behavioral tests — exercise the real bash helper, not just substrings, so
+    broken URL parsing cannot pass silently (ssh:// and scheme-bearing forms)."""
+
+    def test_normalize_handles_all_url_forms(self):
+        cases = {
+            "https://ghes.example.com/org/repo.git": "ghes.example.com",
+            "ssh://git@ghes.example.com/org/repo.git": "ghes.example.com",
+            "ssh://git@ghes.example.com:22/org/repo.git": "ghes.example.com",
+            "git@github.com:owner/repo.git": "github.com",
+            "https://octocorp.ghe.com/org/repo.git": "octocorp.ghe.com",
+            "https://ghes.example.com": "ghes.example.com",
+            "github.com": "github.com",
+        }
+        for raw, expected in cases.items():
+            assert _run_bash(f'_gh_host_normalize "{raw}"') == expected, raw
+
+    def test_override_with_scheme_is_normalized(self):
+        # PROJECT_INIT_HOST short-circuits before any gh/git lookup.
+        out = _run_bash("gh_host", env_extra={"PROJECT_INIT_HOST": "https://ghes.example.com"})
+        assert out == "ghes.example.com"
+
+    def test_ssh_remote_is_parsed(self, tmp_path: Path):
+        repo = tmp_path / "r"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "ssh://git@ghes.example.com/org/repo.git"],
+            cwd=repo,
+            check=True,
+        )
+        # Empty gh config dir → gh is unauthenticated → fast fallback to the git remote.
+        out = _run_bash("gh_host", cwd=repo, env_extra={"GH_CONFIG_DIR": str(tmp_path / "ghcfg")})
+        assert out == "ghes.example.com"

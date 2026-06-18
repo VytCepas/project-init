@@ -14,13 +14,24 @@
 #
 # Resolution order: PROJECT_INIT_HOST → GH_HOST → current repo remote → github.com.
 
+# Strip scheme, userinfo, path, and port from a URL or host string → bare host.
+# Handles https://, http://, ssh://, scp-style git@host:owner/repo, and bare hosts.
+_gh_host_normalize() {
+  printf '%s\n' "$1" | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://##; s#^[^@/]*@##; s#[/:].*$##'
+}
+
 gh_host() {
-  if [ -n "${PROJECT_INIT_HOST:-}" ]; then printf '%s\n' "$PROJECT_INIT_HOST"; return; fi
-  if [ -n "${GH_HOST:-}" ]; then printf '%s\n' "$GH_HOST"; return; fi
-  local url host
-  url=$(gh repo view --json url -q .url 2>/dev/null || true)
-  [ -z "$url" ] && url=$(git config --get remote.origin.url 2>/dev/null || true)
-  host=$(printf '%s\n' "$url" | sed -nE 's#^(https?://|git@)([^/:]+).*#\2#p')
+  local raw=""
+  if [ -n "${PROJECT_INIT_HOST:-}" ]; then
+    raw="$PROJECT_INIT_HOST"
+  elif [ -n "${GH_HOST:-}" ]; then
+    raw="$GH_HOST"
+  else
+    raw=$(gh repo view --json url -q .url 2>/dev/null || true)
+    [ -z "$raw" ] && raw=$(git config --get remote.origin.url 2>/dev/null || true)
+  fi
+  local host
+  host="$(_gh_host_normalize "$raw")"
   printf '%s\n' "${host:-github.com}"
 }
 
