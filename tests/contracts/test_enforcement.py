@@ -11,16 +11,24 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS = _REPO_ROOT / "templates/base/dot_claude/scripts"
+_GH_HOST = _SCRIPTS / "gh_host.sh"
 _MONITOR = _SCRIPTS / "monitor_pr.sh"
 _SETUP = _SCRIPTS / "setup_github.sh"
 _DOC = _REPO_ROOT / "docs/development/enforcement-classification.md"
 
 
-class TestOrgRefusesAdminMerge:
-    def test_monitor_reads_profile_and_refuses_admin_for_org(self):
-        s = _MONITOR.read_text()
-        assert "_project_profile" in s
+class TestProfileHelper:
+    def test_gh_profile_reads_config(self):
+        s = _GH_HOST.read_text()
+        assert "gh_profile" in s
         assert "config.yaml" in s
+
+
+class TestOrgRefusesAdminMerge:
+    def test_monitor_refuses_admin_for_org(self):
+        s = _MONITOR.read_text()
+        assert "gh_host.sh" in s  # sources the shared helper
+        assert "gh_profile" in s
         assert "admin-merge is refused under the org profile" in s
 
     def test_individual_admin_merge_path_intact(self):
@@ -29,6 +37,11 @@ class TestOrgRefusesAdminMerge:
 
 
 class TestHardLayerRuleset:
+    def test_ruleset_gated_to_org_profile(self):
+        s = _SETUP.read_text()
+        assert "gh_profile" in s
+        assert '!= "org"' in s  # advisory profiles skip the owner-binding ruleset
+
     def test_setup_applies_ruleset_binding_everyone(self):
         s = _SETUP.read_text()
         assert '"bypass_actors": []' in s  # binds owners/admins too

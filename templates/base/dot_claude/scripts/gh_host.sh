@@ -51,3 +51,11 @@ gh_api_base() {
     *) printf 'https://%s/api/v3\n' "$host" ;;
   esac
 }
+
+# Distribution profile recorded by project-init in .claude/config.yaml (#247);
+# defaults to individual when unset. Gates org-only hard enforcement (#251).
+gh_profile() {
+  local cfg=".claude/config.yaml" prof=""
+  [ -f "$cfg" ] && prof=$(sed -nE 's/^[[:space:]]*profile:[[:space:]]*([a-z]+).*/\1/p' "$cfg" | head -1)
+  printf '%s\n' "${prof:-individual}"
+}

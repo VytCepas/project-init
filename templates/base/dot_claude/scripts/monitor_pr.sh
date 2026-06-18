@@ -28,6 +28,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/gh_host.sh"
+
 PR_NUMBER="${1:-}"
 MODE="${2:-}"
 REVIEW_CYCLE=0
@@ -117,19 +121,11 @@ _run_gh() {
   return "$status"
 }
 
-# Distribution profile recorded by project-init in .claude/config.yaml (#247);
-# defaults to individual when unset.
-_project_profile() {
-  local cfg=".claude/config.yaml" prof=""
-  [ -f "$cfg" ] && prof=$(sed -nE 's/^[[:space:]]*profile:[[:space:]]*([a-z]+).*/\1/p' "$cfg" | head -1)
-  echo "${prof:-individual}"
-}
-
 _admin_merge() {
   # Hard enforcement must bind under the org profile (ADR-013/#251): admin-merge
   # bypasses the server-side rules, so it is refused — use auto-merge / the merge
-  # queue under the required checks instead.
-  if [ "$(_project_profile)" = "org" ]; then
+  # queue under the required checks instead. gh_profile comes from gh_host.sh.
+  if [ "$(gh_profile)" = "org" ]; then
     echo "ERROR: admin-merge is refused under the org profile (#251) — hard" >&2
     echo "  enforcement must bind. Use auto-merge or the merge queue under the" >&2
     echo "  required checks, or resolve the blocking review/checks." >&2

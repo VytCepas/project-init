@@ -76,14 +76,16 @@ else
   echo "WARNING: could not apply branch protection. Check admin permissions and repository plan." >&2
 fi
 
-# Repository ruleset (#251): the "hard" enforcement layer. A ruleset with an
-# empty bypass_actors binds *everyone* (owners/admins included), so it cannot be
-# admin-bypassed — unlike classic branch protection (enforce_admins=false above).
-# Forks do NOT inherit branch/tag rulesets, so the org profile applies this
-# directly to the repo. Feature-probe first and warn (never fail) on hosts/plans
-# without the rulesets API. Enforced set = required CI + review + no force-push /
-# no deletion; everything else (DAG hooks, commit format, lint) stays advisory.
-if gh api "repos/$OWNER/$NAME/rulesets" >/dev/null 2>&1; then
+# Repository ruleset (#251): the org profile's "hard" enforcement layer. A
+# ruleset with an empty bypass_actors binds *everyone* (owners/admins included),
+# so it cannot be admin-bypassed — unlike classic branch protection
+# (enforce_admins=false above). Applied ONLY under the org profile;
+# individual/standalone keep advisory branch protection (admin escape hatch
+# intact), per ADR-013. Forks do NOT inherit branch/tag rulesets, so the org
+# applies it directly. Feature-probe first and warn (never fail) without rulesets.
+if [ "$(gh_profile)" != "org" ]; then
+  echo "Profile is not 'org' — keeping advisory branch protection only (no owner-binding ruleset)."
+elif gh api "repos/$OWNER/$NAME/rulesets" >/dev/null 2>&1; then
   RULESET=$(mktemp)
   trap 'rm -f "$PROTECTION" "$RULESET"' EXIT
   cat > "$RULESET" <<'RULESET_JSON'
