@@ -51,11 +51,12 @@ The fork owns its releases:
 
 1. Bump the version in `src/project_init/__init__.py` (`__version__`) and
    `pyproject.toml`, on a branch → PR → merge.
-2. Tag it. The workflow guard blocks pushing tags to `main`, so create the tag
-   via the API:
+2. Tag the release — `release.yml` triggers on a tag push:
+   `git tag vX.Y.Z && git push origin vX.Y.Z`. If your org's rulesets or the
+   workflow guard restrict tag pushes, create the tag via the API instead:
    `gh api repos/<ORG>/<FORK>/git/refs -f ref=refs/tags/vX.Y.Z -f sha=<main-sha>`.
-   That triggers `release.yml` (git-cliff changelog from Conventional Commits +
-   wheel; ADR-006/008).
+   Either path triggers `release.yml` (git-cliff changelog from Conventional
+   Commits + wheel; ADR-006/008).
 3. **Channel** (ADR-008/ADR-011): git-based by default — downstream pins with
    `PROJECT_INIT_REF=vX.Y.Z`. A fork publishing to a private index configures its
    *own* PyPI trusted publishing (ADR-011); it owns its release identity/secrets.
