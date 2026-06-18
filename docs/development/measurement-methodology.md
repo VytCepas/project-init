@@ -108,7 +108,7 @@ Three small, reproducible tasks plus a probe. Each has a **fixed prompt** and a
 
 - **Bare target** = a temp project with **no** `.claude/`.
 - **Scaffolded target** = the same temp project + `project-init` output, run
-  per-preset (`base`, then `obsidian`, `graphify`) to expose diminishing returns.
+  per-preset (`obsidian-only`, then `obsidian-graphify`) to expose diminishing returns.
 - **Comparability rules:** same task, same **pinned** `--model`, identical temp
   dir layout, **N repeats (default 5)** for variance, fully non-interactive
   (`--permission-mode` set so headless runs never block on tool approval — safe
@@ -124,9 +124,9 @@ the quality it bought, with a **plain-language verdict** per preset
 Objectives: minimize `cost_usd`, maximize `pass@1` (secondarily minimize
 `wrong_turns`). The frontier is the classic skyline: sort configs ascending by
 cost, sweep once keeping running-max accuracy, keep each config whose accuracy
-strictly exceeds every cheaper one. Bare is the origin baseline; `base` /
-`obsidian` / `graphify` are compared against it to show whether the heavier preset
-is still on the frontier.
+strictly exceeds every cheaper one. Bare is the origin baseline; `obsidian-only`
+and `obsidian-graphify` (the two real presets) are compared against it to show
+whether the heavier preset is still on the frontier.
 
 ## Layout
 

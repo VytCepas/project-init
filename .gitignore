@@ -38,3 +38,6 @@ logs/
 # coverage data
 .coverage
 .coverage.*
+
+# Measurement harness raw outputs (#269/#271) — per-run transcripts/cost JSONL
+tools/benchmark/results/
