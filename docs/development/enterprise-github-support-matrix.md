@@ -138,8 +138,8 @@ exactly the spike-decision the plan anticipated.
 
 ## Recommendation (decision input for ADR-013)
 
-1. **Keep the fork model**, but record a **host-adaptive delivery mode** per profile, not a single
-   marketplace assumption.
+1. **Keep the fork model**, but record a **host-adaptive delivery mode** per profile
+   (`individual` / `standalone` / `org` — see #247), not a single marketplace assumption.
 2. **Primary distribution mode by host:** github.com/GHES → fork + marketplace (full git URL off
    github.com); EMU/GHE.com → copied-in (`--no-plugin`) with the fork as the upgrade source.
 3. **No-egress is achievable via `managed-settings.json`** (`strictKnownMarketplaces` / `hostPattern`
