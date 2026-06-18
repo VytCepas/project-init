@@ -46,3 +46,14 @@ class TestVersionSpan:
     def test_includes_both_versions(self):
         span = _describe_version_span("0.3.0", "0.5.0")
         assert "0.3.0" in span and "0.5.0" in span
+
+    def test_v_prefixed_inputs_do_not_double_prefix(self):
+        span = _describe_version_span("v1.2.3", "v1.3.0")
+        assert "vv" not in span
+        assert "minor update" in span
+        assert "1.2.3" in span and "1.3.0" in span
+
+    def test_prerelease_suffix_is_normalized(self):
+        span = _describe_version_span("0.4.0", "0.5.0-rc1")
+        assert "rc" not in span
+        assert "v0.5.0" in span

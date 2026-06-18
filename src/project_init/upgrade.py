@@ -694,10 +694,13 @@ def _describe_version_span(prev: str | None, current: str | None) -> str:
     p, c = _parse_version(prev), _parse_version(current)
     if not p or not c or p == c:
         return ""
+    # Format from the parsed tuple so a recorded "v" prefix or a "-rc" suffix
+    # can't produce "vv1.2.3" or leak pre-release noise.
+    pv, cv = ".".join(map(str, p)), ".".join(map(str, c))
     if c < p:
-        return f"v{prev} → v{current} (downgrade)"
+        return f"v{pv} → v{cv} (downgrade)"
     level = "major" if c[0] > p[0] else "minor" if c[1] > p[1] else "patch"
-    return f"v{prev} → v{current} ({level} update)"
+    return f"v{pv} → v{cv} ({level} update)"
 
 
 def _print_addition_summary(groups: dict, gate: dict, span: str = "") -> None:
