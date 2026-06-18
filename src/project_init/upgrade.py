@@ -451,7 +451,7 @@ _UPDATES_BLOCK = (
     "\n\nupdates:\n"
     "  # Addition-group consent state (#249): declined IDs, suppressed on future\n"
     "  # `upgrade --apply` unless the upstream addition changes materially.\n"
-    "  declined_additions: []\n"
+    "  declined_additions: {}\n"
 )
 
 
@@ -556,7 +556,161 @@ def _print_report(report: DriftReport, applied: bool) -> None:
         console.print("\nRun [bold]project-init upgrade --apply[/bold] to apply.")
 
 
-def run_upgrade(target: Path, *, apply: bool, no_plugin: bool = False) -> int:
+# --- Opt-in consent for new additions (#249) -------------------------------
+
+# Ordered (path-prefix, group-id, rationale); first match wins, else "misc".
+# Groups bundle new files by feature/overlay so the owner accepts or declines a
+# meaningful unit instead of individual paths (ADR-013).
+_ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
+    ((".devcontainer",), "devcontainer", "Dev container (Codespaces / remote agents)"),
+    ((".vscode",), "vscode", "Shared VS Code config"),
+    ((".github", "workflows"), "github-workflows", "CI / CD workflows"),
+    ((".github",), "github", "GitHub repo config (templates, CODEOWNERS, …)"),
+    ((".claude", "skills"), "claude-skills", "Claude Code skills"),
+    ((".claude", "hooks"), "claude-hooks", "Claude Code hooks"),
+    ((".claude", "agents"), "claude-agents", "Claude Code agent specs"),
+    ((".claude", "docs"), "claude-docs", "In-repo docs (.claude/docs)"),
+    ((".claude",), "claude-core", "Claude Code core config"),
+    ((".codex",), "codex-agent", "Codex agent wiring"),
+    ((".gemini",), "gemini-agent", "Gemini agent wiring"),
+    (("docs",), "docs", "Project documentation site"),
+)
+
+
+def _classify_addition(rel: Path) -> tuple[str, str]:
+    """Map a new file to its addition group ``(id, rationale)``."""
+    parts = rel.parts
+    for prefix, gid, rationale in _ADDITION_GROUP_RULES:
+        if parts[: len(prefix)] == prefix:
+            return gid, rationale
+    return "misc", "Miscellaneous new files"
+
+
+def _addition_groups(new_paths: list[Path], staging: Path) -> dict[str, dict]:
+    """Bucket new files into addition groups, each with a content hash."""
+    groups: dict[str, dict] = {}
+    for rel in sorted(new_paths):
+        gid, rationale = _classify_addition(rel)
+        groups.setdefault(gid, {"paths": [], "rationale": rationale})["paths"].append(rel)
+    for group in groups.values():
+        digest = hashlib.sha256()
+        for rel in group["paths"]:
+            # Length-delimit path + content so different per-file splits can't
+            # collide (e.g. "ab"+"c" vs "a"+"bc" would otherwise match).
+            content = (staging / rel).read_bytes()
+            digest.update(f"{rel.as_posix()}\0{len(content)}\0".encode())
+            digest.update(content)
+        group["hash"] = digest.hexdigest()[:12]
+    return groups
+
+
+_DECLINED_RE = re.compile(r"^(\s*declined_additions:\s*)(.*)$", re.MULTILINE)
+
+
+def _read_declined(target: Path) -> dict[str, str]:
+    """Read the recorded ``{group-id: hash}`` of declined additions."""
+    config_path = target / _CONFIG_REL
+    if not config_path.exists():
+        return {}
+    match = _DECLINED_RE.search(config_path.read_text(encoding="utf-8"))
+    if not match:
+        return {}
+    # config.yaml is hand-editable: extract just the {...} object so a trailing
+    # inline YAML comment doesn't break JSON parsing (and silently drop declines).
+    obj = re.search(r"\{.*\}", match.group(2))
+    if not obj:
+        return {}
+    try:
+        value = json.loads(obj.group(0))
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _write_declined(target: Path, declined: dict[str, str]) -> None:
+    """Persist the ``{group-id: hash}`` of declined additions into config.yaml."""
+    config_path = target / _CONFIG_REL
+    if not config_path.exists():
+        return
+    text = config_path.read_text(encoding="utf-8")
+    payload = json.dumps(declined, sort_keys=True)
+    if _DECLINED_RE.search(text):
+        text = _DECLINED_RE.sub(lambda m: f"{m.group(1)}{payload}", text, count=1)
+    else:
+        text = text.rstrip("\n") + f"\n\nupdates:\n  declined_additions: {payload}\n"
+    config_path.write_text(text, encoding="utf-8")
+
+
+def _resolve_addition_consent(
+    target: Path, groups: dict, accept_new: list[str], decline_new: list[str]
+) -> dict:
+    """Classify each addition group as accepted / declined / undecided.
+
+    A previously-declined group stays declined only while its content hash is
+    unchanged; a materially changed group resurfaces as undecided (ADR-013).
+    """
+    recorded = _read_declined(target)
+    accepted = set(groups) if "all" in accept_new else {g for g in accept_new if g in groups}
+    declined_flag = set(groups) if "all" in decline_new else {g for g in decline_new if g in groups}
+    still_declined = {gid for gid in groups if recorded.get(gid) == groups[gid]["hash"]}
+    declined_now = (declined_flag | still_declined) - accepted
+    undecided = set(groups) - accepted - declined_now
+    return {
+        "accepted": accepted,
+        "declined_now": declined_now,
+        "undecided": undecided,
+        "declined_map": {gid: groups[gid]["hash"] for gid in declined_now},
+    }
+
+
+def _print_addition_gate(groups: dict, undecided: set) -> None:
+    """Print the consent gate that blocks --apply until new groups are decided."""
+    from rich.console import Console
+
+    console = Console()
+    console.print(
+        "\n[bold yellow]New additions need a decision before --apply[/bold yellow] (#249):"
+    )
+    for gid in sorted(undecided):
+        group = groups[gid]
+        console.print(f"  [cyan]{gid}[/cyan] — {group['rationale']} ({len(group['paths'])} files)")
+        for rel in group["paths"]:
+            console.print(f"      {rel}")
+    console.print(
+        "\nDecide per group, then re-run with --apply:\n"
+        "  --accept-new <id>    (or --accept-new all)\n"
+        "  --decline-new <id>   (or --decline-new all)"
+    )
+
+
+def _print_addition_summary(groups: dict, gate: dict) -> None:
+    """Summarize addition groups and their accept/decline/undecided status."""
+    from rich.console import Console
+
+    console = Console()
+    console.print("\n[bold]addition groups[/bold] (#249):")
+    for gid in sorted(groups):
+        if gid in gate["declined_now"]:
+            status = "declined"
+        elif gid in gate["accepted"]:
+            status = "accepted"
+        else:
+            status = "undecided"
+        group = groups[gid]
+        console.print(
+            f"  [cyan]{gid}[/cyan] [{status}] — {group['rationale']} "
+            f"({len(group['paths'])} files)"
+        )
+
+
+def run_upgrade(
+    target: Path,
+    *,
+    apply: bool,
+    no_plugin: bool = False,
+    accept_new: list[str] | None = None,
+    decline_new: list[str] | None = None,
+) -> int:
     """Entry point for the upgrade subcommand; returns a process exit code.
 
     *no_plugin* switches the project to the fallback mode on this run:
@@ -606,12 +760,26 @@ def run_upgrade(target: Path, *, apply: bool, no_plugin: bool = False) -> int:
 
         report = compute_drift(target, staging, rendered, manifest)
         report.migrated = migrated
-        # Run apply even with zero file drift: the config version line and
-        # the scaffold record must still be refreshed to the current tool
-        # version when the user explicitly applied the upgrade.
+        # Opt-in consent for new additions (#249): bucket genuinely-new files
+        # into groups and require an accept/decline decision before --apply
+        # touches them. A file in the recorded manifest that is merely missing is
+        # a restoration the user already consented to — not gated.
+        genuinely_new = [rel for rel in report.new if rel.as_posix() not in manifest]
+        groups = _addition_groups(genuinely_new, staging)
+        gate = _resolve_addition_consent(target, groups, accept_new or [], decline_new or [])
+        if apply and gate["undecided"]:
+            _print_addition_gate(groups, gate["undecided"])
+            return 2
+        # Run apply even with zero file drift: the config version line and the
+        # scaffold record must still refresh to the current tool version.
         if apply:
+            suppressed = {p for gid in gate["declined_now"] for p in groups[gid]["paths"]}
+            report.new = [rel for rel in report.new if rel not in suppressed]
             apply_drift(target, staging, report, preset_name, variables)
+            _write_declined(target, gate["declined_map"])
         _print_report(report, applied=apply)
+        if groups:
+            _print_addition_summary(groups, gate)
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
     return 0

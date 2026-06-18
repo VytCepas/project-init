@@ -39,7 +39,7 @@ class TestFreshScaffoldRecordsObservability:
         assert "enforcement:" in human
         assert "project_init_host:" in human
         assert "project_init_plugin_version:" in human
-        assert "declined_additions: []" in config_text
+        assert "declined_additions: {}" in config_text
 
 
 class TestUpgradeInjectsObservability:
@@ -88,11 +88,11 @@ class TestUpgradeInjectsObservability:
         cfg = target / ".claude" / "config.yaml"
         # Simulate a config predating the updates section (strip the whole block).
         text = re.sub(
-            r"\nupdates:\n(?:  #.*\n)*  declined_additions: \[\]\n",
+            r"\nupdates:\n(?:  #.*\n)*  declined_additions: \{\}\n",
             "\n",
             cfg.read_text(),
         )
         cfg.write_text(text)
         assert "declined_additions:" not in cfg.read_text()  # genuinely gone
         assert run_upgrade(target, apply=True) == 0
-        assert "declined_additions: []" in cfg.read_text()
+        assert "declined_additions: {}" in cfg.read_text()
