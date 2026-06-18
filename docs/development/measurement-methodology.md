@@ -11,7 +11,7 @@ it?"** — *it costs +N tokens, **but** you get fewer wrong turns, higher first-
 accuracy, fewer review cycles.* Every cost delta is paired with the quality delta
 it bought (cost–accuracy Pareto framing).
 
-**Hard constraint (CLAUDE.md / ADR-007).** The scaffolder never calls an LLM, and
+**Hard constraint (CLAUDE.md / ADR-001).** The scaffolder never calls an LLM, and
 neither does the measurement tooling. The harness *orchestrates* agent runs (which
 are LLMs), but the harness code itself scores with `pytest` and prices with a
 static table — **no LLM judge**. All measurement lives in `tools/benchmark/` (dev
@@ -42,8 +42,9 @@ trees, from the actual standards:
   scoring; `pass@1` / `pass^k` over repeats.
 - **Per-run record shape** → Inspect AI's per-sample `model_usage` / `working_time`
   / `score` fields, as plain JSONL.
-- **Cost** → vendored litellm `model_prices_and_context_window.json` (standalone
-  **MIT** data file: `input_cost_per_token`, `output_cost_per_token`, cache fields).
+- **Cost** → litellm's `model_prices_and_context_window.json` (standalone **MIT**
+  data file: `input_cost_per_token`, `output_cost_per_token`, cache fields), vendored
+  locally as `tools/benchmark/model_prices.json`.
 - **Pareto frontier** → ~15-line skyline sweep (no `paretoset`/`pymoo`).
 
 > If we later accept a heavier dependency for a richer scorer ecosystem, Inspect
