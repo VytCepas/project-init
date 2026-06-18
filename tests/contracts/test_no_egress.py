@@ -73,3 +73,21 @@ class TestSettingsEgress:
             no_plugin="true",
         )
         assert data["enabledPlugins"] == {}
+
+
+class TestNoEgressUpgradeBackfill:
+    def test_pre_258_record_preserves_official_marketplace(self, tmp_path: Path):
+        """A record predating the egress keys must upgrade cleanly (strict
+        re-render) and keep the official marketplace — egress defaults on."""
+        from project_init.upgrade import run_upgrade, write_scaffold_record
+
+        target = tmp_path / "p"
+        v = make_variables()
+        created = scaffold(target, load_preset("obsidian-only"), v, strict=True)
+        legacy = {k: val for k, val in v.items() if k not in ("egress_ok", "no_egress")}
+        write_scaffold_record(target, "obsidian-only", legacy, created)
+
+        assert run_upgrade(target, apply=True) == 0
+        data = json.loads((target / ".claude" / "settings.json").read_text())
+        assert "claude-plugins-official" in data["extraKnownMarketplaces"]
+        assert "security-guidance@claude-plugins-official" in data["enabledPlugins"]
