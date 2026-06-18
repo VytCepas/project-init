@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -64,6 +65,53 @@ def _tree_snapshot(target: Path) -> dict[str, bytes]:
     }
 
 
+class TestDirtyTreeGuard:
+    """#242: --apply is gated on a clean git work tree, with an undo hint."""
+
+    @staticmethod
+    def _git(target: Path, *args: str) -> None:
+        subprocess.run(
+            ["git", "-C", str(target), "-c", "user.email=t@t", "-c", "user.name=t", *args],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+    def _committed_scaffold(self, target: Path) -> None:
+        _scaffold(target)
+        self._git(target, "init", "-q")
+        self._git(target, "add", "-A")
+        self._git(target, "commit", "-q", "-m", "scaffold")
+
+    def test_clean_tree_applies_with_undo_hint(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        self._committed_scaffold(target)
+        rc = main(["upgrade", str(target), "--apply"])
+        assert rc == 0
+        assert "restore" in capsys.readouterr().out
+
+    def test_dirty_tree_blocks_apply(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        self._committed_scaffold(target)
+        (target / "justfile").write_text("user edit\n")  # dirty the tree
+        rc = main(["upgrade", str(target), "--apply"])
+        assert rc == 3
+        assert "blocked" in capsys.readouterr().out.lower()
+
+    def test_allow_dirty_bypasses_guard(self, tmp_path: Path):
+        target = tmp_path / "p"
+        self._committed_scaffold(target)
+        (target / "justfile").write_text("user edit\n")
+        assert main(["upgrade", str(target), "--apply", "--allow-dirty"]) == 0
+
+    def test_non_git_target_proceeds_with_note(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)  # no git init
+        rc = main(["upgrade", str(target), "--apply"])
+        assert rc == 0
+        assert "repository" in capsys.readouterr().out
+
+
 class TestScaffoldRecord:
     def test_record_written_and_round_trips(self, tmp_path: Path):
         target = tmp_path / "p"
@@ -88,9 +136,7 @@ class TestScaffoldRecord:
         target = tmp_path / "p"
         _scaffold(target)
         config = target / _CONFIG_REL
-        config.write_text(
-            _MANIFEST_LINE_RE.sub(r"\1{broken json", config.read_text(), count=1)
-        )
+        config.write_text(_MANIFEST_LINE_RE.sub(r"\1{broken json", config.read_text(), count=1))
         rc = main(["upgrade", str(target)])
         assert rc == 1
         assert "corrupted" in capsys.readouterr().err
@@ -148,9 +194,7 @@ class TestUpgradeReport:
         legacy.write_text("old\n")
         _patch_manifest(
             target,
-            lambda m: m.__setitem__(
-                "legacy-tool.cfg", hashlib.sha256(b"old\n").hexdigest()
-            ),
+            lambda m: m.__setitem__("legacy-tool.cfg", hashlib.sha256(b"old\n").hexdigest()),
         )
         rc = main(["upgrade", str(target), "--apply"])
         assert rc == 0
@@ -169,9 +213,7 @@ class TestUpgradeApply:
         justfile.write_bytes(old_render)
         _patch_manifest(
             target,
-            lambda m: m.__setitem__(
-                "justfile", hashlib.sha256(old_render).hexdigest()
-            ),
+            lambda m: m.__setitem__("justfile", hashlib.sha256(old_render).hexdigest()),
         )
 
         rc = main(["upgrade", str(target), "--apply"])
@@ -304,10 +346,20 @@ class TestRecordBackfill:
         assert m
         variables = json.loads(m.group(2))
         for newer in (
-            "project_init_repo", "project_owner", "license", "license_holder",
-            "license_mit", "license_apache", "license_proprietary",
-            "created_year", "justfile", "devcontainer", "mise", "vscode",
-            "vscode_off", "graphify",
+            "project_init_repo",
+            "project_owner",
+            "license",
+            "license_holder",
+            "license_mit",
+            "license_apache",
+            "license_proprietary",
+            "created_year",
+            "justfile",
+            "devcontainer",
+            "mise",
+            "vscode",
+            "vscode_off",
+            "graphify",
         ):
             variables.pop(newer, None)
         config.write_text(
