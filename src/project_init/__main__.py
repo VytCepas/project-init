@@ -332,10 +332,14 @@ def _print_profile_notice(profile: str, *, no_plugin: bool) -> None:
     """
     from rich.console import Console
 
+    # Honest egress: --no-plugin only copies project-init's own payload locally;
+    # the external official marketplace stays enabled in every mode until the
+    # org no-egress mode (#258) disables it.
     delivery = (
-        "copied-in, no external marketplace"
+        "project-init copied in locally; external official marketplace still "
+        "enabled (network egress)"
         if no_plugin
-        else "plugin-first, external official marketplace enabled (network egress)"
+        else "plugin-first; external official marketplace enabled (network egress)"
     )
     Console().print(
         f"[cyan]Profile:[/cyan] {profile} — {_PROFILE_SUMMARY[profile]}\n"
@@ -496,12 +500,13 @@ _PROFILES = ("individual", "standalone", "org")
 # the non-interactive notice so the choice is never silent (ADR-013, #247).
 _PROFILE_SUMMARY = {
     "individual": (
-        "plugin-first (external official marketplace), track upstream, advisory "
-        "enforcement — today's default"
+        "plugin-first (project-init + external official plugins), track upstream, "
+        "advisory enforcement — today's default"
     ),
     "standalone": (
-        "copied-in (no external marketplace), owner-driven pinned updates, "
-        "advisory enforcement"
+        "project-init payload copied in locally, owner-driven pinned updates, "
+        "advisory enforcement (external official marketplace still enabled — "
+        "full no-egress is the org mode, #258)"
     ),
     "org": (
         "fork as source-of-truth, host-adaptive delivery, hard (server-side) "

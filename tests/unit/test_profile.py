@@ -58,7 +58,9 @@ class TestProfileBundles:
         assert v["enforcement"] == "hard"
         assert v["no_plugin"] == ""  # plugin on github.com/GHES by default
 
-    def test_org_on_emu_forces_copied_in(self):
+    def test_org_with_explicit_no_plugin_is_copied_in(self):
+        # No host detection here — just that an explicit --no-plugin wins for org
+        # (the EMU/GHE.com host-adaptive choice lands in #248).
         v = _vars("org", explicit_no_plugin=True)
         assert v["enforcement"] == "hard"
         assert v["no_plugin"] == "true"
