@@ -50,7 +50,7 @@ Legend: ✅ supported · ⚠️ conditional / caveats · 🔻 restricted/blocked
 | **Push rulesets** (private/internal) | ✅ _(Team+)_ | ✅ | ✅ | ✅ |
 | **Required workflows** (org ruleset rule) | ⚠️ Enterprise Cloud only | ✅ | ✅ | ✅ |
 | **Org rulesets** applied directly to target repo | ✅ _(Team+)_ | ✅ | ✅ | ✅ |
-| Disable admin bypass / **merge queue** | ✅ bypass-off; private merge queue → Cloud | ✅ | ✅ | ✅ |
+| Disable admin bypass / **merge queue** | ✅ bypass-off; private/internal merge queue needs Enterprise Cloud | ✅ | ✅ | ✅ |
 | **REST API base** | `api.github.com` | `api.github.com` (or `api.SUB.ghe.com` w/ data residency) | `api.SUBDOMAIN.ghe.com` | `HOST/api/v3` |
 | **No-egress lockdown** (`managed-settings.json`) | ✅ `strictKnownMarketplaces` / `blockedMarketplaces` / `hostPattern` | ✅ same | ✅ same | ✅ `hostPattern` allowlists the GHES host |
 | **Recommended primary distribution mode** | Fork + marketplace | **Copied-in (`--no-plugin`)**; fork = upgrade source | **Copied-in (`--no-plugin`)** | Fork + marketplace (full git URL) |
