@@ -12,8 +12,7 @@
     },
     "project-init": {
       "source": {
-        "source": "github",
-        "repo": "{{project_init_repo}}"
+        {{#if project_init_github}}"source": "github", "repo": "{{project_init_repo}}"{{/if project_init_github}}{{#if project_init_enterprise}}"source": "git", "url": "{{project_init_repo_url}}"{{/if project_init_enterprise}}
       }
     }
   },

@@ -90,6 +90,30 @@ def overlay_layers(agents: str | list[str], *, no_plugin: bool) -> list[str]:
     return extra
 
 
+def marketplace_source_vars(repo_url: str) -> dict[str, str]:
+    """Host-aware plugin-marketplace source fields for settings.json (ADR-013, #248).
+
+    Claude Code's ``source: github`` shorthand resolves only on public github.com;
+    other hosts (GHES, GHE.com) need a full git URL. Returns the template flags +
+    values so the scaffolded marketplace points at the fork's actual host instead
+    of assuming github.com — which the old ``removeprefix("https://github.com/")``
+    silently broke (left a full URL in an ``owner/repo`` field).
+    """
+    host = re.sub(r"^[a-zA-Z][\w+.-]*://", "", repo_url)  # strip scheme
+    host = re.sub(r"^[^@/]*@", "", host)  # strip userinfo (e.g. git@)
+    host = re.split(r"[/:]", host, maxsplit=1)[0]
+    slug = re.sub(r"\.git$", "", repo_url.rstrip("/"))
+    slug = re.sub(r"^.*[/:]([^/]+/[^/]+)$", r"\1", slug)
+    is_github = host == "github.com"
+    url = repo_url if repo_url.endswith(".git") else f"{repo_url}.git"
+    return {
+        "project_init_repo": slug,  # owner/repo — github source + display
+        "project_init_repo_url": url,  # full clone URL — git source (non-github hosts)
+        "project_init_github": "true" if is_github else "",
+        "project_init_enterprise": "" if is_github else "true",
+    }
+
+
 def _render(text: str, variables: dict[str, str]) -> str:
     """Replace {{var}} placeholders and process {{#if var}}...{{/if var}} blocks.
 

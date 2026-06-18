@@ -38,6 +38,7 @@ from project_init.scaffold import (
     _RECORD_MARKER,
     _new_sibling,
     load_preset,
+    marketplace_source_vars,
     overlay_layers,
     scaffold,
 )
@@ -50,6 +51,11 @@ _VERSION_LINE_RE = re.compile(r"^(\s*project_init_version:\s*).*$", re.MULTILINE
 _MIGRATION_DEFAULTS = {
     "project_init_url": "https://github.com/VytCepas/project-init",
     "project_init_repo": "VytCepas/project-init",
+    "project_init_repo_url": "https://github.com/VytCepas/project-init.git",
+    "project_init_github": "true",
+    "project_init_enterprise": "",
+    "project_init_plugin_version": "0.1.0",
+    "project_init_version_prev": "",
 }
 
 # Presets removed in earlier releases mapped to their successors; upgrade
@@ -323,7 +329,6 @@ def _backfill_variables(variables: dict) -> dict:
     url = v.get("project_init_url", _MIGRATION_DEFAULTS["project_init_url"])
 
     derived: dict[str, str] = {
-        "project_init_repo": url.removeprefix("https://github.com/"),
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "justfile": "true" if language != "none" else "",
@@ -334,6 +339,9 @@ def _backfill_variables(variables: dict) -> dict:
         # shared with migration (PI-190).
         **_overlay_off_defaults(),
         **_MIGRATION_DEFAULTS,
+        # Host-aware marketplace fields from the recorded repo URL (#248) — last
+        # so a real recorded URL wins over the github.com migration default.
+        **marketplace_source_vars(url),
     }
     for flag in _LANGUAGE_FLAGS:
         derived[flag] = "true" if language == flag else ""
@@ -527,14 +535,18 @@ def run_upgrade(target: Path, *, apply: bool, no_plugin: bool = False) -> int:
         )
         variables = {**variables, "no_plugin": "true", "plugin_mode": ""}
 
-    from project_init import __version__
+    from project_init import __plugin_version__, __version__
 
     variables = dict(variables)
+    # Record the version span before bumping (#248/#250): version_prev is the
+    # version we are upgrading FROM.
+    variables["project_init_version_prev"] = variables.get("project_init_version", "")
     variables["project_init_version"] = __version__
-    # Backfill profile/enforcement for pre-#247 records so the strict re-render
-    # (config.yaml.tmpl references {{profile}}) never crashes on old projects.
+    # Backfill fields added after older projects were scaffolded so the strict
+    # re-render never crashes (configs predating #247/#248).
     variables.setdefault("profile", "individual")
     variables.setdefault("enforcement", "advisory")
+    variables.setdefault("project_init_plugin_version", __plugin_version__)
 
     staging_root = Path(tempfile.mkdtemp(prefix="project-init-upgrade-"))
     staging = staging_root / "render"
