@@ -111,6 +111,17 @@ class TestGenerate:
         with pytest.raises(ValueError, match="already exists"):
             sc.generate_preset("dup", extends="base")
 
+    def test_generate_escapes_quotes_in_description(self, presets_dir: Path):
+        _write(presets_dir, "base", 'name="base"\ndescription="b"\nlayers=["base"]\n')
+        sc.generate_preset("acme", extends="base", description='ACME "AI" preset')
+        # Must produce valid TOML — load_preset would raise on a parse error.
+        assert sc.load_preset("acme")["description"] == 'ACME "AI" preset'
+
+    def test_generate_rejects_non_slug_name(self, presets_dir: Path):
+        _write(presets_dir, "base", 'name="base"\ndescription="b"\nlayers=["base"]\n')
+        with pytest.raises(ValueError, match="invalid preset name"):
+            sc.generate_preset('bad name"', extends="base")
+
     def test_cli_preset_new(self, presets_dir: Path):
         from project_init.__main__ import main
 
