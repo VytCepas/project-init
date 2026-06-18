@@ -133,3 +133,14 @@ class TestConsentInternals:
         h_ab = _addition_groups([Path("docs/a.md"), Path("docs/b.md")], target)["docs"]["hash"]
         h_ac = _addition_groups([Path("docs/a.md"), Path("docs/c.md")], target)["docs"]["hash"]
         assert h_ab != h_ac
+
+
+class TestRecommendationFraming:
+    def test_report_frames_additions_as_recommendations(self, tmp_path: Path, capsys):
+        target, _ = _genuinely_new_docs(tmp_path)
+        run_upgrade(target, apply=False)
+        # Collapse whitespace — rich wraps lines at the console width.
+        out = " ".join(capsys.readouterr().out.lower().split())
+        assert "recommend" in out
+        assert "never auto-applied" in out
+        assert "update" in out  # the version span (#250) is surfaced
