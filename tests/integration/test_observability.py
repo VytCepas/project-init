@@ -79,3 +79,20 @@ class TestUpgradeInjectsObservability:
         # Fields are present exactly once (no duplicate injection on a current config).
         assert human.count("\n  profile:") == 1
         assert human.count("\n  enforcement:") == 1
+
+    def test_pre_259_config_gains_updates_placeholder(self, tmp_path: Path):
+        target = tmp_path / "p"
+        v = make_variables()
+        created = scaffold(target, load_preset("obsidian-only"), v, strict=True)
+        write_scaffold_record(target, "obsidian-only", v, created)
+        cfg = target / ".claude" / "config.yaml"
+        # Simulate a config predating the updates section (strip the whole block).
+        text = re.sub(
+            r"\nupdates:\n(?:  #.*\n)*  declined_additions: \[\]\n",
+            "\n",
+            cfg.read_text(),
+        )
+        cfg.write_text(text)
+        assert "declined_additions:" not in cfg.read_text()  # genuinely gone
+        assert run_upgrade(target, apply=True) == 0
+        assert "declined_additions: []" in cfg.read_text()

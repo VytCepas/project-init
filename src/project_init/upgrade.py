@@ -445,22 +445,35 @@ _PROJECT_OBSERVABILITY = (
 )
 
 
-def _ensure_observability_fields(text: str, variables: dict) -> str:
-    """Insert missing observability fields into the human ``project:`` block.
+_UPDATES_BLOCK = (
+    "\n\nupdates:\n"
+    "  # Addition-group consent state (#249): declined IDs, suppressed on future\n"
+    "  # `upgrade --apply` unless the upstream addition changes materially.\n"
+    "  declined_additions: []\n"
+)
 
-    Idempotent — fields already present are kept. Inserts after the
-    ``project_init_version`` line so upgraded pre-#259 configs surface them.
+
+def _ensure_observability_fields(text: str, variables: dict) -> str:
+    """Surface the observability record in the hand-editable config (#259).
+
+    Idempotent. Operates on the human section only (above the scaffold-record
+    marker) so injected lines survive ``write_scaffold_record``'s strip-and-
+    re-append. Missing ``project:`` fields are inserted together, in declaration
+    order, in a single substitution after the ``project_init_version`` line; the
+    ``updates`` consent placeholder is appended if the config predates it.
     """
-    for key, comment in _PROJECT_OBSERVABILITY:
-        if re.search(rf"(?m)^\s+{re.escape(key)}:", text):
-            continue
-        value = variables.get(key, "")
-        text = _VERSION_LINE_RE.sub(
-            lambda m, k=key, v=value, c=comment: f"{m.group(0)}\n  {k}: {v}  # {c}",
-            text,
-            count=1,
-        )
-    return text
+    head, sep, tail = text.partition(_RECORD_MARKER)
+    missing = [
+        f"  {key}: {variables.get(key, '')}  # {comment}"
+        for key, comment in _PROJECT_OBSERVABILITY
+        if not re.search(rf"(?m)^\s+{re.escape(key)}:", head)
+    ]
+    if missing:
+        block = "\n".join(missing)
+        head = _VERSION_LINE_RE.sub(lambda m: f"{m.group(0)}\n{block}", head, count=1)
+    if "declined_additions:" not in head:
+        head = head.rstrip("\n") + _UPDATES_BLOCK
+    return head + sep + tail
 
 
 def apply_drift(
