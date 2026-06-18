@@ -271,7 +271,9 @@ def read_preserve_globs(target: Path) -> list[str]:
         text = config.read_text(encoding="utf-8")
     except OSError:
         return []
-    m = re.search(r"^[ \t]*preserve:[ \t]*(\[.*?\])[ \t]*(?:#.*)?$", text, re.MULTILINE)
+    # Greedy capture to the last ``]`` so globs with fnmatch character classes
+    # (e.g. ``file[0-9].txt``) are not truncated at an inner ``]`` (PR #295 review).
+    m = re.search(r"^[ \t]*preserve:[ \t]*(\[.*\])[ \t]*(?:#.*)?$", text, re.MULTILINE)
     if not m:
         return []
     try:

@@ -187,6 +187,16 @@ class TestConfigPreserveList:
         assert (target / "justfile").read_text() == "user owns this\n"
         assert not list(target.glob("justfile.new*"))
 
+    def test_glob_char_class_preserves(self, tmp_path: Path, capsys):
+        # A glob with an fnmatch character class contains ']' — the parser must
+        # capture the whole JSON array, not stop at the first ']' (PR #295 review).
+        target = tmp_path / "p"
+        _scaffold(target)
+        self._add_preserve(target, ["just[f]ile"])
+        (target / "justfile").write_text("user owns this\n")
+        assert main(["upgrade", str(target)]) == 0
+        assert "No drift" in capsys.readouterr().out
+
 
 class TestScaffoldRecord:
     def test_record_written_and_round_trips(self, tmp_path: Path):

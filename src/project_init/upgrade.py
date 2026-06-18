@@ -431,8 +431,13 @@ def compute_drift(target: Path, staging: Path, rendered: list[Path], manifest: d
         report.diffs[rel] = diff
 
     for rel_str in sorted(manifest):
-        if rel_str not in rendered_set and (target / rel_str).exists():
-            report.removed.append(Path(rel_str))
+        rel = Path(rel_str)
+        if (
+            rel_str not in rendered_set
+            and (target / rel_str).exists()
+            and not _is_preserved(rel, preserve_globs)
+        ):
+            report.removed.append(rel)
     return report
 
 
