@@ -54,6 +54,7 @@ _MIGRATION_DEFAULTS = {
     "project_init_repo_url": "https://github.com/VytCepas/project-init.git",
     "project_init_github": "true",
     "project_init_enterprise": "",
+    "project_init_host": "github.com",
     "project_init_plugin_version": "0.1.0",
     "project_init_version_prev": "",
 }
@@ -432,6 +433,36 @@ def _copy_rendered(src: Path, dest: Path) -> None:
     shutil.copy2(src, dest)
 
 
+# Visible observability fields injected into the human `project:` block on upgrade
+# when a pre-#247/#248/#259 config lacks them (config.yaml is not re-rendered on
+# upgrade, so otherwise they live only in the hidden record). (key, comment) —
+# the value comes from the recorded/backfilled variables (#259).
+_PROJECT_OBSERVABILITY = (
+    ("project_init_plugin_version", "plugin payload version (ADR-010)"),
+    ("profile", "individual | standalone | org — distribution profile (ADR-013)"),
+    ("enforcement", "advisory | hard — see ADR-013 / #251"),
+    ("project_init_host", "upstream GitHub host — #255/#259"),
+)
+
+
+def _ensure_observability_fields(text: str, variables: dict) -> str:
+    """Insert missing observability fields into the human ``project:`` block.
+
+    Idempotent — fields already present are kept. Inserts after the
+    ``project_init_version`` line so upgraded pre-#259 configs surface them.
+    """
+    for key, comment in _PROJECT_OBSERVABILITY:
+        if re.search(rf"(?m)^\s+{re.escape(key)}:", text):
+            continue
+        value = variables.get(key, "")
+        text = _VERSION_LINE_RE.sub(
+            lambda m, k=key, v=value, c=comment: f"{m.group(0)}\n  {k}: {v}  # {c}",
+            text,
+            count=1,
+        )
+    return text
+
+
 def apply_drift(
     target: Path,
     staging: Path,
@@ -453,6 +484,7 @@ def apply_drift(
         text = _VERSION_LINE_RE.sub(
             rf"\g<1>{variables['project_init_version']}", text, count=1
         )
+        text = _ensure_observability_fields(text, variables)
         config_path.write_text(text, encoding="utf-8")
 
     # Only files whose on-disk content now equals the render are recorded —

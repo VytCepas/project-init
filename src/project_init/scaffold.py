@@ -109,6 +109,7 @@ def marketplace_source_vars(repo_url: str) -> dict[str, str]:
     return {
         "project_init_repo": slug,  # owner/repo — github source + display
         "project_init_repo_url": url,  # full clone URL — git source (non-github hosts)
+        "project_init_host": host or "github.com",  # observability record (#259)
         "project_init_github": "true" if is_github else "",
         "project_init_enterprise": "" if is_github else "true",
     }
