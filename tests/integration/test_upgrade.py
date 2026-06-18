@@ -476,6 +476,7 @@ class TestInteractiveNoPlugin:
                 vscode=False,
                 agents=["claude"],
                 no_plugin=kw["no_plugin"],
+                profile=kw.get("profile") or "individual",
             )
 
         monkeypatch.setattr(cli, "_gather_inputs_interactive", _fake_gather)

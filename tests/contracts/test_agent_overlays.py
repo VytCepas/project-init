@@ -59,7 +59,9 @@ class TestAgentSelection:
         monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 
-        result = cli._gather_inputs_interactive(default_name="proj", no_plugin=False)
+        result = cli._gather_inputs_interactive(
+            default_name="proj", no_plugin=False, profile="individual"
+        )
         assert result.agents == ["claude", "codex"], "valid retry must be honored"
         assert "unknown agent(s): cursor" in capsys.readouterr().out
 

@@ -57,6 +57,8 @@ def make_variables(**overrides: str) -> dict[str, str]:
         # the copied payload use fallback_variables()/fallback_preset().
         "plugin_mode": "true",
         "no_plugin": "",
+        "profile": "individual",
+        "enforcement": "advisory",
         "graphify": "",
         "obsidian": "true",
         "project_owner": "",
