@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from project_init import __repo_url__, __version__
+from project_init import __plugin_version__, __repo_url__, __version__
 from project_init.mcps import (
     DB_CATALOG,
     MCP_CATALOG,
@@ -20,6 +20,7 @@ from project_init.scaffold import (
     TemplateRenderError,
     list_presets,
     load_preset,
+    marketplace_source_vars,
     overlay_layers,
     scaffold,
 )
@@ -603,8 +604,14 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "created_date": date.today().isoformat(),
         "project_init_version": __version__,
         "project_init_url": __repo_url__,
-        # owner/name slug for the same-repo plugin marketplace (ADR-010)
-        "project_init_repo": __repo_url__.removeprefix("https://github.com/"),
+        # Host-aware plugin-marketplace source (ADR-013, #248) — replaces the
+        # github.com-only removeprefix. Provides project_init_repo + _url +
+        # _github/_enterprise flags so non-github.com forks get a valid source.
+        **marketplace_source_vars(__repo_url__),
+        # Version-record fields (#248): plugin version + the previous scaffolder
+        # version (set on upgrade) for span detection (#250).
+        "project_init_plugin_version": __plugin_version__,
+        "project_init_version_prev": "",
         "language": language,
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": format_installed_mcps(selected_mcps),
