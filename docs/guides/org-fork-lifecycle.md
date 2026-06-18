@@ -1,74 +1,93 @@
 # Org fork lifecycle runbook
 
-> **Status: skeleton (#256).** This is the adoption path the `org` profile is designed
-> around. The mechanics in each stage are filled by #247 (profiles), #248 (fork/pin),
-> #251 (enforcement), #255 (host implementation), and #257 (end-to-end + release
-> plumbing). It exists early so those tickets validate against a real path instead of
-> baking unvalidated assumptions.
+> **Status: validated end-to-end (#257).** Every stage's mechanics now ship; the
+> path is exercised by `tests/integration/test_org_lifecycle.py`. This owns the
+> epic's "three-case model usable end-to-end" criterion (#253).
 
 For *why* the model is shaped this way, see [ADR-013](../adr/adr-013-distribution-governance-model.md)
-(distribution & governance) and the [Enterprise GitHub support matrix](../development/enterprise-github-support-matrix.md).
-This runbook covers the **`org`** profile only; `individual` and `standalone` users do
+and the [Enterprise GitHub support matrix](../development/enterprise-github-support-matrix.md).
+This runbook covers the **`org`** profile; `individual` and `standalone` users do
 not need a fork.
 
 ## At a glance
 
 ```
 1. Create the org copy   →  2. Customize  →  3. Publish a fork version  →  4. Onboard a teammate
-        (fork | import)         (preset)          (tag + pin)                  (install + enforce)
+        (fork | import)         (--profile org)     (tag → release.yml)         (install + enforce)
                          ⟲  Update flow: pull upstream, recommend (never forced)
 ```
 
 ## Stage 1 — Create the org copy (fork or import)
 
-The mechanism is **host-adaptive** (per the spike):
+Host-adaptive (per spike #254):
 
-- **github.com / GHES** → **fork** project-init into the org.
-- **EMU / GHE.com** → **import or mirror** (EMU blocks external forks; import/mirror is
-  the supported path).
+- **github.com / GHES** → **fork** project-init into the org:
+  `gh repo fork VytCepas/project-init --org <ORG>` (or fork on your GHES host).
+- **EMU / GHE.com** → **import or mirror** (external forks are blocked): GitHub
+  Enterprise Importer, or a mirror-clone + mirror-push.
 
-_To be filled (#255):_ host-aware commands, `gh` host selection, org forking-policy
-prerequisites (forking of private/internal repos defaults to *disallow*).
+Then point the lifecycle scripts at your host (#255): they infer the host from
+the repo remote, or set `PROJECT_INIT_HOST` / `GH_HOST`, and
+`PROJECT_INIT_API_BASE` for GHES (`https://HOST/api/v3`). Org forking of
+private/internal repos defaults to *disallow* — enable it in org settings, or use
+import on EMU.
 
 ## Stage 2 — Customize
 
-- Select `--profile org` (recorded in `.claude/config.yaml`).
-- Choose delivery: marketplace (`owner/repo` shorthand on github.com, **full git URL** on
-  GHES); **copied-in (`--no-plugin`)** on EMU/GHE.com.
-- Apply a company preset; for locked-down orgs, enable no-egress via
-  `managed-settings.json`.
+- Scaffold with the org profile: `project-init <target> --profile org` — bundles
+  host-adaptive delivery, pinning, and hard-enforcement defaults, and prints what
+  it bundles + the egress posture (notify-of-options, #247).
+- **Delivery** is host-adaptive (#248): github.com/GHES → fork + marketplace (a
+  full git URL is emitted off github.com); EMU/GHE.com → copied-in (`--no-plugin`).
+- **Company preset**: `project-init preset new acme-backend --extends obsidian-only`,
+  then edit `templates/presets/acme-backend.toml` (layers/vars/deps inherit; a
+  `min_project_init_version` marker guards compatibility) (#252).
+- **Locked down?** add `--no-egress` to omit the external official marketplace
+  from scaffolded settings (#258).
 
-_To be filled:_ profile bundle + notify-of-options (#247), company-preset authoring
-(#252), no-egress mode (#258).
+## Stage 3 — Publish a fork version (release plumbing)
 
-## Stage 3 — Publish a fork version
+The fork owns its releases:
 
-- Cut a release/tag on the fork so teammates install a pinned, reproducible version.
-- Record the plugin-version pin in config.
+1. Bump the version in `src/project_init/__init__.py` (`__version__`) and
+   `pyproject.toml`, on a branch → PR → merge.
+2. Tag it. The workflow guard blocks pushing tags to `main`, so create the tag
+   via the API:
+   `gh api repos/<ORG>/<FORK>/git/refs -f ref=refs/tags/vX.Y.Z -f sha=<main-sha>`.
+   That triggers `release.yml` (git-cliff changelog from Conventional Commits +
+   wheel; ADR-006/008).
+3. **Channel** (ADR-008/ADR-011): git-based by default — downstream pins with
+   `PROJECT_INIT_REF=vX.Y.Z`. A fork publishing to a private index configures its
+   *own* PyPI trusted publishing (ADR-011); it owns its release identity/secrets.
 
-_To be filled:_ version-record fields + re-pointable reference (#248), fork release
-plumbing (#257).
+The plugin/fork version is recorded in scaffolded configs (#248), so downstream
+projects pin to the fork's version, not upstream's.
 
 ## Stage 4 — Onboard a teammate
 
-- Install from the fork (the re-pointed reference); the recorded `org` profile drives
-  delivery and enforcement.
-- Server-side enforcement binds via **org rulesets applied directly to the repo**
-  (forks don't inherit branch/tag rulesets); admin-merge is refused.
+- Install from the fork:
+  `PROJECT_INIT_REPO=https://<HOST>/<ORG>/<FORK>.git ./install.sh`
+  (or `uv tool install "git+https://<HOST>/<ORG>/<FORK>@vX.Y.Z"`), then
+  `project-init <target> --profile org`.
+- The recorded profile/host/enforcement in `.claude/config.yaml` (#259) drives
+  delivery and enforcement on every `upgrade`.
+- **Server-side enforcement** (#251): `.claude/scripts/setup_github.sh --protect`
+  applies the `project-init-baseline` ruleset directly (empty `bypass_actors` —
+  binds everyone, no admin bypass). `monitor_pr.sh` refuses admin-merge under the
+  org profile; merge via auto-merge / the merge queue under the required checks.
 
-_To be filled:_ onboarding command + observability record (#259), hybrid enforcement
-(#251).
+## Update flow — pull-and-recommend (#250 / #249)
 
-## Update flow — pull-and-recommend
+1. The fork pulls upstream project-init and cuts a new fork version (Stage 3).
+2. Downstream projects run `project-init upgrade`: genuinely-new additions are
+   surfaced as **version-span recommendations** (#250) — never auto-applied.
+3. Adopt per group with `--accept-new <id>`, skip with `--decline-new <id>`;
+   `--apply` is refused until each new group is decided (#249). Declined groups
+   are recorded and suppressed unless they change materially.
 
-The fork **pulls upstream** and surfaces **recommendations** to adopt new additions —
-never forced. New additions require **consent** before they land; nothing is silent.
+## Validation (end-to-end)
 
-_To be filled:_ version-span detection + recommendations (#250), opt-in consent for new
-additions (#249).
-
-## Validation reference
-
-Each stage above is intentionally a placeholder anchored to the ticket that fills it.
-#247/#248/#251/#255 should check their design against this path; #257 turns it into a
-validated end-to-end walkthrough and owns the epic's "usable end-to-end" criterion.
+`tests/integration/test_org_lifecycle.py` scaffolds with `--profile org` and
+asserts the recorded profile/enforcement/host, the host-adaptive delivery, the
+no-egress mode, and the enforcement scripts are all coherent — confirming the
+three-case model is usable end-to-end (epic #253).
