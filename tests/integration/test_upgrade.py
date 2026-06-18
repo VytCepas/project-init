@@ -345,7 +345,7 @@ class TestMigration:
         config.write_text(text.split(_RECORD_MARKER)[0])
         (target / "justfile").write_bytes(b"# edited under old version\n")
 
-        rc = main(["upgrade", str(target), "--apply"])
+        rc = main(["upgrade", str(target), "--apply", "--accept-new", "all"])
         out = capsys.readouterr().out
         assert rc == 0
         assert "No scaffold record" in out
@@ -396,7 +396,7 @@ class TestRemovedPresets:
         config.write_text(
             config.read_text().replace("  preset: obsidian-only", "  preset: obsidian-lightrag")
         )
-        rc = main(["upgrade", str(target), "--apply"])
+        rc = main(["upgrade", str(target), "--apply", "--accept-new", "all"])
         assert rc == 0
         assert "re-rendering as obsidian-graphify" in capsys.readouterr().err
         # Successor preset's overlay landed and the record was rewritten.
@@ -443,7 +443,7 @@ class TestNoPluginSwitch:
         _scaffold(target)  # default: plugin mode, no copies
         assert not (target / ".claude" / "hooks" / "pre_commit_gate.sh").exists()
 
-        rc = main(["upgrade", str(target), "--no-plugin", "--apply"])
+        rc = main(["upgrade", str(target), "--no-plugin", "--apply", "--accept-new", "all"])
         assert rc == 0
         assert "switching to the no-plugin fallback" in capsys.readouterr().err
         assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()

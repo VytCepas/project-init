@@ -588,8 +588,31 @@ def _upgrade_main(argv: list[str]) -> int:
         action="store_true",
         help="Accepted for CLI symmetry — upgrade never prompts",
     )
+    p.add_argument(
+        "--accept-new",
+        action="append",
+        default=[],
+        metavar="ID",
+        help="Accept an addition group on --apply (repeatable; 'all' accepts every new group, #249)",
+    )
+    p.add_argument(
+        "--decline-new",
+        action="append",
+        default=[],
+        metavar="ID",
+        help=(
+            "Decline an addition group; recorded and suppressed on future "
+            "--apply unless it changes materially ('all' declines every new group)"
+        ),
+    )
     args = p.parse_args(argv)
-    return run_upgrade(Path(args.target).resolve(), apply=args.apply, no_plugin=args.no_plugin)
+    return run_upgrade(
+        Path(args.target).resolve(),
+        apply=args.apply,
+        no_plugin=args.no_plugin,
+        accept_new=args.accept_new,
+        decline_new=args.decline_new,
+    )
 
 
 def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
