@@ -595,7 +595,11 @@ def _addition_groups(new_paths: list[Path], staging: Path) -> dict[str, dict]:
     for group in groups.values():
         digest = hashlib.sha256()
         for rel in group["paths"]:
-            digest.update((staging / rel).read_bytes())
+            # Length-delimit path + content so different per-file splits can't
+            # collide (e.g. "ab"+"c" vs "a"+"bc" would otherwise match).
+            content = (staging / rel).read_bytes()
+            digest.update(f"{rel.as_posix()}\0{len(content)}\0".encode())
+            digest.update(content)
         group["hash"] = digest.hexdigest()[:12]
     return groups
 
@@ -611,8 +615,13 @@ def _read_declined(target: Path) -> dict[str, str]:
     match = _DECLINED_RE.search(config_path.read_text(encoding="utf-8"))
     if not match:
         return {}
+    # config.yaml is hand-editable: extract just the {...} object so a trailing
+    # inline YAML comment doesn't break JSON parsing (and silently drop declines).
+    obj = re.search(r"\{.*\}", match.group(2))
+    if not obj:
+        return {}
     try:
-        value = json.loads(match.group(2).strip() or "{}")
+        value = json.loads(obj.group(0))
     except json.JSONDecodeError:
         return {}
     return value if isinstance(value, dict) else {}

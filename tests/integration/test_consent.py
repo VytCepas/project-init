@@ -106,3 +106,30 @@ class TestConsentGate:
         doc.unlink()
         assert run_upgrade(target, apply=True) == 0
         assert doc.exists()
+
+
+class TestConsentInternals:
+    def test_read_declined_tolerates_inline_comment(self, tmp_path: Path):
+        from project_init.upgrade import _read_declined
+
+        target = _scaffolded(tmp_path)
+        cfg = target / ".claude/config.yaml"
+        cfg.write_text(
+            re.sub(
+                r"declined_additions:\s*\{.*\}",
+                'declined_additions: {"docs": "abc123"}  # hand-edited note',
+                cfg.read_text(),
+            )
+        )
+        assert _read_declined(target) == {"docs": "abc123"}
+
+    def test_group_hash_is_path_sensitive(self, tmp_path: Path):
+        # Same bytes under different filenames must hash differently — guards
+        # against per-file concatenation collisions.
+        target = tmp_path / "p"
+        (target / "docs").mkdir(parents=True)
+        for name in ("a.md", "b.md", "c.md"):
+            (target / "docs" / name).write_text("same")
+        h_ab = _addition_groups([Path("docs/a.md"), Path("docs/b.md")], target)["docs"]["hash"]
+        h_ac = _addition_groups([Path("docs/a.md"), Path("docs/c.md")], target)["docs"]["hash"]
+        assert h_ab != h_ac
