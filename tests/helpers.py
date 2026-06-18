@@ -33,6 +33,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "project_init_url": "https://github.com/example/project-init",
         "project_init_repo": "example/project-init",
         "project_init_repo_url": "https://github.com/example/project-init.git",
+        "project_init_host": "github.com",
         "project_init_github": "true",
         "project_init_enterprise": "",
         "project_init_plugin_version": "0.1.0",

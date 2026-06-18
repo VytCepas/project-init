@@ -54,6 +54,7 @@ _MIGRATION_DEFAULTS = {
     "project_init_repo_url": "https://github.com/VytCepas/project-init.git",
     "project_init_github": "true",
     "project_init_enterprise": "",
+    "project_init_host": "github.com",
     "project_init_plugin_version": "0.1.0",
     "project_init_version_prev": "",
 }
@@ -432,6 +433,49 @@ def _copy_rendered(src: Path, dest: Path) -> None:
     shutil.copy2(src, dest)
 
 
+# Visible observability fields injected into the human `project:` block on upgrade
+# when a pre-#247/#248/#259 config lacks them (config.yaml is not re-rendered on
+# upgrade, so otherwise they live only in the hidden record). (key, comment) —
+# the value comes from the recorded/backfilled variables (#259).
+_PROJECT_OBSERVABILITY = (
+    ("project_init_plugin_version", "plugin payload version (ADR-010)"),
+    ("profile", "individual | standalone | org — distribution profile (ADR-013)"),
+    ("enforcement", "advisory | hard — see ADR-013 / #251"),
+    ("project_init_host", "upstream GitHub host — #255/#259"),
+)
+
+
+_UPDATES_BLOCK = (
+    "\n\nupdates:\n"
+    "  # Addition-group consent state (#249): declined IDs, suppressed on future\n"
+    "  # `upgrade --apply` unless the upstream addition changes materially.\n"
+    "  declined_additions: []\n"
+)
+
+
+def _ensure_observability_fields(text: str, variables: dict) -> str:
+    """Surface the observability record in the hand-editable config (#259).
+
+    Idempotent. Operates on the human section only (above the scaffold-record
+    marker) so injected lines survive ``write_scaffold_record``'s strip-and-
+    re-append. Missing ``project:`` fields are inserted together, in declaration
+    order, in a single substitution after the ``project_init_version`` line; the
+    ``updates`` consent placeholder is appended if the config predates it.
+    """
+    head, sep, tail = text.partition(_RECORD_MARKER)
+    missing = [
+        f"  {key}: {variables.get(key, '')}  # {comment}"
+        for key, comment in _PROJECT_OBSERVABILITY
+        if not re.search(rf"(?m)^\s+{re.escape(key)}:", head)
+    ]
+    if missing:
+        block = "\n".join(missing)
+        head = _VERSION_LINE_RE.sub(lambda m: f"{m.group(0)}\n{block}", head, count=1)
+    if "declined_additions:" not in head:
+        head = head.rstrip("\n") + _UPDATES_BLOCK
+    return head + sep + tail
+
+
 def apply_drift(
     target: Path,
     staging: Path,
@@ -453,6 +497,7 @@ def apply_drift(
         text = _VERSION_LINE_RE.sub(
             rf"\g<1>{variables['project_init_version']}", text, count=1
         )
+        text = _ensure_observability_fields(text, variables)
         config_path.write_text(text, encoding="utf-8")
 
     # Only files whose on-disk content now equals the render are recorded —

@@ -8,6 +8,8 @@ project:
   project_init_version: {{project_init_version}}
   project_init_plugin_version: {{project_init_plugin_version}}  # plugin payload version (ADR-010)
   profile: {{profile}}     # individual | standalone | org — distribution profile (ADR-013)
+  enforcement: {{enforcement}}      # advisory | hard — see ADR-013 / #251
+  project_init_host: {{project_init_host}}  # upstream GitHub host (github.com | *.ghe.com | GHES) — #255/#259
   project_key: ""          # e.g. "PI" → branches use feat/PI-42-slug, PR titles use feat(PI-42):
   github_project_number: 1 # numeric GitHub Project V2 board number (used by board-automation.yml and create_issue.sh)
 
@@ -31,3 +33,9 @@ tooling:
   lint_command: "{{lint_command}}"
   format_command: "{{format_command}}"
   test_command: "{{test_command}}"
+
+updates:
+  # Addition-group consent state (#249): IDs the owner has declined are stored
+  # here and suppressed on future `upgrade --apply` unless the upstream addition
+  # changes materially. Populated by `--decline-new`; empty by default.
+  declined_additions: []
