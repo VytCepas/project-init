@@ -35,6 +35,7 @@ nav:
     - Plugin marketplace dual-ship: adr/adr-010-plugin-marketplace-dual-ship.md
     - PyPI trusted publishing: adr/adr-011-pypi-trusted-publishing.md
     - Prod-safety guard: adr/adr-012-prod-safety-guard.md
+    - Distribution & governance model: adr/adr-013-distribution-governance-model.md
   - Development:
     - Template system: development/template-system.md
     - Testing: development/testing.md
