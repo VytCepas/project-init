@@ -418,9 +418,13 @@ def _select_preset(
             return load_preset(args.preset)
         except ValueError as e:
             parser.error(str(e))
-    if args.non_interactive:
-        return presets[0]
-    return _choose_preset_interactive(presets)
+    # list_presets returns raw TOML; load the chosen one so `extends` inheritance
+    # and the compat marker are resolved before scaffolding (#252).
+    chosen = presets[0] if args.non_interactive else _choose_preset_interactive(presets)
+    try:
+        return load_preset(chosen["name"])
+    except ValueError as e:
+        parser.error(str(e))
 
 
 def _gather_inputs_interactive(
@@ -732,11 +736,48 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
     )
 
 
+def _preset_main(argv: list[str]) -> int:
+    """Parse and run `project-init preset new` — author a company preset (#252)."""
+    from project_init.scaffold import generate_preset
+
+    p = argparse.ArgumentParser(
+        prog="project-init preset",
+        description="Author company presets (inheritance, compat markers) — #252.",
+    )
+    sub = p.add_subparsers(dest="cmd", required=True)
+    new = sub.add_parser(
+        "new", help="Generate a starter company preset that extends a base preset"
+    )
+    new.add_argument("name", help="New preset name (bare stem, e.g. acme-backend)")
+    new.add_argument("--extends", required=True, help="Base preset to extend")
+    new.add_argument("--description", default="", help="One-line description")
+    new.add_argument(
+        "--min-version",
+        default=__version__,
+        help="min_project_init_version compat marker (default: current version)",
+    )
+    args = p.parse_args(argv)
+    try:
+        path = generate_preset(
+            args.name,
+            extends=args.extends,
+            description=args.description,
+            version=args.min_version,
+        )
+    except ValueError as e:
+        sys.stderr.write(f"error: {e}\n")
+        return 1
+    sys.stdout.write(f"Created preset: {path}\n")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the scaffolding CLI; return the process exit code."""
     argv = list(sys.argv[1:]) if argv is None else list(argv)
     if argv[:1] == ["upgrade"]:
         return _upgrade_main(argv[1:])
+    if argv[:1] == ["preset"]:
+        return _preset_main(argv[1:])
     parser = _build_parser()
     args = parser.parse_args(argv)
 
