@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# gh_host.sh — resolve the active GitHub host for host-aware links and URLs.
+#
+# Sourced by lifecycle scripts so manual links, clone URLs, and curl-based API
+# calls work on github.com, GHE.com (data residency, *.ghe.com), and GitHub
+# Enterprise Server (GHES) — not just public github.com (ADR-013, spike #254).
+#
+# `gh api` already targets the repo's host automatically, so these helpers are
+# only needed for hardcoded URLs and non-gh callers.
+#
+# On Enterprise Managed Users (EMU), external forks are blocked — an org mirrors
+# or imports the upstream instead (see the org fork lifecycle runbook). These
+# helpers resolve the host the same way regardless of fork-vs-import.
+#
+# Resolution order: PROJECT_INIT_HOST → GH_HOST → current repo remote → github.com.
+
+gh_host() {
+  if [ -n "${PROJECT_INIT_HOST:-}" ]; then printf '%s\n' "$PROJECT_INIT_HOST"; return; fi
+  if [ -n "${GH_HOST:-}" ]; then printf '%s\n' "$GH_HOST"; return; fi
+  local url host
+  url=$(gh repo view --json url -q .url 2>/dev/null || true)
+  [ -z "$url" ] && url=$(git config --get remote.origin.url 2>/dev/null || true)
+  host=$(printf '%s\n' "$url" | sed -nE 's#^(https?://|git@)([^/:]+).*#\2#p')
+  printf '%s\n' "${host:-github.com}"
+}
+
+# Web base for browser links, e.g. https://github.com or https://ghes.example.com
+gh_web_base() { printf 'https://%s\n' "$(gh_host)"; }
+
+# REST API base for curl-based callers. Prefer `gh api` where possible (it
+# resolves the host itself). github.com & *.ghe.com use api.<host>; GHES uses
+# <host>/api/v3. Override explicitly with PROJECT_INIT_API_BASE.
+gh_api_base() {
+  if [ -n "${PROJECT_INIT_API_BASE:-}" ]; then printf '%s\n' "$PROJECT_INIT_API_BASE"; return; fi
+  local host
+  host="$(gh_host)"
+  case "$host" in
+    "") printf 'https://api.github.com\n' ;;
+    github.com | *.ghe.com) printf 'https://api.%s\n' "$host" ;;
+    *) printf 'https://%s/api/v3\n' "$host" ;;
+  esac
+}

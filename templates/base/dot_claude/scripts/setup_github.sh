@@ -10,6 +10,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/gh_host.sh"
+
 BRANCH="main"
 PROTECT=0
 for arg in "$@"; do
@@ -20,14 +24,16 @@ for arg in "$@"; do
   esac
 done
 
-if ! gh auth status >/dev/null 2>&1; then
-  echo "ERROR: gh is not authenticated. Run gh auth login first." >&2
+HOST="$(gh_host)"
+if ! gh auth status -h "$HOST" >/dev/null 2>&1; then
+  echo "ERROR: gh is not authenticated for $HOST. Run: gh auth login --hostname $HOST" >&2
   exit 1
 fi
 
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 OWNER=${REPO%/*}
 NAME=${REPO#*/}
+WEB_BASE="https://$HOST"
 
 echo "Configuring GitHub governance for $REPO ($BRANCH)"
 # Default endpoint: repos/$OWNER/$NAME/branches/main/protection
@@ -77,7 +83,7 @@ if gh api "repos/$OWNER/$NAME/code-review-settings" -X PUT -f copilot_code_revie
   echo "Copilot code review enabled"
 else
   echo "WARNING: Enable Copilot code review manually if your plan supports it:" >&2
-  echo "  https://github.com/$OWNER/$NAME/settings/code_review" >&2
+  echo "  $WEB_BASE/$OWNER/$NAME/settings/code_review" >&2
 fi
 
 # --- GitHub Project board field provisioning ---
@@ -121,7 +127,7 @@ if [ -z "$PROJECT_ID" ]; then
   echo "  • Agent ready  — options: Yes, No" >&2
   echo "  • Confidence   — options: high, medium, low, unknown" >&2
   echo "  • Type         — options: feature, bug, chore, documentation, test" >&2
-  echo "  Settings: https://github.com/users/$OWNER/projects/$PROJECT_NUMBER/settings/fields" >&2
+  echo "  Settings: $WEB_BASE/users/$OWNER/projects/$PROJECT_NUMBER/settings/fields" >&2
 else
   EXISTING_FIELDS=$(echo "$PROJECT_DATA" | jq -r \
     '((.data.user.projectV2 // .data.organization.projectV2).fields.nodes // [])[] | .name // empty')
@@ -138,7 +144,7 @@ else
     else
       # Repo: $REPO  Project: #$PROJECT_NUMBER
       echo "  WARNING: could not create '$field_name' for $REPO — add it manually:" >&2
-      echo "    https://github.com/users/$OWNER/projects/$PROJECT_NUMBER/settings/fields" >&2
+      echo "    $WEB_BASE/users/$OWNER/projects/$PROJECT_NUMBER/settings/fields" >&2
     fi
   }
 

@@ -18,6 +18,9 @@ INSTALL_DIR="${PROJECT_INIT_HOME:-$HOME/.local/share/project-init}"
 COMMANDS_DIR="$HOME/.claude/commands"
 # Pin a version with PROJECT_INIT_REF=vX.Y.Z, or track the development head
 # with PROJECT_INIT_REF=main. Default: the latest GitHub Release (ADR-008).
+# For non-github.com hosts (GHES / GHE.com), point PROJECT_INIT_REPO at the full
+# clone URL; the REST API base is derived from its host, or set it explicitly
+# with PROJECT_INIT_API_BASE (e.g. https://ghes.example.com/api/v3).
 REQUESTED_REF="${PROJECT_INIT_REF:-}"
 
 say() { printf '\033[1;36m[project-init]\033[0m %s\n' "$*"; }
@@ -47,13 +50,26 @@ resolve_ref() {
         printf '%s\n' "$REQUESTED_REF"
         return
     fi
-    # Derive owner/repo from REPO_URL for the API query (github.com only).
-    # POSIX ERE has no lazy quantifier, so strip the .git suffix separately.
-    local slug tag
-    slug=$(printf '%s\n' "$REPO_URL" | sed -nE 's#.*github\.com[:/]([^/]+/[^/]+)$#\1#p')
+    # Derive the host + owner/repo slug from REPO_URL (any GitHub host, not just
+    # github.com), then pick the REST API base. POSIX ERE has no lazy quantifier,
+    # so strip the .git suffix separately.
+    local host slug api_base tag
+    host=$(printf '%s\n' "$REPO_URL" | sed -nE 's#^(https?://|git@)([^/:]+).*#\2#p')
+    slug=$(printf '%s\n' "$REPO_URL" | sed -nE 's#.*[/:]([^/]+/[^/]+)$#\1#p')
     slug="${slug%.git}"
+    # API base: explicit override wins; github.com & *.ghe.com use api.<host>;
+    # GitHub Enterprise Server uses <host>/api/v3.
+    if [ -n "${PROJECT_INIT_API_BASE:-}" ]; then
+        api_base="$PROJECT_INIT_API_BASE"
+    else
+        case "$host" in
+            "") api_base="https://api.github.com" ;;
+            github.com | *.ghe.com) api_base="https://api.$host" ;;
+            *) api_base="https://$host/api/v3" ;;
+        esac
+    fi
     if [ -n "$slug" ]; then
-        tag=$(curl -fsSL "https://api.github.com/repos/$slug/releases/latest" 2>/dev/null \
+        tag=$(curl -fsSL "$api_base/repos/$slug/releases/latest" 2>/dev/null \
             | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name"[^"]*"([^"]+)".*/\1/' || true)
     fi
     if [ -n "${tag:-}" ]; then
