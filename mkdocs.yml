@@ -37,7 +37,8 @@ nav:
     - PyPI trusted publishing: adr/adr-011-pypi-trusted-publishing.md
     - Prod-safety guard: adr/adr-012-prod-safety-guard.md
     - Distribution & governance model: adr/adr-013-distribution-governance-model.md
-    - Environment promotion chains: adr/adr-014-environment-promotion-chains.md
+    - Environment promotion chains (superseded): adr/adr-014-environment-promotion-chains.md
+    - Env & deploy model: adr/adr-015-env-deploy-model.md
   - Development:
     - Template system: development/template-system.md
     - Testing: development/testing.md
