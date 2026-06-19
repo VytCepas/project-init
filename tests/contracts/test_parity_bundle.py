@@ -79,3 +79,29 @@ class TestParityBundleAbsent:
     def test_prototype_without_flag_has_no_devcontainer(self, tmp_path: Path):
         target = _scaffold(tmp_path / "proto", delivery="prototype", language="python")
         assert not (target / ".devcontainer" / "devcontainer.json").exists()
+
+
+class TestBuildOnceCI:
+    """PI-320: service CI builds the same image once (tagged by SHA); host-based
+    tests stay the pinned location. Prototype/library CI has no image build."""
+
+    def _ci(self, target: Path) -> str:
+        return (target / ".github" / "workflows" / "ci.yml").read_text()
+
+    def test_service_ci_builds_image_once(self, tmp_path: Path):
+        ci = self._ci(_service(tmp_path / "svc"))
+        assert "build-image:" in ci
+        assert "docker/build-push-action" in ci
+        assert "${{ github.sha }}" in ci
+        assert "push: false" in ci  # deploy overlay (#323) wires the push-by-digest
+
+    def test_prototype_ci_has_no_image_build(self, tmp_path: Path):
+        ci = self._ci(_scaffold(tmp_path / "proto", delivery="prototype"))
+        assert "build-image:" not in ci
+        assert "build-push-action" not in ci
+
+    def test_library_ci_has_no_image_build(self, tmp_path: Path):
+        # delivery_service must never leak true for a library (PR #334 review).
+        ci = self._ci(_scaffold(tmp_path / "lib", delivery="library"))
+        assert "build-image:" not in ci
+        assert "build-push-action" not in ci
