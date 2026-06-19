@@ -256,6 +256,22 @@ class TestPromoteEnvValidation:
         assert "merge" not in calls
         assert "push" not in calls
 
+    def test_push_uses_no_verify(self, monkeypatch):
+        # The promotion push must skip the local pre-push hook (bare env-branch
+        # names fail its type-prefix rule); server-side rulesets still govern.
+        dag = self._dag(monkeypatch, ["dev", "test", "main"])
+        monkeypatch.setattr(dag, "_current_branch", lambda: "dev")
+        pushes: list[list[str]] = []
+
+        def fake_git(args: list[str]) -> tuple[int, str]:
+            if args[0] == "push":
+                pushes.append(args)
+            return (0, "")
+
+        monkeypatch.setattr(dag, "_git", fake_git)
+        assert dag.cmd_promote_env("test") == 0
+        assert pushes and "--no-verify" in pushes[0]
+
 
 class TestPromoteEnvFastForward:
     def test_promotes_by_fast_forward(self, tmp_path: Path, monkeypatch):
@@ -364,3 +380,23 @@ class TestSetupEnvBranches:
         script = target / ".claude/scripts/setup_env_branches.sh"
         assert script.is_file()
         assert script.stat().st_mode & 0o111
+
+
+class TestCIRetargeting:
+    def _scaffold(self, tmp_path: Path, **overrides: str) -> Path:
+        target = tmp_path / "p"
+        scaffold(target, fallback_preset(), fallback_variables(**overrides), strict=True)
+        return target
+
+    def test_validate_pr_default_targets_main(self, tmp_path: Path):
+        vp = (self._scaffold(tmp_path) / ".github/workflows/validate-pr.yml").read_text()
+        assert "branches: [main]" in vp
+
+    def test_validate_pr_targets_base_for_env(self, tmp_path: Path):
+        vp = (self._scaffold(tmp_path, base_branch="dev") / ".github/workflows/validate-pr.yml").read_text()
+        assert "branches: [dev]" in vp
+
+    def test_ci_targets_base_for_env(self, tmp_path: Path):
+        ci = (self._scaffold(tmp_path, base_branch="dev") / ".github/workflows/ci.yml").read_text()
+        assert "branches: [dev]" in ci
+        assert "branches: [main]" not in ci
