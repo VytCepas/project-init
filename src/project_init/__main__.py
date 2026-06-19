@@ -51,6 +51,9 @@ class ScaffoldInputs:
     # Delivery model (epic #316, ADR-015): how the project ships — drives the
     # env/CI/release bundle. "prototype" is the safe minimal default.
     delivery: str = "prototype"
+    # Deploy target (epic #316, ADR-015): opt-in deploy overlay for services.
+    # "none" = my platform owns deploy, or not deployed via Actions yet.
+    deploy: str = "none"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -88,6 +91,17 @@ def _build_parser() -> argparse.ArgumentParser:
             "service (deployed app — gets the container parity bundle), prototype "
             "(default — single trunk, nothing env-specific). service needs a "
             "language."
+        ),
+    )
+    p.add_argument(
+        "--deploy",
+        metavar="TARGET",
+        default=None,
+        # Validated by resolve_deploy(); only meaningful for delivery=service.
+        help=(
+            "Deploy overlay for a service (ADR-015, opt-in): none (default — your "
+            "platform/PaaS owns deploy, or not yet), cloud-run, fly, k8s, registry "
+            "(publish image only), or custom. Requires --delivery service."
         ),
     )
     p.add_argument(
@@ -444,15 +458,49 @@ def _select_preset(
         parser.error(str(e))
 
 
+def _resolve_overlays_interactive(
+    language: str, delivery: str | None, deploy: str | None
+) -> tuple[str, str]:
+    """Resolve (delivery, deploy) for the interactive path.
+
+    A passed flag is validated; on a conflict (e.g. service + language none) or
+    no flag, we prompt — never crash (the non-interactive path turns the same
+    error into a parser.error). Deploy applies only to services.
+    """
+    from rich.console import Console
+
+    resolved_delivery = None
+    if delivery:
+        try:
+            resolved_delivery = resolve_delivery(delivery, language)
+        except ValueError as e:
+            Console().print(f"[red]{e}[/red]")
+    if resolved_delivery is None:
+        resolved_delivery = _choose_delivery_interactive(language)
+
+    if resolved_delivery != "service":
+        return resolved_delivery, "none"
+    if deploy:
+        try:
+            return resolved_delivery, resolve_deploy(deploy, resolved_delivery)
+        except ValueError as e:
+            Console().print(f"[red]{e}[/red]")
+    return resolved_delivery, _choose_deploy_interactive()
+
+
 def _gather_inputs_interactive(
     default_name: str,
     *,
     no_plugin: bool,
     profile: str | None,
     no_egress: bool = False,
-    delivery: str | None = None,
+    cli_overlays: tuple[str | None, str | None] = (None, None),
 ) -> ScaffoldInputs:
-    """Prompt for the profile, project basics, MCPs, governance, and overlays."""
+    """Prompt for the profile, project basics, MCPs, governance, and overlays.
+
+    ``cli_overlays`` pre-seeds (delivery, deploy) from flags; either may be None
+    to prompt.
+    """
     resolved_profile = profile or _choose_profile_interactive()
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
     project_name = _prompt("Project name", default=default_name)
@@ -460,19 +508,10 @@ def _gather_inputs_interactive(
     language = _prompt("Language (python/node/go/none)", default="none")
     if language not in {"python", "node", "go", "none"}:
         language = "none"
-    # A delivery flag may conflict with the prompted language (e.g. service +
-    # none); on the interactive path re-prompt cleanly rather than crash (the
-    # non-interactive path turns the same error into a parser.error). PR #332.
-    resolved_delivery = None
-    if delivery:
-        try:
-            resolved_delivery = resolve_delivery(delivery, language)
-        except ValueError as e:
-            from rich.console import Console
-
-            Console().print(f"[red]{e}[/red]")
-    if resolved_delivery is None:
-        resolved_delivery = _choose_delivery_interactive(language)
+    delivery_flag, deploy_flag = cli_overlays
+    resolved_delivery, resolved_deploy = _resolve_overlays_interactive(
+        language, delivery_flag, deploy_flag
+    )
 
     # MCP selection — three steps.
     selected_mcps = _choose_mcps_interactive(MCP_CATALOG)
@@ -522,6 +561,7 @@ def _gather_inputs_interactive(
         profile=resolved_profile,
         no_egress=no_egress,
         delivery=resolved_delivery,
+        deploy=resolved_deploy,
     )
 
 
@@ -584,6 +624,56 @@ def _choose_delivery_interactive(language: str) -> str:
             return resolve_delivery(_DELIVERY[choice - 1], language)
         except ValueError as e:
             console.print(f"[red]{e}[/red]")
+
+
+_DEPLOY_TARGETS = ("none", "cloud-run", "fly", "k8s", "registry", "custom")
+
+# Container-deploy targets get the build-once-by-digest deploy graph; registry is
+# publication only; none = no Actions deploy overlay.
+_DEPLOY_CONTAINER = ("cloud-run", "fly", "k8s", "custom")
+
+_DEPLOY_SUMMARY = {
+    "none": "my platform/PaaS deploys it, or not deployed via Actions yet (default)",
+    "cloud-run": "Google Cloud Run (build-once, promote the digest)",
+    "fly": "Fly.io (build-once, promote the digest)",
+    "k8s": "Kubernetes (kubectl/helm set image to the digest)",
+    "registry": "publish the image to GHCR only — not a deployment",
+    "custom": "container deploy with a TODO ship step you fill in",
+}
+
+
+def resolve_deploy(raw: str | None, delivery: str) -> str:
+    """Normalize a deploy target; default 'none'.
+
+    Deploy targets apply only to ``delivery=service`` — a non-'none' target on a
+    library/prototype is a configuration error. Raises ValueError otherwise.
+    """
+    value = (raw or "").strip().lower() or "none"
+    if value not in _DEPLOY_TARGETS:
+        valid = ", ".join(_DEPLOY_TARGETS)
+        raise ValueError(f"invalid deploy target '{raw}'. Choose one of: {valid}")
+    if value != "none" and delivery != "service":
+        raise ValueError(
+            "deploy targets apply only to delivery=service "
+            f"(got delivery={delivery!r}). Use --delivery service, or --deploy none"
+        )
+    return value
+
+
+def _choose_deploy_interactive() -> str:
+    """Present the deploy options (ADR-015); default none. Shown only for services."""
+    from rich.console import Console
+    from rich.prompt import IntPrompt
+
+    console = Console()
+    console.print("\n[bold]How is this service deployed?[/bold]")
+    for i, name in enumerate(_DEPLOY_TARGETS, 1):
+        console.print(f"  {i}. [cyan]{name}[/cyan] — {_DEPLOY_SUMMARY[name]}")
+    choice = IntPrompt.ask("Choose a deploy target", default=1)
+    if choice < 1 or choice > len(_DEPLOY_TARGETS):
+        console.print("[red]Invalid choice. Using none.[/red]")
+        return "none"
+    return _DEPLOY_TARGETS[choice - 1]
 
 
 _VALID_AGENTS = ("claude", "codex", "gemini", "ollama")
@@ -780,6 +870,16 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "delivery": inputs.delivery,
         "delivery_library": "true" if inputs.delivery == "library" else "",
         "delivery_service": "true" if inputs.delivery == "service" else "",
+        # Deploy overlay (ADR-015, opt-in): the deploy.yml / environments.yaml
+        # templates gate on these. deploy_container = build-once-by-digest graph;
+        # deploy_registry = publish-image-only; both imply deploy_enabled.
+        "deploy_target": inputs.deploy,
+        "deploy_enabled": "true" if inputs.deploy != "none" else "",
+        "deploy_container": "true" if inputs.deploy in _DEPLOY_CONTAINER else "",
+        "deploy_registry": "true" if inputs.deploy == "registry" else "",
+        "deploy_cloud_run": "true" if inputs.deploy == "cloud-run" else "",
+        "deploy_fly": "true" if inputs.deploy == "fly" else "",
+        "deploy_k8s": "true" if inputs.deploy == "k8s" else "",
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": format_installed_mcps(selected_mcps),
         "installed_mcps_yaml": format_installed_mcps_yaml(selected_mcps),
@@ -858,6 +958,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
     no_plugin = _profile_delivery_no_plugin(profile, args.no_plugin)
     try:
         delivery = resolve_delivery(args.delivery, args.language or "none")
+        deploy = resolve_deploy(args.deploy, delivery)
     except ValueError as e:
         parser.error(str(e))
     _print_profile_notice(profile, no_plugin=no_plugin, no_egress=args.no_egress)
@@ -876,6 +977,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         profile=profile,
         no_egress=args.no_egress,
         delivery=delivery,
+        deploy=deploy,
     )
 
 
@@ -945,7 +1047,7 @@ def main(argv: list[str] | None = None) -> int:
             no_plugin=args.no_plugin,
             profile=args.profile,
             no_egress=args.no_egress,
-            delivery=args.delivery,
+            cli_overlays=(args.delivery, args.deploy),
         )
     target.mkdir(parents=True, exist_ok=True)
 

@@ -1,0 +1,23 @@
+{{#if deploy_enabled}}# Deployment environments (ADR-015) — the declarative, agent-legible model of
+# where this service runs. Build the image once; promote the SAME digest through
+# these environments. This file is the source of truth an agent reads instead of
+# inferring deploy state from branch topology.
+#
+# Fixed shape (staging → production). To see what's actually live, an agent can
+# query the GitHub deployments API (`gh api repos/{owner}/{repo}/deployments`).
+environments:
+  staging:
+    github_environment: staging
+    trigger: auto            # deploys on merge to {{base_branch}}
+    gated: false
+  production:
+    github_environment: production
+    trigger: promote         # deploys after staging; gated by the GitHub
+                             # Environment's protection rules (required reviewers
+                             # / wait timer). Arm them with:
+                             #   .claude/scripts/setup_env_protection.sh
+    gated: true
+
+# Promotion model: the deploy.yml workflow builds the image once and deploys that
+# exact digest to staging, then production. Rollback = redeploy a prior digest.
+{{/if deploy_enabled}}

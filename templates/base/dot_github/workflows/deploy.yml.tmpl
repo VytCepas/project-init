@@ -1,0 +1,94 @@
+{{#if deploy_container}}# Deploy ({{deploy_target}}) — build once, promote the SAME image digest through
+# environments (ADR-015). Staging deploys automatically on merge to
+# {{base_branch}}; production is gated by the `production` GitHub Environment
+# (arm its protection rules with `.claude/scripts/setup_env_protection.sh`).
+# The model is declared in deploy/environments.yaml.
+name: Deploy
+
+on:
+  push:
+    branches: [{{base_branch}}]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # --- build once: push the image to GHCR and emit its immutable digest ---
+  build-push:
+    name: Build + push image (by digest)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # github.repository may contain uppercase (invalid in an image ref).
+      - name: Compute lowercase image name
+        id: meta
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push (SHA-tagged, by digest)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # --- promote the SAME digest to staging automatically ---
+  deploy-staging:
+    name: Deploy to staging
+    needs: build-push
+    runs-on: ubuntu-24.04
+    environment: staging
+    env:
+      IMAGE: ${{ needs.build-push.outputs.image }}@${{ needs.build-push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy ${{ env.IMAGE }} to staging
+        run: |
+{{#if deploy_cloud_run}}          # TODO: authenticate to GCP (workload identity), then:
+          # gcloud run deploy my-service --image "$IMAGE" --region "$REGION"
+{{/if deploy_cloud_run}}{{#if deploy_fly}}          # TODO: flyctl deploy --image "$IMAGE" --app my-service-staging
+{{/if deploy_fly}}{{#if deploy_k8s}}          # TODO: kubectl set image deploy/my-service app="$IMAGE" -n staging
+          #   (or: helm upgrade --set image="$IMAGE")
+{{/if deploy_k8s}}          echo "Deploy '$IMAGE' to staging — replace this with your ship command."
+
+  # --- promote the SAME digest to production, gated by the environment ---
+  deploy-production:
+    name: Deploy to production
+    # Both: ordered after staging AND needs build-push's digest outputs (the
+    # `needs` context only exposes directly-declared jobs).
+    needs: [build-push, deploy-staging]
+    runs-on: ubuntu-24.04
+    # The `production` GitHub Environment is the server-side gate (required
+    # reviewers / wait timer). An agent cannot bypass it. See #324 / setup_env_protection.sh.
+    environment: production
+    env:
+      IMAGE: ${{ needs.build-push.outputs.image }}@${{ needs.build-push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy ${{ env.IMAGE }} to production
+        run: |
+{{#if deploy_cloud_run}}          # TODO: gcloud run deploy my-service --image "$IMAGE" --region "$REGION"
+{{/if deploy_cloud_run}}{{#if deploy_fly}}          # TODO: flyctl deploy --image "$IMAGE" --app my-service
+{{/if deploy_fly}}{{#if deploy_k8s}}          # TODO: kubectl set image deploy/my-service app="$IMAGE" -n production
+{{/if deploy_k8s}}          echo "Deploy '$IMAGE' to production — replace this with your ship command."
+{{/if deploy_container}}
