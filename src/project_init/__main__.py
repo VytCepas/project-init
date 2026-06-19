@@ -711,8 +711,10 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         # and enforcement defaults. The enforcing behavior lands in #251.
         "profile": inputs.profile,
         "enforcement": _profile_enforcement(inputs.profile),
-        # Single trunk: feature PRs target the default branch. Templates that key
-        # off the trunk (ci.yml, validate-pr.yml, start_issue.sh) consume this.
+        # Single trunk: feature PRs target 'main'. Pinned to 'main' (not the live
+        # default branch) so the rendered workflows and gh_host's base_branch()
+        # agree. Templates that key off the trunk (ci.yml, validate-pr.yml,
+        # start_issue.sh) consume this.
         "base_branch": "main",
         # No-egress mode (#258): omit the external official marketplace. egress_ok
         # is the inverse flag the template gates on (the engine has no else-branch).

@@ -60,10 +60,11 @@ gh_profile() {
   printf '%s\n' "${prof:-individual}"
 }
 
-# Base branch for feature PRs: the repo's default branch (then main). Single
-# trunk — feature PRs target it. Used by start_issue.sh.
+# Base branch for feature PRs. Single trunk: the scaffolder pins the rendered
+# workflows (ci.yml, validate-pr.yml) to 'main', so this MUST return 'main' too —
+# resolving the live default branch instead would let start_issue.sh target a
+# branch the CI/validation workflows don't cover (PR #330 review). Used by
+# start_issue.sh.
 base_branch() {
-  local base=""
-  base=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
-  printf '%s\n' "${base:-main}"
+  printf 'main\n'
 }

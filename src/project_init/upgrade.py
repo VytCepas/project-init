@@ -359,6 +359,11 @@ def _backfill_variables(variables: dict) -> dict:
         derived[flag] = "true" if language == flag else ""
     for key, value in derived.items():
         v.setdefault(key, value)
+    # Normalize the base branch to single-trunk 'main'. Branch-per-env is removed
+    # (epic #316), so a record from the short-lived promotion-chain feature may
+    # carry e.g. base_branch=dev; left as-is, the re-rendered workflows would
+    # target 'dev' while gh_host's base_branch() returns 'main' (PR #330 review).
+    v["base_branch"] = "main"
     return v
 
 

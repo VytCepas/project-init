@@ -126,6 +126,15 @@ class TestBranchProtectionBootstrap:
         assert '"CI / Lint and test"' in script
         assert '"CI / Secret scan (gitleaks)"' in script
 
+    def test_protect_sets_squash_only_merge_policy(self):
+        """--protect centralizes the repo merge policy (lifted from the removed
+        setup_env_branches.sh, PR #330): squash-only + delete-branch-on-merge."""
+        script = _SETUP_GITHUB.read_text()
+        assert "allow_squash_merge=true" in script
+        assert "allow_merge_commit=false" in script
+        assert "allow_rebase_merge=false" in script
+        assert "delete_branch_on_merge=true" in script
+
 
 def test_superseded_adrs_note_adr_006():
     """PI-193: ADR-003/005's PR-title rule was superseded by ADR-006; their
