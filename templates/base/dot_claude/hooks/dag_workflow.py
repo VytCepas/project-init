@@ -501,7 +501,9 @@ def _base_branch(config_path: Path | None = None) -> str | None:
         text = cfg.read_text(encoding="utf-8")
     except OSError:
         return None
-    m = re.search(r'^\s*promotion_chain:\s*\[\s*"([^"]+)"', text, re.MULTILINE)
+    # Tolerate quoted or unquoted entries (config.yaml is hand-editable; ADR-014
+    # prose shows unquoted forms like [main] / [dev, test, main]).
+    m = re.search(r'^\s*promotion_chain:\s*\[\s*"?([^"\s,\]]+)', text, re.MULTILINE)
     return m.group(1) if m else None
 
 

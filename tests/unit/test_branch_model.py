@@ -15,7 +15,7 @@ from project_init.__main__ import (
     resolve_branch_chain,
 )
 from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from tests.helpers import fallback_preset, fallback_variables, make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DAG_HOOK = _REPO_ROOT / ".claude" / "hooks" / "dag_workflow.py"
@@ -169,16 +169,32 @@ class TestBaseBranchReader:
         cfg.write_text("project:\n  name: x\n")
         assert _load_dag()._base_branch(cfg) is None
 
+    def test_reads_unquoted_chain(self, tmp_path: Path):
+        # config.yaml is hand-editable; tolerate unquoted lists (ADR-014 prose).
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("    promotion_chain: [dev, test, main]\n")
+        assert _load_dag()._base_branch(cfg) == "dev"
+
 
 class TestBaseBranchWiring:
-    def test_gh_host_defines_base_branch(self):
-        assert "base_branch()" in (_SCRIPTS / "gh_host.sh").read_text()
+    """The base-branch wiring must survive scaffolding into a real project tree
+    (repo rule: templates/ changes need a scaffold-into-tempdir test)."""
 
-    def test_start_issue_targets_base(self):
-        s = (_SCRIPTS / "start_issue.sh").read_text()
+    def _scaffold(self, tmp_path: Path) -> Path:
+        target = tmp_path / "p"
+        scaffold(target, fallback_preset(), fallback_variables(), strict=True)
+        return target
+
+    def test_scaffolded_gh_host_defines_base_branch(self, tmp_path: Path):
+        target = self._scaffold(tmp_path)
+        assert "base_branch()" in (target / ".claude/scripts/gh_host.sh").read_text()
+
+    def test_scaffolded_start_issue_targets_base(self, tmp_path: Path):
+        target = self._scaffold(tmp_path)
+        s = (target / ".claude/scripts/start_issue.sh").read_text()
         assert "gh_host.sh" in s
         assert "--base" in s
 
-    def test_dag_workflow_has_base_reader(self):
-        hook = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "dag_workflow.py"
-        assert "_base_branch" in hook.read_text()
+    def test_scaffolded_dag_workflow_has_base_reader(self, tmp_path: Path):
+        target = self._scaffold(tmp_path)
+        assert "_base_branch" in (target / ".claude/hooks/dag_workflow.py").read_text()
