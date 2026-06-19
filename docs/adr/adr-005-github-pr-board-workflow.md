@@ -1,7 +1,7 @@
 # ADR-005: GitHub PR and board lifecycle workflow
 
 **Date:** 2026-04-27
-**Status:** Accepted — superseded in part by [ADR-006](adr-006-conventional-commit-titles.md) (the PR/commit title format)
+**Status:** Accepted — superseded in part by [ADR-006](adr-006-conventional-commit-titles.md) (the PR/commit title format) and [ADR-014](adr-014-environment-promotion-chains.md) (the single-trunk base-branch assumption; the base branch is now configurable via an opt-in promotion chain)
 
 ## Context
 
