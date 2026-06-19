@@ -114,14 +114,8 @@ def _overlay_off_defaults() -> dict[str, str]:
         "enforcement": "advisory",
         "no_egress": "",
         "egress_ok": "true",
-        # Branch model (ADR-014, #301): single-trunk is the faithful "off" state
-        # for records predating the promotion-chain feature.
-        "branch_chain": "main",
-        "branch_chain_yaml": '"main"',
+        # Single trunk: feature PRs target the default branch.
         "base_branch": "main",
-        "production_branch": "main",
-        "single_trunk": "true",
-        "multi_env": "",
         "project_owner": "",
         "license": "none",
         "license_mit": "",
@@ -365,6 +359,11 @@ def _backfill_variables(variables: dict) -> dict:
         derived[flag] = "true" if language == flag else ""
     for key, value in derived.items():
         v.setdefault(key, value)
+    # Normalize the base branch to single-trunk 'main'. Branch-per-env is removed
+    # (epic #316), so a record from the short-lived promotion-chain feature may
+    # carry e.g. base_branch=dev; left as-is, the re-rendered workflows would
+    # target 'dev' while gh_host's base_branch() returns 'main' (PR #330 review).
+    v["base_branch"] = "main"
     return v
 
 

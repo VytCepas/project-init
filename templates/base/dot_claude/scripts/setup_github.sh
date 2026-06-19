@@ -39,6 +39,17 @@ echo "Configuring GitHub governance for $REPO ($BRANCH)"
 # Default endpoint: repos/$OWNER/$NAME/branches/main/protection
 
 if [ "$PROTECT" = 1 ]; then
+# Repo merge policy: squash-only + delete-branch-on-merge. Squash keeps history
+# linear (one commit per PR) and reuses the PR title (ADR-006); deleting the head
+# branch on merge keeps the branch list clean.
+if gh api "repos/$OWNER/$NAME" -X PATCH \
+     -F allow_squash_merge=true -F allow_merge_commit=false \
+     -F allow_rebase_merge=false -F delete_branch_on_merge=true >/dev/null 2>&1; then
+  echo "Repo merge policy: squash-only + delete-branch-on-merge"
+else
+  echo "WARNING: could not set repo merge policy (admin permission?)." >&2
+fi
+
 PROTECTION=$(mktemp)
 trap 'rm -f "$PROTECTION"' EXIT
 
