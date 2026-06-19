@@ -32,16 +32,16 @@ fi
 
 printf '%-14s %-12s %-10s %s\n' "ENVIRONMENT" "STATE" "SHA" "WHEN"
 any=0
+# Uses gh's built-in jq (-q) — no external jq binary required.
 for env in "${ENVS[@]}"; do
-  dep=$(gh api "repos/$OWNER/$NAME/deployments?environment=$env&per_page=1" 2>/dev/null || echo '[]')
-  id=$(echo "$dep" | jq -r '.[0].id // empty')
-  if [ -z "$id" ]; then
+  line=$(gh api "repos/$OWNER/$NAME/deployments?environment=$env&per_page=1" \
+    -q '.[0] | "\(.id // "")\t\(.sha[0:7] // "?")\t\(.created_at // "?")"' 2>/dev/null || true)
+  IFS=$'\t' read -r id sha when <<< "$line"
+  if [ -z "${id:-}" ]; then
     printf '%-14s %-12s %-10s %s\n' "$env" "—" "—" "(no GitHub deployment)"
     continue
   fi
   any=1
-  sha=$(echo "$dep" | jq -r '.[0].sha[0:7] // "?"')
-  when=$(echo "$dep" | jq -r '.[0].created_at // "?"')
   state=$(gh api "repos/$OWNER/$NAME/deployments/$id/statuses?per_page=1" -q '.[0].state' 2>/dev/null || echo "?")
   printf '%-14s %-12s %-10s %s\n' "$env" "$state" "$sha" "$when"
 done

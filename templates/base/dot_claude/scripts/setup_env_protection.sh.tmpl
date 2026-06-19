@@ -30,8 +30,8 @@ WAIT_MIN=5
 REVIEWERS=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --reviewer) REVIEWERS+=("$2"); shift 2 ;;
-    --wait) WAIT_MIN="$2"; shift 2 ;;
+    --reviewer) [ $# -ge 2 ] || { echo "Missing value for --reviewer" >&2; exit 1; }; REVIEWERS+=("$2"); shift 2 ;;
+    --wait) [ $# -ge 2 ] || { echo "Missing value for --wait" >&2; exit 1; }; WAIT_MIN="$2"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -71,6 +71,7 @@ resolve_reviewer() {
 BODY=$(mktemp)
 trap 'rm -f "$BODY"' EXIT
 
+SKIP_PROD=0
 if [ "$PROFILE" = "org" ]; then
   reviewers_json="[]"
   if [ "${#REVIEWERS[@]}" -gt 0 ]; then
@@ -82,14 +83,19 @@ if [ "$PROFILE" = "org" ]; then
     reviewers_json="[$(IFS=,; echo "${parts[*]}")]"
   fi
   if [ "$reviewers_json" = "[]" ]; then
-    echo "WARNING: org profile but no --reviewer resolved — production has NO human reviewer yet." >&2
-    echo "  Re-run with: setup_env_protection.sh --reviewer @your-org/your-team" >&2
-  fi
-  cat > "$BODY" <<JSON
-{ "prevent_self_review": true, "reviewers": $reviewers_json,
+    # Do NOT PUT an empty-reviewers payload — that would WIPE any reviewers already
+    # configured on production, silently removing the gate. Leave production as-is.
+    echo "WARNING: org profile but no --reviewer resolved — leaving production protection" >&2
+    echo "  UNCHANGED (existing reviewers, if any, are preserved). Re-run with:" >&2
+    echo "    setup_env_protection.sh --reviewer @your-org/your-team" >&2
+    SKIP_PROD=1
+  else
+    cat > "$BODY" <<JSON
+{ "prevent_self_review": true, "can_admins_bypass": false, "reviewers": $reviewers_json,
   "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true } }
 JSON
-  GATE_DESC="required reviewers + prevent-self-review (hard human gate)"
+    GATE_DESC="required reviewers + prevent-self-review + no admin bypass (hard human gate)"
+  fi
 else
   cat > "$BODY" <<JSON
 { "wait_timer": $WAIT_MIN,
@@ -98,7 +104,9 @@ JSON
   GATE_DESC="${WAIT_MIN}-min wait timer (DELAYED/ADVISORY — not a human gate)"
 fi
 
-if gh api "repos/$OWNER/$NAME/environments/production" -X PUT --input "$BODY" >/dev/null 2>&1; then
+if [ "$SKIP_PROD" = 1 ]; then
+  :  # production left untouched (see warning above)
+elif gh api "repos/$OWNER/$NAME/environments/production" -X PUT --input "$BODY" >/dev/null 2>&1; then
   echo "Environment 'production' ensured: $GATE_DESC"
   # Restrict production deploys to the base branch.
   if gh api "repos/$OWNER/$NAME/environments/production/deployment-branch-policies" \
