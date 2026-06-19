@@ -210,6 +210,13 @@ class TestScaffoldObsidianOnly:
         assert (docs / "development" / "conventions.md").is_file()
         assert (docs / "development" / "testing.md").is_file()
         assert (docs / "guides" / "using-memory.md").is_file()
+        # PI-317 (epic #316): the env/deploy decision guide ships with every scaffold
+        # and states the single-trunk + deploy-time-environments model.
+        env_guide = docs / "guides" / "environments.md"
+        assert env_guide.is_file()
+        env_text = env_guide.read_text()
+        assert "single-trunk" in env_text
+        assert "deploy-time concern" in env_text
         # PI-135: per-developer git hygiene lives in docs, not as scaffolder features
         onboarding = docs / "guides" / "developer-onboarding.md"
         assert onboarding.is_file()
