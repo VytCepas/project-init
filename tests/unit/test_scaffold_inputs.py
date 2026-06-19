@@ -94,3 +94,14 @@ class TestDeliveryModel:
         scaffold(target, load_preset("obsidian-only"), make_variables(delivery="library"), strict=True)
         config = (target / ".claude" / "config.yaml").read_text()
         assert "delivery: library" in config
+
+    def test_alias_survives_argparse(self):
+        """PR #332: argparse must not reject documented aliases before
+        resolve_delivery() normalizes them."""
+        from project_init.__main__ import _build_parser, resolve_delivery
+
+        args = _build_parser().parse_args(
+            ["proj", "--delivery", "service-or-app", "--language", "python"]
+        )
+        # No SystemExit from argparse choices; resolver then normalizes the alias.
+        assert resolve_delivery(args.delivery, args.language) == "service"

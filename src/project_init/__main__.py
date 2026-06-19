@@ -78,8 +78,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--delivery",
-        choices=["library", "service", "prototype"],
+        metavar="MODEL",
         default=None,
+        # No argparse `choices`: resolve_delivery() validates so the documented
+        # aliases (service-or-app, prototype-or-none) are accepted, not rejected
+        # before normalization (PR #332 review).
         help=(
             "How the project is delivered (ADR-015): library (published package), "
             "service (deployed app — gets the container parity bundle), prototype "
@@ -457,11 +460,19 @@ def _gather_inputs_interactive(
     language = _prompt("Language (python/node/go/none)", default="none")
     if language not in {"python", "node", "go", "none"}:
         language = "none"
-    resolved_delivery = (
-        resolve_delivery(delivery, language)
-        if delivery
-        else _choose_delivery_interactive(language)
-    )
+    # A delivery flag may conflict with the prompted language (e.g. service +
+    # none); on the interactive path re-prompt cleanly rather than crash (the
+    # non-interactive path turns the same error into a parser.error). PR #332.
+    resolved_delivery = None
+    if delivery:
+        try:
+            resolved_delivery = resolve_delivery(delivery, language)
+        except ValueError as e:
+            from rich.console import Console
+
+            Console().print(f"[red]{e}[/red]")
+    if resolved_delivery is None:
+        resolved_delivery = _choose_delivery_interactive(language)
 
     # MCP selection — three steps.
     selected_mcps = _choose_mcps_interactive(MCP_CATALOG)
