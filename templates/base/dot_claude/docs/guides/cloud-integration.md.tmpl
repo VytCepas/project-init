@@ -38,6 +38,10 @@ your cloud setup provides the values. The deploy (`deploy.yml`) and infra
    workflow deploys — and *no* standing credentials handed to the repo.
 3. The variable values above.
 
+> Shipped for OIDC-backed targets (Cloud Run, cloud IaC). Other targets — `fly`
+> (API token), `k8s`/`custom` (auth varies) — can reuse this same contract if they
+> authenticate to a cloud via OIDC.
+
 ## Boundary
 
 Governance, monitoring, IAM, org policies, and the landing zone are **out of
