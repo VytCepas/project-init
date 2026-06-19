@@ -308,3 +308,51 @@ class TestPromoteEnvShim:
         shim = (target / ".claude/scripts/promote_env.sh").read_text()
         assert "dag_workflow.py" in shim
         assert "promote-env" in shim
+
+
+class TestSetupEnvBranches:
+    SCRIPT = _REPO_ROOT / "templates/base/dot_claude/scripts/setup_env_branches.sh"
+    GH_HOST = _REPO_ROOT / "templates/base/dot_claude/scripts/gh_host.sh"
+
+    def _chain(self, tmp_path: Path, line: str) -> str:
+        cfg = tmp_path / ".claude" / "config.yaml"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text(line)
+        out = subprocess.run(
+            ["bash", "-c", f'cd "{tmp_path}" && . "{self.GH_HOST}" && promotion_chain'],
+            capture_output=True, text=True,
+        )
+        return out.stdout.strip()
+
+    def test_promotion_chain_quoted(self, tmp_path: Path):
+        assert self._chain(tmp_path, '    promotion_chain: ["dev", "test", "main"]\n') == "dev test main"
+
+    def test_promotion_chain_unquoted(self, tmp_path: Path):
+        assert self._chain(tmp_path, "    promotion_chain: [dev, test, main]\n") == "dev test main"
+
+    def test_promotion_chain_single(self, tmp_path: Path):
+        assert self._chain(tmp_path, '    promotion_chain: ["main"]\n') == "main"
+
+    def test_single_trunk_noop_guard(self):
+        assert "-lt 2" in self.SCRIPT.read_text()
+
+    def test_sets_squash_only_policy(self):
+        s = self.SCRIPT.read_text()
+        assert "allow_squash_merge=true" in s
+        assert "allow_merge_commit=false" in s
+        assert "delete_branch_on_merge=true" in s
+
+    def test_creates_branches_via_refs_api(self):
+        assert "git/refs" in self.SCRIPT.read_text()
+
+    def test_org_ruleset_gated_with_empty_bypass(self):
+        s = self.SCRIPT.read_text()
+        assert 'PROFILE" = "org"' in s
+        assert '"bypass_actors": []' in s
+
+    def test_scaffolded_and_executable(self, tmp_path: Path):
+        target = tmp_path / "p"
+        scaffold(target, fallback_preset(), fallback_variables(), strict=True)
+        script = target / ".claude/scripts/setup_env_branches.sh"
+        assert script.is_file()
+        assert script.stat().st_mode & 0o111
