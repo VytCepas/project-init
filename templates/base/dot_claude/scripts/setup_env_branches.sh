@@ -91,20 +91,24 @@ fi
 # block force-push + deletion and require checks + linear, but DO NOT require a PR
 # (a require-PR rule would refuse the ff promotion push server-side).
 apply_protection() {
-  local branch="$1" require_pr="$2" reviews tmp
+  local branch="$1" require_pr="$2" reviews conv tmp
   if [ "$require_pr" = 1 ]; then
     reviews='{ "required_approving_review_count": 1, "dismiss_stale_reviews": true, "require_code_owner_reviews": false, "require_last_push_approval": false }'
+    conv=true
   else
     reviews='null'
+    conv=false
   fi
   tmp=$(mktemp)
+  # Required checks mirror setup_github.sh's baseline (lint+test AND secret scan).
   cat > "$tmp" <<JSON
 {
-  "required_status_checks": { "strict": true, "contexts": ["CI / Lint and test"] },
+  "required_status_checks": { "strict": true, "contexts": ["CI / Lint and test", "CI / Secret scan (gitleaks)"] },
   "enforce_admins": false,
   "required_pull_request_reviews": $reviews,
   "restrictions": null,
   "required_linear_history": true,
+  "required_conversation_resolution": $conv,
   "allow_force_pushes": false,
   "allow_deletions": false
 }
@@ -134,7 +138,7 @@ if [ "$PROFILE" = "org" ]; then
   if gh api "repos/$OWNER/$NAME/rulesets" >/dev/null 2>&1; then
     for b in "${CHAIN[@]}"; do
       pr_rule=""
-      [ "$b" = "$BASE" ] && pr_rule='{ "type": "pull_request", "parameters": { "required_approving_review_count": 1, "dismiss_stale_reviews_on_push": true, "require_code_owner_review": false, "require_last_push_approval": false, "required_review_thread_resolution": false } },'
+      [ "$b" = "$BASE" ] && pr_rule='{ "type": "pull_request", "parameters": { "required_approving_review_count": 1, "dismiss_stale_reviews_on_push": true, "require_code_owner_review": false, "require_last_push_approval": false, "required_review_thread_resolution": true } },'
       rs=$(mktemp)
       cat > "$rs" <<JSON
 {
@@ -145,10 +149,11 @@ if [ "$PROFILE" = "org" ]; then
   "rules": [
     { "type": "non_fast_forward" },
     { "type": "deletion" },
+    { "type": "required_linear_history" },
     $pr_rule
     { "type": "required_status_checks", "parameters": {
         "strict_required_status_checks_policy": true,
-        "required_status_checks": [ { "context": "CI / Lint and test" } ] } }
+        "required_status_checks": [ { "context": "CI / Lint and test" }, { "context": "CI / Secret scan (gitleaks)" } ] } }
   ],
   "bypass_actors": []
 }

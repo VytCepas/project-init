@@ -350,6 +350,14 @@ class TestSetupEnvBranches:
         assert 'PROFILE" = "org"' in s
         assert '"bypass_actors": []' in s
 
+    def test_governance_consistent_with_setup_github(self):
+        # Mirror setup_github.sh's baseline: secret-scan required, linear history,
+        # conversation resolution (Copilot review on #308).
+        s = self.SCRIPT.read_text()
+        assert "CI / Secret scan (gitleaks)" in s
+        assert "required_conversation_resolution" in s
+        assert '"type": "required_linear_history"' in s
+
     def test_scaffolded_and_executable(self, tmp_path: Path):
         target = tmp_path / "p"
         scaffold(target, fallback_preset(), fallback_variables(), strict=True)
