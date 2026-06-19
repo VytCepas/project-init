@@ -3,6 +3,7 @@ rendered config, and the upgrade backfill for pre-branch-model records."""
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,17 @@ from project_init.__main__ import (
 )
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DAG_HOOK = _REPO_ROOT / ".claude" / "hooks" / "dag_workflow.py"
+_SCRIPTS = _REPO_ROOT / "templates" / "base" / "dot_claude" / "scripts"
+
+
+def _load_dag():
+    spec = importlib.util.spec_from_file_location("dag_workflow_under_test", _DAG_HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def _inputs(branch_chain: list[str]) -> ScaffoldInputs:
@@ -136,3 +148,37 @@ class TestUpgradeBackfill:
         write_scaffold_record(target, "obsidian-only", legacy, created)
         # Strict re-render must succeed (branch vars are backfilled to single-trunk).
         assert run_upgrade(target, apply=False) == 0
+
+
+class TestBaseBranchReader:
+    def test_reads_first_chain_element(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text('  branch_model:\n    promotion_chain: ["dev", "test", "main"]\n')
+        assert _load_dag()._base_branch(cfg) == "dev"
+
+    def test_single_trunk_returns_main(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text('    promotion_chain: ["main"]\n')
+        assert _load_dag()._base_branch(cfg) == "main"
+
+    def test_missing_config_returns_none(self, tmp_path: Path):
+        assert _load_dag()._base_branch(tmp_path / "absent.yaml") is None
+
+    def test_no_chain_returns_none(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("project:\n  name: x\n")
+        assert _load_dag()._base_branch(cfg) is None
+
+
+class TestBaseBranchWiring:
+    def test_gh_host_defines_base_branch(self):
+        assert "base_branch()" in (_SCRIPTS / "gh_host.sh").read_text()
+
+    def test_start_issue_targets_base(self):
+        s = (_SCRIPTS / "start_issue.sh").read_text()
+        assert "gh_host.sh" in s
+        assert "--base" in s
+
+    def test_dag_workflow_has_base_reader(self):
+        hook = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "dag_workflow.py"
+        assert "_base_branch" in hook.read_text()

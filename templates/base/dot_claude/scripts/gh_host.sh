@@ -59,3 +59,13 @@ gh_profile() {
   [ -f "$cfg" ] && prof=$(sed -nE 's/^[[:space:]]*profile:[[:space:]]*([a-z]+).*/\1/p' "$cfg" | head -1)
   printf '%s\n' "${prof:-individual}"
 }
+
+# Base branch for feature PRs (ADR-014): the first branch in the promotion chain
+# recorded in .claude/config.yaml; falls back to the repo's default branch (then
+# main) when no chain is configured (single-trunk). Used by start_issue.sh.
+base_branch() {
+  local cfg=".claude/config.yaml" base=""
+  [ -f "$cfg" ] && base=$(sed -nE 's/^[[:space:]]*promotion_chain:[[:space:]]*\[[[:space:]]*"([^"]+)".*/\1/p' "$cfg" | head -1)
+  [ -z "$base" ] && base=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
+  printf '%s\n' "${base:-main}"
+}
