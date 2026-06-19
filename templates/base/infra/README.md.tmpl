@@ -1,0 +1,17 @@
+{{#if iac_enabled}}# Infrastructure ({{project_name}})
+
+An **OpenTofu** (HCL) skeleton — structural only, no real resources yet.
+
+```bash
+tofu init      # after configuring backend.tf
+tofu plan      # preview
+tofu apply     # apply (manual / environment-gated in CI — never on merge)
+```
+
+- Engine: **OpenTofu** (`tofu`), the license-safe HCL tool (ADR-015). The files
+  are plain HCL, so Terraform reads them too.
+- **Commit `.terraform.lock.hcl`** (provider checksums). Never commit `*.tfstate`,
+  `*.tfvars`, or credentials.
+- CI (`.github/workflows/infra.yml`) runs `fmt`/`validate`/`plan` on PRs; apply is
+  manual and gated by the `infra-apply` environment.
+{{/if iac_enabled}}

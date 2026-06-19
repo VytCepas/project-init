@@ -1,0 +1,8 @@
+{{#if iac_enabled}}.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+# NOT ignored: .terraform.lock.hcl is committed (provider checksum pinning).
+{{/if iac_enabled}}

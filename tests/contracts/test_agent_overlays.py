@@ -58,6 +58,7 @@ class TestAgentSelection:
         monkeypatch.setattr(cli, "_choose_db_interactive", lambda: None)
         monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
         monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
+        monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 
         result = cli._gather_inputs_interactive(

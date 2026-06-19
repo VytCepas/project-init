@@ -54,6 +54,8 @@ class ScaffoldInputs:
     # Deploy target (epic #316, ADR-015): opt-in deploy overlay for services.
     # "none" = my platform owns deploy, or not deployed via Actions yet.
     deploy: str = "none"
+    # IaC overlay (ADR-015, opt-in): none | opentofu. Independent of delivery.
+    iac: str = "none"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -102,6 +104,17 @@ def _build_parser() -> argparse.ArgumentParser:
             "Deploy overlay for a service (ADR-015, opt-in): none (default — your "
             "platform/PaaS owns deploy, or not yet), cloud-run, fly, k8s, registry "
             "(publish image only), or custom. Requires --delivery service."
+        ),
+    )
+    p.add_argument(
+        "--iac",
+        metavar="TOOL",
+        default=None,
+        # Validated by resolve_iac(); independent of delivery.
+        help=(
+            "Infrastructure-as-Code overlay (ADR-015, opt-in): none (default) or "
+            "opentofu (emits an HCL skeleton + plan-on-PR workflow; apply is "
+            "manual/gated). OpenTofu is the license-safe default vs BUSL Terraform."
         ),
     )
     p.add_argument(
@@ -458,14 +471,27 @@ def _select_preset(
         parser.error(str(e))
 
 
+def _resolve_iac_interactive(iac: str | None) -> str:
+    """Resolve the IaC overlay for the interactive path: validate a flag, else prompt."""
+    if iac:
+        try:
+            return resolve_iac(iac)
+        except ValueError as e:
+            from rich.console import Console
+
+            Console().print(f"[red]{e}[/red]")
+    return _choose_iac_interactive()
+
+
 def _resolve_overlays_interactive(
-    language: str, delivery: str | None, deploy: str | None
-) -> tuple[str, str]:
-    """Resolve (delivery, deploy) for the interactive path.
+    language: str, delivery: str | None, deploy: str | None, iac: str | None
+) -> tuple[str, str, str]:
+    """Resolve (delivery, deploy, iac) for the interactive path.
 
     A passed flag is validated; on a conflict (e.g. service + language none) or
     no flag, we prompt — never crash (the non-interactive path turns the same
-    error into a parser.error). Deploy applies only to services.
+    error into a parser.error). Deploy applies only to services; IaC is
+    independent of delivery.
     """
     from rich.console import Console
 
@@ -478,19 +504,24 @@ def _resolve_overlays_interactive(
     if resolved_delivery is None:
         resolved_delivery = _choose_delivery_interactive(language)
 
+    resolved_iac = _resolve_iac_interactive(iac)
+
     if resolved_delivery != "service":
         if deploy and deploy.strip().lower() not in ("", "none"):
             Console().print(
                 f"[yellow]--deploy {deploy} ignored: deploy targets apply only to "
                 f"delivery=service (this is {resolved_delivery}).[/yellow]"
             )
-        return resolved_delivery, "none"
+        return resolved_delivery, "none", resolved_iac
+    resolved_deploy = None
     if deploy:
         try:
-            return resolved_delivery, resolve_deploy(deploy, resolved_delivery)
+            resolved_deploy = resolve_deploy(deploy, resolved_delivery)
         except ValueError as e:
             Console().print(f"[red]{e}[/red]")
-    return resolved_delivery, _choose_deploy_interactive()
+    if resolved_deploy is None:
+        resolved_deploy = _choose_deploy_interactive()
+    return resolved_delivery, resolved_deploy, resolved_iac
 
 
 def _gather_inputs_interactive(
@@ -499,12 +530,12 @@ def _gather_inputs_interactive(
     no_plugin: bool,
     profile: str | None,
     no_egress: bool = False,
-    cli_overlays: tuple[str | None, str | None] = (None, None),
+    cli_overlays: tuple[str | None, str | None, str | None] = (None, None, None),
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
-    ``cli_overlays`` pre-seeds (delivery, deploy) from flags; either may be None
-    to prompt.
+    ``cli_overlays`` pre-seeds (delivery, deploy, iac) from flags; any may be
+    None to prompt.
     """
     resolved_profile = profile or _choose_profile_interactive()
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
@@ -513,9 +544,9 @@ def _gather_inputs_interactive(
     language = _prompt("Language (python/node/go/none)", default="none")
     if language not in {"python", "node", "go", "none"}:
         language = "none"
-    delivery_flag, deploy_flag = cli_overlays
-    resolved_delivery, resolved_deploy = _resolve_overlays_interactive(
-        language, delivery_flag, deploy_flag
+    delivery_flag, deploy_flag, iac_flag = cli_overlays
+    resolved_delivery, resolved_deploy, resolved_iac = _resolve_overlays_interactive(
+        language, delivery_flag, deploy_flag, iac_flag
     )
 
     # MCP selection — three steps.
@@ -567,6 +598,7 @@ def _gather_inputs_interactive(
         no_egress=no_egress,
         delivery=resolved_delivery,
         deploy=resolved_deploy,
+        iac=resolved_iac,
     )
 
 
@@ -679,6 +711,44 @@ def _choose_deploy_interactive() -> str:
         console.print("[red]Invalid choice. Using none.[/red]")
         return "none"
     return _DEPLOY_TARGETS[choice - 1]
+
+
+_IAC_OPTIONS = ("none", "opentofu")
+_IAC_ALIASES = {"tofu": "opentofu", "terraform": "opentofu"}
+_IAC_SUMMARY = {
+    "none": "no infrastructure-as-code scaffolding",
+    "opentofu": "OpenTofu (HCL) skeleton + plan-on-PR workflow; apply manual/gated",
+}
+
+
+def resolve_iac(raw: str | None) -> str:
+    """Normalize an --iac value; default 'none'. Raises ValueError on an unknown tool.
+
+    `tofu`/`terraform` alias to `opentofu` (we always emit plain HCL run by the
+    OpenTofu binary — the license-safe default; ADR-015).
+    """
+    value = (raw or "").strip().lower() or "none"
+    value = _IAC_ALIASES.get(value, value)
+    if value not in _IAC_OPTIONS:
+        valid = ", ".join(_IAC_OPTIONS)
+        raise ValueError(f"invalid iac tool '{raw}'. Choose one of: {valid}")
+    return value
+
+
+def _choose_iac_interactive() -> str:
+    """Present the IaC options (ADR-015); default none."""
+    from rich.console import Console
+    from rich.prompt import IntPrompt
+
+    console = Console()
+    console.print("\n[bold]Infrastructure-as-Code overlay?[/bold]")
+    for i, name in enumerate(_IAC_OPTIONS, 1):
+        console.print(f"  {i}. [cyan]{name}[/cyan] — {_IAC_SUMMARY[name]}")
+    choice = IntPrompt.ask("Choose an IaC overlay", default=1)
+    if choice < 1 or choice > len(_IAC_OPTIONS):
+        console.print("[red]Invalid choice. Using none.[/red]")
+        return "none"
+    return _IAC_OPTIONS[choice - 1]
 
 
 _VALID_AGENTS = ("claude", "codex", "gemini", "ollama")
@@ -885,6 +955,9 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "deploy_cloud_run": "true" if inputs.deploy == "cloud-run" else "",
         "deploy_fly": "true" if inputs.deploy == "fly" else "",
         "deploy_k8s": "true" if inputs.deploy == "k8s" else "",
+        # IaC overlay (ADR-015, opt-in): infra/ HCL skeleton + infra.yml gate on this.
+        "iac": inputs.iac,
+        "iac_enabled": "true" if inputs.iac != "none" else "",
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": format_installed_mcps(selected_mcps),
         "installed_mcps_yaml": format_installed_mcps_yaml(selected_mcps),
@@ -964,6 +1037,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
     try:
         delivery = resolve_delivery(args.delivery, args.language or "none")
         deploy = resolve_deploy(args.deploy, delivery)
+        iac = resolve_iac(args.iac)
     except ValueError as e:
         parser.error(str(e))
     _print_profile_notice(profile, no_plugin=no_plugin, no_egress=args.no_egress)
@@ -983,6 +1057,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         no_egress=args.no_egress,
         delivery=delivery,
         deploy=deploy,
+        iac=iac,
     )
 
 
@@ -1052,7 +1127,7 @@ def main(argv: list[str] | None = None) -> int:
             no_plugin=args.no_plugin,
             profile=args.profile,
             no_egress=args.no_egress,
-            cli_overlays=(args.delivery, args.deploy),
+            cli_overlays=(args.delivery, args.deploy, args.iac),
         )
     target.mkdir(parents=True, exist_ok=True)
 
