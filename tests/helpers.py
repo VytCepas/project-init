@@ -51,6 +51,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "deploy_k8s": "",
         "iac": "none",
         "iac_enabled": "",
+        "cloud_oidc": "",
         "want_devcontainer": "",
         "memory_stack": "obsidian-only",
         "installed_mcps": "none",

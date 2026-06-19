@@ -132,6 +132,7 @@ def _overlay_off_defaults() -> dict[str, str]:
         # IaC overlay (ADR-015): off for records predating the iac question.
         "iac": "none",
         "iac_enabled": "",
+        "cloud_oidc": "",
         "want_devcontainer": "",
         "project_owner": "",
         "license": "none",

@@ -1,0 +1,51 @@
+{{#if cloud_oidc}}# Cloud integration seam — OIDC + env contract
+
+This project's deploy/infra workflows authenticate to your cloud with **OpenID
+Connect (OIDC)** — short-lived, federated tokens, **no long-lived keys in repo
+secrets**. project-init scaffolds the *workflow side* of that handshake and stops
+at the cloud boundary. The *cloud side* — the workload-identity provider, the
+service account/role, org policies, monitoring, and the rest of the landing zone
+— is a **separate concern** (a platform/landing-zone product or your own setup),
+not something this scaffolder provisions. This file is the **contract** between
+the two.
+
+## What the workflows expect (the env contract)
+
+Set these as **repo (or environment) variables/secrets** — the landing zone /
+your cloud setup provides the values. The deploy (`deploy.yml`) and infra
+(`infra.yml`) workflows read them in their OIDC auth step (marked `# TODO` there).
+
+**GCP (workload identity federation):**
+| Name | Kind | Meaning |
+|------|------|---------|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | variable | full WIF provider resource name |
+| `GCP_SERVICE_ACCOUNT` | variable | service account email the workflow impersonates |
+| `GCP_PROJECT_ID` | variable | target project |
+| `GCP_REGION` | variable | deploy region (e.g. Cloud Run) |
+
+**AWS (OIDC role):**
+| Name | Kind | Meaning |
+|------|------|---------|
+| `AWS_ROLE_ARN` | variable | role the workflow assumes via OIDC |
+| `AWS_REGION` | variable | target region |
+
+## What the cloud side must provide (the OIDC trust contract)
+
+1. An OIDC trust between the cloud and GitHub's token issuer
+   (`https://token.actions.githubusercontent.com`), scoped to **this repository**
+   (and ideally to the `production` / `infra-apply` environments).
+2. A service account / role with **least-privilege** permissions for what the
+   workflow deploys — and *no* standing credentials handed to the repo.
+3. The variable values above.
+
+> Shipped for OIDC-backed targets (Cloud Run, cloud IaC). Other targets — `fly`
+> (API token), `k8s`/`custom` (auth varies) — can reuse this same contract if they
+> authenticate to a cloud via OIDC.
+
+## Boundary
+
+Governance, monitoring, IAM, org policies, and the landing zone are **out of
+scope for project-init** (ADR-015). They belong to a separate platform product
+that this contract plugs into — keep that product's lifecycle independent of this
+repo. The scaffolded workflows are the consumer; the landing zone is the provider.
+{{/if cloud_oidc}}

@@ -668,6 +668,10 @@ _DEPLOY_TARGETS = ("none", "cloud-run", "fly", "k8s", "registry", "custom")
 # Container-deploy targets get the build-once-by-digest deploy graph; registry is
 # publication only; none = no Actions deploy overlay.
 _DEPLOY_CONTAINER = ("cloud-run", "fly", "k8s", "custom")
+# Targets whose scaffolded workflow uses cloud OIDC federation (GCP WIF / AWS
+# role) — the cloud-integration seam doc (#326) applies. fly is token-based and
+# k8s/custom auth varies, so they're excluded (the doc says others can reuse it).
+_DEPLOY_OIDC = ("cloud-run",)
 
 _DEPLOY_SUMMARY = {
     "none": "my platform/PaaS deploys it, or not deployed via Actions yet (default)",
@@ -958,6 +962,13 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         # IaC overlay (ADR-015, opt-in): infra/ HCL skeleton + infra.yml gate on this.
         "iac": inputs.iac,
         "iac_enabled": "true" if inputs.iac != "none" else "",
+        # Cloud-OIDC integration seam (#326): set whenever a deploy or IaC workflow
+        # authenticates to a cloud via OIDC, so the contract doc ships for them.
+        "cloud_oidc": (
+            "true"
+            if (inputs.deploy in _DEPLOY_OIDC or inputs.iac != "none")
+            else ""
+        ),
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": format_installed_mcps(selected_mcps),
         "installed_mcps_yaml": format_installed_mcps_yaml(selected_mcps),
