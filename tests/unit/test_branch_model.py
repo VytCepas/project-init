@@ -420,3 +420,26 @@ class TestBranchModelDocs:
         assert "base branch" in skill
         assert "promote_env.sh" in skill
         assert "project.branch_model.promotion_chain" in skill
+
+
+class TestEpicSizingGuidance:
+    """PI-313: the create_issue surface teaches epic→small-task discipline."""
+
+    def _scaffold(self, tmp_path: Path) -> Path:
+        target = tmp_path / "p"
+        scaffold(target, fallback_preset(), fallback_variables(), strict=True)
+        return target
+
+    def test_create_issue_skill_has_sizing_rule(self, tmp_path: Path):
+        skill = (self._scaffold(tmp_path) / ".claude/skills/create_issue/SKILL.md").read_text()
+        assert "Keep tickets small" in skill
+        assert "--scale task" in skill
+
+    def test_issue_metadata_guide_documents_scale(self, tmp_path: Path):
+        guide = (self._scaffold(tmp_path) / ".claude/docs/guides/issue-metadata.md").read_text()
+        assert "scale:epic" in guide
+        assert "scale:task" in guide
+
+    def test_create_issue_sh_help_mentions_small_tickets(self, tmp_path: Path):
+        sh = (self._scaffold(tmp_path) / ".claude/scripts/create_issue.sh").read_text()
+        assert "Keep an epic's child tickets" in sh
