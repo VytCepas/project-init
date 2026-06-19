@@ -1,4 +1,4 @@
-{{#if devcontainer}}#!/bin/bash
+{{#if want_devcontainer}}#!/bin/bash
 # Devcontainer bootstrap (scaffolded by project-init): install the toolchain
 # the scaffolded workflow expects, then sync dependencies through the same
 # path the SessionStart hook uses. Idempotent — safe to re-run.
@@ -28,4 +28,4 @@ fi
 # local; plugin-mode containers bootstrap via just (the plugin hook stamps
 # the environment once a session opens).
 {{#if no_plugin}}bash .claude/hooks/session_setup.sh{{/if no_plugin}}{{#if plugin_mode}}command -v just >/dev/null 2>&1 && [ -f justfile ] && just setup || true{{/if plugin_mode}}
-{{/if devcontainer}}
+{{/if want_devcontainer}}

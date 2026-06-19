@@ -1,0 +1,24 @@
+{{#if delivery_service}}# .dockerignore — keep the build context (and image) small and secret-free.
+.git
+.gitignore
+.github
+.claude
+.devcontainer
+.venv
+__pycache__
+*.pyc
+node_modules
+dist
+build
+target
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.pytest_cache
+.ruff_cache
+.mypy_cache
+coverage
+.coverage
+{{/if delivery_service}}

@@ -1,4 +1,4 @@
-{{#if devcontainer}}{
+{{#if want_devcontainer}}{
   "name": "{{project_name}}",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
 {{#if go}}  "features": {
@@ -14,4 +14,4 @@
     }
   }
 }
-{{/if devcontainer}}
+{{/if want_devcontainer}}

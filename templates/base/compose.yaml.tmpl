@@ -1,0 +1,38 @@
+{{#if delivery_service}}# compose.yaml — local run of {{project_name}} (scaffolded by project-init).
+# Same image as cloud; only config/secrets differ (kept in .env, never committed).
+# `just up` builds and runs this. Backing services are commented out — uncomment
+# and wire the ones you actually need rather than carrying services you don't.
+services:
+  app:
+    build: .
+    env_file: .env
+    # Both sides track $PORT: the app listens on $PORT (Dockerfile) and we publish
+    # the same port, so a PORT override in .env stays reachable.
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    # Optional hot-reload: requires a recent Docker Compose. `just up` works
+    # without it — uncomment to sync source into the running container on change.
+    # develop:
+    #   watch:
+    #     - action: sync
+    #       path: .
+    #       target: /app
+    #       ignore: [.git/, .venv/, node_modules/]
+    #     - action: rebuild
+    #       path: ./Dockerfile
+
+  # --- Example backing services (uncomment what you need) ---
+  # postgres:
+  #   image: postgres:17-alpine
+  #   environment:
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  #   ports: ["5432:5432"]
+  #   volumes: [pgdata:/var/lib/postgresql/data]
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   ports: ["6379:6379"]
+
+# volumes:
+#   pgdata:
+{{/if delivery_service}}

@@ -92,4 +92,18 @@ scan:
 
 # what CI runs
 ci: lint test
-{{/if go}}
+{{/if go}}{{#if delivery_service}}
+# --- container parity (delivery=service): same image local and in cloud ---
+
+# build + run the app (and any backing services) locally
+up:
+    docker compose up --build
+
+# build the image only
+build:
+    docker compose build
+
+# stop and remove the local stack
+down:
+    docker compose down
+{{/if delivery_service}}

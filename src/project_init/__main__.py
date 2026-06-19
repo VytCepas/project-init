@@ -801,6 +801,9 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "go": "true" if language == "go" else "",
         "justfile": "true" if language != "none" else "",
         "devcontainer": "true" if devcontainer else "",
+        # A service delivery (ADR-015) gets a devcontainer automatically; the
+        # standalone --devcontainer flag still works for non-service projects.
+        "want_devcontainer": "true" if (devcontainer or inputs.delivery == "service") else "",
         # Multi-agent support (PI-137): the agents list drives overlay layers
         # on upgrade re-render; per-agent flags gate conditional blocks.
         "agents": ",".join(agents),
