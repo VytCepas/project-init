@@ -29,7 +29,7 @@ Types: `feat` `fix` `chore` `docs` `test`
 You (the agent) work on **feature/PR branches only — never push or commit to the production ref (`main`)**. On any auto-deploy platform, write access to the production branch *is* production-deploy access. This is enforced two ways:
 
 - **Fast-feedback (in-repo):** the command guard blocks `git push main`/`master`, `gh pr merge`, and `gh api .../merge` — but a hook is editable, so treat it as a guard rail, not the boundary.
-- **The real boundary (server-side):** branch protection installed by `.claude/scripts/setup_github.sh --protect` (squash-only, required CI, required review, no force-push) — and, for deployed services, GitHub Environment protection rules. These live server-side and an agent cannot edit them. Run `setup_github.sh --protect` once with admin rights to arm them.
+- **The real boundary (server-side), tiered by profile (ADR-013):** run `.claude/scripts/setup_github.sh --protect` once with admin rights. For the **`org`** profile it installs rulesets with an *empty bypass list* (plus GitHub Environment reviewers for services) — a **hard** boundary no agent can edit or bypass. For **`individual`/`standalone`** it installs classic branch protection that is **advisory** (`enforce_admins=false`, so an admin-capable token can override it) — useful, but not a hard production gate; move to the `org` profile (or add a second human approver / Environment reviewer) when you need one.
 
 ## Standard lifecycle
 
