@@ -1,0 +1,56 @@
+{{#if delivery_service}}# Dockerfile — the immutable artifact for {{project_name}} (scaffolded by project-init).
+# Build once, promote the same image by digest dev → staging → prod (ADR-015).
+# Multi-arch: build with `docker buildx build --platform linux/amd64,linux/arm64 .`
+# The app must listen on $PORT (default 8080) and 0.0.0.0.
+{{#if python}}# --- build stage: resolve deps with uv into a venv ---
+FROM python:3.13-slim AS build
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+COPY pyproject.toml uv.lock* ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --no-dev --no-install-project --frozen 2>/dev/null || uv sync --no-dev --no-install-project
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
+
+# --- runtime stage: copy the venv, drop the toolchain ---
+FROM python:3.13-slim AS runtime
+WORKDIR /app
+COPY --from=build /app /app
+ENV PATH="/app/.venv/bin:$PATH" PORT=8080
+EXPOSE 8080
+# TODO: replace with your app's entrypoint (e.g. uvicorn app.main:app --host 0.0.0.0 --port $PORT)
+CMD ["python", "-c", "import os; print('replace CMD: serving on', os.environ.get('PORT', '8080'))"]
+{{/if python}}{{#if node}}# --- build stage: install deps with bun ---
+FROM oven/bun:1 AS build
+WORKDIR /app
+COPY package.json bun.lock* bun.lockb* ./
+RUN bun install --frozen-lockfile 2>/dev/null || bun install
+COPY . .
+RUN bun run build 2>/dev/null || true
+
+# --- runtime stage ---
+FROM oven/bun:1-slim AS runtime
+WORKDIR /app
+COPY --from=build /app /app
+ENV NODE_ENV=production PORT=8080
+EXPOSE 8080
+# TODO: replace with your app's start command (e.g. bun run start)
+CMD ["bun", "run", "start"]
+{{/if node}}{{#if go}}# --- build stage: compile a static binary ---
+FROM golang:1.23 AS build
+WORKDIR /src
+COPY go.mod go.sum* ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -o /app/server ./...
+
+# --- runtime stage: distroless, no shell/toolchain ---
+FROM gcr.io/distroless/static-debian12 AS runtime
+WORKDIR /app
+COPY --from=build /app/server /app/server
+ENV PORT=8080
+EXPOSE 8080
+# TODO: ensure your server reads $PORT and listens on 0.0.0.0
+ENTRYPOINT ["/app/server"]
+{{/if go}}{{/if delivery_service}}

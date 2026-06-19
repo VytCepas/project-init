@@ -42,6 +42,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "delivery": "prototype",
         "delivery_library": "",
         "delivery_service": "",
+        "want_devcontainer": "",
         "memory_stack": "obsidian-only",
         "installed_mcps": "none",
         "installed_mcps_yaml": "[]",
@@ -82,6 +83,12 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "created_year": "2026",
     }
     defaults.update(overrides)
+    # Mirror _build_variables: a service delivery (or an explicit devcontainer)
+    # auto-enables the devcontainer (#319). Derived unless overridden explicitly.
+    if "want_devcontainer" not in overrides:
+        defaults["want_devcontainer"] = (
+            "true" if (defaults.get("devcontainer") or defaults.get("delivery") == "service") else ""
+        )
     return defaults
 
 

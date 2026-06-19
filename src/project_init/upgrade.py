@@ -121,6 +121,7 @@ def _overlay_off_defaults() -> dict[str, str]:
         "delivery": "prototype",
         "delivery_library": "",
         "delivery_service": "",
+        "want_devcontainer": "",
         "project_owner": "",
         "license": "none",
         "license_mit": "",
@@ -369,6 +370,12 @@ def _backfill_variables(variables: dict) -> dict:
     # carry e.g. base_branch=dev; left as-is, the re-rendered workflows would
     # target 'dev' while gh_host's base_branch() returns 'main' (PR #330 review).
     v["base_branch"] = "main"
+    # Derive want_devcontainer (#319): the devcontainer templates now gate on it,
+    # so an existing project that opted into --devcontainer (or is a service) must
+    # still render the devcontainer on re-render. Derived, not setdefault'd.
+    v["want_devcontainer"] = (
+        "true" if (v.get("devcontainer") or v.get("delivery") == "service") else ""
+    )
     return v
 
 
