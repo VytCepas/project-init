@@ -78,6 +78,8 @@ class TestRegistryAndOff:
         t = _service_deploy(tmp_path / "reg", "registry")
         assert _registry(t).is_file()
         assert not _deploy_yml(t).exists()  # registry is publication, not a deploy
+        # No environments model either — registry doesn't promote staging→prod (PR #337).
+        assert not _envs(t).exists()
         assert "PUBLICATION" in _registry(t).read_text()  # not a deployment
 
     def test_deploy_none_service_has_no_overlay(self, tmp_path: Path):

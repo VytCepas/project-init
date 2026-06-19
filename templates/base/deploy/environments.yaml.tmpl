@@ -1,4 +1,4 @@
-{{#if deploy_enabled}}# Deployment environments (ADR-015) — the declarative, agent-legible model of
+{{#if deploy_container}}# Deployment environments (ADR-015) — the declarative, agent-legible model of
 # where this service runs. Build the image once; promote the SAME digest through
 # these environments. This file is the source of truth an agent reads instead of
 # inferring deploy state from branch topology.
@@ -20,4 +20,4 @@ environments:
 
 # Promotion model: the deploy.yml workflow builds the image once and deploys that
 # exact digest to staging, then production. Rollback = redeploy a prior digest.
-{{/if deploy_enabled}}
+{{/if deploy_container}}

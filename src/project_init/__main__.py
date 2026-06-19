@@ -479,6 +479,11 @@ def _resolve_overlays_interactive(
         resolved_delivery = _choose_delivery_interactive(language)
 
     if resolved_delivery != "service":
+        if deploy and deploy.strip().lower() not in ("", "none"):
+            Console().print(
+                f"[yellow]--deploy {deploy} ignored: deploy targets apply only to "
+                f"delivery=service (this is {resolved_delivery}).[/yellow]"
+            )
         return resolved_delivery, "none"
     if deploy:
         try:
