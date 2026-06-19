@@ -24,8 +24,10 @@ are only fast-feedback defense-in-depth.
 
 The unifier is the **container image + the `justfile`**, not Terraform:
 
-- **Local:** `just up` (Compose), `just test`, `just lint`, `just build`. One `.env`
-  for *your* dev config.
+- **Local:** your project's `justfile` runs the task commands (`just test`,
+  `just lint`, …). A **deployed service** additionally gets `just up` (Compose) and
+  `just build` from the **container parity bundle**, so the same image runs locally
+  and in cloud. One `.env` for *your* dev config.
 - **Cloud:** the *same image* is deployed; per-environment config/secrets live in
   **GitHub Environment secrets/variables**, injected at deploy — **never** in a
   local `.env` and never baked into the image.
@@ -43,5 +45,5 @@ The unifier is the **container image + the `justfile`**, not Terraform:
 - If a managed platform (Vercel/Netlify/Render/…) owns your deploy, let it — this
   project points at its native flow rather than fighting it.
 
-See [ADR-015](../../../docs/adr/adr-015-env-deploy-model.md) in the project-init
-source for the full rationale.
+For the full rationale, see ADR-015 (env & deploy model) in the project-init
+source repository.
