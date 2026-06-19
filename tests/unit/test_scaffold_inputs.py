@@ -52,3 +52,45 @@ def test_migrate_and_backfill_share_off_defaults():
     assert d["no_plugin"] == "true"
     assert d["license"] == "none"
     assert all(d[k] == "" for k in ("devcontainer", "mise", "vscode", "codex", "gemini"))
+
+
+class TestDeliveryModel:
+    """PI-318 (epic #316, ADR-015): the delivery question drives the bundle."""
+
+    def test_default_is_prototype(self):
+        from project_init.__main__ import resolve_delivery
+
+        assert resolve_delivery(None, "python") == "prototype"
+        assert resolve_delivery("", "none") == "prototype"
+
+    def test_aliases_normalize(self):
+        from project_init.__main__ import resolve_delivery
+
+        assert resolve_delivery("service-or-app", "python") == "service"
+        assert resolve_delivery("prototype-or-none", "none") == "prototype"
+
+    def test_service_requires_language(self):
+        import pytest
+
+        from project_init.__main__ import resolve_delivery
+
+        with pytest.raises(ValueError, match="needs a language"):
+            resolve_delivery("service", "none")
+        assert resolve_delivery("service", "python") == "service"
+
+    def test_invalid_value_rejected(self):
+        import pytest
+
+        from project_init.__main__ import resolve_delivery
+
+        with pytest.raises(ValueError, match="invalid delivery"):
+            resolve_delivery("webapp", "python")
+
+    def test_config_records_delivery(self, tmp_path):
+        from project_init.scaffold import load_preset, scaffold
+        from tests.helpers import make_variables
+
+        target = tmp_path / "p"
+        scaffold(target, load_preset("obsidian-only"), make_variables(delivery="library"), strict=True)
+        config = (target / ".claude" / "config.yaml").read_text()
+        assert "delivery: library" in config

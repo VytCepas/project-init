@@ -116,6 +116,11 @@ def _overlay_off_defaults() -> dict[str, str]:
         "egress_ok": "true",
         # Single trunk: feature PRs target the default branch.
         "base_branch": "main",
+        # Delivery model (ADR-015): records predating the delivery question are
+        # faithfully "prototype" (no env/CI/release bundle was emitted then).
+        "delivery": "prototype",
+        "delivery_library": "",
+        "delivery_service": "",
         "project_owner": "",
         "license": "none",
         "license_mit": "",

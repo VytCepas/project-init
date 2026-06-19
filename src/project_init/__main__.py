@@ -48,6 +48,9 @@ class ScaffoldInputs:
     no_plugin: bool
     profile: str
     no_egress: bool = False
+    # Delivery model (epic #316, ADR-015): how the project ships — drives the
+    # env/CI/release bundle. "prototype" is the safe minimal default.
+    delivery: str = "prototype"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -72,6 +75,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "--language",
         choices=["python", "node", "go", "none"],
         help="Primary language/runtime",
+    )
+    p.add_argument(
+        "--delivery",
+        choices=["library", "service", "prototype"],
+        default=None,
+        help=(
+            "How the project is delivered (ADR-015): library (published package), "
+            "service (deployed app — gets the container parity bundle), prototype "
+            "(default — single trunk, nothing env-specific). service needs a "
+            "language."
+        ),
     )
     p.add_argument(
         "--mcps",
@@ -428,7 +442,12 @@ def _select_preset(
 
 
 def _gather_inputs_interactive(
-    default_name: str, *, no_plugin: bool, profile: str | None, no_egress: bool = False
+    default_name: str,
+    *,
+    no_plugin: bool,
+    profile: str | None,
+    no_egress: bool = False,
+    delivery: str | None = None,
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays."""
     resolved_profile = profile or _choose_profile_interactive()
@@ -438,6 +457,11 @@ def _gather_inputs_interactive(
     language = _prompt("Language (python/node/go/none)", default="none")
     if language not in {"python", "node", "go", "none"}:
         language = "none"
+    resolved_delivery = (
+        resolve_delivery(delivery, language)
+        if delivery
+        else _choose_delivery_interactive(language)
+    )
 
     # MCP selection — three steps.
     selected_mcps = _choose_mcps_interactive(MCP_CATALOG)
@@ -486,7 +510,69 @@ def _gather_inputs_interactive(
         no_plugin=no_plugin,
         profile=resolved_profile,
         no_egress=no_egress,
+        delivery=resolved_delivery,
     )
+
+
+_DELIVERY = ("library", "service", "prototype")
+
+# Aliases accepted from the CLI/menu so the wording in docs ("service-or-app",
+# "prototype-or-none") still resolves to the canonical token.
+_DELIVERY_ALIASES = {
+    "service-or-app": "service",
+    "app": "service",
+    "prototype-or-none": "prototype",
+    "none": "prototype",
+}
+
+_DELIVERY_SUMMARY = {
+    "library": "a package/library published to a registry (PyPI/npm/crate)",
+    "service": "a deployed service or app — gets the container parity bundle",
+    "prototype": "a prototype / not sure yet — single trunk, nothing env-specific",
+}
+
+
+def resolve_delivery(raw: str | None, language: str) -> str:
+    """Normalize a delivery value; default 'prototype'.
+
+    Rejects ``service`` + ``language none`` — there is no safe generic Dockerfile
+    or test command for an unknown runtime (ADR-015). Raises ValueError otherwise.
+    """
+    value = (raw or "").strip().lower() or "prototype"
+    value = _DELIVERY_ALIASES.get(value, value)
+    if value not in _DELIVERY:
+        valid = ", ".join(_DELIVERY)
+        raise ValueError(f"invalid delivery '{raw}'. Choose one of: {valid}")
+    if value == "service" and language == "none":
+        raise ValueError(
+            "delivery 'service' needs a language toolchain — pass "
+            "--language python/node/go, or choose 'prototype'"
+        )
+    return value
+
+
+def _choose_delivery_interactive(language: str) -> str:
+    """Present the delivery options (ADR-015); default prototype.
+
+    Re-prompts if the choice is invalid for the chosen language (a service needs
+    a language toolchain).
+    """
+    from rich.console import Console
+    from rich.prompt import IntPrompt
+
+    console = Console()
+    console.print("\n[bold]How is this delivered?[/bold]")
+    for i, name in enumerate(_DELIVERY, 1):
+        console.print(f"  {i}. [cyan]{name}[/cyan] — {_DELIVERY_SUMMARY[name]}")
+    while True:
+        choice = IntPrompt.ask("Choose a delivery model", default=3)
+        if choice < 1 or choice > len(_DELIVERY):
+            console.print("[red]Invalid choice. Using prototype.[/red]")
+            return "prototype"
+        try:
+            return resolve_delivery(_DELIVERY[choice - 1], language)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
 
 
 _VALID_AGENTS = ("claude", "codex", "gemini", "ollama")
@@ -678,6 +764,11 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "project_init_plugin_version": __plugin_version__,
         "project_init_version_prev": "",
         "language": language,
+        # Delivery model (ADR-015): recorded in config; the parity bundle and
+        # release/deploy overlays (later #316 tickets) gate on these flags.
+        "delivery": inputs.delivery,
+        "delivery_library": "true" if inputs.delivery == "library" else "",
+        "delivery_service": "true" if inputs.delivery == "service" else "",
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": format_installed_mcps(selected_mcps),
         "installed_mcps_yaml": format_installed_mcps_yaml(selected_mcps),
@@ -751,6 +842,10 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         parser.error(str(e))
     profile = args.profile or "individual"
     no_plugin = _profile_delivery_no_plugin(profile, args.no_plugin)
+    try:
+        delivery = resolve_delivery(args.delivery, args.language or "none")
+    except ValueError as e:
+        parser.error(str(e))
     _print_profile_notice(profile, no_plugin=no_plugin, no_egress=args.no_egress)
     return ScaffoldInputs(
         project_name=args.name,
@@ -766,6 +861,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         no_plugin=no_plugin,
         profile=profile,
         no_egress=args.no_egress,
+        delivery=delivery,
     )
 
 
@@ -835,6 +931,7 @@ def main(argv: list[str] | None = None) -> int:
             no_plugin=args.no_plugin,
             profile=args.profile,
             no_egress=args.no_egress,
+            delivery=args.delivery,
         )
     target.mkdir(parents=True, exist_ok=True)
 
