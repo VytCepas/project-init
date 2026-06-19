@@ -31,8 +31,11 @@ jobs:
       #   google-github-actions/auth@v2 with workload_identity_provider.
       - name: Format check
         run: tofu fmt -check -recursive
+      # Uses whatever infra/backend.tf configures (an empty scaffold has none →
+      # local backend, which inits without credentials); once a remote backend +
+      # OIDC auth are wired above, plans run against real state.
       - name: Init
-        run: tofu init -backend=false
+        run: tofu init
       - name: Validate
         run: tofu validate
       - name: Plan

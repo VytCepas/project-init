@@ -28,10 +28,14 @@ class TestIacOverlayPresent:
 
     def test_backend_is_commented_stub(self, tmp_path: Path):
         backend = (_iac(tmp_path / "p") / "infra" / "backend.tf").read_text()
-        # Every backend line is commented — no uncommented backend block.
+        # Every backend line is commented — no uncommented backend/terraform block
+        # anywhere, including the file's first line (column 0).
         assert 'backend "s3"' in backend
         assert '# terraform {' in backend
-        assert "\nterraform {" not in backend  # not uncommented
+        for line in backend.splitlines():
+            stripped = line.lstrip()
+            assert not stripped.startswith("terraform {"), f"uncommented: {line!r}"
+            assert not stripped.startswith("backend "), f"uncommented: {line!r}"
 
     def test_gitignore_keeps_lockfile_tracked(self, tmp_path: Path):
         gi = (_iac(tmp_path / "p") / "infra" / ".gitignore").read_text()
