@@ -60,25 +60,10 @@ gh_profile() {
   printf '%s\n' "${prof:-individual}"
 }
 
-# Base branch for feature PRs (ADR-014): the first branch in the promotion chain
-# recorded in .claude/config.yaml; falls back to the repo's default branch (then
-# main) when no chain is configured (single-trunk). Used by start_issue.sh.
+# Base branch for feature PRs: the repo's default branch (then main). Single
+# trunk — feature PRs target it. Used by start_issue.sh.
 base_branch() {
-  local cfg=".claude/config.yaml" base=""
-  # Tolerate quoted or unquoted entries (config.yaml is hand-editable).
-  [ -f "$cfg" ] && base=$(sed -nE 's/^[[:space:]]*promotion_chain:[[:space:]]*\[[[:space:]]*"?([^]",[:space:]]+).*/\1/p' "$cfg" | head -1)
-  [ -z "$base" ] && base=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
+  local base=""
+  base=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
   printf '%s\n' "${base:-main}"
-}
-
-# Full promotion chain (ADR-014) as space-separated branch names (base→production);
-# empty when no chain is configured. Tolerates quoted or unquoted entries.
-promotion_chain() {
-  local cfg=".claude/config.yaml" inner=""
-  [ -f "$cfg" ] || return 0
-  inner=$(sed -nE 's/^[[:space:]]*promotion_chain:[[:space:]]*\[(.*)\].*/\1/p' "$cfg" | head -1)
-  [ -z "$inner" ] && return 0
-  inner=$(printf '%s' "$inner" | tr ',"' '  ')
-  # shellcheck disable=SC2086  # intentional word-splitting normalizes whitespace
-  echo $inner
 }

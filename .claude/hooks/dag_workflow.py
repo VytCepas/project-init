@@ -15,8 +15,6 @@ Subcommands:
                         push, promote, then exec monitor_pr.sh --merge.
   create-pr-nojira <type> <title> [--branch B] [--base B]
                         create a no-issue feature branch + draft PR.
-  promote-env [<target>]
-                        fast-forward promote one step along the chain (ADR-014).
 
 The `check` and `guard` paths are pure read-only; they're used by hooks and
 lifecycle scripts. The other subcommands consolidate the bash lifecycle
@@ -491,32 +489,6 @@ def _slugify(text: str) -> str:
     return s.strip("-")
 
 
-def _promotion_chain(config_path: Path | None = None) -> list[str]:
-    """The full promotion chain from .claude/config.yaml (ADR-014), base→production.
-
-    Empty list when no chain is configured. Tolerates quoted or unquoted entries
-    (config.yaml is hand-editable; ADR-014 prose shows forms like [main] and
-    [dev, test, main]).
-    """
-    cfg = config_path or Path(".claude/config.yaml")
-    try:
-        text = cfg.read_text(encoding="utf-8")
-    except OSError:
-        return []
-    m = re.search(r"^\s*promotion_chain:\s*\[([^\]]*)\]", text, re.MULTILINE)
-    if not m:
-        return []
-    return re.findall(r'[^"\s,]+', m.group(1))
-
-
-def _base_branch(config_path: Path | None = None) -> str | None:
-    """First branch of the promotion chain (ADR-014), or None when no chain is
-    configured (single-trunk → the repo's default branch). Feature PRs target it.
-    """
-    chain = _promotion_chain(config_path)
-    return chain[0] if chain else None
-
-
 def cmd_create_pr_nojira(
     type_: str, title: str, branch: str | None, base: str | None
 ) -> int:
@@ -574,10 +546,7 @@ def cmd_create_pr_nojira(
     # Conventional Commits, no scope = no linked issue (ADR-006)
     pr_title = f"{type_}: {title}"
     pr_body = "No linked issue (nojira)."
-    # Target the base of the promotion chain when one is configured (ADR-014);
-    # no chain → base stays None → gh uses the repo default branch.
-    if base is None:
-        base = _base_branch()
+    # Single trunk: with no explicit --base, gh targets the repo default branch.
     args = ["pr", "create", "--draft", "--title", pr_title, "--body", pr_body]
     if base:
         args += ["--base", base]
@@ -586,72 +555,6 @@ def cmd_create_pr_nojira(
         sys.stderr.write("create-pr-nojira: gh pr create failed\n")
         return code
     sys.stdout.write(f"Draft PR: {out.strip()}\n")
-    return 0
-
-
-def cmd_promote_env(target: str | None) -> int:
-    """Fast-forward promote one step along the configured chain (ADR-014).
-
-    Promotes the predecessor of *target* into *target* with `git merge --ff-only`,
-    then pushes. The push is an internal subprocess (not via cmd_push), so it can
-    update a protected env branch the same way cmd_push's subprocess bypasses the
-    PreToolUse hook; server-side rulesets govern what is actually allowed.
-    """
-    chain = _promotion_chain()
-    if len(chain) < 2:
-        sys.stderr.write(
-            "promote-env: no promotion chain configured (single-trunk). "
-            "Set branch_model.promotion_chain in .claude/config.yaml.\n"
-        )
-        return 1
-    if target is None:
-        sys.stderr.write(
-            f"promote-env: specify the target env. Chain: {' -> '.join(chain)}\n"
-        )
-        return 1
-    if target not in chain:
-        sys.stderr.write(f"promote-env: '{target}' is not in the chain {chain}\n")
-        return 1
-    idx = chain.index(target)
-    if idx == 0:
-        sys.stderr.write(
-            f"promote-env: '{target}' is the base branch — nothing promotes into it\n"
-        )
-        return 1
-    source = chain[idx - 1]
-    original = _current_branch()
-
-    code, _ = _git(["fetch", "origin", source, target])
-    if code != 0:
-        sys.stderr.write(f"promote-env: git fetch failed for {source}/{target}\n")
-        return 1
-    code, _ = _git(["checkout", "-B", target, f"origin/{target}"])
-    if code != 0:
-        sys.stderr.write(
-            f"promote-env: could not check out {target} (uncommitted changes or "
-            "conflicting local state?). Aborting; nothing merged or pushed.\n"
-        )
-        if original and original != target:
-            _git(["checkout", original])
-        return 1
-    code, out = _git(["merge", "--ff-only", f"origin/{source}"])
-    if code != 0:
-        sys.stderr.write(
-            f"promote-env: {source} -> {target} is not a fast-forward "
-            f"({target} has diverged); resolve manually.\n{out}"
-        )
-        if original and original != target:
-            _git(["checkout", original])
-        return 1
-    # --no-verify: a bare env-branch name fails the pre-push type-prefix rule;
-    # this promotion is sanctioned (server-side rulesets govern). See ADR-014.
-    code, _ = _git(["push", "--no-verify", "origin", target])
-    if original and original != target:
-        _git(["checkout", original])
-    if code != 0:
-        sys.stderr.write(f"promote-env: push of {target} failed\n")
-        return 1
-    sys.stdout.write(f"promote-env: {source} -> {target} (fast-forward) pushed\n")
     return 0
 
 
@@ -691,12 +594,6 @@ def main(argv: list[str] | None = None) -> int:
     p_nojira.add_argument("--branch", default=None)
     p_nojira.add_argument("--base", default=None)
 
-    p_promote_env = sub.add_parser(
-        "promote-env",
-        help="fast-forward promote one step along the configured chain (ADR-014)",
-    )
-    p_promote_env.add_argument("target", nargs="?", default=None)
-
     args = parser.parse_args(argv)
 
     if args.cmd == "check":
@@ -715,8 +612,6 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_finish(args.pr_number, args.review_cycle)
     if args.cmd == "create-pr-nojira":
         return cmd_create_pr_nojira(args.type, args.title, args.branch, args.base)
-    if args.cmd == "promote-env":
-        return cmd_promote_env(args.target)
     return 1
 
 

@@ -114,14 +114,8 @@ def _overlay_off_defaults() -> dict[str, str]:
         "enforcement": "advisory",
         "no_egress": "",
         "egress_ok": "true",
-        # Branch model (ADR-014, #301): single-trunk is the faithful "off" state
-        # for records predating the promotion-chain feature.
-        "branch_chain": "main",
-        "branch_chain_yaml": '"main"',
+        # Single trunk: feature PRs target the default branch.
         "base_branch": "main",
-        "production_branch": "main",
-        "single_trunk": "true",
-        "multi_env": "",
         "project_owner": "",
         "license": "none",
         "license_mit": "",
