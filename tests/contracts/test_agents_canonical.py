@@ -92,3 +92,26 @@ class TestSkillNeutrality:
         content = (self._SKILLS / "github_workflow" / "SKILL.md").read_text()
         frontmatter = content.split("---")[1]
         assert "Claude" not in frontmatter, "lifecycle skill must not be Claude-scoped"
+
+
+class TestGithubWorkflowProductionBoundary:
+    """PI-321 (epic #316): the github_workflow skill must make the agent's
+    production-ref boundary explicit, and all copies must stay in sync."""
+
+    _REPO = Path(__file__).resolve().parents[2]
+    _SKILLS = [
+        _REPO / "templates/fallback/dot_claude/skills/github_workflow/SKILL.md",
+        _REPO / "templates/codex/dot_agents/skills/github_workflow/SKILL.md",
+        _REPO / "templates/gemini/dot_agents/skills/github_workflow/SKILL.md",
+        _REPO / "plugins/project-init-workflow/skills/github_workflow/SKILL.md",
+    ]
+
+    def test_skill_documents_production_boundary(self):
+        text = self._SKILLS[0].read_text()
+        assert "production boundary" in text.lower()
+        assert "never push or commit to the production ref" in text
+        assert "setup_github.sh --protect" in text
+
+    def test_all_copies_carry_the_boundary(self):
+        for skill in self._SKILLS:
+            assert "production boundary" in skill.read_text().lower(), f"{skill} out of sync"
