@@ -11,6 +11,9 @@
 
 set -euo pipefail
 
+# Resolve the base branch (ADR-014) from the promotion chain via gh_host.sh.
+source "$(dirname "$0")/gh_host.sh"
+
 VALID_TYPES="feat fix chore docs test"
 
 usage() {
@@ -130,8 +133,10 @@ fi
 PR_TITLE="${TYPE}(${ISSUE_REF}): ${CLEAN_TITLE}"
 PR_BODY="Closes #${ISSUE_NUMBER}"
 
+BASE_BRANCH=$(base_branch)
 PR_URL=$(gh pr create \
   --draft \
+  --base "$BASE_BRANCH" \
   --title "$PR_TITLE" \
   --body "$PR_BODY")
 

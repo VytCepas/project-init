@@ -489,6 +489,24 @@ def _slugify(text: str) -> str:
     return s.strip("-")
 
 
+def _base_branch(config_path: Path | None = None) -> str | None:
+    """First branch of the promotion chain in .claude/config.yaml (ADR-014), or
+    None when no chain is configured (single-trunk → the repo's default branch).
+
+    Feature PRs target this so an env-branch project (e.g. dev→test→main) opens
+    PRs against the base; a project with no chain is unaffected.
+    """
+    cfg = config_path or Path(".claude/config.yaml")
+    try:
+        text = cfg.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    # Tolerate quoted or unquoted entries (config.yaml is hand-editable; ADR-014
+    # prose shows unquoted forms like [main] / [dev, test, main]).
+    m = re.search(r'^\s*promotion_chain:\s*\[\s*"?([^"\s,\]]+)', text, re.MULTILINE)
+    return m.group(1) if m else None
+
+
 def cmd_create_pr_nojira(
     type_: str, title: str, branch: str | None, base: str | None
 ) -> int:
@@ -546,6 +564,10 @@ def cmd_create_pr_nojira(
     # Conventional Commits, no scope = no linked issue (ADR-006)
     pr_title = f"{type_}: {title}"
     pr_body = "No linked issue (nojira)."
+    # Target the base of the promotion chain when one is configured (ADR-014);
+    # no chain → base stays None → gh uses the repo default branch.
+    if base is None:
+        base = _base_branch()
     args = ["pr", "create", "--draft", "--title", pr_title, "--body", pr_body]
     if base:
         args += ["--base", base]

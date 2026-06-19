@@ -3,6 +3,7 @@ rendered config, and the upgrade backfill for pre-branch-model records."""
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,18 @@ from project_init.__main__ import (
     resolve_branch_chain,
 )
 from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from tests.helpers import fallback_preset, fallback_variables, make_variables
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DAG_HOOK = _REPO_ROOT / ".claude" / "hooks" / "dag_workflow.py"
+_SCRIPTS = _REPO_ROOT / "templates" / "base" / "dot_claude" / "scripts"
+
+
+def _load_dag():
+    spec = importlib.util.spec_from_file_location("dag_workflow_under_test", _DAG_HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def _inputs(branch_chain: list[str]) -> ScaffoldInputs:
@@ -136,3 +148,53 @@ class TestUpgradeBackfill:
         write_scaffold_record(target, "obsidian-only", legacy, created)
         # Strict re-render must succeed (branch vars are backfilled to single-trunk).
         assert run_upgrade(target, apply=False) == 0
+
+
+class TestBaseBranchReader:
+    def test_reads_first_chain_element(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text('  branch_model:\n    promotion_chain: ["dev", "test", "main"]\n')
+        assert _load_dag()._base_branch(cfg) == "dev"
+
+    def test_single_trunk_returns_main(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text('    promotion_chain: ["main"]\n')
+        assert _load_dag()._base_branch(cfg) == "main"
+
+    def test_missing_config_returns_none(self, tmp_path: Path):
+        assert _load_dag()._base_branch(tmp_path / "absent.yaml") is None
+
+    def test_no_chain_returns_none(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("project:\n  name: x\n")
+        assert _load_dag()._base_branch(cfg) is None
+
+    def test_reads_unquoted_chain(self, tmp_path: Path):
+        # config.yaml is hand-editable; tolerate unquoted lists (ADR-014 prose).
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("    promotion_chain: [dev, test, main]\n")
+        assert _load_dag()._base_branch(cfg) == "dev"
+
+
+class TestBaseBranchWiring:
+    """The base-branch wiring must survive scaffolding into a real project tree
+    (repo rule: templates/ changes need a scaffold-into-tempdir test)."""
+
+    def _scaffold(self, tmp_path: Path) -> Path:
+        target = tmp_path / "p"
+        scaffold(target, fallback_preset(), fallback_variables(), strict=True)
+        return target
+
+    def test_scaffolded_gh_host_defines_base_branch(self, tmp_path: Path):
+        target = self._scaffold(tmp_path)
+        assert "base_branch()" in (target / ".claude/scripts/gh_host.sh").read_text()
+
+    def test_scaffolded_start_issue_targets_base(self, tmp_path: Path):
+        target = self._scaffold(tmp_path)
+        s = (target / ".claude/scripts/start_issue.sh").read_text()
+        assert "gh_host.sh" in s
+        assert "--base" in s
+
+    def test_scaffolded_dag_workflow_has_base_reader(self, tmp_path: Path):
+        target = self._scaffold(tmp_path)
+        assert "_base_branch" in (target / ".claude/hooks/dag_workflow.py").read_text()
