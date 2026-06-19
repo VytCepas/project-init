@@ -238,6 +238,24 @@ class TestPromoteEnvValidation:
     def test_base_target_refused(self, monkeypatch):
         assert self._dag(monkeypatch, ["dev", "test", "main"]).cmd_promote_env("dev") == 1
 
+    def test_aborts_on_checkout_failure(self, monkeypatch):
+        # A failed checkout must abort before merge/push (Codex P1): otherwise the
+        # ff-merge runs on the wrong branch and a stale ref gets pushed as success.
+        dag = self._dag(monkeypatch, ["dev", "test", "main"])
+        monkeypatch.setattr(dag, "_current_branch", lambda: "dev")
+        calls: list[str] = []
+
+        def fake_git(args: list[str]) -> tuple[int, str]:
+            calls.append(args[0])
+            if args[0] == "checkout" and "-B" in args:
+                return (1, "error: local changes would be overwritten")
+            return (0, "")
+
+        monkeypatch.setattr(dag, "_git", fake_git)
+        assert dag.cmd_promote_env("test") == 1
+        assert "merge" not in calls
+        assert "push" not in calls
+
 
 class TestPromoteEnvFastForward:
     def test_promotes_by_fast_forward(self, tmp_path: Path, monkeypatch):

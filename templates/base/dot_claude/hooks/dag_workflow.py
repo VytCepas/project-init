@@ -625,7 +625,15 @@ def cmd_promote_env(target: str | None) -> int:
     if code != 0:
         sys.stderr.write(f"promote-env: git fetch failed for {source}/{target}\n")
         return 1
-    _git(["checkout", "-B", target, f"origin/{target}"])
+    code, _ = _git(["checkout", "-B", target, f"origin/{target}"])
+    if code != 0:
+        sys.stderr.write(
+            f"promote-env: could not check out {target} (uncommitted changes or "
+            "conflicting local state?). Aborting; nothing merged or pushed.\n"
+        )
+        if original and original != target:
+            _git(["checkout", original])
+        return 1
     code, out = _git(["merge", "--ff-only", f"origin/{source}"])
     if code != 0:
         sys.stderr.write(
