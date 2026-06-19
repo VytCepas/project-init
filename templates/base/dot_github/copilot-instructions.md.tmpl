@@ -15,7 +15,7 @@ Canonical agent rules: [AGENTS.md](../AGENTS.md) | Workflow: [.claude/project-in
 - Draft PRs are opened immediately when work starts, not when done
 - When asked to push/finish a PR, load the `github_workflow` skill for the full lifecycle and review-cycle protocol.
 - No direct commits to `main`
-- Branch model (ADR-014): single-trunk by default; opt into env chains via `branch_model.promotion_chain` in `.claude/config.yaml` + `setup_env_branches.sh`, then `promote_env.sh <env>` to fast-forward downstream
+- Branch model (ADR-014): single-trunk by default; opt into env chains via `project.branch_model.promotion_chain` in `.claude/config.yaml` + `.claude/scripts/setup_env_branches.sh`, then `.claude/scripts/promote_env.sh <env>` to fast-forward downstream
 
 ## Key rules
 

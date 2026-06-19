@@ -122,6 +122,8 @@ Feature PRs then target the **base** (first) branch and squash-merge there; adva
 .claude/scripts/promote_env.sh main   # ff-promote test → main
 ```
 
+> **Enabling a chain at scaffold time is cleanest:** pass `--branch-model dev-test-main` (or a custom chain) to `project-init` so the CI / `validate-pr` workflows are generated for the base branch. If you enable a chain **later**, also point the `branches:` filters in `.github/workflows/ci.yml` and `.github/workflows/validate-pr.yml` at your base branch — they were rendered for `main` at scaffold time, so PRs to the base branch won't run the required checks until you do.
+
 Single-trunk projects ignore all of this — the chain defaults to `["main"]`.
 
 ### Commit and PR format

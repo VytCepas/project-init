@@ -415,5 +415,8 @@ class TestBranchModelDocs:
         skill = (
             _REPO_ROOT
             / "templates/fallback/dot_claude/skills/github_workflow/SKILL.md"
-        )
-        assert "Branch model (ADR-014)" in skill.read_text()
+        ).read_text()
+        assert "Branch model (ADR-014)" in skill
+        assert "base branch" in skill
+        assert "promote_env.sh" in skill
+        assert "project.branch_model.promotion_chain" in skill
