@@ -47,6 +47,8 @@ Sub-issues:
   --parent links the new issue as a native GitHub sub-issue of the given parent.
   Cross-repo parents use owner/repo#42 or the full issue URL.
   --scale epic marks this issue as a parent work item (adds scale:epic label).
+  Keep an epic's child tickets --scale task and sized S/M (avoid L/XL) so each is
+  one small PR — small tickets keep AI-assisted work and context bounded.
 
 Metadata model:
   GitHub labels: type and scale when labels exist or can be created.

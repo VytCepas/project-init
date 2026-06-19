@@ -17,16 +17,18 @@ Before creating the issue, determine:
 - priority: `high`, `medium`, or `low`
 - area: existing repo area label or plain body metadata
 - size: `XS`, `S`, `M`, `L`, or `XL`
+- scale: `task` (default — one focused PR) or `epic` (a large initiative tracked as the parent of small child tasks)
 - references: related issues, PRs, ADRs, docs, designs, logs, or external links
 - dependencies: blocked-by, parent, or follow-up relationships
 - acceptance criteria: concrete checklist items
 
-If type, title, priority, area, size, or acceptance criteria are not clear from context, ask the user before proceeding.
+If type, title, priority, area, size, or acceptance criteria are not clear from context, ask the user before proceeding (scale defaults to `task` — only set `epic` for a large parent initiative).
 
 ## Rules
 
+- **Keep tickets small.** An `epic` may be large, but every child ticket must be `--scale task` and sized `S`/`M` (split anything that would be `L`/`XL`). Small tickets mean small PRs and bounded context — where AI-assisted implementation works best.
 - Use `.claude/scripts/create_issue.sh`; do not call `gh issue create` directly unless the script cannot satisfy the case.
-- Do not invent labels. The script may create priority and size labels, but area labels are repository-specific.
+- Do not invent labels. The script may create priority, size, and scale labels, but area labels are repository-specific.
 - Store relationships that GitHub does not support portably in markdown sections.
 - The script writes Definition of Ready/Done defaults so issues created from this skill satisfy the scaffolded issue-validation workflow.
 - Check for duplicate issues before creating a new one:
@@ -43,6 +45,7 @@ Run:
   --priority <high|medium|low> \
   --area "<area>" \
   --size <XS|S|M|L|XL> \
+  --scale <task|epic> \
   --reference "<reference>" \
   --dependency "<dependency>" \
   --acceptance "<criterion>"
