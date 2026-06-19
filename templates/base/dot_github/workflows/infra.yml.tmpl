@@ -1,0 +1,67 @@
+{{#if iac_enabled}}# Infrastructure CI (ADR-015, OpenTofu). Plan on PRs; apply is MANUAL and
+# environment-gated — never apply-on-merge. Auth via OIDC (no long-lived keys).
+name: Infra
+
+on:
+  pull_request:
+    paths: ["infra/**"]
+  workflow_dispatch:        # apply is run manually (see the apply job)
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: tofu plan
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write       # OIDC to your cloud (configure below)
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@v1
+
+      # TODO: authenticate to your cloud via OIDC, e.g.
+      #   aws-actions/configure-aws-credentials@v4 with role-to-assume, or
+      #   google-github-actions/auth@v2 with workload_identity_provider.
+      - name: Format check
+        run: tofu fmt -check -recursive
+      # Uses whatever infra/backend.tf configures (an empty scaffold has none →
+      # local backend, which inits without credentials); once a remote backend +
+      # OIDC auth are wired above, plans run against real state.
+      - name: Init
+        run: tofu init
+      - name: Validate
+        run: tofu validate
+      - name: Plan
+        run: tofu plan -input=false
+
+  apply:
+    name: tofu apply (manual, gated)
+    if: github.event_name == 'workflow_dispatch'
+    needs: plan
+    runs-on: ubuntu-24.04
+    # The infra-apply GitHub Environment is the human gate (required reviewers /
+    # wait timer). An agent cannot apply to prod infra without clearing it.
+    environment: infra-apply
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@v1
+      # TODO: OIDC cloud auth (as above).
+      - name: Init
+        run: tofu init
+      - name: Apply
+        run: tofu apply -input=false -auto-approve
+{{/if iac_enabled}}

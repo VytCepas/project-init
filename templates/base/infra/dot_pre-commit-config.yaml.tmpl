@@ -1,0 +1,13 @@
+{{#if iac_enabled}}# Pre-commit hooks for the infra/ HCL. Requires the OpenTofu binary (`tofu`),
+# NOT `terraform` — export PCT_TFPATH=tofu so the hooks invoke OpenTofu
+# (antonbabenko/pre-commit-terraform reads PCT_TFPATH). Run: pre-commit run -a.
+repos:
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.99.0
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_validate
+      - id: terraform_tflint
+      - id: terraform_trivy
+      - id: terraform_docs
+{{/if iac_enabled}}

@@ -129,6 +129,9 @@ def _overlay_off_defaults() -> dict[str, str]:
         "deploy_cloud_run": "",
         "deploy_fly": "",
         "deploy_k8s": "",
+        # IaC overlay (ADR-015): off for records predating the iac question.
+        "iac": "none",
+        "iac_enabled": "",
         "want_devcontainer": "",
         "project_owner": "",
         "license": "none",

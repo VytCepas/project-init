@@ -1,0 +1,14 @@
+{{#if iac_enabled}}# Provider + version constraints. Runs on OpenTofu (the `tofu` binary) — the
+# license-safe HCL engine (ADR-015). Plain Terraform also reads this file.
+terraform {
+  required_version = ">= 1.6"
+
+  # Declare your providers here with pessimistic (~>) version pins, e.g.:
+  # required_providers {
+  #   aws = {
+  #     source  = "hashicorp/aws"
+  #     version = "~> 5.0"
+  #   }
+  # }
+}
+{{/if iac_enabled}}
