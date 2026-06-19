@@ -83,8 +83,6 @@ def test_readme_layout_has_no_phantom_examples_dir():
 def test_readme_documents_env_model_flags():
     """PI-328 (epic #316): README must document the delivery/deploy/iac flags so
     the user-facing docs don't drift from the wizard surface."""
-    from pathlib import Path
-
-    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text()
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
     for flag in ("--delivery", "--deploy", "--iac"):
         assert flag in readme, f"README.md missing {flag}"
