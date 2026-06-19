@@ -455,6 +455,21 @@ class TestRecordBackfill:
         rc = main(["upgrade", str(target)])
         assert rc == 0, "backfilled defaults must keep strict re-render working"
 
+    def test_pre_316_record_backfills_env_deploy_fields(self):
+        """A record predating epic #316 (no delivery/deploy/iac keys, and a
+        branch-per-env base_branch) backfills to the off state and normalizes
+        base_branch to single-trunk main (#329)."""
+        from project_init.upgrade import _backfill_variables
+
+        # An ex-promotion-chain record: has base_branch=dev, lacks the #316 keys.
+        old = {"language": "python", "base_branch": "dev", "memory_stack": "obsidian-only"}
+        out = _backfill_variables(old)
+        assert out["delivery"] == "prototype"
+        assert out["deploy_target"] == "none"
+        assert out["iac"] == "none"
+        assert out["cloud_oidc"] == ""
+        assert out["base_branch"] == "main", "ex-chain base_branch must normalize to main"
+
     def test_backfill_derives_repo_slug_from_recorded_url(self, tmp_path: Path):
         target = tmp_path / "p"
         _scaffold(target)
