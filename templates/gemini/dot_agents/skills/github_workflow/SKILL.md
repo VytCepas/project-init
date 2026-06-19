@@ -24,6 +24,13 @@ Types: `feat` `fix` `chore` `docs` `test`
 
 **Branch model:** single-trunk — feature PRs target the repo default branch (`main`) and squash-merge. Environments are a deploy-time concern (config + deploy target), not a branching concern.
 
+## Agent safety — the production boundary
+
+You (the agent) work on **feature/PR branches only — never push or commit to the production ref (`main`)**. On any auto-deploy platform, write access to the production branch *is* production-deploy access. This is enforced two ways:
+
+- **Fast-feedback (in-repo):** the command guard blocks `git push main`/`master`, `gh pr merge`, and `gh api .../merge` — but a hook is editable, so treat it as a guard rail, not the boundary.
+- **The real boundary (server-side):** branch protection installed by `.claude/scripts/setup_github.sh --protect` (squash-only, required CI, required review, no force-push) — and, for deployed services, GitHub Environment protection rules. These live server-side and an agent cannot edit them. Run `setup_github.sh --protect` once with admin rights to arm them.
+
 ## Standard lifecycle
 
 1. **Start work** — use the `start_task` skill. It runs `start_issue.sh` which creates
