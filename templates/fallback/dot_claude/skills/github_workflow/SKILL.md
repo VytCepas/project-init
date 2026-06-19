@@ -22,6 +22,8 @@ Commit messages use the same format (Conventional Commits). Legacy `[PROJECT-123
 
 Types: `feat` `fix` `chore` `docs` `test`
 
+**Branch model (ADR-014):** feature PRs target the **base branch** — the first entry of `project.branch_model.promotion_chain` in `.claude/config.yaml` (`main` by default). In multi-environment projects, advance downstream branches by fast-forward with `.claude/scripts/promote_env.sh <env>` — never via a PR.
+
 ## Standard lifecycle
 
 1. **Start work** — use the `start_task` skill. It runs `start_issue.sh` which creates

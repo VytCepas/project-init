@@ -99,6 +99,33 @@ Run the scaffolded setup helper after creating the repository:
 
 It attempts to configure branch protection, required checks, conversation resolution, and Copilot code review. If GitHub does not expose a setting through the API or your token lacks permission, it prints the manual setup step.
 
+### Branch model (ADR-014) — opinionated default, reworkable
+
+By default this project is **single-trunk**: feature PRs target `main` and merge by squash. That's a sensible default for most projects — **rework it freely** if yours needs environments.
+
+To use an environment **promotion chain** (e.g. `dev → test → main`, or `dev → uat → preprod → main`), set it in `.claude/config.yaml` and create the branches once:
+
+```yaml
+project:
+  branch_model:
+    promotion_chain: ["dev", "test", "main"]   # base first → production last
+```
+
+```bash
+.claude/scripts/setup_env_branches.sh --protect   # create + protect the chain
+```
+
+Feature PRs then target the **base** (first) branch and squash-merge there; advance downstream by **fast-forward** promotion (never a PR):
+
+```bash
+.claude/scripts/promote_env.sh test   # ff-promote dev → test
+.claude/scripts/promote_env.sh main   # ff-promote test → main
+```
+
+> **Enabling a chain at scaffold time is cleanest:** pass `--branch-model dev-test-main` (or a custom chain) to `project-init` so the CI / `validate-pr` workflows are generated for the base branch. If you enable a chain **later**, also point the `branches:` filters in `.github/workflows/ci.yml` and `.github/workflows/validate-pr.yml` at your base branch — they were rendered for `main` at scaffold time, so PRs to the base branch won't run the required checks until you do.
+
+Single-trunk projects ignore all of this — the chain defaults to `["main"]`.
+
 ### Commit and PR format
 
 | What | Format | Example |

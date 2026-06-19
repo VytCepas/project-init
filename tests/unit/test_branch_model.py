@@ -400,3 +400,23 @@ class TestCIRetargeting:
         ci = (self._scaffold(tmp_path, base_branch="dev") / ".github/workflows/ci.yml").read_text()
         assert "branches: [dev]" in ci
         assert "branches: [main]" not in ci
+
+
+class TestBranchModelDocs:
+    def test_project_init_md_documents_branch_model(self, tmp_path: Path):
+        target = tmp_path / "p"
+        scaffold(target, fallback_preset(), fallback_variables(), strict=True)
+        doc = (target / ".claude/project-init.md").read_text()
+        assert "Branch model (ADR-014)" in doc
+        assert "promote_env.sh" in doc
+        assert "setup_env_branches.sh" in doc
+
+    def test_github_workflow_skill_mentions_base_branch(self):
+        skill = (
+            _REPO_ROOT
+            / "templates/fallback/dot_claude/skills/github_workflow/SKILL.md"
+        ).read_text()
+        assert "Branch model (ADR-014)" in skill
+        assert "base branch" in skill
+        assert "promote_env.sh" in skill
+        assert "project.branch_model.promotion_chain" in skill
