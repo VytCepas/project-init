@@ -1,0 +1,54 @@
+{{#if deploy_container}}#!/bin/bash
+# whats_deployed.sh — show what's deployed where, from the GitHub Deployments API
+# (ADR-015). The DESIRED model is deploy/environments.yaml; the ACTUAL state is
+# the latest deployment + status per environment. An agent reads this instead of
+# inferring deploy state from branch topology.
+#
+# Usage: whats_deployed.sh
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/gh_host.sh"
+
+HOST="$(gh_host)"
+if ! gh auth status -h "$HOST" >/dev/null 2>&1; then
+  echo "ERROR: gh is not authenticated for $HOST. Run: gh auth login --hostname $HOST" >&2
+  exit 1
+fi
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+OWNER=${REPO%/*}
+NAME=${REPO#*/}
+
+# Desired environments from the declarative model (fixed shape; no yq needed).
+ENVS_FILE="$(cd "$SCRIPT_DIR/../.." && pwd)/deploy/environments.yaml"
+ENVS=()
+if [ -f "$ENVS_FILE" ]; then
+  while IFS= read -r e; do ENVS+=("$e"); done < <(
+    sed -n 's/^  \([a-z][a-z0-9_-]*\):$/\1/p' "$ENVS_FILE")
+fi
+[ "${#ENVS[@]}" -eq 0 ] && ENVS=(staging production)
+
+printf '%-14s %-12s %-10s %s\n' "ENVIRONMENT" "STATE" "SHA" "WHEN"
+any=0
+for env in "${ENVS[@]}"; do
+  dep=$(gh api "repos/$OWNER/$NAME/deployments?environment=$env&per_page=1" 2>/dev/null || echo '[]')
+  id=$(echo "$dep" | jq -r '.[0].id // empty')
+  if [ -z "$id" ]; then
+    printf '%-14s %-12s %-10s %s\n' "$env" "—" "—" "(no GitHub deployment)"
+    continue
+  fi
+  any=1
+  sha=$(echo "$dep" | jq -r '.[0].sha[0:7] // "?"')
+  when=$(echo "$dep" | jq -r '.[0].created_at // "?"')
+  state=$(gh api "repos/$OWNER/$NAME/deployments/$id/statuses?per_page=1" -q '.[0].state' 2>/dev/null || echo "?")
+  printf '%-14s %-12s %-10s %s\n' "$env" "$state" "$sha" "$when"
+done
+
+if [ "$any" -eq 0 ]; then
+  echo ""
+  echo "No GitHub Deployments found. If a platform (Vercel/Render/Fly/…) owns your"
+  echo "deploy, check its dashboard/CLI for live state — GitHub won't have records."
+fi
+{{/if deploy_container}}
