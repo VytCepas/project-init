@@ -6,8 +6,10 @@ services:
   app:
     build: .
     env_file: .env
+    # Both sides track $PORT: the app listens on $PORT (Dockerfile) and we publish
+    # the same port, so a PORT override in .env stays reachable.
     ports:
-      - "${PORT:-8080}:8080"
+      - "${PORT:-8080}:${PORT:-8080}"
     # Optional hot-reload: requires a recent Docker Compose. `just up` works
     # without it — uncomment to sync source into the running container on change.
     # develop:
