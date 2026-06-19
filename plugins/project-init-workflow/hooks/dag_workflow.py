@@ -643,7 +643,9 @@ def cmd_promote_env(target: str | None) -> int:
         if original and original != target:
             _git(["checkout", original])
         return 1
-    code, _ = _git(["push", "origin", target])
+    # --no-verify: a bare env-branch name fails the pre-push type-prefix rule;
+    # this promotion is sanctioned (server-side rulesets govern). See ADR-014.
+    code, _ = _git(["push", "--no-verify", "origin", target])
     if original and original != target:
         _git(["checkout", original])
     if code != 0:

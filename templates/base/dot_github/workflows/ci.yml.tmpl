@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [{{base_branch}}]
   pull_request:
-    branches: [main]
+    branches: [{{base_branch}}]
   # Optimization: Only run CI when relevant files change
   # Uncomment and adjust paths as needed for your project
 
