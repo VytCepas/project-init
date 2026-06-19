@@ -1,0 +1,131 @@
+{{#if deploy_container}}#!/bin/bash
+# setup_env_protection.sh — install SERVER-SIDE GitHub Environment protection on
+# the deploy environments (ADR-015, epic #316). The `production` environment is
+# the real boundary an agent cannot bypass; deploy.yml references it. Run once,
+# with repo admin rights, after the deploy overlay is configured.
+#
+# Tiered by distribution profile (.claude/config.yaml; ADR-013):
+#   org                   -> production requires human reviewers + prevent-self-review
+#                            (a TRUE human gate). Pass reviewers with --reviewer.
+#   individual/standalone -> production gets a wait timer only — a DELAYED/ADVISORY
+#                            gate, NOT a human gate (a solo account has no second
+#                            approver). Move to the org profile or add a reviewer.
+#
+# Setup contract:
+#   - Requires gh + repo ADMIN permission.
+#   - Idempotent: the environment PUT replaces existing settings.
+#   - Required reviewers + wait timers need a PUBLIC repo on GitHub Free/Pro, or
+#     GitHub Team/Enterprise for a private repo. On an unsupported plan the API
+#     rejects the call; this script WARNS and continues rather than failing.
+#
+# Usage: setup_env_protection.sh [--reviewer @user | @org/team]... [--wait MIN]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/gh_host.sh"
+
+WAIT_MIN=5
+REVIEWERS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --reviewer) [ $# -ge 2 ] || { echo "Missing value for --reviewer" >&2; exit 1; }; REVIEWERS+=("$2"); shift 2 ;;
+    --wait) [ $# -ge 2 ] || { echo "Missing value for --wait" >&2; exit 1; }; WAIT_MIN="$2"; shift 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+HOST="$(gh_host)"
+if ! gh auth status -h "$HOST" >/dev/null 2>&1; then
+  echo "ERROR: gh is not authenticated for $HOST. Run: gh auth login --hostname $HOST" >&2
+  exit 1
+fi
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+OWNER=${REPO%/*}
+NAME=${REPO#*/}
+PROFILE="$(gh_profile)"
+BASE="$(base_branch)"
+
+echo "Configuring deploy environments for $REPO (profile=$PROFILE)"
+
+# --- staging: ensured, no gate (auto-deploy) ---
+if gh api "repos/$OWNER/$NAME/environments/staging" -X PUT >/dev/null 2>&1; then
+  echo "Environment 'staging' ensured (auto-deploy, no gate)"
+else
+  echo "WARNING: could not create the 'staging' environment (admin permission / plan?)." >&2
+fi
+
+# Resolve a @user / @org/team handle to {"type":...,"id":N} for the reviewers API.
+resolve_reviewer() {
+  local who="${1#@}" id
+  if [[ "$who" == */* ]]; then
+    id=$(gh api "orgs/${who%/*}/teams/${who#*/}" -q .id 2>/dev/null || true)
+    [ -n "$id" ] && printf '{"type":"Team","id":%s}' "$id"
+  else
+    id=$(gh api "users/$who" -q .id 2>/dev/null || true)
+    [ -n "$id" ] && printf '{"type":"User","id":%s}' "$id"
+  fi
+}
+
+BODY=$(mktemp)
+trap 'rm -f "$BODY"' EXIT
+
+SKIP_PROD=0
+if [ "$PROFILE" = "org" ]; then
+  reviewers_json="[]"
+  if [ "${#REVIEWERS[@]}" -gt 0 ]; then
+    parts=()
+    for r in "${REVIEWERS[@]}"; do
+      j=$(resolve_reviewer "$r") || true
+      if [ -n "$j" ]; then parts+=("$j"); else echo "WARNING: could not resolve reviewer '$r' — skipping." >&2; fi
+    done
+    reviewers_json="[$(IFS=,; echo "${parts[*]}")]"
+  fi
+  if [ "$reviewers_json" = "[]" ]; then
+    # Do NOT PUT an empty-reviewers payload — that would WIPE any reviewers already
+    # configured on production, silently removing the gate. Leave production as-is.
+    echo "WARNING: org profile but no --reviewer resolved — leaving production protection" >&2
+    echo "  UNCHANGED (existing reviewers, if any, are preserved). Re-run with:" >&2
+    echo "    setup_env_protection.sh --reviewer @your-org/your-team" >&2
+    SKIP_PROD=1
+  else
+    cat > "$BODY" <<JSON
+{ "prevent_self_review": true, "can_admins_bypass": false, "reviewers": $reviewers_json,
+  "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true } }
+JSON
+    GATE_DESC="required reviewers + prevent-self-review + no admin bypass (hard human gate)"
+  fi
+else
+  cat > "$BODY" <<JSON
+{ "wait_timer": $WAIT_MIN,
+  "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true } }
+JSON
+  GATE_DESC="${WAIT_MIN}-min wait timer (DELAYED/ADVISORY — not a human gate)"
+fi
+
+if [ "$SKIP_PROD" = 1 ]; then
+  :  # production left untouched (see warning above)
+elif gh api "repos/$OWNER/$NAME/environments/production" -X PUT --input "$BODY" >/dev/null 2>&1; then
+  echo "Environment 'production' ensured: $GATE_DESC"
+  # Restrict production deploys to the base branch.
+  if gh api "repos/$OWNER/$NAME/environments/production/deployment-branch-policies" \
+       -X POST -f name="$BASE" >/dev/null 2>&1; then
+    echo "  production deploys restricted to '$BASE'"
+  else
+    echo "  (branch policy for '$BASE' may already exist)"
+  fi
+else
+  echo "WARNING: could not protect 'production'. Required reviewers/wait timers need a" >&2
+  echo "  PUBLIC repo on Free/Pro, or GitHub Team/Enterprise for a private repo." >&2
+fi
+
+if [ "$PROFILE" != "org" ]; then
+  echo ""
+  echo "NOTE: this is a delayed/advisory gate, not a human gate — a solo account has no"
+  echo "  second approver. For a real gate, use the org profile or add a reviewer."
+fi
+
+echo ""
+echo "Check live deploy state with: .claude/scripts/whats_deployed.sh"
+{{/if deploy_container}}

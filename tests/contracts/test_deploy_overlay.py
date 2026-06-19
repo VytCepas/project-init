@@ -107,3 +107,39 @@ class TestResolveDeploy:
     def test_invalid_target(self):
         with pytest.raises(ValueError, match="invalid deploy target"):
             resolve_deploy("heroku", "service")
+
+
+def _envprot(t: Path) -> Path:
+    return t / ".claude" / "scripts" / "setup_env_protection.sh"
+
+
+def _whats(t: Path) -> Path:
+    return t / ".claude" / "scripts" / "whats_deployed.sh"
+
+
+class TestDeployGateScripts:
+    """PI-324: container-deploy services get the server-side gate + introspection
+    scripts; the gate is tiered (org hard / individual advisory)."""
+
+    def test_scripts_render_and_executable(self, tmp_path: Path):
+        import os
+
+        t = _service_deploy(tmp_path / "svc", "cloud-run")
+        for p in (_envprot(t), _whats(t)):
+            assert p.is_file(), p
+            assert os.access(p, os.X_OK), f"{p} not executable"
+
+    def test_gate_is_tiered(self, tmp_path: Path):
+        text = _envprot(_service_deploy(tmp_path / "svc", "cloud-run")).read_text()
+        assert "prevent_self_review" in text          # org: hard human gate
+        assert "reviewers" in text
+        assert "wait_timer" in text                   # individual/standalone: advisory
+        assert "PUBLIC repo" in text                  # plan caveat documented
+
+    def test_absent_for_registry_none_and_prototype(self, tmp_path: Path):
+        reg = _service_deploy(tmp_path / "reg", "registry")
+        none = _service_deploy(tmp_path / "none", "none")
+        proto = _scaffold(tmp_path / "proto", delivery="prototype")
+        for t in (reg, none, proto):
+            assert not _envprot(t).exists()
+            assert not _whats(t).exists()
