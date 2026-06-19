@@ -107,7 +107,14 @@ class TestBranchModelRecorded:
         scaffold(
             target,
             load_preset("obsidian-only"),
-            make_variables(branch_chain_yaml='"dev", "test", "main"'),
+            make_variables(
+                branch_chain="dev,test,main",
+                branch_chain_yaml='"dev", "test", "main"',
+                base_branch="dev",
+                production_branch="main",
+                single_trunk="",
+                multi_env="true",
+            ),
             strict=True,
         )
         cfg = (target / ".claude" / "config.yaml").read_text()
