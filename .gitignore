@@ -41,3 +41,10 @@ logs/
 
 # Measurement harness raw outputs (#269/#271) — per-run transcripts/cost JSONL
 tools/benchmark/results/
+
+# MkDocs build output (published to the gh-pages branch, not committed)
+site/
+
+# Plan-review scratch from codex-review / grill skills (work is tracked in Issues)
+PLAN.md
+PLAN-REVIEW-LOG.md
