@@ -94,7 +94,7 @@ After the **git install** (`install.sh`), a `/project-init` slash command is ava
 /project-init
 ```
 
-This runs the interactive wizard in the current project directory. It asks for project name, language, memory stack, and MCPs — then scaffolds `.claude/` for you.
+This runs the interactive wizard in the current project directory. It asks for project name, language, delivery model, memory stack, and MCPs — then scaffolds `.claude/` for you.
 
 ### Option 2: From a shell (non-interactive, for CI / scripts)
 
@@ -116,6 +116,9 @@ The wizard asks (interactive mode only):
 
 - Project name / description
 - Language (Python/Node/Go/none) — drives `lint_command`, `format_command`, `test_command`
+- Delivery model (`--delivery library|service|prototype`) — how the project ships, driving its env/CI/release bundle (ADR-015). `service` adds the container **parity bundle** (Dockerfile + `compose.yaml` + devcontainer + `just up`/`build`) and unlocks the deploy overlay; `library` adds a tag-triggered release workflow (publish **disabled** until you wire the registry); `prototype` (default) adds nothing env-specific. `service` requires a language.
+- Deploy overlay (`--deploy none|cloud-run|fly|k8s|registry|custom`) — opt-in, **service only**. Container targets scaffold a build-once-**by-digest** `deploy.yml` (GitHub Environments: staging auto-deploys, production is **gated**) + a declarative `deploy/environments.yaml`, plus `setup_env_protection.sh` (server-side prod gate, tiered by profile) and `whats_deployed.sh`. `none` (default) = your platform (Vercel/Render/Fly/…) owns deploy.
+- Infrastructure-as-Code (`--iac none|opentofu`) — opt-in OpenTofu/HCL skeleton under `infra/` + a plan-on-PR workflow (apply is **manual / environment-gated**, never apply-on-merge). Emits structure only — no resources or credentials.
 - Memory stack — Obsidian-only or Obsidian + Graphify (recommended for code-heavy projects)
 - Core MCPs (Context7)
 - Database MCP — none / Postgres / SQLite

@@ -78,3 +78,11 @@ def test_readme_layout_has_no_phantom_examples_dir():
     readme = (repo / "README.md").read_text(encoding="utf-8")
     if "examples/" in readme:
         assert (repo / "examples").is_dir(), "README references examples/ but it doesn't exist"
+
+
+def test_readme_documents_env_model_flags():
+    """PI-328 (epic #316): README must document the delivery/deploy/iac flags so
+    the user-facing docs don't drift from the wizard surface."""
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
+    for flag in ("--delivery", "--deploy", "--iac"):
+        assert flag in readme, f"README.md missing {flag}"
