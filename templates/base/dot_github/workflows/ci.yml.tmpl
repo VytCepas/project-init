@@ -256,27 +256,32 @@ jobs:
 {{/if python}}
 
   {{#if delivery_service}}
-  # Build-once (ADR-015): build the SAME immutable image CI tests against and the
-  # deploy overlay promotes. Tests are pinned HOST-based above (the language
-  # matrix); this job validates the Dockerfile builds and produces the artifact,
-  # tagged by the commit SHA. Pushing the digest to a registry is wired by the
-  # deploy overlay (#323) — here we only build (push: false).
+  # Build-once (ADR-015): validate the Dockerfile builds and warm the layer cache
+  # for the SAME image the deploy overlay promotes. Tests are pinned HOST-based
+  # above (the language matrix). This job only builds (push: false) — the deploy
+  # overlay (#323) builds and pushes the real digest to a registry.
   build-image:
     name: Build image (build-once)
     runs-on: ubuntu-24.04
     needs: lint-and-test
+    permissions:
+      contents: read
+      actions: write   # required to save the type=gha build cache
     steps:
       - uses: actions/checkout@v6
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build the immutable artifact (tagged by SHA)
+      # Static lowercase tag — ${{ github.repository }} may contain uppercase
+      # (invalid in a Docker ref). The real registry name is set by the deploy
+      # overlay; here the tag only needs to be valid and SHA-pinned.
+      - name: Build the image (SHA-pinned, cached)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
-          tags: ${{ github.repository }}:${{ github.sha }}
+          tags: app:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 {{/if delivery_service}}

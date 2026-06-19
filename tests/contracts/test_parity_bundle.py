@@ -99,3 +99,9 @@ class TestBuildOnceCI:
         ci = self._ci(_scaffold(tmp_path / "proto", delivery="prototype"))
         assert "build-image:" not in ci
         assert "build-push-action" not in ci
+
+    def test_library_ci_has_no_image_build(self, tmp_path: Path):
+        # delivery_service must never leak true for a library (PR #334 review).
+        ci = self._ci(_scaffold(tmp_path / "lib", delivery="library"))
+        assert "build-image:" not in ci
+        assert "build-push-action" not in ci
