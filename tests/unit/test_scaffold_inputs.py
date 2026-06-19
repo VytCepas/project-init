@@ -105,3 +105,24 @@ class TestDeliveryModel:
         )
         # No SystemExit from argparse choices; resolver then normalizes the alias.
         assert resolve_delivery(args.delivery, args.language) == "service"
+
+
+class TestConfigSchemaEnvFields:
+    """PI-327 (epic #316): .claude/config.yaml records the delivery/deploy/iac
+    schema so `upgrade` can re-render and backfill faithfully."""
+
+    def test_config_records_all_three_overlays(self, tmp_path):
+        from project_init.scaffold import load_preset, scaffold
+        from tests.helpers import make_variables
+
+        target = tmp_path / "p"
+        scaffold(
+            target,
+            load_preset("obsidian-only"),
+            make_variables(delivery="service", deploy_target="cloud-run", iac="opentofu"),
+            strict=True,
+        )
+        config = (target / ".claude" / "config.yaml").read_text()
+        assert "delivery: service" in config
+        assert "deploy: cloud-run" in config
+        assert "iac: opentofu" in config
