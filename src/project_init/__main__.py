@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
@@ -48,6 +49,9 @@ class ScaffoldInputs:
     no_plugin: bool
     profile: str
     no_egress: bool = False
+    # Branch model (ADR-014, #301): the git promotion chain, base first →
+    # production last. Single-trunk (the default) is a length-1 chain.
+    branch_chain: list[str] = field(default_factory=lambda: ["main"])
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -165,6 +169,16 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--branch-model",
+        default=None,
+        help=(
+            "Git branch model (ADR-014): single-trunk (default), dev-test-main, "
+            "dev-uat-preprod-main, or a custom comma chain base-first "
+            "(e.g. dev,test,main). Opt-in; env branches are created post-clone "
+            "by .claude/scripts/setup_env_branches.sh"
+        ),
+    )
+    p.add_argument(
         "--non-interactive",
         action="store_true",
         help="Skip all prompts (requires --preset, --name, --description)",
@@ -270,6 +284,34 @@ def _choose_profile_interactive() -> str:
         console.print("[red]Invalid choice. Using individual.[/red]")
         choice = 1
     return _PROFILES[choice - 1]
+
+
+def _choose_branch_model_interactive() -> list[str]:
+    """Present the branch-model options (ADR-014); default single-trunk."""
+    from rich.console import Console
+    from rich.prompt import IntPrompt
+
+    console = Console()
+    options = ["single-trunk", "dev-test-main", "dev-uat-preprod-main", "custom"]
+    console.print("\n[bold]Branch model[/bold] (ADR-014 — opt-in, reworkable):")
+    for i, name in enumerate(options, 1):
+        console.print(f"  [cyan]{i}[/cyan]. {name} — {_BRANCH_MODEL_SUMMARY[name]}")
+    console.print()
+    choice = IntPrompt.ask("Choose a branch model", default=1)
+    if choice < 1 or choice > len(options):
+        console.print("[red]Invalid choice. Using single-trunk.[/red]")
+        choice = 1
+    if options[choice - 1] != "custom":
+        return resolve_branch_chain(options[choice - 1])
+    while True:
+        raw = _prompt(
+            "Custom chain, base first → production last (comma-separated, e.g. dev,test,main)",
+            default="main",
+        )
+        try:
+            return resolve_branch_chain(raw)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
 
 
 def _resolve_mcps_non_interactive(
@@ -472,6 +514,7 @@ def _gather_inputs_interactive(
             from rich.console import Console
 
             Console().print(f"[red]{e}[/red]")
+    branch_chain = _choose_branch_model_interactive()
     return ScaffoldInputs(
         project_name=project_name,
         project_description=project_description,
@@ -486,6 +529,7 @@ def _gather_inputs_interactive(
         no_plugin=no_plugin,
         profile=resolved_profile,
         no_egress=no_egress,
+        branch_chain=branch_chain,
     )
 
 
@@ -507,6 +551,57 @@ def resolve_agents(raw: str) -> list[str]:
 def agent_layers(agents: list[str]) -> list[str]:
     """Template layers contributed by the selected agents (no fallback)."""
     return overlay_layers(agents, no_plugin=False)
+
+
+# Branch model (ADR-014): named promotion-chain presets + a validator. A chain is
+# ordered base-first → production-last; single-trunk is just a length-1 chain.
+_BRANCH_MODEL_PRESETS: dict[str, list[str]] = {
+    "single-trunk": ["main"],
+    "dev-test-main": ["dev", "test", "main"],
+    "dev-uat-preprod-main": ["dev", "uat", "preprod", "main"],
+}
+
+_BRANCH_MODEL_SUMMARY = {
+    "single-trunk": "one trunk (main); feature PRs target it — today's default",
+    "dev-test-main": "promote dev → test → main by fast-forward",
+    "dev-uat-preprod-main": "promote dev → uat → preprod → main by fast-forward",
+    "custom": "your own ordered chain (base first → production last)",
+}
+
+# Long-lived env-branch names are kept simple (no slashes — those are for feature
+# branches): a lowercase letter then letters/digits/dot/underscore/dash.
+_BRANCH_NAME_RE = re.compile(r"^[a-z][a-z0-9._-]*$")
+
+
+def resolve_branch_chain(raw: str) -> list[str]:
+    """Parse/validate a --branch-model value into an ordered promotion chain.
+
+    Accepts a preset name (single-trunk, dev-test-main, dev-uat-preprod-main) or a
+    custom comma chain (base first → production last). Returns an ordered,
+    de-duplicated list; a length-1 chain is single-trunk. Raises ValueError on an
+    invalid branch name.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return ["main"]
+    if raw in _BRANCH_MODEL_PRESETS:
+        return list(_BRANCH_MODEL_PRESETS[raw])
+    names = [n.strip() for n in raw.split(",") if n.strip()]
+    invalid = [n for n in names if not _BRANCH_NAME_RE.match(n)]
+    if invalid:
+        presets = ", ".join(_BRANCH_MODEL_PRESETS)
+        msg = (
+            f"invalid branch name(s): {', '.join(invalid)}. Use a preset "
+            f"({presets}) or a custom chain of lowercase names like dev,test,main"
+        )
+        raise ValueError(msg)
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for n in names:
+        if n not in seen:
+            seen.add(n)
+            ordered.append(n)
+    return ordered or ["main"]
 
 
 _PROFILES = ("individual", "standalone", "org")
@@ -711,6 +806,15 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         # and enforcement defaults. The enforcing behavior lands in #251.
         "profile": inputs.profile,
         "enforcement": _profile_enforcement(inputs.profile),
+        # Branch model (ADR-014, #301): the promotion chain. Single-trunk is a
+        # length-1 chain; env branches are created post-clone. The engine has no
+        # loop, so the chain renders as a flat string + flags.
+        "branch_chain": ",".join(inputs.branch_chain),
+        "branch_chain_yaml": ", ".join(f'"{b}"' for b in inputs.branch_chain),
+        "base_branch": inputs.branch_chain[0],
+        "production_branch": inputs.branch_chain[-1],
+        "single_trunk": "true" if len(inputs.branch_chain) == 1 else "",
+        "multi_env": "true" if len(inputs.branch_chain) > 1 else "",
         # No-egress mode (#258): omit the external official marketplace. egress_ok
         # is the inverse flag the template gates on (the engine has no else-branch).
         "no_egress": "true" if inputs.no_egress else "",
@@ -742,6 +846,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
     try:
         selected_mcps = _resolve_mcps_non_interactive(args.mcps, args.db, args.browser)
         agents = resolve_agents(args.agents)
+        branch_chain = resolve_branch_chain(args.branch_model or "single-trunk")
     except ValueError as e:
         parser.error(str(e))
     profile = args.profile or "individual"
@@ -761,6 +866,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         no_plugin=no_plugin,
         profile=profile,
         no_egress=args.no_egress,
+        branch_chain=branch_chain,
     )
 
 

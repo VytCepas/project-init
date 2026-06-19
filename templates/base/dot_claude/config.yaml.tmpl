@@ -12,6 +12,12 @@ project:
   project_init_host: {{project_init_host}}  # upstream GitHub host (github.com | *.ghe.com | GHES) — #255/#259
   project_key: ""          # e.g. "PI" → branches use feat/PI-42-slug, PR titles use feat(PI-42):
   github_project_number: 1 # numeric GitHub Project V2 board number (used by board-automation.yml and create_issue.sh)
+  # Branch model (ADR-014) — opinionated default, safe to rework. Single-trunk by
+  # default: feature PRs target the one branch below. To use environments, list
+  # them base→production (e.g. ["dev", "test", "main"]) and run
+  # .claude/scripts/setup_env_branches.sh to create + protect them.
+  branch_model:
+    promotion_chain: [{{branch_chain_yaml}}]   # ordered base → production; fast-forward only
 
 language: {{language}}            # python | node | go | none
 
