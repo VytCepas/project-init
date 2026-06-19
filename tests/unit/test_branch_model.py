@@ -4,6 +4,7 @@ rendered config, and the upgrade backfill for pre-branch-model records."""
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -19,7 +20,6 @@ from tests.helpers import fallback_preset, fallback_variables, make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DAG_HOOK = _REPO_ROOT / ".claude" / "hooks" / "dag_workflow.py"
-_SCRIPTS = _REPO_ROOT / "templates" / "base" / "dot_claude" / "scripts"
 
 
 def _load_dag():
@@ -198,3 +198,95 @@ class TestBaseBranchWiring:
     def test_scaffolded_dag_workflow_has_base_reader(self, tmp_path: Path):
         target = self._scaffold(tmp_path)
         assert "_base_branch" in (target / ".claude/hooks/dag_workflow.py").read_text()
+
+
+class TestPromotionChain:
+    def test_quoted(self, tmp_path: Path):
+        cfg = tmp_path / "c.yaml"
+        cfg.write_text('    promotion_chain: ["dev", "test", "main"]\n')
+        assert _load_dag()._promotion_chain(cfg) == ["dev", "test", "main"]
+
+    def test_unquoted(self, tmp_path: Path):
+        cfg = tmp_path / "c.yaml"
+        cfg.write_text("    promotion_chain: [dev, test, main]\n")
+        assert _load_dag()._promotion_chain(cfg) == ["dev", "test", "main"]
+
+    def test_single(self, tmp_path: Path):
+        cfg = tmp_path / "c.yaml"
+        cfg.write_text('    promotion_chain: ["main"]\n')
+        assert _load_dag()._promotion_chain(cfg) == ["main"]
+
+    def test_missing(self, tmp_path: Path):
+        assert _load_dag()._promotion_chain(tmp_path / "absent.yaml") == []
+
+
+class TestPromoteEnvValidation:
+    def _dag(self, monkeypatch, chain: list[str]):
+        dag = _load_dag()
+        monkeypatch.setattr(dag, "_promotion_chain", lambda *a, **k: chain)
+        return dag
+
+    def test_single_trunk_refused(self, monkeypatch):
+        assert self._dag(monkeypatch, ["main"]).cmd_promote_env("main") == 1
+
+    def test_no_target_refused(self, monkeypatch):
+        assert self._dag(monkeypatch, ["dev", "test", "main"]).cmd_promote_env(None) == 1
+
+    def test_unknown_target_refused(self, monkeypatch):
+        assert self._dag(monkeypatch, ["dev", "test", "main"]).cmd_promote_env("nope") == 1
+
+    def test_base_target_refused(self, monkeypatch):
+        assert self._dag(monkeypatch, ["dev", "test", "main"]).cmd_promote_env("dev") == 1
+
+
+class TestPromoteEnvFastForward:
+    def test_promotes_by_fast_forward(self, tmp_path: Path, monkeypatch):
+        remote = tmp_path / "remote.git"
+        work = tmp_path / "work"
+        subprocess.run(
+            ["git", "init", "--bare", "-b", "main", str(remote)],
+            check=True, capture_output=True,
+        )
+        subprocess.run(
+            ["git", "clone", str(remote), str(work)], check=True, capture_output=True
+        )
+
+        def g(*args: str) -> None:
+            subprocess.run(["git", "-C", str(work), *args], check=True, capture_output=True)
+
+        g("config", "user.email", "t@t")
+        g("config", "user.name", "t")
+        (work / "a.txt").write_text("1")
+        g("add", "-A")
+        g("commit", "-m", "init")
+        g("branch", "dev")
+        g("branch", "test")
+        g("push", "origin", "main", "dev", "test")
+        g("checkout", "dev")
+        (work / "b.txt").write_text("2")
+        g("add", "-A")
+        g("commit", "-m", "feat")
+        g("push", "origin", "dev")
+        (work / ".claude").mkdir()
+        (work / ".claude" / "config.yaml").write_text(
+            '    promotion_chain: ["dev", "test", "main"]\n'
+        )
+        monkeypatch.chdir(work)
+        assert _load_dag().cmd_promote_env("test") == 0
+
+        def sha(ref: str) -> str:
+            return subprocess.run(
+                ["git", "-C", str(work), "rev-parse", ref],
+                capture_output=True, text=True,
+            ).stdout.strip()
+
+        assert sha("origin/test") == sha("origin/dev")
+
+
+class TestPromoteEnvShim:
+    def test_shim_scaffolded(self, tmp_path: Path):
+        target = tmp_path / "p"
+        scaffold(target, fallback_preset(), fallback_variables(), strict=True)
+        shim = (target / ".claude/scripts/promote_env.sh").read_text()
+        assert "dag_workflow.py" in shim
+        assert "promote-env" in shim
