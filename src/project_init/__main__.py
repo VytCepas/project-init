@@ -958,6 +958,13 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         # IaC overlay (ADR-015, opt-in): infra/ HCL skeleton + infra.yml gate on this.
         "iac": inputs.iac,
         "iac_enabled": "true" if inputs.iac != "none" else "",
+        # Cloud-OIDC integration seam (#326): set whenever a deploy or IaC workflow
+        # authenticates to a cloud via OIDC, so the contract doc ships for them.
+        "cloud_oidc": (
+            "true"
+            if (inputs.deploy in _DEPLOY_CONTAINER or inputs.iac != "none")
+            else ""
+        ),
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": format_installed_mcps(selected_mcps),
         "installed_mcps_yaml": format_installed_mcps_yaml(selected_mcps),
