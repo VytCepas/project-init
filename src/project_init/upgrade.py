@@ -161,6 +161,7 @@ class DriftReport:
     changed: list[Path] = field(default_factory=list)
     conflicts: list[Path] = field(default_factory=list)
     merged: list[Path] = field(default_factory=list)  # user+upstream, 3-way auto-merged (#240)
+    skipped: list[Path] = field(default_factory=list)  # left drifted by interactive apply (#245)
     removed: list[Path] = field(default_factory=list)
     diffs: dict[Path, str] = field(default_factory=dict)
     merge_results: dict[Path, str] = field(default_factory=dict)  # merged text per #240 file
@@ -786,6 +787,24 @@ def apply_drift(
     write_base(target, base)
 
 
+def _print_clean_or_all_skipped(console, report: DriftReport) -> None:
+    """Report the no-drift case, distinguishing two outcomes.
+
+    A truly clean tree prints "No drift"; an interactive run that skipped every
+    drifted file leaves the project drifted (#245 review), so it must say so
+    rather than claim "No drift" when there still is.
+    """
+    if report.skipped:
+        console.print(
+            f"[yellow]Skipped all {len(report.skipped)} drifted file(s)[/yellow] — "
+            "left as-is; re-offered on the next upgrade:"
+        )
+        for rel in report.skipped:
+            console.print(f"  {rel}")
+        return
+    console.print("[green]No drift — project matches the current templates.[/green]")
+
+
 def _print_report(report: DriftReport, applied: bool) -> None:
     from rich.console import Console
 
@@ -797,7 +816,7 @@ def _print_report(report: DriftReport, applied: bool) -> None:
             " hashes every modified file is treated as a conflict.[/yellow]"
         )
     if not report.has_drift:
-        console.print("[green]No drift — project matches the current templates.[/green]")
+        _print_clean_or_all_skipped(console, report)
         return
 
     sections = (
@@ -817,6 +836,7 @@ def _print_report(report: DriftReport, applied: bool) -> None:
             if not applied
             else "locally edited — rendered as .new siblings",
         ),
+        ("skipped", report.skipped, "left drifted by interactive choice — re-offered next upgrade"),
         ("removed", report.removed, "no longer rendered (left in place)"),
     )
     for label, paths, note in sections:
@@ -1182,6 +1202,7 @@ def _interactive_select(report: DriftReport) -> None:
             else:
                 console.print(f"    [dim]skipped {rel}[/dim]")
                 report.merge_results.pop(rel, None)
+                report.skipped.append(rel)
         paths[:] = kept
 
 

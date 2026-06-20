@@ -902,6 +902,20 @@ class TestInteractiveApply:
         assert main(["upgrade", str(target), "--apply"]) == 0
         assert (target / "justfile").read_bytes() == rendered
 
+    def test_skip_all_reports_left_drifted_not_no_drift(self, tmp_path: Path, monkeypatch, capsys):
+        """Skipping every drifted file must not print 'No drift' — the project
+        is still drifted and the skips must be surfaced (#245 review)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        _make_changed_justfile(target)
+        monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "s")
+
+        assert main(["upgrade", str(target), "--apply", "-i"]) == 0
+        out = capsys.readouterr().out
+        assert "No drift" not in out
+        assert "Skipped all" in out
+        assert "justfile" in out
+
     def test_skip_of_conflict_writes_no_sibling(self, tmp_path: Path, monkeypatch):
         target = tmp_path / "p"
         _scaffold(target)
