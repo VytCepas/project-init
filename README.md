@@ -204,7 +204,8 @@ The report classifies every template-owned file:
 |---|---|---|
 | new | not in your project | creates it |
 | changed | drifted, but you never edited it | updates it |
-| conflict | drifted **and** locally edited | writes the new render as a `<file>.new` sibling — your edit is never overwritten |
+| merged | drifted **and** locally edited, but the edits don't overlap | 3-way auto-merges both in place — no `.new` sibling |
+| conflict | drifted **and** locally edited with overlapping changes | keeps your file; writes the conflict-marked merge as a `<file>.new` sibling — your edit is never overwritten |
 | removed | no longer rendered by current templates | nothing (reported only; upgrade never deletes) |
 
 `.claude/memory/` and `.claude/vault/` are never compared or touched, and
@@ -214,13 +215,17 @@ refreshed.
 
 How it works: scaffolding records the preset, template variables, and a
 content-hash manifest in a `scaffold:` block at the end of
-`.claude/config.yaml`. Upgrade re-renders the same preset at the current
-template version into a staging directory and compares hashes, so user
-edits are distinguishable from upstream template changes. **Migration:**
-projects scaffolded before this record existed are reconstructed from the
-semantic config fields; without recorded hashes, every modified file is
-conservatively treated as a conflict (`.new` sibling). Run `upgrade --apply`
-once and the record is written for next time.
+`.claude/config.yaml`, plus the exact rendered bytes of each managed file in a
+`.claude/.upgrade-base.json` sidecar. Upgrade re-renders the same preset at the
+current template version into a staging directory and compares hashes, so user
+edits are distinguishable from upstream template changes. When both you and the
+templates changed a file, the sidecar is the *base* leg of a 3-way merge (via
+`git merge-file`, with a pure-Python fallback): non-overlapping edits auto-merge,
+only true overlaps become a `<file>.new` conflict. **Migration:** projects
+scaffolded before this record existed are reconstructed from the semantic config
+fields; without recorded hashes or a base, every modified file is conservatively
+treated as a conflict (`.new` sibling). Run `upgrade --apply` once and the record
+is written for next time.
 
 ## Uninstall
 
