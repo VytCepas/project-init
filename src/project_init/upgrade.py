@@ -829,7 +829,12 @@ def _print_migration_notes(prev: str | None, current: str | None) -> None:
     from rich.console import Console
 
     console = Console()
-    span = _describe_version_span(prev, current) or f"v{current}"
+    # Fall back to just the target version when the span can't be described
+    # (missing/unparseable prev). Format from the parsed tuple so a recorded "v"
+    # prefix or "-rc" suffix can't leak as "vv1.2.3" (Copilot review) — notes is
+    # non-empty, so current is guaranteed parseable here.
+    parsed = _parse_version(current)
+    span = _describe_version_span(prev, current) or f"v{'.'.join(map(str, parsed))}"
     console.print(f"\n[bold]Upgrade notes[/bold] — {span}:")
     for version, entry in notes:
         console.print(f"\n  [cyan]v{version}[/cyan] — {entry['summary']}")

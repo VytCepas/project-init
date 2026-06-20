@@ -981,3 +981,13 @@ class TestMigrationNotes:
         _scaffold(target)  # recorded at the current tool version
         assert main(["upgrade", str(target)]) == 0
         assert "Upgrade notes" not in capsys.readouterr().out
+
+    def test_fallback_header_avoids_double_v_prefix(self, capsys):
+        """With no parseable prev the header falls back to the target version;
+        a 'v'-prefixed/suffixed current must not leak as 'vv…' (Copilot review)."""
+        from project_init.upgrade import _print_migration_notes
+
+        _print_migration_notes(None, "v0.4.0-rc1")
+        out = capsys.readouterr().out
+        assert "vv" not in out
+        assert "v0.4.0" in out
