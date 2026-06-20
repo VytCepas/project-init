@@ -36,6 +36,20 @@ class TestUpgradePrWorkflow:
         # GitHub Actions expressions survive rendering (negative lookbehind on $).
         assert "${{ secrets.UPGRADE_PR_TOKEN || github.token }}" in text
 
+    def test_authenticates_on_enterprise_hosts(self, tmp_path: Path):
+        """GHES `gh` reads GH_ENTERPRISE_TOKEN, not GH_TOKEN — both are set so
+        PR creation works on any host (#241, Codex review)."""
+        text = _render(tmp_path / "p")
+        assert "GH_TOKEN:" in text
+        assert "GH_ENTERPRISE_TOKEN:" in text
+
+    def test_guards_against_duplicate_upgrade_prs(self, tmp_path: Path):
+        """A scheduled run must not stack duplicate PRs for the same drift —
+        it skips when an open upgrade PR already exists (#241, Codex review)."""
+        text = _render(tmp_path / "p")
+        assert "gh pr list --state open" in text
+        assert 'startswith("project-init-upgrade/")' in text
+
     def test_targets_the_recorded_base_branch(self, tmp_path: Path):
         text = _render(tmp_path / "p", base_branch="trunk")
         assert '--base "trunk"' in text

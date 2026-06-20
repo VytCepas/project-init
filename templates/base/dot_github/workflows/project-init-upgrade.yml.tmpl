@@ -46,11 +46,22 @@ jobs:
 
       - name: Open a pull request for the drift
         env:
+          # github.com & *.ghe.com read GH_TOKEN; a self-hosted GHES host reads
+          # GH_ENTERPRISE_TOKEN — set both so `gh` authenticates on any host.
           GH_TOKEN: ${{ secrets.UPGRADE_PR_TOKEN || github.token }}
+          GH_ENTERPRISE_TOKEN: ${{ secrets.UPGRADE_PR_TOKEN || github.token }}
         run: |
           set -euo pipefail
           if [ -z "$(git status --porcelain)" ]; then
             echo "No scaffolding drift — nothing to upgrade."
+            exit 0
+          fi
+          # Don't stack duplicate PRs for the same drift: if a scheduled run
+          # finds an open upgrade PR still waiting, leave it for review.
+          open_prs=$(gh pr list --state open --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("project-init-upgrade/"))] | length')
+          if [ "$open_prs" -gt 0 ]; then
+            echo "An open project-init-upgrade PR already exists — skipping."
             exit 0
           fi
           branch="project-init-upgrade/$(date -u +%Y%m%d-%H%M%S)"
