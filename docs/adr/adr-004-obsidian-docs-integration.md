@@ -15,7 +15,7 @@ Three-tier documentation system with strict separation of concerns:
 |---|---|---|---|
 | System of record | `docs/adr/`, `docs/development/` | Agents + developers | Native markdown |
 | Human workspace | `.claude/vault/` | Humans | None needed |
-| Public docs | MkDocs → GitHub Pages | End users | — |
+| ~~Public docs~~ | ~~MkDocs → GitHub Pages~~ — retired (PI-343); github.com renders `docs/`, `mkdocs.yml` kept for local preview | End users | — |
 
 **Key rules:**
 - `docs/` is authoritative — agents read it, not vault
@@ -31,4 +31,4 @@ Three-tier documentation system with strict separation of concerns:
 - `session_end.sh` hook writes session logs to `vault/sessions/` (human review later)
 - Agents instructed to read `docs/adr/` before starting tasks
 - `CLAUDE.md.tmpl` updated to explain the two-layer system
-- MkDocs site deployed to GitHub Pages from `docs/` on push to main
+- ~~MkDocs site deployed to GitHub Pages from `docs/` on push to main~~ — retired in PI-343; no site is published (github.com renders the Markdown; `mkdocs.yml` remains for local `mkdocs serve`)
