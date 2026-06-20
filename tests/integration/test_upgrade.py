@@ -57,6 +57,20 @@ def _patch_manifest(target: Path, mutate) -> None:
     )
 
 
+def _set_base(target: Path, rel: str, content: str) -> None:
+    """Override the recorded 3-way merge base for *rel* (#240).
+
+    Lets a single-version test stand in an *old* render — content the current
+    templates have since moved past — so a user edit on top can be 3-way merged
+    against the live render.
+    """
+    from project_init.upgrade import read_base, write_base
+
+    base = read_base(target)
+    base[rel] = content
+    write_base(target, base)
+
+
 def _tree_snapshot(target: Path) -> dict[str, bytes]:
     return {
         p.relative_to(target).as_posix(): p.read_bytes()
@@ -308,19 +322,40 @@ class TestUpgradeApply:
         assert justfile.read_bytes() == rendered_now
         assert not (target / "justfile.new").exists()
 
-    def test_user_edited_file_becomes_new_sibling(self, tmp_path: Path, capsys):
+    def test_user_edit_with_no_upstream_change_is_kept(self, tmp_path: Path):
+        """User edited a file but upstream did not change it: the 3-way merge has
+        nothing to apply, so the edit is kept in place with no .new sibling (#240
+        — previously this dropped a pointless conflict sibling)."""
         target = tmp_path / "p"
         _scaffold(target)
         justfile = target / "justfile"
-        rendered_now = justfile.read_bytes()
         user_edit = b"# my local recipes\n"
         justfile.write_bytes(user_edit)
 
         rc = main(["upgrade", str(target), "--apply"])
         assert rc == 0
-        assert "conflict" in capsys.readouterr().out
         assert justfile.read_bytes() == user_edit, "local edits must survive"
-        assert (target / "justfile.new").read_bytes() == rendered_now
+        assert not (target / "justfile.new").exists()
+
+    def test_overlapping_edit_becomes_new_sibling(self, tmp_path: Path, capsys):
+        """User edit overlaps an upstream change with no clean 3-way merge: the
+        user's file is kept and the conflict-marked merge lands as a .new (#240).
+        A sentinel base shares no lines with either side, forcing the overlap."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        justfile = target / "justfile"
+        rendered_now = justfile.read_text()
+        _set_base(target, "justfile", "# pristine base line — shared by neither side\n")
+        user_edit = "# my local recipes\n"
+        justfile.write_text(user_edit)
+
+        rc = main(["upgrade", str(target), "--apply"])
+        assert rc == 0
+        assert "conflict" in capsys.readouterr().out
+        assert justfile.read_text() == user_edit, "local edits must survive"
+        sibling = (target / "justfile.new").read_text()
+        assert "<<<<<<<" in sibling and ">>>>>>>" in sibling
+        assert user_edit in sibling and rendered_now in sibling
 
     def test_deleted_file_is_restored(self, tmp_path: Path):
         target = tmp_path / "p"
@@ -371,15 +406,18 @@ class TestUpgradeApply:
         — the fresh render goes to .new.1 instead (PR #160 review)."""
         target = tmp_path / "p"
         _scaffold(target)
-        rendered_now = (target / "justfile").read_bytes()
+        # Force a genuine overlap (sentinel base) so a .new sibling is produced.
+        _set_base(target, "justfile", "# pristine base line — shared by neither side\n")
         (target / "justfile").write_bytes(b"# my local recipes\n")
         assert main(["upgrade", str(target), "--apply"]) == 0
+        first_sibling = (target / "justfile.new").read_bytes()
+        assert b"<<<<<<<" in first_sibling
 
         merge_in_progress = b"# half-merged result\n"
         (target / "justfile.new").write_bytes(merge_in_progress)
         assert main(["upgrade", str(target), "--apply"]) == 0
         assert (target / "justfile.new").read_bytes() == merge_in_progress
-        assert (target / "justfile.new.1").read_bytes() == rendered_now
+        assert (target / "justfile.new.1").exists()
 
     def test_apply_refreshes_version_even_without_drift(self, tmp_path: Path):
         """Tool updated but no template drift: --apply must still bump the
@@ -404,9 +442,10 @@ class TestUpgradeApply:
         assert recorded["project_init_version"] == __version__
 
     def test_conflicted_file_stays_unrecorded(self, tmp_path: Path):
-        """A conflict keeps its .new sibling and is flagged again next run."""
+        """A genuine conflict keeps its .new sibling and is flagged again."""
         target = tmp_path / "p"
         _scaffold(target)
+        _set_base(target, "justfile", "# pristine base line — shared by neither side\n")
         (target / "justfile").write_bytes(b"# my local recipes\n")
 
         assert main(["upgrade", str(target), "--apply"]) == 0
@@ -496,13 +535,16 @@ class TestMigration:
         text = config.read_text()
         assert _RECORD_MARKER in text
         config.write_text(text.split(_RECORD_MARKER)[0])
+        # A genuinely pre-record config predates the #240 merge-base sidecar too,
+        # so remove it — without a base there is nothing to 3-way merge against.
+        (target / ".claude" / ".upgrade-base.json").unlink()
         (target / "justfile").write_bytes(b"# edited under old version\n")
 
         rc = main(["upgrade", str(target), "--apply", "--accept-new", "all"])
         out = capsys.readouterr().out
         assert rc == 0
         assert "No scaffold record" in out
-        # Without hashes, a modified file must be a conflict — never overwritten.
+        # Without hashes or a base, a modified file is a conflict — never overwritten.
         assert (target / "justfile").read_bytes() == b"# edited under old version\n"
         assert (target / "justfile.new").exists()
 
@@ -638,3 +680,162 @@ class TestInteractiveNoPlugin:
         assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
         settings = (target / ".claude" / "settings.json").read_text()
         assert "project-init-workflow" not in settings
+
+
+class TestThreeWayMergeEngine:
+    """#240: unit coverage of the 3-way merge primitive (git + difflib paths)."""
+
+    BASE = "line1\nline2\nline3\n"
+
+    def test_non_overlapping_edits_merge_cleanly(self):
+        from project_init.upgrade import _three_way_merge
+
+        ours = "TOP\nline1\nline2\nline3\n"  # user prepended
+        theirs = "line1\nline2\nline3\nBOTTOM\n"  # upstream appended
+        merged, clean = _three_way_merge(self.BASE, ours, theirs)
+        assert clean
+        assert merged == "TOP\nline1\nline2\nline3\nBOTTOM\n"
+
+    def test_overlapping_edits_conflict(self):
+        from project_init.upgrade import _three_way_merge
+
+        ours = "line1\nOURS\nline3\n"
+        theirs = "line1\nTHEIRS\nline3\n"
+        merged, clean = _three_way_merge(self.BASE, ours, theirs)
+        assert not clean
+        assert "<<<<<<<" in merged and ">>>>>>>" in merged
+        assert "OURS" in merged and "THEIRS" in merged
+
+    def test_one_sided_change_takes_that_side(self):
+        from project_init.upgrade import _three_way_merge
+
+        # ours unchanged from base → upstream change wins, no conflict.
+        theirs = "line1\nline2-upstream\nline3\n"
+        merged, clean = _three_way_merge(self.BASE, self.BASE, theirs)
+        assert clean and merged == theirs
+
+    def test_difflib_path_matches_when_git_absent(self, monkeypatch):
+        """With git unavailable the pure-Python merge still resolves non-overlap
+        and flags overlap (DoD: difflib fallback)."""
+        import project_init.upgrade as up
+
+        def _no_git(*a, **k):
+            raise OSError("git not found")
+
+        monkeypatch.setattr(up.subprocess, "run", _no_git)
+
+        ours = "TOP\nline1\nline2\nline3\n"
+        theirs = "line1\nline2\nline3\nBOTTOM\n"
+        merged, clean = up._three_way_merge(self.BASE, ours, theirs)
+        assert clean and merged == "TOP\nline1\nline2\nline3\nBOTTOM\n"
+
+        merged2, clean2 = up._three_way_merge(self.BASE, "line1\nA\nline3\n", "line1\nB\nline3\n")
+        assert not clean2 and "<<<<<<<" in merged2
+
+
+class TestThreeWayMergeApply:
+    """#240: --apply auto-merges non-overlapping user+upstream edits in place."""
+
+    def test_first_scaffold_writes_merge_base(self, tmp_path: Path):
+        from project_init.upgrade import read_base
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        assert (target / ".claude" / ".upgrade-base.json").is_file()
+        base = read_base(target)
+        assert base["justfile"] == (target / "justfile").read_text()
+
+    def test_base_sidecar_is_not_reported_as_drift(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        assert main(["upgrade", str(target)]) == 0
+        out = capsys.readouterr().out
+        assert ".upgrade-base.json" not in out
+        assert "No drift" in out
+
+    def test_non_overlapping_edit_auto_merges_and_base_advances(self, tmp_path: Path, capsys):
+        from project_init.upgrade import read_base
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        justfile = target / "justfile"
+        live = justfile.read_text()
+        lines = live.splitlines(keepends=True)
+        assert len(lines) >= 2, "fixture justfile needs ≥2 lines"
+
+        # base = an older render missing the final line (upstream "added" it);
+        # ours = that older render with a unique user line prepended. The two
+        # edits are at opposite ends → a clean 3-way merge.
+        older = "".join(lines[:-1])
+        _set_base(target, "justfile", older)
+        justfile.write_text("# USER-ADDED-LINE\n" + older)
+
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert "merged" in capsys.readouterr().out
+        result = justfile.read_text()
+        assert result == "# USER-ADDED-LINE\n" + live, "both edits incorporated"
+        assert not (target / "justfile.new").exists()
+        # Base advances to the new render so the next upgrade re-merges cleanly.
+        assert read_base(target)["justfile"] == live
+
+    def test_apply_backfills_base_for_unchanged_files(self, tmp_path: Path):
+        """A project that predates the sidecar (or had it deleted) must gain a
+        full merge base after one --apply — not just for drifted files — so a
+        later user+upstream edit auto-merges instead of falling back to .new
+        (#240, Codex review)."""
+        from project_init.upgrade import read_base
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        # Simulate a pre-sidecar project: no base, but no template drift either.
+        (target / ".claude" / ".upgrade-base.json").unlink()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+
+        base = read_base(target)
+        # An unchanged managed file (never drifted this run) is now recorded.
+        justfile = target / "justfile"
+        assert base["justfile"] == justfile.read_text()
+
+        # Prove it: a non-overlapping user+upstream edit now auto-merges.
+        live = justfile.read_text()
+        lines = live.splitlines(keepends=True)
+        assert len(lines) >= 2
+        older = "".join(lines[:-1])
+        _set_base(target, "justfile", older)
+        justfile.write_text("# USER\n" + older)
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert justfile.read_text() == "# USER\n" + live
+        assert not (target / "justfile.new").exists()
+
+    def test_conflict_new_sibling_keeps_executable_bit(self, tmp_path: Path):
+        """A conflict-marked .new for a script must stay executable so promoting
+        it doesn't silently drop +x (#240 review)."""
+        import os
+        import stat
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        script = target / ".claude" / "scripts" / "push_branch.sh"
+        assert script.stat().st_mode & stat.S_IXUSR, "fixture script must be executable"
+        # Force a genuine overlap so a conflict-marked .new is written.
+        _set_base(target, ".claude/scripts/push_branch.sh", "#!/usr/bin/env bash\n# base\n")
+        script.write_text("#!/usr/bin/env bash\n# my local edit\n")
+
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        sibling = target / ".claude" / "scripts" / "push_branch.sh.new"
+        assert sibling.exists()
+        assert sibling.stat().st_mode & stat.S_IXUSR, "the .new sibling must keep +x"
+        assert os.access(sibling, os.X_OK)
+
+    def test_read_base_filters_corrupt_entries(self, tmp_path: Path):
+        """A hand-corrupted sidecar (non-string values) is filtered, not fatal
+        — the bad entry must never reach the merge engine (#240 review)."""
+        from project_init.upgrade import read_base
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        (target / ".claude" / ".upgrade-base.json").write_text(
+            json.dumps({"justfile": "ok\n", "bad": 123, "alsobad": ["x"]})
+        )
+        base = read_base(target)
+        assert base == {"justfile": "ok\n"}

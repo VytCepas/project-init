@@ -1,9 +1,11 @@
 """`project-init upgrade` — re-render from recorded config with a drift report.
 
-Deliberately small and deterministic (PI-142): no 3-way merge engine, no new
-dependencies. The scaffold record appended to ``.claude/config.yaml`` stores
-the preset, the exact template variables, and a manifest of content hashes
-for the files the scaffolder rendered. On upgrade the same preset is
+Deterministic, stdlib-only (PI-142). The scaffold record appended to
+``.claude/config.yaml`` stores the preset, the exact template variables, and a
+manifest of content hashes for the files the scaffolder rendered; the rendered
+*text* of each UTF-8 file is kept in the ``.claude/.upgrade-base.json`` sidecar
+(#240) as the base leg for a 3-way merge (binary/non-UTF-8 renders are omitted
+and fall back to the ``.new`` path on conflict). On upgrade the same preset is
 re-rendered at the current template version into a staging directory and
 compared against the project:
 
@@ -11,8 +13,13 @@ compared against the project:
 - project file matches the new render    -> unchanged
 - differs, but matches the recorded hash -> changed (applied on ``--apply``;
   the user never edited it, so overwriting loses nothing)
-- differs from the recorded hash too     -> conflict (written as a ``.new``
-  sibling on ``--apply``; local edits are never overwritten silently)
+- differs from the recorded hash too     -> the user edited it; a 3-way merge
+  (base render / current file / new render) runs via ``git merge-file`` with a
+  pure-Python fallback (#240). Non-overlapping user+upstream edits auto-merge
+  in place (``merged``); a genuine overlap stays a ``conflict`` and the
+  conflict-marked merge is written as a ``.new`` sibling — local edits are
+  never overwritten silently. Without a recorded base (pre-#240) it falls back
+  to dropping the raw new render as a ``.new`` sibling.
 - in the old manifest, not re-rendered   -> removed (reported only; upgrade
   never deletes)
 
@@ -153,19 +160,153 @@ class DriftReport:
     new: list[Path] = field(default_factory=list)
     changed: list[Path] = field(default_factory=list)
     conflicts: list[Path] = field(default_factory=list)
+    merged: list[Path] = field(default_factory=list)  # user+upstream, 3-way auto-merged (#240)
     removed: list[Path] = field(default_factory=list)
     diffs: dict[Path, str] = field(default_factory=dict)
+    merge_results: dict[Path, str] = field(default_factory=dict)  # merged text per #240 file
     rendered: list[Path] = field(default_factory=list)  # full staging render
     migrated: bool = False  # True when no scaffold record existed
 
     @property
     def has_drift(self) -> bool:
         """True when at least one file differs from the fresh render."""
-        return bool(self.new or self.changed or self.conflicts or self.removed)
+        return bool(self.new or self.changed or self.conflicts or self.merged or self.removed)
 
 
 def _hash_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+# --- 3-way merge base store (#240) -----------------------------------------
+
+# Sidecar holding the exact bytes each managed file was last rendered as — the
+# *base* leg for a 3-way merge (base / ours=current file / theirs=new render).
+# Kept out of config.yaml so the hand-editable record stays small (#296); a
+# single pretty-printed JSON file gives per-file granularity in an upgrade diff
+# (#241). Text only — files that don't decode as UTF-8 are omitted and fall back
+# to the ``.new`` sibling path on conflict.
+_BASE_REL = Path(".claude/.upgrade-base.json")
+
+
+def read_base(target: Path) -> dict[str, str]:
+    """Return the recorded ``{rel: rendered-text}`` merge base, or ``{}``.
+
+    The sidecar is hand-editable JSON, so non-string keys/values are filtered
+    out — a corrupted entry must not later reach the merge engine as a non-text
+    base and crash the upgrade (#240 review).
+    """
+    path = target / _BASE_REL
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(value, dict):
+        return {}
+    return {k: v for k, v in value.items() if isinstance(k, str) and isinstance(v, str)}
+
+
+def write_base(target: Path, base: dict[str, str]) -> None:
+    """Persist the ``{rel: rendered-text}`` merge base sidecar (sorted, pretty)."""
+    if not (target / _CONFIG_REL).exists():
+        return  # not a scaffolded project — nothing to anchor the base to
+    path = target / _BASE_REL
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(base, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+
+def _decode(data: bytes) -> str | None:
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def _git_three_way(base: str, ours: str, theirs: str) -> tuple[str, bool] | None:
+    """Merge with ``git merge-file``; ``(merged, clean)`` or None if git absent.
+
+    Merges the upstream (base→theirs) change into the user's file (ours). A clean
+    merge exits 0; a conflicted one exits with the conflict count and emits
+    ``<<<<<<<``/``>>>>>>>`` markers; anything else is treated as unusable (None),
+    falling back to the difflib merge.
+    """
+    with tempfile.TemporaryDirectory(prefix="project-init-merge-") as d:
+        bp, op, tp = Path(d) / "base", Path(d) / "ours", Path(d) / "theirs"
+        bp.write_text(base, encoding="utf-8")
+        op.write_text(ours, encoding="utf-8")
+        tp.write_text(theirs, encoding="utf-8")
+        try:
+            r = subprocess.run(
+                ["git", "merge-file", "-p", "-L", "current", "-L", "base", "-L", "upgrade",
+                 str(op), str(bp), str(tp)],
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            return None  # git not installed
+        if r.returncode == 0:
+            return r.stdout, True
+        if 0 < r.returncode < 128:
+            return r.stdout, False
+        return None  # git error — let the caller fall back
+
+
+def _line_index_map(base_l: list[str], other_l: list[str]) -> dict[int, int]:
+    """Map base line index -> other line index for lines equal in both."""
+    sm = difflib.SequenceMatcher(None, base_l, other_l, autojunk=False)
+    mapping: dict[int, int] = {}
+    for a, b, size in sm.get_matching_blocks():
+        for k in range(size):
+            mapping[a + k] = b + k
+    return mapping
+
+
+def _resolve_segment(b: list[str], o: list[str], t: list[str]) -> tuple[list[str], bool]:
+    """Resolve one between-anchors segment; ``(lines, conflict)``."""
+    if o == t:
+        return o, False  # both sides made the same edit (or none)
+    if o == b:
+        return t, False  # ours unchanged here -> take upstream
+    if t == b:
+        return o, False  # upstream unchanged here -> keep user's edit
+    markers = ["<<<<<<< current\n", *o, "=======\n", *t, ">>>>>>> upgrade\n"]
+    return markers, True
+
+
+def _difflib_three_way(base: str, ours: str, theirs: str) -> tuple[str, bool]:
+    """Line-level 3-way merge with no git dependency; ``(merged, clean)``.
+
+    Anchors on base lines that survive unchanged in *both* ours and theirs, then
+    resolves each segment between anchors: a one-sided edit is taken verbatim, an
+    identical two-sided edit collapses, and a genuine overlap is wrapped in
+    conflict markers. Conservative — it never silently drops either side.
+    """
+    base_l = base.splitlines(keepends=True)
+    ours_l = ours.splitlines(keepends=True)
+    theirs_l = theirs.splitlines(keepends=True)
+    om = _line_index_map(base_l, ours_l)
+    tm = _line_index_map(base_l, theirs_l)
+    stable = sorted(i for i in om if i in tm)
+    anchors = [(-1, -1, -1)]
+    anchors += [(i, om[i], tm[i]) for i in stable]
+    anchors.append((len(base_l), len(ours_l), len(theirs_l)))
+
+    out: list[str] = []
+    clean = True
+    # Pairwise over consecutive anchors — anchors[1:] is intentionally shorter.
+    for (pb, po, pt), (cb, co, ct) in zip(anchors, anchors[1:], strict=False):
+        seg, conflict = _resolve_segment(
+            base_l[pb + 1 : cb], ours_l[po + 1 : co], theirs_l[pt + 1 : ct]
+        )
+        out.extend(seg)
+        clean = clean and not conflict
+        if cb < len(base_l):  # emit the stable anchor line itself
+            out.append(base_l[cb])
+    return "".join(out), clean
+
+
+def _three_way_merge(base: str, ours: str, theirs: str) -> tuple[str, bool]:
+    """3-way merge via git, falling back to a pure-Python line merge."""
+    return _git_three_way(base, ours, theirs) or _difflib_three_way(base, ours, theirs)
 
 
 def _is_preserved(rel: Path, preserve_globs: list[str] | None = None) -> bool:
@@ -187,12 +328,21 @@ def write_scaffold_record(
     preset_name: str,
     variables: dict[str, str],
     created: list[Path],
+    *,
+    write_merge_base: bool = True,
 ) -> None:
     """Append/replace the scaffold record block in .claude/config.yaml.
 
     The manifest hashes the on-disk content of every rendered file so a later
     ``upgrade`` can tell user edits apart from upstream template changes.
     The values are single-line JSON — valid YAML, parseable with stdlib.
+
+    When *write_merge_base* is set (the first-scaffold default), the exact
+    rendered text of each managed file is also written to the merge-base sidecar
+    (#240) so a later ``upgrade`` can 3-way-merge user edits. ``upgrade --apply``
+    passes ``write_merge_base=False`` because it maintains the base itself —
+    successfully-merged files must advance to the *new* render, not their
+    (post-merge) on-disk bytes.
     """
     config_path = target / _CONFIG_REL
     if not config_path.exists():
@@ -200,12 +350,19 @@ def write_scaffold_record(
 
     preserve_globs = read_preserve_globs(target)
     manifest: dict[str, str] = {}
+    base: dict[str, str] = {}
     for rel in sorted(set(created)):
         if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
             continue
         path = target / rel
         if path.is_file():
-            manifest[rel.as_posix()] = _hash_bytes(path.read_bytes())
+            data = path.read_bytes()
+            manifest[rel.as_posix()] = _hash_bytes(data)
+            text = _decode(data)
+            if text is not None:
+                base[rel.as_posix()] = text
+    if write_merge_base:
+        write_base(target, base)
 
     block = (
         f"\n{_RECORD_MARKER}\n"
@@ -436,11 +593,39 @@ def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Pa
     return scaffold(staging, preset, variables, strict=True)
 
 
-def compute_drift(target: Path, staging: Path, rendered: list[Path], manifest: dict) -> DriftReport:
+def _classify_conflict(
+    report: DriftReport, rel: Path, base: dict, current: bytes, new_bytes: bytes
+) -> None:
+    """A user-edited file that upstream also changed: 3-way merge or conflict (#240).
+
+    With a recorded base for the file and all three legs decodable as text, a
+    clean merge of non-overlapping edits lands in ``merged``; a genuine overlap
+    stays a ``conflict`` (its merge_results text carries the markers). Without a
+    base (pre-#240 record) or for binary content, it falls back to ``conflict``
+    with no merge_results, i.e. the old ``.new`` sibling behaviour.
+    """
+    base_text = base.get(rel.as_posix())
+    ours, theirs = _decode(current), _decode(new_bytes)
+    if base_text is None or ours is None or theirs is None:
+        report.conflicts.append(rel)
+        return
+    merged, clean = _three_way_merge(base_text, ours, theirs)
+    report.merge_results[rel] = merged
+    (report.merged if clean else report.conflicts).append(rel)
+
+
+def compute_drift(
+    target: Path,
+    staging: Path,
+    rendered: list[Path],
+    manifest: dict,
+    base: dict | None = None,
+) -> DriftReport:
     """Compare the staged re-render against the project tree."""
     report = DriftReport(rendered=list(rendered))
     rendered_set = {rel.as_posix() for rel in rendered}
     preserve_globs = read_preserve_globs(target)
+    base = base or {}
 
     for rel in sorted(rendered):
         if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
@@ -458,7 +643,7 @@ def compute_drift(target: Path, staging: Path, rendered: list[Path], manifest: d
         if recorded is not None and _hash_bytes(current) == recorded:
             report.changed.append(rel)
         else:
-            report.conflicts.append(rel)
+            _classify_conflict(report, rel, base, current, new_bytes)
         report.diffs[rel] = diff
 
     for rel_str in sorted(manifest):
@@ -475,6 +660,18 @@ def compute_drift(target: Path, staging: Path, rendered: list[Path], manifest: d
 def _copy_rendered(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
+
+
+def _mirror_mode(src: Path, dest: Path) -> None:
+    """Carry *src*'s executable bit onto *dest* (#240 review).
+
+    A conflict-marked merge is written with ``write_text`` (it is generated
+    text, not a copy of the render), which would otherwise drop the executable
+    bit a script render carries — surprising the user when they promote the
+    ``.new`` sibling.
+    """
+    if src.stat().st_mode & 0o111:
+        dest.chmod(dest.stat().st_mode | 0o111)
 
 
 # Visible observability fields injected into the human `project:` block on upgrade
@@ -527,11 +724,48 @@ def apply_drift(
     preset_name: str,
     variables: dict,
 ) -> None:
-    """Apply non-conflicting changes; write conflicts as ``.new`` siblings."""
+    """Apply changes; 3-way-merge user edits (#240); conflicts become ``.new``.
+
+    new/changed files are overwritten with the render. A ``merged`` file (user
+    edit + non-overlapping upstream change) is written with the auto-merged
+    content. A genuine ``conflict`` keeps the user's file and drops the new
+    render — or, when a 3-way merge was attempted and overlapped, the
+    conflict-marked merge — as a ``.new`` sibling, never overwriting silently.
+    """
+    base = read_base(target)
     for rel in report.new + report.changed:
         _copy_rendered(staging / rel, target / rel)
+    for rel in report.merged:
+        # Clean 3-way merge: write the combined content in place.
+        dest = target / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(report.merge_results[rel], encoding="utf-8")
     for rel in report.conflicts:
-        _copy_rendered(staging / rel, _new_sibling(target / rel, (staging / rel).read_bytes()))
+        # Prefer the conflict-marked merge (shows the overlap) when one exists,
+        # else the raw new render. Either way the user's file is left intact.
+        if rel in report.merge_results:
+            sibling = _new_sibling(target / rel, report.merge_results[rel].encode("utf-8"))
+            sibling.parent.mkdir(parents=True, exist_ok=True)
+            sibling.write_text(report.merge_results[rel], encoding="utf-8")
+            _mirror_mode(staging / rel, sibling)
+        else:
+            _copy_rendered(staging / rel, _new_sibling(target / rel, (staging / rel).read_bytes()))
+
+    # The base advances to the *new* render for every managed file whose upstream
+    # render is now the pristine baseline — not just files that drifted this run.
+    # Recording unchanged files too is what lets a project that predated the
+    # sidecar (or had it deleted) gain a full base after one --apply, so a later
+    # user+upstream edit can 3-way merge instead of falling back to .new (#240,
+    # Codex review). A still-conflicted file keeps its old base so its unresolved
+    # edit can merge again next time.
+    preserve_globs = read_preserve_globs(target)
+    conflicted = set(report.conflicts)
+    for rel in report.rendered:
+        if rel in conflicted or rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
+            continue
+        text = _decode((staging / rel).read_bytes())
+        if text is not None:
+            base[rel.as_posix()] = text
 
     # Targeted config.yaml updates: the human-readable version line, then the
     # scaffold record (variables + a manifest reflecting post-apply state).
@@ -543,13 +777,15 @@ def apply_drift(
         config_path.write_text(text, encoding="utf-8")
 
     # Only files whose on-disk content now equals the render are recorded —
-    # conflicted files stay user-owned, so the next upgrade flags them again.
+    # conflicted/merged files stay user-owned, so the next upgrade flags them
+    # again (and the merge base above lets that flag become a clean re-merge).
     applied = [
         rel
         for rel in report.rendered
         if (target / rel).is_file() and (target / rel).read_bytes() == (staging / rel).read_bytes()
     ]
-    write_scaffold_record(target, preset_name, variables, applied)
+    write_scaffold_record(target, preset_name, variables, applied, write_merge_base=False)
+    write_base(target, base)
 
 
 def _print_report(report: DriftReport, applied: bool) -> None:
@@ -570,6 +806,13 @@ def _print_report(report: DriftReport, applied: bool) -> None:
         ("new", report.new, "would be created" if not applied else "created"),
         ("changed", report.changed, "would be updated" if not applied else "updated"),
         (
+            "merged",
+            report.merged,
+            "locally edited — would 3-way merge with the new render"
+            if not applied
+            else "locally edited — 3-way merged with the new render in place",
+        ),
+        (
             "conflicts",
             report.conflicts,
             "locally edited — would be written as .new siblings"
@@ -585,7 +828,7 @@ def _print_report(report: DriftReport, applied: bool) -> None:
         for rel in paths:
             console.print(f"  {rel}")
 
-    for rel in report.changed + report.conflicts:
+    for rel in report.changed + report.merged + report.conflicts:
         diff = report.diffs.get(rel)
         if diff:
             console.print(f"\n[bold]--- drift: {rel} ---[/bold]")
@@ -954,7 +1197,7 @@ def run_upgrade(
             sys.stderr.write(f"error: re-render failed: {e}\n")
             return 1
 
-        report = compute_drift(target, staging, rendered, manifest)
+        report = compute_drift(target, staging, rendered, manifest, read_base(target))
         report.migrated = migrated
         # Opt-in consent for new additions (#249): bucket genuinely-new files
         # into groups and require an accept/decline decision before --apply
