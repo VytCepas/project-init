@@ -35,6 +35,11 @@ _ANY_PLACEHOLDER_RE = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
 _PRESERVE_DIRS = {"memory", "vault"}
 # Except READMEs — those are always refreshed.
 _ALWAYS_OVERWRITE = {"README.md"}
+# The owner-edited record file. On a re-scaffold it is preserved (not re-rendered)
+# once it carries the scaffold record, so hand-edits — preserve list, project_key,
+# declined_additions, safety.allow — survive (#296); write_scaffold_record then
+# updates the record block in place. A first scaffold (no record) renders it.
+_CONFIG_REL = Path(".claude/config.yaml")
 # Marker that write_scaffold_record (upgrade.py) appends to .claude/config.yaml
 # after a real project-init scaffold. Its PRESENCE — not the file merely
 # existing — distinguishes a re-run from a first scaffold (PI-196).
@@ -313,6 +318,11 @@ def _should_preserve(rel_path: Path, target: Path, preserve_globs: list[str] | N
         return False
     if rel_path.name in _ALWAYS_OVERWRITE:
         return False
+    # A re-scaffold must not clobber a hand-edited config.yaml that already
+    # carries a scaffold record (#296); write_scaffold_record updates the record
+    # block in place afterwards. A first scaffold (no record) still renders it.
+    if rel_path == _CONFIG_REL and _has_scaffold_record(dest):
+        return True
     if any(part in _PRESERVE_DIRS for part in rel_path.parts):
         return True
     return _matches_preserve_glob(rel_path, preserve_globs or [])
