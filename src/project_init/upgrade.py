@@ -161,6 +161,11 @@ class DriftReport:
     changed: list[Path] = field(default_factory=list)
     conflicts: list[Path] = field(default_factory=list)
     merged: list[Path] = field(default_factory=list)  # user+upstream, 3-way auto-merged (#240)
+    skipped: list[Path] = field(default_factory=list)  # left drifted by interactive apply (#245)
+    # Skipped 'changed' files (unedited old render): their recorded hash must be
+    # carried into the new manifest so they stay a clean 'changed' next upgrade,
+    # not a dropped-record conflict (#245, Codex review).
+    skipped_unedited: list[Path] = field(default_factory=list)
     removed: list[Path] = field(default_factory=list)
     diffs: dict[Path, str] = field(default_factory=dict)
     merge_results: dict[Path, str] = field(default_factory=dict)  # merged text per #240 file
@@ -751,22 +756,6 @@ def apply_drift(
         else:
             _copy_rendered(staging / rel, _new_sibling(target / rel, (staging / rel).read_bytes()))
 
-    # The base advances to the *new* render for every managed file whose upstream
-    # render is now the pristine baseline — not just files that drifted this run.
-    # Recording unchanged files too is what lets a project that predated the
-    # sidecar (or had it deleted) gain a full base after one --apply, so a later
-    # user+upstream edit can 3-way merge instead of falling back to .new (#240,
-    # Codex review). A still-conflicted file keeps its old base so its unresolved
-    # edit can merge again next time.
-    preserve_globs = read_preserve_globs(target)
-    conflicted = set(report.conflicts)
-    for rel in report.rendered:
-        if rel in conflicted or rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
-            continue
-        text = _decode((staging / rel).read_bytes())
-        if text is not None:
-            base[rel.as_posix()] = text
-
     # Targeted config.yaml updates: the human-readable version line, then the
     # scaffold record (variables + a manifest reflecting post-apply state).
     config_path = target / _CONFIG_REL
@@ -778,14 +767,50 @@ def apply_drift(
 
     # Only files whose on-disk content now equals the render are recorded —
     # conflicted/merged files stay user-owned, so the next upgrade flags them
-    # again (and the merge base above lets that flag become a clean re-merge).
+    # again (and the merge base below lets that flag become a clean re-merge).
     applied = [
         rel
         for rel in report.rendered
         if (target / rel).is_file() and (target / rel).read_bytes() == (staging / rel).read_bytes()
     ]
-    write_scaffold_record(target, preset_name, variables, applied, write_merge_base=False)
+    # Carry the recorded hash of skipped-but-unedited files forward: they still
+    # hold their old render, so re-hashing the on-disk bytes preserves the entry
+    # and keeps them a clean 'changed' (not a dropped-record conflict) next time.
+    manifest_files = applied + [rel for rel in report.skipped_unedited if (target / rel).is_file()]
+    write_scaffold_record(target, preset_name, variables, manifest_files, write_merge_base=False)
+
+    # The base advances to the new render for files now matching it (applied or
+    # already unchanged) plus cleanly merged ones — making the new render the
+    # pristine baseline. This both backfills unchanged files for a project that
+    # predated the sidecar (#240, Codex review) and is correct when interactive
+    # apply (#245) skipped some drifted files: a skipped file is neither in
+    # ``applied`` nor ``merged``, so it keeps its old base and is re-offered.
+    preserve_globs = read_preserve_globs(target)
+    for rel in [*applied, *report.merged]:
+        if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
+            continue
+        text = _decode((staging / rel).read_bytes())
+        if text is not None:
+            base[rel.as_posix()] = text
     write_base(target, base)
+
+
+def _print_clean_or_all_skipped(console, report: DriftReport) -> None:
+    """Report the no-drift case, distinguishing two outcomes.
+
+    A truly clean tree prints "No drift"; an interactive run that skipped every
+    drifted file leaves the project drifted (#245 review), so it must say so
+    rather than claim "No drift" when there still is.
+    """
+    if report.skipped:
+        console.print(
+            f"[yellow]Skipped all {len(report.skipped)} drifted file(s)[/yellow] — "
+            "left as-is; re-offered on the next upgrade:"
+        )
+        for rel in report.skipped:
+            console.print(f"  {rel}")
+        return
+    console.print("[green]No drift — project matches the current templates.[/green]")
 
 
 def _print_report(report: DriftReport, applied: bool) -> None:
@@ -799,7 +824,7 @@ def _print_report(report: DriftReport, applied: bool) -> None:
             " hashes every modified file is treated as a conflict.[/yellow]"
         )
     if not report.has_drift:
-        console.print("[green]No drift — project matches the current templates.[/green]")
+        _print_clean_or_all_skipped(console, report)
         return
 
     sections = (
@@ -819,6 +844,7 @@ def _print_report(report: DriftReport, applied: bool) -> None:
             if not applied
             else "locally edited — rendered as .new siblings",
         ),
+        ("skipped", report.skipped, "left drifted by interactive choice — re-offered next upgrade"),
         ("removed", report.removed, "no longer rendered (left in place)"),
     )
     for label, paths, note in sections:
@@ -1139,19 +1165,90 @@ def _print_undo_hint(status: str | None, target: Path) -> None:
         )
 
 
-def run_upgrade(
+# --- Per-file interactive apply (#245) -------------------------------------
+
+# Drift categories the interactive walk covers — new files keep the separate
+# addition-consent gate (#249), so they are deliberately not prompted here.
+_INTERACTIVE_LABELS = (
+    ("changed", "update with the new render"),
+    ("merged", "apply the 3-way auto-merge"),
+    ("conflicts", "write the .new conflict sibling"),
+)
+
+
+def _interactive_select(report: DriftReport) -> None:
+    """Walk each changed/merged/conflicting file, keeping only chosen ones (#245).
+
+    Mutates *report* in place: a skipped file is removed from its category (and
+    from ``merge_results``) so :func:`apply_drift` never touches it — it stays
+    drifted and is re-offered next upgrade. ``new``/``removed`` are untouched.
+    Per file the user picks [u]pdate / [s]kip / [d]iff (diff re-prompts).
+    """
+    from rich.console import Console
+    from rich.prompt import Prompt
+
+    console = Console()
+    console.print(
+        "\n[bold]Interactive apply[/bold] (#245) — per file: "
+        "[bold]u[/bold]pdate · [bold]s[/bold]kip · [bold]d[/bold]iff"
+    )
+    for label, action in _INTERACTIVE_LABELS:
+        paths = getattr(report, label)
+        kept: list[Path] = []
+        for rel in paths:
+            choice = "d"
+            while choice == "d":
+                choice = Prompt.ask(
+                    f"  [cyan]{label}[/cyan] {rel} — {action}?",
+                    choices=["u", "s", "d"],
+                    default="u",
+                )
+                if choice == "d":
+                    _show_interactive_diff(console, report, rel)
+            if choice == "u":
+                kept.append(rel)
+            else:
+                console.print(f"    [dim]skipped {rel}[/dim]")
+                report.merge_results.pop(rel, None)
+                report.skipped.append(rel)
+                # A skipped 'changed' file is unedited and stays at its recorded
+                # render, so its manifest entry must survive (#245, Codex review);
+                # merged/conflict skips are user-edited and stay unrecorded.
+                if label == "changed":
+                    report.skipped_unedited.append(rel)
+        paths[:] = kept
+
+
+def _show_interactive_diff(console, report: DriftReport, rel: Path) -> None:
+    """Print the drift (and any merge result) for one file during the walk."""
+    diff = report.diffs.get(rel)
+    if diff:
+        console.print(diff, markup=False, highlight=False)
+    merged = report.merge_results.get(rel)
+    if merged is not None:
+        console.print(f"\n[dim]--- 3-way merge result for {rel} ---[/dim]")
+        console.print(merged, markup=False, highlight=False)
+    if not diff and merged is None:
+        console.print("    [dim](no textual diff available)[/dim]")
+
+
+def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
     target: Path,
     *,
     apply: bool,
     no_plugin: bool = False,
     accept_new: list[str] | None = None,
     decline_new: list[str] | None = None,
+    interactive: bool = False,
 ) -> int:
     """Entry point for the upgrade subcommand; returns a process exit code.
 
     *no_plugin* switches the project to the fallback mode on this run:
     the re-render carries copied hooks/skills and local settings wiring,
     surfacing as new/changed files in the report.
+
+    *interactive* (with *apply*) walks each changed/merged/conflicting file and
+    lets the user update or skip it (#245); skipped files are left drifted.
 
     The clean-tree guard and post-apply undo hint (#242) live in the CLI layer
     (_upgrade_main), not here, so programmatic callers manage their own safety.
@@ -1214,6 +1311,11 @@ def run_upgrade(
         if apply:
             suppressed = {p for gid in gate["declined_now"] for p in groups[gid]["paths"]}
             report.new = [rel for rel in report.new if rel not in suppressed]
+            # Per-file interactive walk (#245): drop the files the user skips so
+            # apply_drift only touches the chosen ones. New-file additions keep
+            # the group-level consent gate above, so they are not re-prompted.
+            if interactive and (report.changed or report.merged or report.conflicts):
+                _interactive_select(report)
             apply_drift(target, staging, report, preset_name, variables)
             _write_declined(target, gate["declined_map"])
         _print_report(report, applied=apply)
