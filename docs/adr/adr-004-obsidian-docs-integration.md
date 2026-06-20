@@ -1,7 +1,7 @@
 # ADR-004: Obsidian vault + /docs integration — human memory meets docs-as-code
 
 **Date:** 2026-04-27
-**Status:** Accepted
+**Status:** Accepted (the "Public docs → GitHub Pages" tier was retired in PI-343 — github.com renders the `docs/` Markdown natively and `mkdocs.yml` remains for local preview; no site is published)
 
 ## Context
 
