@@ -813,6 +813,37 @@ def _print_clean_or_all_skipped(console, report: DriftReport) -> None:
     console.print("[green]No drift — project matches the current templates.[/green]")
 
 
+def _print_migration_notes(prev: str | None, current: str | None) -> None:
+    """Surface curated changelog/migration notes for the version span (#244).
+
+    Connects file drift to release intent: shows what changed between the
+    project's recorded version and the target, with any "action required" note
+    called out prominently. Deterministic — notes are read from the packaged
+    ``migration_notes`` module, never fetched.
+    """
+    from project_init.migration_notes import notes_for_span
+
+    notes = notes_for_span(prev, current)
+    if not notes:
+        return
+    from rich.console import Console
+
+    console = Console()
+    # Fall back to just the target version when the span can't be described
+    # (missing/unparseable prev). Format from the parsed tuple so a recorded "v"
+    # prefix or "-rc" suffix can't leak as "vv1.2.3" (Copilot review) — notes is
+    # non-empty, so current is guaranteed parseable here.
+    parsed = _parse_version(current)
+    span = _describe_version_span(prev, current) or f"v{'.'.join(map(str, parsed))}"
+    console.print(f"\n[bold]Upgrade notes[/bold] — {span}:")
+    for version, entry in notes:
+        console.print(f"\n  [cyan]v{version}[/cyan] — {entry['summary']}")
+        if entry.get("action_required"):
+            console.print(
+                f"  [bold yellow]⚠ action required:[/bold yellow] {entry['action_required']}"
+            )
+
+
 def _print_report(report: DriftReport, applied: bool) -> None:
     from rich.console import Console
 
@@ -1303,6 +1334,13 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
         genuinely_new = [rel for rel in report.new if rel.as_posix() not in manifest]
         groups = _addition_groups(genuinely_new, staging)
         gate = _resolve_addition_consent(target, groups, accept_new or [], decline_new or [])
+        # Surface the version-span changelog/action-required notes (#244) BEFORE
+        # the addition gate: a direct --apply that stops at the gate must still
+        # show the upgrade warnings, not hide them until a re-run (Codex review).
+        _print_migration_notes(
+            variables.get("project_init_version_prev"),
+            variables.get("project_init_version"),
+        )
         if apply and gate["undecided"]:
             _print_addition_gate(groups, gate["undecided"])
             return 2

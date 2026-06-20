@@ -948,3 +948,63 @@ class TestInteractiveApply:
         assert main(["upgrade", str(target), "--apply", "-i"]) == 0
         assert (target / "justfile").read_text() == "# my local recipes\n"
         assert not (target / "justfile.new").exists(), "skipped conflict drops no .new"
+
+
+def _set_recorded_version(target: Path, version: str) -> None:
+    """Rewrite the recorded scaffold version to simulate an older project."""
+    config = target / _CONFIG_REL
+    text = config.read_text()
+    m = re.search(r"^(  variables: )(.*)$", text, re.MULTILINE)
+    assert m, "scaffold record variables line missing"
+    variables = json.loads(m.group(2))
+    variables["project_init_version"] = version
+    config.write_text(
+        text[: m.start()] + m.group(1) + json.dumps(variables, sort_keys=True) + text[m.end() :]
+    )
+
+
+class TestMigrationNotes:
+    """#244: upgrade surfaces curated notes for the version span it crosses."""
+
+    def test_upgrade_shows_notes_for_version_span(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        _set_recorded_version(target, "0.3.0")  # pretend it was scaffolded on 0.3.0
+        assert main(["upgrade", str(target)]) == 0  # report-only is enough
+        out = capsys.readouterr().out
+        assert "Upgrade notes" in out
+        assert "v0.4.0" in out  # the 0.4.0 entry is crossed
+        assert "action required" in out.lower()
+
+    def test_same_version_upgrade_shows_no_notes(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)  # recorded at the current tool version
+        assert main(["upgrade", str(target)]) == 0
+        assert "Upgrade notes" not in capsys.readouterr().out
+
+    def test_fallback_header_avoids_double_v_prefix(self, capsys):
+        """With no parseable prev the header falls back to the target version;
+        a 'v'-prefixed/suffixed current must not leak as 'vv…' (Copilot review)."""
+        from project_init.upgrade import _print_migration_notes
+
+        _print_migration_notes(None, "v0.4.0-rc1")
+        out = capsys.readouterr().out
+        assert "vv" not in out
+        assert "v0.4.0" in out
+
+    def test_notes_shown_even_when_addition_gate_blocks(self, tmp_path: Path, capsys):
+        """A direct --apply that stops at the addition-consent gate must still
+        surface the version-span notes, not hide them until a re-run (#244,
+        Codex review)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        _set_recorded_version(target, "0.3.0")
+        # Make justfile a genuinely-new file (missing on disk AND from the
+        # manifest) so `--apply` stops at the addition gate with exit 2.
+        (target / "justfile").unlink()
+        _patch_manifest(target, lambda m: m.pop("justfile", None))
+
+        assert main(["upgrade", str(target), "--apply"]) == 2  # gate blocks apply
+        out = capsys.readouterr().out
+        assert "Upgrade notes" in out
+        assert "action required" in out.lower()
