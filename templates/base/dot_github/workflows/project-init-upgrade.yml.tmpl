@@ -6,10 +6,10 @@
 # Default trigger is manual (workflow_dispatch). Uncomment the schedule to check
 # on a cadence.
 #
-# NOTE: a PR opened with the built-in GITHUB_TOKEN does not itself trigger other
-# workflows (CI won't run on the upgrade PR). To get CI on it, either close and
-# reopen the PR, or set an `UPGRADE_PR_TOKEN` secret (a PAT) — this job uses it
-# automatically when present.
+# NOTE: a PR opened with the built-in GITHUB_TOKEN won't automatically run other
+# workflows — CI on the upgrade PR is skipped (or left pending approval), not
+# started. To get CI running on it, either close and reopen the PR, or set an
+# `UPGRADE_PR_TOKEN` secret (a PAT) — this job uses it automatically when present.
 name: project-init upgrade
 
 on:

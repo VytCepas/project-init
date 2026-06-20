@@ -205,8 +205,8 @@ and are re-offered next upgrade. New-file additions still use the
 `--accept-new`/`--decline-new` group consent.
 
 **Upgrade as a PR.** Every scaffold ships a `.github/workflows/project-init-upgrade.yml`
-workflow (manual `workflow_dispatch`, opt into a `schedule` by uncommenting one
-line). It runs the upgrade on a fresh branch and opens a pull request with the
+workflow (manual `workflow_dispatch`, opt into a cadence by uncommenting the
+`schedule:` block). It runs the upgrade on a fresh branch and opens a pull request with the
 drift — Renovate-style, but for the scaffold — so the change never lands on your
 default branch unreviewed and `.new` conflicts show up right in the PR diff. It
 installs project-init from your recorded source URL (so forks/GHES hosts work)
