@@ -223,6 +223,12 @@ The report classifies every template-owned file:
 | conflict | drifted **and** locally edited with overlapping changes | keeps your file; writes the conflict-marked merge as a `<file>.new` sibling — your edit is never overwritten |
 | removed | no longer rendered by current templates | nothing (reported only; upgrade never deletes) |
 
+**Migration notes.** Alongside the file drift, upgrade prints the curated
+changelog/migration notes for the version span it crosses (recorded → target),
+with any **action required** step called out prominently — so you know *why* the
+files changed, not just *which*. The notes are packaged and read offline (no
+changelog fetch).
+
 `.claude/memory/` and `.claude/vault/` are never compared or touched, and
 `.claude/config.yaml` keeps your hand-edited fields (`project_key`, board
 number) — only its `project_init_version` and the scaffold record are

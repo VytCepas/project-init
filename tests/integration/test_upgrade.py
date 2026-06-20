@@ -948,3 +948,36 @@ class TestInteractiveApply:
         assert main(["upgrade", str(target), "--apply", "-i"]) == 0
         assert (target / "justfile").read_text() == "# my local recipes\n"
         assert not (target / "justfile.new").exists(), "skipped conflict drops no .new"
+
+
+def _set_recorded_version(target: Path, version: str) -> None:
+    """Rewrite the recorded scaffold version to simulate an older project."""
+    config = target / _CONFIG_REL
+    text = config.read_text()
+    m = re.search(r"^(  variables: )(.*)$", text, re.MULTILINE)
+    assert m, "scaffold record variables line missing"
+    variables = json.loads(m.group(2))
+    variables["project_init_version"] = version
+    config.write_text(
+        text[: m.start()] + m.group(1) + json.dumps(variables, sort_keys=True) + text[m.end() :]
+    )
+
+
+class TestMigrationNotes:
+    """#244: upgrade surfaces curated notes for the version span it crosses."""
+
+    def test_upgrade_shows_notes_for_version_span(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        _set_recorded_version(target, "0.3.0")  # pretend it was scaffolded on 0.3.0
+        assert main(["upgrade", str(target)]) == 0  # report-only is enough
+        out = capsys.readouterr().out
+        assert "Upgrade notes" in out
+        assert "v0.4.0" in out  # the 0.4.0 entry is crossed
+        assert "action required" in out.lower()
+
+    def test_same_version_upgrade_shows_no_notes(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)  # recorded at the current tool version
+        assert main(["upgrade", str(target)]) == 0
+        assert "Upgrade notes" not in capsys.readouterr().out
