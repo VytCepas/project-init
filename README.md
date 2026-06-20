@@ -194,9 +194,15 @@ After updating the tool itself, re-render any project from its recorded
 config and see what changed:
 
 ```bash
-project-init upgrade /path/to/my-project           # drift report only, touches nothing
-project-init upgrade /path/to/my-project --apply   # apply the changes
+project-init upgrade /path/to/my-project              # drift report only, touches nothing
+project-init upgrade /path/to/my-project --apply      # apply the changes
+project-init upgrade /path/to/my-project --apply -i   # decide per file: update / skip / diff
 ```
+
+With `-i`/`--interactive`, `--apply` walks each changed/merged/conflicting file
+and prompts to update it, skip it, or show its diff — skipped files stay drifted
+and are re-offered next upgrade. New-file additions still use the
+`--accept-new`/`--decline-new` group consent.
 
 The report classifies every template-owned file:
 

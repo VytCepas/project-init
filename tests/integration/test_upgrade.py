@@ -839,3 +839,76 @@ class TestThreeWayMergeApply:
         )
         base = read_base(target)
         assert base == {"justfile": "ok\n"}
+
+
+def _make_changed_justfile(target: Path, old: bytes = b"# old render\n") -> bytes:
+    """Turn justfile into a `changed` file (drifted, unedited) and return *old*.
+
+    Writes *old* and patches the recorded hash to match, so upgrade sees a file
+    the templates moved past but the user never touched.
+    """
+    (target / "justfile").write_bytes(old)
+    _patch_manifest(target, lambda m: m.__setitem__("justfile", hashlib.sha256(old).hexdigest()))
+    return old
+
+
+class TestInteractiveApply:
+    """#245: `upgrade --apply -i` walks each drifted file with update/skip/diff."""
+
+    def test_skip_leaves_file_unchanged(self, tmp_path: Path, monkeypatch):
+        target = tmp_path / "p"
+        _scaffold(target)
+        old = _make_changed_justfile(target)
+        monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "s")
+
+        assert main(["upgrade", str(target), "--apply", "-i"]) == 0
+        assert (target / "justfile").read_bytes() == old, "skipped file must not change"
+        assert not (target / "justfile.new").exists()
+
+    def test_update_applies_file(self, tmp_path: Path, monkeypatch):
+        target = tmp_path / "p"
+        _scaffold(target)
+        rendered = (target / "justfile").read_bytes()  # the live render
+        _make_changed_justfile(target)
+        monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "u")
+
+        assert main(["upgrade", str(target), "--apply", "-i"]) == 0
+        assert (target / "justfile").read_bytes() == rendered, "chosen file is updated"
+
+    def test_diff_choice_shows_diff_then_proceeds(self, tmp_path: Path, monkeypatch, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        rendered = (target / "justfile").read_bytes()
+        _make_changed_justfile(target)
+        answers = iter(["d", "u"])  # show diff, then update
+        monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: next(answers))
+
+        assert main(["upgrade", str(target), "--apply", "-i"]) == 0
+        out = capsys.readouterr().out
+        assert "justfile" in out  # the diff was printed
+        assert (target / "justfile").read_bytes() == rendered
+
+    def test_non_interactive_apply_does_not_prompt(self, tmp_path: Path, monkeypatch):
+        """Without -i, --apply must never call the prompt (behavior unchanged)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        rendered = (target / "justfile").read_bytes()
+        _make_changed_justfile(target)
+
+        def _boom(*a, **k):
+            raise AssertionError("non-interactive apply must not prompt")
+
+        monkeypatch.setattr("rich.prompt.Prompt.ask", _boom)
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert (target / "justfile").read_bytes() == rendered
+
+    def test_skip_of_conflict_writes_no_sibling(self, tmp_path: Path, monkeypatch):
+        target = tmp_path / "p"
+        _scaffold(target)
+        _set_base(target, "justfile", "# pristine base — shared by neither side\n")
+        (target / "justfile").write_text("# my local recipes\n")
+        monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "s")
+
+        assert main(["upgrade", str(target), "--apply", "-i"]) == 0
+        assert (target / "justfile").read_text() == "# my local recipes\n"
+        assert not (target / "justfile.new").exists(), "skipped conflict drops no .new"

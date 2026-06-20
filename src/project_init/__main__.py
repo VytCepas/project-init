@@ -858,7 +858,17 @@ def _upgrade_main(argv: list[str]) -> int:
     p.add_argument(
         "--non-interactive",
         action="store_true",
-        help="Accepted for CLI symmetry — upgrade never prompts",
+        help="Accepted for CLI symmetry — upgrade never prompts unless -i is given",
+    )
+    p.add_argument(
+        "-i",
+        "--interactive",
+        action="store_true",
+        help=(
+            "With --apply, walk each changed/merged/conflicting file and choose "
+            "update/skip/diff per file (#245). New-file additions still use "
+            "--accept-new/--decline-new."
+        ),
     )
     p.add_argument(
         "--accept-new",
@@ -907,6 +917,7 @@ def _upgrade_main(argv: list[str]) -> int:
         no_plugin=args.no_plugin,
         accept_new=args.accept_new,
         decline_new=args.decline_new,
+        interactive=args.interactive,
     )
     if args.apply and rc == 0:
         _print_undo_hint(git_status, target)
