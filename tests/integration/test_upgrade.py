@@ -322,7 +322,7 @@ class TestUpgradeApply:
         assert justfile.read_bytes() == rendered_now
         assert not (target / "justfile.new").exists()
 
-    def test_user_edit_with_no_upstream_change_is_kept(self, tmp_path: Path, capsys):
+    def test_user_edit_with_no_upstream_change_is_kept(self, tmp_path: Path):
         """User edited a file but upstream did not change it: the 3-way merge has
         nothing to apply, so the edit is kept in place with no .new sibling (#240
         — previously this dropped a pointless conflict sibling)."""
