@@ -50,10 +50,10 @@ class TestPythonToolchain:
         assert "docstring_style: google" in content
         assert "Zensical" in content, "migration note for mkdocs-material maintenance mode"
 
-    def test_docs_workflow_uses_mkdocs(self):
-        content = (self.target / ".github" / "workflows" / "docs.yml").read_text()
-        assert "mkdocs build" in content
-        assert "actions/deploy-pages" in content
+    def test_no_pages_deploy_workflow(self):
+        """No published docs site — github.com renders Markdown and mkdocs.yml
+        stays for local `mkdocs serve` preview (PI-343)."""
+        assert not (self.target / ".github" / "workflows" / "docs.yml").exists()
 
     def test_no_other_language_configs(self):
         assert not (self.target / "eslint.config.mjs").exists()
@@ -80,10 +80,10 @@ class TestNodeToolchain:
         assert config["entryPoints"]
         assert config["validation"]["notDocumented"] is True
 
-    def test_docs_workflow_uses_typedoc(self):
-        content = (self.target / ".github" / "workflows" / "docs.yml").read_text()
-        assert "typedoc" in content
-        assert "actions/deploy-pages" in content
+    def test_no_pages_deploy_workflow(self):
+        """No published docs site — typedoc.json stays for local API-doc
+        generation, but nothing is auto-published to Pages (PI-343)."""
+        assert not (self.target / ".github" / "workflows" / "docs.yml").exists()
 
     def test_no_other_language_configs(self):
         assert not (self.target / "ruff.toml").exists()
