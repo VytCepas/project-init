@@ -173,6 +173,56 @@ class TestFirstScaffoldProtectsExistingFiles:
         assert not spurious, f"layer overwrites must not create siblings: {spurious}"
 
 
+class TestReScaffoldPreservesConfig:
+    """#296: re-running project-init must not clobber a hand-edited config.yaml
+    that already carries a scaffold record — the record block is updated in
+    place, every hand-edited human field survives."""
+
+    def test_hand_edits_survive_a_re_scaffold(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        assert _run(target) == 0
+        config = target / ".claude" / "config.yaml"
+
+        # Hand-edit the fields the issue calls out, in the human section.
+        text = config.read_text()
+        text = text.replace('project_key: ""', 'project_key: "PI"')
+        text = text.replace("  allow: []", '  allow: ["kubectl --context dev-.*"]')
+        text = text.replace("declined_additions: {}", 'declined_additions: {"docs": "abc123"}')
+        # Uncomment the preserve example in the human section (where users edit it).
+        text = text.replace(
+            '# preserve: ["ci.yml", "justfile", "docs/*.md"]',
+            'preserve: ["ci.yml", "justfile"]',
+        )
+        config.write_text(text)
+
+        # Re-scaffold: config.yaml must be preserved, not re-rendered.
+        assert _run(target) == 0
+
+        result = config.read_text()
+        assert 'project_key: "PI"' in result
+        assert 'allow: ["kubectl --context dev-.*"]' in result
+        assert 'declined_additions: {"docs": "abc123"}' in result
+        assert 'preserve: ["ci.yml", "justfile"]' in result
+        # No .new sibling — preservation is silent, not a conflict.
+        assert not (target / ".claude" / "config.yaml.new").exists()
+        # The scaffold record is still present (updated in place by
+        # write_scaffold_record), so a later `upgrade` still works.
+        from project_init.scaffold import _RECORD_MARKER
+
+        assert _RECORD_MARKER in result
+
+    def test_first_scaffold_still_renders_config(self, tmp_path: Path):
+        """A first scaffold (no record) must render config.yaml from the
+        template — preservation only kicks in once a record exists."""
+        target = tmp_path / "proj"
+        assert _run(target) == 0
+        config = target / ".claude" / "config.yaml"
+        text = config.read_text()
+        # Template placeholders are resolved and the name we passed is present.
+        assert "{{" not in text
+        assert "owns" in text
+
+
 class TestStrictModeProtection:
     def test_strict_scaffold_protects_existing_file(self, tmp_path: Path):
         target = tmp_path / "proj"
