@@ -162,6 +162,10 @@ class DriftReport:
     conflicts: list[Path] = field(default_factory=list)
     merged: list[Path] = field(default_factory=list)  # user+upstream, 3-way auto-merged (#240)
     skipped: list[Path] = field(default_factory=list)  # left drifted by interactive apply (#245)
+    # Skipped 'changed' files (unedited old render): their recorded hash must be
+    # carried into the new manifest so they stay a clean 'changed' next upgrade,
+    # not a dropped-record conflict (#245, Codex review).
+    skipped_unedited: list[Path] = field(default_factory=list)
     removed: list[Path] = field(default_factory=list)
     diffs: dict[Path, str] = field(default_factory=dict)
     merge_results: dict[Path, str] = field(default_factory=dict)  # merged text per #240 file
@@ -769,7 +773,11 @@ def apply_drift(
         for rel in report.rendered
         if (target / rel).is_file() and (target / rel).read_bytes() == (staging / rel).read_bytes()
     ]
-    write_scaffold_record(target, preset_name, variables, applied, write_merge_base=False)
+    # Carry the recorded hash of skipped-but-unedited files forward: they still
+    # hold their old render, so re-hashing the on-disk bytes preserves the entry
+    # and keeps them a clean 'changed' (not a dropped-record conflict) next time.
+    manifest_files = applied + [rel for rel in report.skipped_unedited if (target / rel).is_file()]
+    write_scaffold_record(target, preset_name, variables, manifest_files, write_merge_base=False)
 
     # The base advances to the new render for files now matching it (applied or
     # already unchanged) plus cleanly merged ones — making the new render the
@@ -1203,6 +1211,11 @@ def _interactive_select(report: DriftReport) -> None:
                 console.print(f"    [dim]skipped {rel}[/dim]")
                 report.merge_results.pop(rel, None)
                 report.skipped.append(rel)
+                # A skipped 'changed' file is unedited and stays at its recorded
+                # render, so its manifest entry must survive (#245, Codex review);
+                # merged/conflict skips are user-edited and stay unrecorded.
+                if label == "changed":
+                    report.skipped_unedited.append(rel)
         paths[:] = kept
 
 

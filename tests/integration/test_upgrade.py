@@ -916,6 +916,28 @@ class TestInteractiveApply:
         assert "Skipped all" in out
         assert "justfile" in out
 
+    def test_skipped_changed_file_keeps_manifest_entry(self, tmp_path: Path, monkeypatch):
+        """Skipping a clean 'changed' file must carry its manifest hash forward,
+        so next upgrade it is still a clean update — not a dropped-record
+        conflict, even with no merge base (binary/pre-sidecar) (#245, Codex)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        rendered = (target / "justfile").read_bytes()  # the live render
+        old = _make_changed_justfile(target)
+        monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "s")
+        assert main(["upgrade", str(target), "--apply", "-i"]) == 0
+
+        # The skipped file's recorded hash survived in the manifest.
+        _, _, manifest, _ = read_scaffold_record(target)
+        assert manifest["justfile"] == hashlib.sha256(old).hexdigest()
+
+        # Drop the sidecar to mimic a binary/pre-sidecar file (no 3-way base):
+        # the carried manifest hash alone must keep it a clean 'changed'.
+        (target / ".claude" / ".upgrade-base.json").unlink()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert (target / "justfile").read_bytes() == rendered, "re-offered as a clean update"
+        assert not (target / "justfile.new").exists(), "not downgraded to a conflict"
+
     def test_skip_of_conflict_writes_no_sibling(self, tmp_path: Path, monkeypatch):
         target = tmp_path / "p"
         _scaffold(target)
