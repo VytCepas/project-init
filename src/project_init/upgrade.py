@@ -1334,6 +1334,13 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
         genuinely_new = [rel for rel in report.new if rel.as_posix() not in manifest]
         groups = _addition_groups(genuinely_new, staging)
         gate = _resolve_addition_consent(target, groups, accept_new or [], decline_new or [])
+        # Surface the version-span changelog/action-required notes (#244) BEFORE
+        # the addition gate: a direct --apply that stops at the gate must still
+        # show the upgrade warnings, not hide them until a re-run (Codex review).
+        _print_migration_notes(
+            variables.get("project_init_version_prev"),
+            variables.get("project_init_version"),
+        )
         if apply and gate["undecided"]:
             _print_addition_gate(groups, gate["undecided"])
             return 2
@@ -1350,12 +1357,6 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
             apply_drift(target, staging, report, preset_name, variables)
             _write_declined(target, gate["declined_map"])
         _print_report(report, applied=apply)
-        # Connect the file drift to release intent: what changed between the
-        # recorded version and the target, plus action-required notes (#244).
-        _print_migration_notes(
-            variables.get("project_init_version_prev"),
-            variables.get("project_init_version"),
-        )
         if groups:
             span = _describe_version_span(
                 variables.get("project_init_version_prev"),

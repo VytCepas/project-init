@@ -991,3 +991,20 @@ class TestMigrationNotes:
         out = capsys.readouterr().out
         assert "vv" not in out
         assert "v0.4.0" in out
+
+    def test_notes_shown_even_when_addition_gate_blocks(self, tmp_path: Path, capsys):
+        """A direct --apply that stops at the addition-consent gate must still
+        surface the version-span notes, not hide them until a re-run (#244,
+        Codex review)."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        _set_recorded_version(target, "0.3.0")
+        # Make justfile a genuinely-new file (missing on disk AND from the
+        # manifest) so `--apply` stops at the addition gate with exit 2.
+        (target / "justfile").unlink()
+        _patch_manifest(target, lambda m: m.pop("justfile", None))
+
+        assert main(["upgrade", str(target), "--apply"]) == 2  # gate blocks apply
+        out = capsys.readouterr().out
+        assert "Upgrade notes" in out
+        assert "action required" in out.lower()
