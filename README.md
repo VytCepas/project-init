@@ -215,7 +215,7 @@ refreshed.
 
 How it works: scaffolding records the preset, template variables, and a
 content-hash manifest in a `scaffold:` block at the end of
-`.claude/config.yaml`, plus the exact rendered bytes of each managed file in a
+`.claude/config.yaml`, plus the rendered text of each managed (UTF-8) file in a
 `.claude/.upgrade-base.json` sidecar. Upgrade re-renders the same preset at the
 current template version into a staging directory and compares hashes, so user
 edits are distinguishable from upstream template changes. When both you and the

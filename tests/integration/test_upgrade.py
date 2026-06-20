@@ -777,3 +777,65 @@ class TestThreeWayMergeApply:
         assert not (target / "justfile.new").exists()
         # Base advances to the new render so the next upgrade re-merges cleanly.
         assert read_base(target)["justfile"] == live
+
+    def test_apply_backfills_base_for_unchanged_files(self, tmp_path: Path):
+        """A project that predates the sidecar (or had it deleted) must gain a
+        full merge base after one --apply — not just for drifted files — so a
+        later user+upstream edit auto-merges instead of falling back to .new
+        (#240, Codex review)."""
+        from project_init.upgrade import read_base
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        # Simulate a pre-sidecar project: no base, but no template drift either.
+        (target / ".claude" / ".upgrade-base.json").unlink()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+
+        base = read_base(target)
+        # An unchanged managed file (never drifted this run) is now recorded.
+        justfile = target / "justfile"
+        assert base["justfile"] == justfile.read_text()
+
+        # Prove it: a non-overlapping user+upstream edit now auto-merges.
+        live = justfile.read_text()
+        lines = live.splitlines(keepends=True)
+        assert len(lines) >= 2
+        older = "".join(lines[:-1])
+        _set_base(target, "justfile", older)
+        justfile.write_text("# USER\n" + older)
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert justfile.read_text() == "# USER\n" + live
+        assert not (target / "justfile.new").exists()
+
+    def test_conflict_new_sibling_keeps_executable_bit(self, tmp_path: Path):
+        """A conflict-marked .new for a script must stay executable so promoting
+        it doesn't silently drop +x (#240 review)."""
+        import os
+        import stat
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        script = target / ".claude" / "scripts" / "push_branch.sh"
+        assert script.stat().st_mode & stat.S_IXUSR, "fixture script must be executable"
+        # Force a genuine overlap so a conflict-marked .new is written.
+        _set_base(target, ".claude/scripts/push_branch.sh", "#!/usr/bin/env bash\n# base\n")
+        script.write_text("#!/usr/bin/env bash\n# my local edit\n")
+
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        sibling = target / ".claude" / "scripts" / "push_branch.sh.new"
+        assert sibling.exists()
+        assert sibling.stat().st_mode & stat.S_IXUSR, "the .new sibling must keep +x"
+        assert os.access(sibling, os.X_OK)
+
+    def test_read_base_filters_corrupt_entries(self, tmp_path: Path):
+        """A hand-corrupted sidecar (non-string values) is filtered, not fatal
+        — the bad entry must never reach the merge engine (#240 review)."""
+        from project_init.upgrade import read_base
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        (target / ".claude" / ".upgrade-base.json").write_text(
+            json.dumps({"justfile": "ok\n", "bad": 123, "alsobad": ["x"]})
+        )
+        base = read_base(target)
+        assert base == {"justfile": "ok\n"}

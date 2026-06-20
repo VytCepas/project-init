@@ -2,9 +2,10 @@
 
 Deterministic, stdlib-only (PI-142). The scaffold record appended to
 ``.claude/config.yaml`` stores the preset, the exact template variables, and a
-manifest of content hashes for the files the scaffolder rendered; the exact
-rendered *bytes* of each file are kept in the ``.claude/.upgrade-base.json``
-sidecar (#240) as the base leg for a 3-way merge. On upgrade the same preset is
+manifest of content hashes for the files the scaffolder rendered; the rendered
+*text* of each UTF-8 file is kept in the ``.claude/.upgrade-base.json`` sidecar
+(#240) as the base leg for a 3-way merge (binary/non-UTF-8 renders are omitted
+and fall back to the ``.new`` path on conflict). On upgrade the same preset is
 re-rendered at the current template version into a staging directory and
 compared against the project:
 
@@ -188,13 +189,20 @@ _BASE_REL = Path(".claude/.upgrade-base.json")
 
 
 def read_base(target: Path) -> dict[str, str]:
-    """Return the recorded ``{rel: rendered-text}`` merge base, or ``{}``."""
+    """Return the recorded ``{rel: rendered-text}`` merge base, or ``{}``.
+
+    The sidecar is hand-editable JSON, so non-string keys/values are filtered
+    out — a corrupted entry must not later reach the merge engine as a non-text
+    base and crash the upgrade (#240 review).
+    """
     path = target / _BASE_REL
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    return value if isinstance(value, dict) else {}
+    if not isinstance(value, dict):
+        return {}
+    return {k: v for k, v in value.items() if isinstance(k, str) and isinstance(v, str)}
 
 
 def write_base(target: Path, base: dict[str, str]) -> None:
@@ -654,6 +662,18 @@ def _copy_rendered(src: Path, dest: Path) -> None:
     shutil.copy2(src, dest)
 
 
+def _mirror_mode(src: Path, dest: Path) -> None:
+    """Carry *src*'s executable bit onto *dest* (#240 review).
+
+    A conflict-marked merge is written with ``write_text`` (it is generated
+    text, not a copy of the render), which would otherwise drop the executable
+    bit a script render carries — surprising the user when they promote the
+    ``.new`` sibling.
+    """
+    if src.stat().st_mode & 0o111:
+        dest.chmod(dest.stat().st_mode | 0o111)
+
+
 # Visible observability fields injected into the human `project:` block on upgrade
 # when a pre-#247/#248/#259 config lacks them (config.yaml is not re-rendered on
 # upgrade, so otherwise they live only in the hidden record). (key, comment) —
@@ -727,13 +747,22 @@ def apply_drift(
             sibling = _new_sibling(target / rel, report.merge_results[rel].encode("utf-8"))
             sibling.parent.mkdir(parents=True, exist_ok=True)
             sibling.write_text(report.merge_results[rel], encoding="utf-8")
+            _mirror_mode(staging / rel, sibling)
         else:
             _copy_rendered(staging / rel, _new_sibling(target / rel, (staging / rel).read_bytes()))
 
-    # The base advances to the *new* render for every file whose upstream change
-    # was incorporated (overwritten or cleanly merged); a still-conflicted file
-    # keeps its old base so its unresolved edit can merge again next time (#240).
-    for rel in report.new + report.changed + report.merged:
+    # The base advances to the *new* render for every managed file whose upstream
+    # render is now the pristine baseline — not just files that drifted this run.
+    # Recording unchanged files too is what lets a project that predated the
+    # sidecar (or had it deleted) gain a full base after one --apply, so a later
+    # user+upstream edit can 3-way merge instead of falling back to .new (#240,
+    # Codex review). A still-conflicted file keeps its old base so its unresolved
+    # edit can merge again next time.
+    preserve_globs = read_preserve_globs(target)
+    conflicted = set(report.conflicts)
+    for rel in report.rendered:
+        if rel in conflicted or rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
+            continue
         text = _decode((staging / rel).read_bytes())
         if text is not None:
             base[rel.as_posix()] = text
@@ -779,9 +808,9 @@ def _print_report(report: DriftReport, applied: bool) -> None:
         (
             "merged",
             report.merged,
-            "locally edited + upstream changed — would 3-way auto-merge"
+            "locally edited — would 3-way merge with the new render"
             if not applied
-            else "locally edited + upstream changed — auto-merged in place",
+            else "locally edited — 3-way merged with the new render in place",
         ),
         (
             "conflicts",
@@ -799,7 +828,7 @@ def _print_report(report: DriftReport, applied: bool) -> None:
         for rel in paths:
             console.print(f"  {rel}")
 
-    for rel in report.changed + report.conflicts:
+    for rel in report.changed + report.merged + report.conflicts:
         diff = report.diffs.get(rel)
         if diff:
             console.print(f"\n[bold]--- drift: {rel} ---[/bold]")
