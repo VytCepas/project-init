@@ -39,10 +39,14 @@ models — day-2 model management for claude-code-router
 EOF
 }
 
-# Atomically rewrite the config with a jq program (temp file + mv).
+# Atomically rewrite the config with a jq program (temp file + mv), preserving
+# the file's permissions — it holds substituted API keys (setup_models.sh chmods
+# it 600), so the replacement must not inherit a looser umask (e.g. 0644).
 _jq_write() {
-  local tmp="$CONFIG.tmp.$$"
+  local tmp="$CONFIG.tmp.$$" mode
+  mode=$(stat -c '%a' "$CONFIG" 2>/dev/null || stat -f '%Lp' "$CONFIG" 2>/dev/null || echo 600)
   if jq "$@" "$CONFIG" >"$tmp"; then
+    chmod "$mode" "$tmp" 2>/dev/null || chmod 600 "$tmp" 2>/dev/null || true
     mv "$tmp" "$CONFIG"
   else
     rm -f "$tmp"
