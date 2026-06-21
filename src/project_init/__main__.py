@@ -421,8 +421,9 @@ def _choose_multi_model_interactive() -> bool:
     States plainly what the overlay does, how it helps, and the honest
     alternatives (Gemini/OpenAI are better in their native --agents harnesses;
     Ollama runs locally), so the user makes an informed choice or declines —
-    declining leaves a clean project. Non-interactive callers pass the flag and
-    never reach here.
+    declining leaves a clean project. Passing --multi-model (in either mode)
+    pre-accepts via the flag and skips this; only an interactive run without the
+    flag reaches here.
     """
     from rich.console import Console
     from rich.panel import Panel
