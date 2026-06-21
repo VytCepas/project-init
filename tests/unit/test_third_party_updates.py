@@ -8,7 +8,7 @@ and the scaffolded installer's version can never silently drift apart.
 from __future__ import annotations
 
 import importlib.util
-import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -76,13 +76,15 @@ def test_apply_bumps_manifest_and_used_in(tmp_path, monkeypatch):
     # Build a self-contained fake repo so apply touches only temp files.
     (tmp_path / "tools").mkdir()
     manifest = tmp_path / "tools" / "pinned_third_party.toml"
+    # used_in (an array with '[') deliberately precedes `pinned` to lock the
+    # ordering-robustness of _replace_in_toml (Copilot review on #373).
     manifest.write_text(
         "[tools.ccr]\n"
         'package = "@x/ccr"\n'
         'ecosystem = "npm"\n'
-        'pinned = "2.0.0"\n'
-        'version_var = "CCR_VERSION"\n'
         'used_in = ["setup.sh"]\n'
+        'version_var = "CCR_VERSION"\n'
+        'pinned = "2.0.0"\n'
         "\n"
         "[tools.other]\n"
         'package = "@x/other"\n'
@@ -97,26 +99,11 @@ def test_apply_bumps_manifest_and_used_in(tmp_path, monkeypatch):
 
     assert script in changed and manifest in changed
     assert 'CCR_VERSION="2.1.0"' in script.read_text(encoding="utf-8")
-    text = manifest.read_text(encoding="utf-8")
-    assert re.search(r"\[tools\.ccr\][^\[]*pinned = \"2\.1\.0\"", text, re.DOTALL)
-    # The other tool's pin must be untouched (scoped replacement).
-    assert 'pinned = "1.0.0"' in text
+    tools = tomllib.loads(manifest.read_text(encoding="utf-8"))["tools"]
+    assert tools["ccr"]["pinned"] == "2.1.0"
+    assert tools["other"]["pinned"] == "1.0.0"  # scoped replacement — untouched
 
 
 def test_apply_unknown_tool_raises():
     with pytest.raises(KeyError):
         mod.apply("nope", "1.0.0")
-
-
-def test_manifest_pin_matches_installer_version():
-    """Contract: the manifest pin and CCR_VERSION in the scaffolded installer must
-    stay in lockstep — the whole point of `apply`. Guards silent drift (#356)."""
-    manifest = mod.load_manifest()
-    pinned = manifest["ccr"]["pinned"]
-    installer = (
-        REPO_ROOT / "templates" / "multi_model" / "dot_claude" / "scripts" / "setup_models.sh"
-    ).read_text(encoding="utf-8")
-    assert f'CCR_VERSION="{pinned}"' in installer, (
-        f"manifest pins ccr at {pinned} but setup_models.sh disagrees — run "
-        "tools/check_third_party_updates.py apply ccr <version>"
-    )

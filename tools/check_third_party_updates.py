@@ -23,6 +23,7 @@ import re
 import tomllib
 import urllib.request
 from pathlib import Path
+from urllib.parse import quote
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = REPO_ROOT / "tools" / "pinned_third_party.toml"
@@ -65,7 +66,9 @@ def fetch_latest(tool: dict, *, get_json=_http_get_json) -> str:
     ecosystem = tool.get("ecosystem", "npm")
     if ecosystem != "npm":
         raise ValueError(f"unsupported ecosystem: {ecosystem!r} (only npm so far)")
-    data = get_json(f"https://registry.npmjs.org/{tool['package']}")
+    # Scoped packages need the "/" encoded as %2F for the registry doc endpoint
+    # (keep the leading "@"); the unencoded form happens to resolve too.
+    data = get_json(f"https://registry.npmjs.org/{quote(tool['package'], safe='@')}")
     return data["dist-tags"]["latest"]
 
 
@@ -86,15 +89,27 @@ def check(manifest: dict, *, get_json=_http_get_json) -> list[dict]:
 
 
 def _replace_in_toml(text: str, tool_id: str, version: str) -> str:
-    """Set ``pinned = "<version>"`` inside the ``[tools.<tool_id>]`` table only."""
-    pattern = re.compile(
-        r"(\[tools\." + re.escape(tool_id) + r"\][^\[]*?\bpinned\s*=\s*\")[^\"]*(\")",
-        re.DOTALL,
-    )
-    new_text, n = pattern.subn(rf"\g<1>{version}\g<2>", text, count=1)
-    if n != 1:
+    """Set ``pinned = "<version>"`` inside the ``[tools.<tool_id>]`` table only.
+
+    Scans line by line and tracks the active table, so it is robust to field
+    order within the block (a ``used_in = [...]`` array before ``pinned`` no
+    longer confuses it) and never touches another table's pin.
+    """
+    section_re = re.compile(r"^\s*\[([^\]]+)\]\s*$")
+    pin_re = re.compile(r'^(\s*pinned\s*=\s*")[^"]*(")')
+    target = f"tools.{tool_id}"
+    out, in_section, done = [], False, False
+    for line in text.splitlines(keepends=True):
+        header = section_re.match(line)
+        if header:
+            in_section = header.group(1) == target
+        elif in_section and not done:
+            line, n = pin_re.subn(rf"\g<1>{version}\g<2>", line)
+            done = bool(n)
+        out.append(line)
+    if not done:
         raise ValueError(f"could not find pinned for [tools.{tool_id}] in the manifest")
-    return new_text
+    return "".join(out)
 
 
 def _replace_version_var(text: str, var: str, version: str) -> tuple[str, int]:

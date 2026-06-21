@@ -9,7 +9,10 @@
 set -euo pipefail
 
 UPDATES="${1:?usage: propose_third_party_bumps.sh <updates.json>}"
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Run from the repo root so the relative tool/manifest paths resolve regardless
+# of the caller's working directory. Resolve UPDATES first (it may be relative).
+UPDATES="$(cd "$(dirname "$UPDATES")" && pwd)/$(basename "$UPDATES")"
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 have gh || { echo "gh CLI required" >&2; exit 1; }
@@ -36,15 +39,22 @@ while read -r tool package pinned latest; do
   branch="chore/bump-${tool}-${latest}"
   echo "=== $tool: $pinned → $latest ==="
 
-  # Idempotent: skip if a branch/PR for this exact bump already exists.
+  # Idempotent: skip if a PR is open OR the remote branch already exists (e.g. a
+  # prior proposal was closed without deleting it) — recreating it would fail the
+  # push with a non-fast-forward.
   if gh pr list --head "$branch" --state open --json number --jq '.[0].number' | grep -q '[0-9]'; then
     echo "  PR for $branch already open — skipping."
     continue
   fi
+  if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+    echo "  remote branch $branch already exists (no open PR) — skipping; delete it to re-propose."
+    continue
+  fi
 
   # Security scan of the candidate (best-effort; never blocks the proposal).
-  scan="(npm not available — scan skipped)"
+  scan="(security scan unavailable — npm not installed)"
   if have npm; then
+    scan="(npm audit produced no report)"
     tmp="$(mktemp -d)"
     ( cd "$tmp" && npm init -y >/dev/null 2>&1 \
         && npm install "${package}@${latest}" --package-lock-only --no-audit >/dev/null 2>&1 \
