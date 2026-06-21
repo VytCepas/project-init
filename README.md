@@ -37,18 +37,50 @@ that is cheap, but it is not natively so — be explicit about what each agent g
 
 | Tier | What you get | Applies to |
 |---|---|---|
-| **Native (Claude Code)** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring | Claude Code only |
-| **Instructions-only** | `AGENTS.md` / `GEMINI.md` redirect to the canonical `CLAUDE.md`; agents read conventions but **no hook fires and nothing is enforced** for them | Codex, Gemini CLI, Cursor, and other AGENTS.md-aware tools |
-| **Portable regardless** | Lifecycle scripts (plain bash), memory and vault (plain markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent by construction; git hooks bind once `.claude/scripts/install_hooks.sh` has run in the clone (server-side actions need branch protection) | Everything, including Ollama-based agents |
+| **Native** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring — read directly from `.claude/` | Claude Code (CLI + the Anthropic VS Code extension) |
+| **Generated per-surface config** | One canonical hook/MCP spec rendered to each surface's native files (ADR-017): Codex `.codex/`, Cursor `.cursor/`, Antigravity `.agents/` (experimental), VS Code `.vscode/mcp.json`. Skills cross-read natively. GUI hooks are **best-effort/fail-open** | Codex (CLI+IDE), Cursor, Antigravity, VS Code Copilot |
+| **Instructions + portable** | `AGENTS.md`/`GEMINI.md` redirect to `CLAUDE.md`; lifecycle scripts (plain bash), memory/vault (markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent; git hooks bind once `.claude/scripts/install_hooks.sh` has run (server-side actions need branch protection) | Everything, including Ollama-based agents |
 
-Two honest caveats:
+### Surface support matrix
 
-- Hook enforcement and skill invocation **do not exist outside Claude Code**. An
-  agent reading `AGENTS.md` is asked to follow the rules; nothing makes it.
-  The git hooks and CI checks are the only enforcement that binds all agents.
-- **Automated testing covers the Claude Code artifacts only.** The test suite
-  validates settings schema, skills, hooks, and rendered files; no other agent
-  is exercised in CI.
+Which scaffolded config each surface actually reads (full detail + sources:
+[`docs/development/non-cli-surface-matrix.md`](docs/development/non-cli-surface-matrix.md)):
+
+| Surface | Instructions | Skills | Hooks | MCP | Local shell |
+|---|---|---|---|---|---|
+| Claude Code CLI / VS Code ext | `CLAUDE.md` | `.claude/skills` | `.claude/settings.json` (honored) | root `.mcp.json` | yes |
+| VS Code Copilot | `CLAUDE.md`/`AGENTS.md` | `.claude/skills` | Claude hooks (matchers ignored) | `.vscode/mcp.json` (`servers`) | yes |
+| Cursor | `AGENTS.md` | `.claude/skills` | `.cursor/hooks.json` (best-effort) | `.cursor/mcp.json` | yes |
+| Codex (CLI + IDE) | `AGENTS.md` | `.agents/skills` | `.codex/hooks.json` | `.codex/config.toml` | yes |
+| Antigravity (experimental) | `AGENTS.md` / `GEMINI.md` | `.agents/skills` | `.agents/hooks.json` (best-effort) | `~/.gemini/config/mcp_config.json` (global) | yes |
+| Ollama-based | `AGENTS.md` | — | — | — | yes |
+
+`AGENTS.md` is the portability backbone (every surface reads it); `CLAUDE.md`
+rides alongside for Claude + VS Code. The generated `.claude/CAPABILITIES.md`
+lists exactly what a given scaffold exposes, on any surface.
+
+### Local vs. cloud: where enforcement actually runs (ADR-007)
+
+The execution model — not the surface name — decides what binds:
+
+- **Local-execution surfaces** (Claude Desktop-local, VS Code, Codex IDE, Cursor,
+  Antigravity, Gemini Code Assist): bash hooks + git hooks + MCP stdio servers all
+  run on your machine, so the enforcement layer is live (subject to the
+  per-surface fidelity above — some drop hook matchers).
+- **Cloud-sandbox surfaces** (Claude web, Codex cloud, Jules): only
+  **repo-committed** config runs; user-level `~/.claude` is dropped, hooks run
+  inside the VM, and git goes through a push-restricted proxy — the local
+  enforcement layer is replaced by the sandbox's.
+
+Two honest caveats hold across all of it:
+
+- **GUI hook enforcement is best-effort, not a guarantee.** Generated hooks are
+  fail-open and some surfaces ignore matchers; an agent reading `AGENTS.md` is
+  *asked* to follow the rules. The **git hooks + CI checks are the only
+  enforcement that binds every surface** — that is the real boundary (ADR-007).
+- **Automated testing covers the Claude Code artifacts + the rendered per-surface
+  files.** The suite validates settings/skills/hooks/MCP and the generated
+  surface configs; no GUI agent is driven live in CI.
 
 ## Install (one-time)
 
