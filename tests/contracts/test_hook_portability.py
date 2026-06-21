@@ -48,11 +48,14 @@ def test_no_bash4_builtins(name: str, builtin: str):
 
 
 def test_session_setup_fingerprint_is_shasum_aware():
-    """The bootstrap fingerprint must not assume GNU sha256sum exists."""
+    """The bootstrap fingerprint must not assume GNU sha256sum exists, and must
+    stay defined on a host with neither hasher (POSIX cksum fallback)."""
     for path in _hook_files("session_setup.sh"):
         text = path.read_text()
-        assert "shasum -a 256" in text, f"{path}: no BSD shasum fallback for sha256"
         assert "command -v sha256sum" in text, f"{path}: must probe for sha256sum"
+        assert "command -v shasum" in text, f"{path}: must probe for shasum"
+        assert "shasum -a 256" in text, f"{path}: no BSD shasum fallback for sha256"
+        assert "cksum" in text, f"{path}: no POSIX cksum fallback when neither exists"
 
 
 def test_commit_gate_builds_arrays_portably():

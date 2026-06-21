@@ -12,11 +12,16 @@ LOG=".claude/logs/session_setup.log"
 mkdir -p .claude/logs
 
 # macOS BSD coreutils ship `shasum`, not GNU `sha256sum`. Pick whichever the
-# host provides so the always-on bootstrap fingerprint works everywhere.
+# host provides; fall back to POSIX `cksum` so the fingerprint is always defined
+# even on a minimal host with neither hasher (an empty fingerprint would force a
+# re-bootstrap every session). cksum isn't cryptographic, but a stable content
+# digest is all this stamp needs.
 if command -v sha256sum >/dev/null 2>&1; then
   _sha256() { sha256sum; }
-else
+elif command -v shasum >/dev/null 2>&1; then
   _sha256() { shasum -a 256; }
+else
+  _sha256() { cksum; }
 fi
 
 fingerprint() {
