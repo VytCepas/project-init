@@ -652,4 +652,11 @@ def scaffold(
         conflicts=conflicts,
     )
 
+    # Surface-independent capabilities inventory (PI-374): a generated
+    # CAPABILITIES.md derived from the canonical skill/hook/MCP sources + the
+    # chosen options, regenerated each run so it never drifts.
+    from project_init import capabilities
+
+    created += capabilities.emit(target, variables)
+
     return created
