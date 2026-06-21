@@ -645,6 +645,11 @@ def scaffold(
         if mcp_raw in ("", "none")
         else [s.strip() for s in mcp_raw.split(",") if s.strip()]
     )
-    created += surfaces.emit(target, agents=agents, servers=servers_for_ids(mcp_ids))
+    created += surfaces.emit(
+        target,
+        agents=agents,
+        servers=servers_for_ids(mcp_ids),
+        conflicts=conflicts,
+    )
 
     return created

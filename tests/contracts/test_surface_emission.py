@@ -83,13 +83,33 @@ def test_hooks_emitted_without_mcp_selection(tmp_path: Path):
     assert not (t / ".cursor/mcp.json").exists()  # no MCP file without servers
 
 
-def test_emission_skips_existing_user_file(tmp_path: Path):
-    """Re-scaffold must not clobber a user's edited generated config."""
+def test_rescaffold_surfaces_changes_as_new_sibling(tmp_path: Path):
+    """A re-scaffold must neither clobber a user's edit nor silently leave a
+    stale server list — the change lands as a .new sibling (PI-366 review)."""
     t = _scaffold(tmp_path / "p", agents="claude,cursor", installed_mcps="context7")
     mcp = t / ".cursor/mcp.json"
     mcp.write_text('{"mcpServers": {"mine": {"command": "x"}}}\n')
     _scaffold(t, agents="claude,cursor", installed_mcps="context7")
-    assert "mine" in mcp.read_text(), "re-scaffold clobbered a user-edited MCP file"
+    # Original preserved …
+    assert "mine" in mcp.read_text(), "re-scaffold clobbered a user-edited file"
+    # … and the canonical render is surfaced for review.
+    sibling = t / ".cursor/mcp.json.new"
+    assert sibling.is_file()
+    assert "context7" in sibling.read_text()
+
+
+def test_rescaffold_no_sibling_when_unchanged(tmp_path: Path):
+    """Re-running with the same selection is a no-op (no spurious .new)."""
+    t = _scaffold(tmp_path / "p", agents="claude,cursor", installed_mcps="context7")
+    _scaffold(t, agents="claude,cursor", installed_mcps="context7")
+    assert not (t / ".cursor/mcp.json.new").exists()
+
+
+def test_vscode_mcp_is_committable(tmp_path: Path):
+    """The generated VS Code MCP config must be unignored so it can be shared."""
+    t = _scaffold(tmp_path / "p", agents="claude,vscode", installed_mcps="context7")
+    assert (t / ".vscode/mcp.json").is_file()
+    assert "!.vscode/mcp.json" in (t / ".gitignore").read_text()
 
 
 def test_guard_adapter_has_gui_dialects(tmp_path: Path):

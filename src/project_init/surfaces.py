@@ -196,18 +196,45 @@ def planned_files(agents: list[str], servers: dict[str, dict]) -> dict[str, str]
     return files
 
 
-def emit(target: Path, *, agents: list[str], servers: dict[str, dict]) -> list[Path]:
+def emit(
+    target: Path,
+    *,
+    agents: list[str],
+    servers: dict[str, dict],
+    conflicts: list[tuple[Path, Path]] | None = None,
+) -> list[Path]:
     """Write the per-surface config files into *target*.
 
-    Skip-if-exists so a re-scaffold never clobbers a user's edited config
-    (consistent with .gitattributes preservation). Returns the paths written.
+    Three cases per file (mirrors the engine's PI-179 protection so a
+    re-scaffold neither clobbers a user's edits nor silently leaves a stale
+    server list):
+
+    - absent → write it;
+    - present and identical to the fresh render → no-op (already current);
+    - present but different → never overwrite; write a ``.new`` sibling and, when
+      a *conflicts* list is given, record ``(original, sibling)`` so ``upgrade``
+      reports it. (We can't tell a stale prior render from a user edit without
+      storing the previous render, so the change is always surfaced for review.)
+
+    Returns the relative paths written (originals and/or siblings).
     """
+    from project_init.scaffold import _new_sibling
+
     written: list[Path] = []
     for rel, content in planned_files(agents, servers).items():
         dest = target / rel
-        if dest.exists():
+        if dest.exists() and dest.read_text(encoding="utf-8") == content:
             continue
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(content, encoding="utf-8", newline="\n")
-        written.append(Path(rel))
+        if not dest.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(content, encoding="utf-8", newline="\n")
+            written.append(Path(rel))
+            continue
+        # Exists and differs — surface a .new sibling, never clobber.
+        sibling = _new_sibling(dest, content.encode("utf-8"))
+        sibling.write_text(content, encoding="utf-8", newline="\n")
+        rec = Path(rel).parent / sibling.name
+        written.append(rec)
+        if conflicts is not None:
+            conflicts.append((Path(rel), rec))
     return written
