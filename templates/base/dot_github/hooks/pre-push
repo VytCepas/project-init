@@ -11,7 +11,9 @@ set -e
 
 ZERO_SHA="0000000000000000000000000000000000000000"
 
-while read local_ref local_sha remote_ref remote_sha; do
+# git feeds "<local_ref> <local_sha> <remote_ref> <remote_sha>" per ref; we only
+# use local_sha + remote_ref, so the other two fields go to `_`. -r per SC2162.
+while read -r _ local_sha remote_ref _; do
   # Branch deletions are always allowed (cleaning up misnamed branches).
   if [[ "$local_sha" == "$ZERO_SHA" ]]; then
     continue
