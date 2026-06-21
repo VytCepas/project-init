@@ -68,8 +68,17 @@ PY
 
   # Apply the bump (manifest pin + version string in lockstep) on a fresh branch.
   git checkout -b "$branch" >/dev/null 2>&1 || git checkout "$branch"
-  uv run python tools/check_third_party_updates.py apply "$tool" "$latest"
-  git add -A
+  # Stage ONLY the files apply changed (it prints "bumped <path>" per file), so
+  # the transient updates.json and any other workspace state never leak into the
+  # single-purpose bump PR.
+  mapfile -t bumped < <(uv run python tools/check_third_party_updates.py apply "$tool" "$latest" | sed -n 's/^bumped //p')
+  if [ "${#bumped[@]}" -eq 0 ]; then
+    echo "  apply changed nothing — skipping."
+    git checkout - >/dev/null 2>&1 || git checkout main >/dev/null 2>&1
+    continue
+  fi
+  printf '  bumped: %s\n' "${bumped[@]}"
+  git add -- "${bumped[@]}"
   git commit -q -m "chore: bump ${tool} ${pinned} → ${latest} (vetted pin)"
   git push -u origin "$branch" >/dev/null 2>&1
 
