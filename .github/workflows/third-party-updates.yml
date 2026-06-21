@@ -1,0 +1,38 @@
+name: Third-party updates
+
+# Checks the pinned third-party tools project-init vets (CCR first; ADR-016 §5,
+# #356) for newer upstream releases, security-scans each candidate, and opens a
+# PR proposing the bump. Never auto-merges — a human reviews the changelog/diff.
+on:
+  schedule:
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-propose:
+    name: Check pinned third-party tools
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+          python-version: "3.12"
+
+      - name: Detect available updates
+        run: |
+          uv run python tools/check_third_party_updates.py check --json | tee updates.json
+
+      - name: Security-scan candidates and open PRs (no auto-merge)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          bash tools/propose_third_party_bumps.sh updates.json
