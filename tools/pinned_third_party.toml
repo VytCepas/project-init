@@ -1,0 +1,18 @@
+# Pinned third-party tools project-init owns the vetted version of (ADR-016 §5).
+#
+# These sit on the *request path* of a scaffolded project (CCR proxies model
+# traffic), so we never bump them blindly. The scheduled "third-party-updates"
+# workflow runs tools/check_third_party_updates.py to detect newer releases,
+# security-scans the candidate, and opens a PR proposing the bump — never
+# auto-merged. Downstream projects inherit the vetted pin via upgrade-as-PR
+# (PI-241). Add a [tools.<id>] block to bring another external tool under this.
+
+[tools.ccr]
+package = "@musistudio/claude-code-router"
+ecosystem = "npm"
+pinned = "2.0.0"
+# The shell variable carrying this version in each used_in file (kept in lockstep
+# with `pinned` by `check_third_party_updates.py apply`).
+version_var = "CCR_VERSION"
+used_in = ["templates/multi_model/dot_claude/scripts/setup_models.sh"]
+changelog = "https://github.com/musistudio/claude-code-router/releases"
