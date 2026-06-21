@@ -140,6 +140,8 @@ def _overlay_off_defaults() -> dict[str, str]:
         "iac": "none",
         "iac_enabled": "",
         "cloud_oidc": "",
+        # Multi-model overlay (ADR-016): off for records predating the question.
+        "multi_model": "",
         "want_devcontainer": "",
         "project_owner": "",
         "license": "none",
@@ -591,7 +593,9 @@ def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Pa
     # same helper the scaffolder uses, so upgrade can't render a different layer
     # set (PI-189).
     extra = overlay_layers(
-        variables.get("agents", "claude"), no_plugin=bool(variables.get("no_plugin"))
+        variables.get("agents", "claude"),
+        no_plugin=bool(variables.get("no_plugin")),
+        multi_model=bool(variables.get("multi_model")),
     )
     if extra:
         preset = {**preset, "layers": list(preset["layers"]) + extra}

@@ -1,0 +1,22 @@
+# Multi-model (CCR) provider API keys — token APIs, not subscriptions.
+#
+# Copy this file to `.env` in the same directory and fill in the keys for the
+# providers you actually route to (see config.json -> Router). `.env` is already
+# gitignored. `setup_models.sh` reads this file to seed the global CCR config at
+# ~/.claude-code-router/config.json.
+#
+# You only need a key for a provider you reference in Router. The shipped
+# defaults route: default/longContext -> Claude, background/think -> DeepSeek.
+# So at minimum set ANTHROPIC_API_KEY + DEEPSEEK_API_KEY, or edit config.json.
+
+# Anthropic (Claude) — https://console.anthropic.com/settings/keys
+ANTHROPIC_API_KEY=
+
+# DeepSeek — https://platform.deepseek.com/api_keys  (cheap cloud, Anthropic-friendly)
+DEEPSEEK_API_KEY=
+
+# Moonshot / Kimi — https://platform.moonshot.ai/console/api-keys
+# Note: mainland-China accounts use https://api.moonshot.cn (edit config.json).
+MOONSHOT_API_KEY=
+
+# Ollama is local — no key needed (config uses the literal "ollama").
