@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Install git hooks from .github/hooks/ to .git/hooks/
 # Run this once after cloning or when hooks are updated
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Configure or check GitHub repository governance for the scaffolded workflow.
 #
 # Usage: setup_github.sh [branch] [--protect]
@@ -9,6 +9,9 @@
 # Requires: gh and admin permission on the repository.
 
 set -euo pipefail
+
+# This script hard-requires the GitHub CLI (PI-362).
+command -v gh >/dev/null 2>&1 || { echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null
@@ -156,7 +159,10 @@ if [ -n "${PROJECT_TOKEN:-}" ]; then
   export GH_TOKEN="$PROJECT_TOKEN"
 fi
 
-PROJECT_DATA=$(gh api graphql -f query='
+# Query the project board with gh's built-in gojq (-q) instead of an external
+# jq, so the script has no jq dependency (PI-362). Two short round-trips on a
+# one-time admin script is negligible.
+PROJECT_QUERY='
   query($owner: String!, $number: Int!) {
     user(login: $owner) {
       projectV2(number: $number) {
@@ -170,10 +176,12 @@ PROJECT_DATA=$(gh api graphql -f query='
         fields(first: 50) { nodes { ... on ProjectV2SingleSelectField { name } } }
       }
     }
-  }' -f owner="$OWNER" -F number="$PROJECT_NUMBER" 2>/dev/null || echo '{}')
+  }'
 
-PROJECT_ID=$(echo "$PROJECT_DATA" | jq -r \
-  '(.data.user.projectV2 // .data.organization.projectV2 // {}).id // empty')
+PROJECT_ID=$(gh api graphql -f query="$PROJECT_QUERY" \
+  -f owner="$OWNER" -F number="$PROJECT_NUMBER" \
+  -q '(.data.user.projectV2 // .data.organization.projectV2 // {}).id // empty' \
+  2>/dev/null || echo '')
 
 if [ -z "$PROJECT_ID" ]; then
   echo "WARNING: Project #$PROJECT_NUMBER not found for $REPO." >&2
@@ -185,8 +193,10 @@ if [ -z "$PROJECT_ID" ]; then
   echo "  • Type         — options: feature, bug, chore, documentation, test" >&2
   echo "  Settings: $WEB_BASE/users/$OWNER/projects/$PROJECT_NUMBER/settings/fields" >&2
 else
-  EXISTING_FIELDS=$(echo "$PROJECT_DATA" | jq -r \
-    '((.data.user.projectV2 // .data.organization.projectV2).fields.nodes // [])[] | .name // empty')
+  EXISTING_FIELDS=$(gh api graphql -f query="$PROJECT_QUERY" \
+    -f owner="$OWNER" -F number="$PROJECT_NUMBER" \
+    -q '((.data.user.projectV2 // .data.organization.projectV2).fields.nodes // [])[] | .name // empty' \
+    2>/dev/null || echo '')
 
   ensure_single_select_field() {
     local field_name="$1"

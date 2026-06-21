@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Pre-push hook: lifecycle gate (ADR-007).
 #   1. Prevent direct pushes to main/master.
 #   2. Enforce a branch type prefix — (feat|fix|chore|docs|test)/<slug> —

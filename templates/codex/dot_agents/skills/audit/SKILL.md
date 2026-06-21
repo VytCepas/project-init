@@ -35,7 +35,7 @@ Run each check category. Track findings as `[PASS]`, `[WARN]`, or `[FAIL]`.
 
 For every file in `.claude/hooks/`:
 
-1. **Executable bit** — `stat -c '%a' <file>` must show execute permission
+1. **Executable bit** — `stat -c '%a' <file> 2>/dev/null || stat -f '%Lp' <file> 2>/dev/null` (GNU then BSD/macOS) must show execute permission
 2. **Hook protocol** — must output JSON to stdout and `exit 0` (never `exit 1` to block). Search for:
    - `exit 1` that isn't inside a `trap` or error path before JSON parsing → `[FAIL]`
    - `>&2` used for block output instead of stdout → `[FAIL]`

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # commit-msg hook: validate commit message format before push.
 # Install: .claude/scripts/install-hooks.sh (runs automatically)
 #
