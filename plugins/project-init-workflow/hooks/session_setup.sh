@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # SessionStart bootstrap (PI-146): make a fresh/remote container immediately
 # usable — sync dependencies so tests and linters run instead of failing on
 # a missing venv. Fast on warm environments: a content stamp of the

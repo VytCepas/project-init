@@ -218,7 +218,11 @@ def write_base(target: Path, base: dict[str, str]) -> None:
         return  # not a scaffolded project — nothing to anchor the base to
     path = target / _BASE_REL
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(base, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(base, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",  # LF on all hosts (PI-362)
+    )
 
 
 def _decode(data: bytes) -> str | None:
@@ -379,7 +383,7 @@ def write_scaffold_record(
         f"  manifest: {json.dumps(manifest, sort_keys=True)}\n"
     )
     text = _strip_record(config_path.read_text(encoding="utf-8"))
-    config_path.write_text(text + block, encoding="utf-8")
+    config_path.write_text(text + block, encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
 
 
 def _scalar(line: str) -> str:
@@ -981,7 +985,7 @@ def _write_declined(target: Path, declined: dict[str, str]) -> None:
         text = _DECLINED_RE.sub(lambda m: f"{m.group(1)}{payload}", text, count=1)
     else:
         text = text.rstrip("\n") + f"\n\nupdates:\n  declined_additions: {payload}\n"
-    config_path.write_text(text, encoding="utf-8")
+    config_path.write_text(text, encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
 
 
 def _resolve_addition_consent(

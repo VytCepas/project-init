@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Wait for all CI checks on a PR, then optionally merge.
 # Only prints failures or the final pass line — no per-refresh noise.
 # Requires: gh, a Python 3 (resolved via ../hooks/_py.sh; stdlib only — no jq).
@@ -27,6 +27,9 @@
 #   least once before force-merging.
 
 set -euo pipefail
+
+# This script hard-requires the GitHub CLI (PI-362).
+command -v gh >/dev/null 2>&1 || { echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null

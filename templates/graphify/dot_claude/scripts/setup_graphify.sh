@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # One-time Graphify setup (scaffolded by project-init; ADR-009).
 # Run this yourself — the scaffolder never installs tools.
 # Idempotent: safe to re-run after Graphify updates.

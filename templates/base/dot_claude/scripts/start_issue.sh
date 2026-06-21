@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Start work on a GitHub issue: create branch, push, and open a draft PR.
 #
 # Usage:
@@ -10,6 +10,9 @@
 #   .claude/scripts/create_issue.sh feat "Add OAuth login" | xargs -I{} .claude/scripts/start_issue.sh {} feat
 
 set -euo pipefail
+
+# This script hard-requires the GitHub CLI (PI-362).
+command -v gh >/dev/null 2>&1 || { echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2; exit 1; }
 
 # Resolve the base branch (ADR-014) from the promotion chain via gh_host.sh.
 source "$(dirname "$0")/gh_host.sh"

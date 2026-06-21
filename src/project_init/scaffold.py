@@ -187,7 +187,9 @@ def generate_preset(name: str, *, extends: str, description: str = "", version: 
         "dev = []",
         "",
     ]
-    path.write_text("\n".join(lines), encoding="utf-8")
+    # newline="\n" keeps rendered output LF even if the scaffolder runs on a
+    # native-Windows Python (PI-362). No effect under WSL/macOS.
+    path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     return path
 
 
@@ -434,7 +436,7 @@ def _emit_file(
         if not rendered.strip():
             return None
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(rendered, encoding="utf-8")
+        dest.write_text(rendered, encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
     else:
         rendered = ""
         dest.parent.mkdir(parents=True, exist_ok=True)

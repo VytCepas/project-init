@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Create a GitHub issue with typed labels and planning metadata.
 # Priority, Size, Agent ready, and Confidence are written into the issue body
 # (so the issue is self-contained) and mirrored to the GitHub Project v2 board.
@@ -12,6 +12,9 @@
 #   .claude/scripts/create_issue.sh feat "Add OAuth login" --priority high | xargs -I{} .claude/scripts/start_issue.sh {} feat
 
 set -euo pipefail
+
+# This script hard-requires the GitHub CLI (PI-362).
+command -v gh >/dev/null 2>&1 || { echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2; exit 1; }
 
 # Resolve the Python interpreter through the canonical helper (PI-361).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
