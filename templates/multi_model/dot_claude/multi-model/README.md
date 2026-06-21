@@ -17,6 +17,9 @@ Those run below the model and stay identical whichever model you point at.
   seeds the global config from `config.json` + your `.env`, optionally pulls local
   Ollama models sized to your RAM, and wires your shell so plain `claude` routes
   through CCR.
+- `../scripts/models.sh` — day-2 helper: `list` / `add` / `rm` models (Ollama +
+  cloud) after setup, editing the global CCR config via `jq` (needs `jq`; warns
+  below the ~7B tool-calling floor).
 
 ## Quick start
 

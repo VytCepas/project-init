@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -87,6 +89,18 @@ class TestMultiModelOn:
         assert '. "$ENV_FILE"' not in content
         assert 'mv "$tmp" "$GLOBAL_CONFIG"' in content
 
+    def test_day2_helper_present_executable_and_documented(self):
+        helper = self.target / ".claude" / "scripts" / "models.sh"
+        assert helper.is_file()
+        assert os.access(helper, os.X_OK)
+        content = helper.read_text(encoding="utf-8")
+        for cmd in ("models list", "add ollama", "rm   ollama", "ccr ui"):
+            assert cmd in content
+        # The <7B tool-calling floor guard must be present (issue #358).
+        assert "7B" in content
+        # Edits must be atomic (temp file + mv), never an in-place truncate.
+        assert 'mv "$tmp" "$CONFIG"' in content
+
     def test_env_example_has_key_slots(self):
         env = (self.mm / ".env.example").read_text()
         for key in ("ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "MOONSHOT_API_KEY"):
@@ -105,6 +119,53 @@ class TestMultiModelOn:
         assert "7B" in text or "7b" in text
         assert "caching" in text.lower()
         assert "setup_models.sh" in text
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="models.sh needs jq at runtime")
+class TestDay2HelperRuntime:
+    """Exercise the day-2 helper's jq edits end-to-end (#358). Runs wherever jq is
+    available (e.g. CI); skipped otherwise. Ollama is absent in CI, so the script's
+    `have ollama` branch degrades to register-only — exactly the path we assert."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_path: Path):
+        target = _scaffold(tmp_path / "p", multi_model=True)
+        self.helper = target / ".claude" / "scripts" / "models.sh"
+        self.cfg = tmp_path / "ccr.json"
+        self.cfg.write_text(
+            (target / ".claude" / "multi-model" / "config.json").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+    def _run(self, *args: str):
+        return subprocess.run(
+            ["bash", str(self.helper), *args],
+            env={**os.environ, "CCR_CONFIG": str(self.cfg)},
+            capture_output=True,
+            text=True,
+        )
+
+    def _models(self, provider: str) -> list[str]:
+        cfg = json.loads(self.cfg.read_text(encoding="utf-8"))
+        return next(p["models"] for p in cfg["Providers"] if p["name"] == provider)
+
+    def test_add_then_remove_cloud_model(self):
+        assert self._run("add", "deepseek", "deepseek-coder").returncode == 0
+        assert "deepseek-coder" in self._models("deepseek")
+        assert self._run("rm", "deepseek", "deepseek-coder").returncode == 0
+        assert "deepseek-coder" not in self._models("deepseek")
+        # config stays valid JSON throughout
+        json.loads(self.cfg.read_text(encoding="utf-8"))
+
+    def test_add_unknown_provider_fails(self):
+        r = self._run("add", "openai", "gpt-5")
+        assert r.returncode != 0
+        assert "not in config" in (r.stdout + r.stderr)
+
+    def test_register_ollama_model_without_pull(self):
+        # ollama is absent in CI → registers in config without pulling.
+        assert self._run("add", "ollama", "qwen3:14b").returncode == 0
+        assert "qwen3:14b" in self._models("ollama")
 
 
 class TestMultiModelOff:
