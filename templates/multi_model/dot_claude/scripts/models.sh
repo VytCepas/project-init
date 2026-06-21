@@ -43,8 +43,11 @@ EOF
 # the file's permissions — it holds substituted API keys (setup_models.sh chmods
 # it 600), so the replacement must not inherit a looser umask (e.g. 0644).
 _jq_write() {
-  local tmp="$CONFIG.tmp.$$" mode
+  local tmp mode
   mode=$(stat -c '%a' "$CONFIG" 2>/dev/null || stat -f '%Lp' "$CONFIG" 2>/dev/null || echo 600)
+  # mktemp (next to the config, so mv is atomic same-fs) avoids the predictable
+  # "$$"-name symlink race and starts at 0600.
+  tmp=$(mktemp "$CONFIG.XXXXXX") || die "could not create a temp file next to $CONFIG."
   if jq "$@" "$CONFIG" >"$tmp"; then
     chmod "$mode" "$tmp" 2>/dev/null || chmod 600 "$tmp" 2>/dev/null || true
     mv "$tmp" "$CONFIG"
