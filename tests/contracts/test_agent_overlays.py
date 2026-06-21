@@ -42,8 +42,8 @@ class TestAgentSelection:
         assert resolve_agents("claude") == ["claude"]
 
     def test_unknown_agent_rejected(self):
-        with pytest.raises(ValueError, match="cursor"):
-            resolve_agents("codex,cursor")
+        with pytest.raises(ValueError, match="windsurf"):
+            resolve_agents("codex,windsurf")
 
     def test_wizard_reprompts_on_invalid_agents(self, monkeypatch, capsys):
         """An invalid interactive selection must re-prompt, not silently
@@ -51,7 +51,7 @@ class TestAgentSelection:
         import project_init.__main__ as cli
 
         answers = iter(
-            ["proj", "desc", "python", "@owner", "none", "codex,cursor", "codex"]
+            ["proj", "desc", "python", "@owner", "none", "codex,windsurf", "codex"]
         )
         monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
         monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
@@ -65,7 +65,7 @@ class TestAgentSelection:
             default_name="proj", no_plugin=False, profile="individual"
         )
         assert result.agents == ["claude", "codex"], "valid retry must be honored"
-        assert "unknown agent(s): cursor" in capsys.readouterr().out
+        assert "unknown agent(s): windsurf" in capsys.readouterr().out
 
     def test_only_codex_and_gemini_contribute_layers(self):
         assert agent_layers(["claude", "codex", "gemini", "ollama"]) == ["codex", "gemini"]

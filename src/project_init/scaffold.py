@@ -632,4 +632,19 @@ def scaffold(
             shutil.rmtree(work_dir)
         raise
 
+    # Per-surface config generation (ADR-017 / PI-366): emit hooks + MCP for the
+    # selected GUI surfaces from the canonical surface table + MCP catalog. Runs
+    # against the committed target (after _commit_staged in strict mode).
+    from project_init import surfaces
+    from project_init.mcps import servers_for_ids
+
+    agents = [a.strip() for a in variables.get("agents", "").split(",") if a.strip()]
+    mcp_raw = variables.get("installed_mcps", "none")
+    mcp_ids = (
+        []
+        if mcp_raw in ("", "none")
+        else [s.strip() for s in mcp_raw.split(",") if s.strip()]
+    )
+    created += surfaces.emit(target, agents=agents, servers=servers_for_ids(mcp_ids))
+
     return created

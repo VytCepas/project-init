@@ -164,9 +164,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--agents",
         default="claude",
         help=(
-            "Comma-separated agents the project supports: claude (always "
-            "included), codex, gemini, ollama. Codex/Gemini get native "
-            "wiring overlays; ollama is instructions-level only (PI-137)"
+            "Comma-separated agents/surfaces the project supports: claude "
+            "(always included), codex, gemini, ollama, cursor, antigravity, "
+            "vscode. Codex/Gemini get native overlays; cursor/antigravity get "
+            "generated hooks+MCP config; vscode gets MCP config; ollama is "
+            "instructions-level only (PI-137, PI-366; antigravity experimental)"
         ),
     )
     p.add_argument(
@@ -631,7 +633,7 @@ def _gather_inputs_interactive(
     resolved_multi_model = multi_model_flag or _choose_multi_model_interactive()
     while True:
         agents_raw = _prompt(
-            "Agents to support (claude always; add codex/gemini/ollama, comma-separated)",
+            "Agents/surfaces (claude always; add codex/gemini/ollama/cursor/antigravity/vscode, comma-separated)",
             default="claude",
         )
         try:
@@ -815,7 +817,17 @@ def _choose_iac_interactive() -> str:
     return _IAC_OPTIONS[choice - 1]
 
 
-_VALID_AGENTS = ("claude", "codex", "gemini", "ollama")
+# claude/codex/gemini/ollama are CLI harnesses; cursor/antigravity/vscode are
+# GUI surfaces that get generated per-surface config (ADR-017 / PI-366).
+_VALID_AGENTS = (
+    "claude",
+    "codex",
+    "gemini",
+    "ollama",
+    "cursor",
+    "antigravity",
+    "vscode",
+)
 
 
 def resolve_agents(raw: str) -> list[str]:
@@ -1066,7 +1078,15 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "codex": "true" if "codex" in agents else "",
         "gemini": "true" if "gemini" in agents else "",
         "ollama": "true" if "ollama" in agents else "",
-        "multi_agent": "true" if ("codex" in agents or "gemini" in agents) else "",
+        # No per-surface template flags for cursor/antigravity/vscode: their
+        # config is generated from the `agents` list by surfaces.emit (PI-366),
+        # not by templates. ("vscode" here would also collide with the existing
+        # VS Code editor-settings var.)
+        # The guard adapter is needed by every surface that wires a hook to it
+        # (codex/gemini + the GUI surfaces cursor/antigravity); PI-366.
+        "multi_agent": "true"
+        if any(a in agents for a in ("codex", "gemini", "cursor", "antigravity"))
+        else "",
         "other_agents": "true" if len(agents) > 1 else "",
         # Multi-model switching overlay (ADR-016, #351): gates the multi_model
         # layer; recorded in config.yaml's variables block so `upgrade` re-derives

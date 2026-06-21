@@ -174,7 +174,7 @@ class TestCLIOverlayFlags:
 
     def test_unknown_agent_rejected(self, tmp_path: Path):
         with pytest.raises(SystemExit):
-            self._run(tmp_path / "p", "--agents", "claude,cursor")
+            self._run(tmp_path / "p", "--agents", "claude,windsurf")
 
     def test_upgrade_re_renders_agent_overlays(self, tmp_path: Path):
         """The recorded agents list restores overlay layers on re-render —
