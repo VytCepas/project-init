@@ -28,7 +28,11 @@ ERRORS=""
 # Lint and auto-fix staged Python files. Prefer 'uv run ruff' inside a
 # uv-managed project so the hook uses the same ruff the project itself uses;
 # fall back to a system ruff binary.
-mapfile -t STAGED_PY < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
+# bash 3.2 (macOS /bin/bash) has no `mapfile`/`readarray` — read into the array
+# with a portable while-loop so the always-on commit gate runs everywhere.
+STAGED_PY=()
+while IFS= read -r _f; do [ -n "$_f" ] && STAGED_PY+=("$_f"); done \
+    < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
 if [ "${#STAGED_PY[@]}" -gt 0 ]; then
     LINT_OUT=""
     if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
@@ -49,7 +53,9 @@ fi
 
 # Lint and auto-fix staged JS/TS files
 # Use bunx (bun's package runner) — consistent with project convention (PI-15).
-mapfile -t STAGED_JS < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '\.(js|ts|jsx|tsx)$' || true)
+STAGED_JS=()
+while IFS= read -r _f; do [ -n "$_f" ] && STAGED_JS+=("$_f"); done \
+    < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '\.(js|ts|jsx|tsx)$' || true)
 if [ "${#STAGED_JS[@]}" -gt 0 ] && command -v bunx &>/dev/null; then
     bunx eslint --fix --quiet "${STAGED_JS[@]}" 2>/dev/null || true
     LINT_OUT=$(bunx eslint --quiet "${STAGED_JS[@]}" 2>&1 || true)

@@ -103,9 +103,11 @@ class TestScaffoldObsidianOnly:
 
     def test_pre_commit_gate_quotes_staged_file_paths(self):
         content = (self.target / ".claude" / "hooks" / "pre_commit_gate.sh").read_text()
-        assert "mapfile -t STAGED_PY" in content
+        # PI-360: staged lists are built with a portable read loop (bash 3.2 has
+        # no mapfile), and the expanded arrays stay quoted to handle spaces.
+        assert "STAGED_PY+=(" in content
         assert '"${STAGED_PY[@]}"' in content
-        assert "mapfile -t STAGED_JS" in content
+        assert "STAGED_JS+=(" in content
         assert '"${STAGED_JS[@]}"' in content
 
     def test_legacy_safety_hooks_not_scaffolded(self):

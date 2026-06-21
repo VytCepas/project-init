@@ -11,9 +11,17 @@ STAMP=".claude/.session_setup_stamp"
 LOG=".claude/logs/session_setup.log"
 mkdir -p .claude/logs
 
+# macOS BSD coreutils ship `shasum`, not GNU `sha256sum`. Pick whichever the
+# host provides so the always-on bootstrap fingerprint works everywhere.
+if command -v sha256sum >/dev/null 2>&1; then
+  _sha256() { sha256sum; }
+else
+  _sha256() { shasum -a 256; }
+fi
+
 fingerprint() {
   cat pyproject.toml uv.lock package.json bun.lock bun.lockb go.mod go.sum 2>/dev/null \
-    | sha256sum | cut -d' ' -f1
+    | _sha256 | cut -d' ' -f1
 }
 
 # The stamp alone is not enough: an ephemeral container can restore the repo
