@@ -97,3 +97,106 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+  # PI-363 Layer 2: shellcheck the rendered scaffold output (quoting/SC2086 and
+  # general portability the denylist lint can't see). Cheap; runs every PR.
+  shellcheck:
+    name: ShellCheck (scaffolded scripts)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.12"
+
+      - name: Scaffold a project (templates -> real scripts)
+        run: |
+          uv run project-init /tmp/sc-target \
+            --non-interactive --preset obsidian-only --name sc \
+            --description "shellcheck" --language python --no-plugin --strict
+
+      - name: ShellCheck rendered shell scripts
+        run: |
+          set -euo pipefail
+          # Every rendered bash script (incl. extensionless git hooks); skip .md.
+          files=$(grep -rIl '^#!/usr/bin/env bash' /tmp/sc-target | grep -v '\.md$')
+          echo "$files"
+          # shellcheck-py pins the binary so CI matches local `uvx` runs.
+          uvx --from shellcheck-py shellcheck --severity=warning $files
+
+  # PI-363 Layer 3 gate: only spend the 10x-billed macOS minutes when shell or
+  # template files actually change. Ordinary PRs skip the macOS job entirely.
+  changes:
+    name: Detect shell/template changes
+    runs-on: ubuntu-24.04
+    outputs:
+      shell: ${{ steps.filter.outputs.shell }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shell:
+              - '**/*.sh'
+              - '**/*.sh.tmpl'
+              - 'templates/**/hooks/**'
+              - 'templates/**/scripts/**'
+
+  # PI-363 Layer 3: the real bash-3.2 oracle. macos-latest ships bash 3.2 as
+  # /bin/bash and BSD coreutils — the genuine stock-Mac environment — so it
+  # catches behavioral breakage (sha256sum/shasum, mapfile, _py.sh resolution)
+  # the static denylist can't. Gated to shell/template changes.
+  macos-portability:
+    name: macOS bash-3.2 portability
+    needs: changes
+    if: needs.changes.outputs.shell == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+          python-version: "3.12"
+
+      - name: Confirm the stock-Mac bash is 3.2
+        run: /bin/bash --version | head -1
+
+      - name: Scaffold a project
+        run: |
+          uv run project-init /tmp/macos-target \
+            --non-interactive --preset obsidian-only --name mac \
+            --description "macos portability" --language python --no-plugin --strict
+
+      - name: SessionStart bootstrap runs under bash 3.2 (sha256sum->shasum)
+        run: |
+          cd /tmp/macos-target
+          # Force the stock bash 3.2; the hook must never exit non-zero.
+          /bin/bash .claude/hooks/session_setup.sh
+          test -f .claude/.session_setup_stamp
+
+      - name: Commit gate runs under bash 3.2 against a staged file
+        run: |
+          cd /tmp/macos-target
+          git init -q
+          git config user.email ci@example.com
+          git config user.name ci
+          printf 'x = 1\n' > sample.py
+          git add sample.py
+          # PreToolUse hook: reads tool JSON on stdin, must exit 0 for a clean file.
+          printf '%s' '{"tool_input":{"command":"git commit -m test"}}' \
+            | /bin/bash .claude/hooks/pre_commit_gate.sh
+          echo "pre_commit_gate.sh exit: $?"
+
+      - name: _py.sh resolves an interpreter on macOS
+        run: |
+          cd /tmp/macos-target
+          out=$(/bin/bash .claude/hooks/_py.sh -c "print('resolver-ok')")
+          test "$out" = "resolver-ok"
