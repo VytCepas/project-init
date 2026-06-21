@@ -69,3 +69,11 @@ slipped past a clone without hooks.)
   (free; personal accounts need none) — noted in the CI template.
 - Once #139 lands, the pre-commit gate should call `just scan` instead of
   invoking gitleaks directly.
+- **Non-CLI surfaces don't move this boundary (#359 / ADR-017).** The
+  per-surface hook configs generated for Cursor/Codex/Antigravity/VS Code are
+  **best-effort and fail-open** — fidelity varies (e.g. VS Code Copilot ignores
+  hook matchers), and cloud-sandbox surfaces (Claude web, Codex cloud, Jules)
+  honor only repo-committed config with no local `~/.claude`. So the in-editor
+  hooks are advisory; **git hooks + CI remain the only enforcement that binds
+  every surface.** Surface fidelity + the local-vs-cloud split are documented in
+  `docs/development/non-cli-surface-matrix.md` and the README's surface matrix.
