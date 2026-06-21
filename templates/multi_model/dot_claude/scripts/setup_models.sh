@@ -87,22 +87,39 @@ seed_config() {
   fi
 
   # Load .env so set keys are substituted into the seeded config; unset $VARs are
-  # left intact for CCR to interpolate from the environment at runtime.
-  set -a; [ -f "$ENV_FILE" ] && . "$ENV_FILE"; set +a
+  # left intact for CCR to interpolate from the environment at runtime. We parse
+  # KEY=VALUE lines rather than sourcing the file, so a stray command in .env is
+  # never executed (it is gitignored but still user-editable).
+  if [ -f "$ENV_FILE" ]; then
+    local line key val
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in ''|'#'*) continue ;; esac
+      [[ "$line" == *=* ]] || continue
+      key=${line%%=*}
+      val=${line#*=}
+      [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+      val=${val%\"}; val=${val#\"}; val=${val%\'}; val=${val#\'}  # strip wrapping quotes
+      export "$key=$val"
+    done <"$ENV_FILE"
+  fi
 
+  # Generate to a temp file and move into place: if the generator fails, the
+  # existing global config is left intact (a redirect would truncate it first).
+  local tmp="$GLOBAL_CONFIG.tmp.$$"
   if have python3; then
-    python3 - "$TEMPLATE_CONFIG" >"$GLOBAL_CONFIG" <<'PY'
+    python3 - "$TEMPLATE_CONFIG" >"$tmp" <<'PY'
 import os, re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 sys.stdout.write(re.sub(r"\$([A-Z_][A-Z0-9_]*)",
                         lambda m: os.environ.get(m.group(1)) or m.group(0), text))
 PY
   elif have envsubst; then
-    envsubst <"$TEMPLATE_CONFIG" >"$GLOBAL_CONFIG"
+    envsubst <"$TEMPLATE_CONFIG" >"$tmp"
   else
-    cp "$TEMPLATE_CONFIG" "$GLOBAL_CONFIG"
+    cp "$TEMPLATE_CONFIG" "$tmp"
     warn "No python3/envsubst — copied config with \$VAR placeholders; export the keys in your shell so CCR can read them."
   fi
+  mv "$tmp" "$GLOBAL_CONFIG"
   chmod 600 "$GLOBAL_CONFIG" 2>/dev/null || true
   ok "Seeded $GLOBAL_CONFIG (Router: background→DeepSeek to cut cost; default→Claude)."
 }

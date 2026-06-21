@@ -4,7 +4,7 @@
   "Providers": [
     {
       "name": "anthropic",
-      "api_base_url": "https://api.anthropic.com/v1/chat/completions",
+      "api_base_url": "https://api.anthropic.com/v1/messages",
       "api_key": "$ANTHROPIC_API_KEY",
       "models": [
         "claude-opus-4-8",

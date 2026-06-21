@@ -60,6 +60,10 @@ class TestMultiModelOn:
         # saver (ADR-016); default stays on Claude so the primary UX is unchanged.
         assert cfg["Router"]["background"].startswith("deepseek,")
         assert cfg["Router"]["default"].startswith("anthropic,")
+        # The Anthropic passthrough transformer POSTs native Anthropic format, so
+        # the provider must target the Messages endpoint, not the OpenAI path.
+        anthropic = next(p for p in cfg["Providers"] if p["name"] == "anthropic")
+        assert anthropic["api_base_url"].endswith("/v1/messages")
 
     def test_config_uses_env_placeholders_not_secrets(self):
         text = (self.mm / "config.json").read_text()
@@ -77,6 +81,11 @@ class TestMultiModelOn:
         assert "bun add -g" in content
         assert "bun install -g" not in content
         assert 'eval "$(ccr activate)"' in content
+        # Hardening (PR #368 review): never source the user-editable .env (arbitrary
+        # code exec); seed via a temp file + mv so a failed generate can't truncate
+        # the existing global config.
+        assert '. "$ENV_FILE"' not in content
+        assert 'mv "$tmp" "$GLOBAL_CONFIG"' in content
 
     def test_env_example_has_key_slots(self):
         env = (self.mm / ".env.example").read_text()
