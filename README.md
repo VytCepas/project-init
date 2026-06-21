@@ -52,7 +52,7 @@ Which scaffolded config each surface actually reads (full detail + sources:
 | VS Code Copilot | `CLAUDE.md`/`AGENTS.md` | `.claude/skills` | Claude hooks (matchers ignored) | `.vscode/mcp.json` (`servers`) | yes |
 | Cursor | `AGENTS.md` | `.claude/skills` | `.cursor/hooks.json` (best-effort) | `.cursor/mcp.json` | yes |
 | Codex (CLI + IDE) | `AGENTS.md` | `.agents/skills` | `.codex/hooks.json` | `.codex/config.toml` | yes |
-| Antigravity (experimental) | `AGENTS.md` | `.agents/skills` | `.agents/hooks.json` (best-effort) | `~/.gemini` (global) | yes |
+| Antigravity (experimental) | `AGENTS.md` / `GEMINI.md` | `.agents/skills` | `.agents/hooks.json` (best-effort) | `~/.gemini/config/mcp_config.json` (global) | yes |
 | Ollama-based | `AGENTS.md` | — | — | — | yes |
 
 `AGENTS.md` is the portability backbone (every surface reads it); `CLAUDE.md`
