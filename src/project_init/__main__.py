@@ -56,6 +56,9 @@ class ScaffoldInputs:
     deploy: str = "none"
     # IaC overlay (ADR-015, opt-in): none | opentofu. Independent of delivery.
     iac: str = "none"
+    # Multi-model switching overlay (ADR-016, epic #315, opt-in): scaffolds the
+    # claude-code-router config + setup_models.sh installer. Off by default.
+    multi_model: bool = False
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -115,6 +118,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "Infrastructure-as-Code overlay (ADR-015, opt-in): none (default) or "
             "opentofu (emits an HCL skeleton + plan-on-PR workflow; apply is "
             "manual/gated). OpenTofu is the license-safe default vs BUSL Terraform."
+        ),
+    )
+    p.add_argument(
+        "--multi-model",
+        action="store_true",
+        help=(
+            "Scaffold the opt-in multi-model switching overlay (ADR-016): a "
+            "claude-code-router config + setup_models.sh installer to run other "
+            "models (DeepSeek/Kimi/Ollama) through the Claude Code harness with "
+            "live /model switching and background cost-routing. Clean by default."
         ),
     )
     p.add_argument(
@@ -530,12 +543,13 @@ def _gather_inputs_interactive(
     no_plugin: bool,
     profile: str | None,
     no_egress: bool = False,
-    cli_overlays: tuple[str | None, str | None, str | None] = (None, None, None),
+    cli_overlays: tuple[str | None, str | None, str | None, bool] = (None, None, None, False),
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
-    ``cli_overlays`` pre-seeds (delivery, deploy, iac) from flags; any may be
-    None to prompt.
+    ``cli_overlays`` pre-seeds the overlay flags (delivery, deploy, iac,
+    multi_model) from the CLI; the string slots may be None to prompt, and
+    multi_model=True skips the multi-model prompt (ADR-016, #351).
     """
     resolved_profile = profile or _choose_profile_interactive()
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
@@ -544,7 +558,7 @@ def _gather_inputs_interactive(
     language = _prompt("Language (python/node/go/none)", default="none")
     if language not in {"python", "node", "go", "none"}:
         language = "none"
-    delivery_flag, deploy_flag, iac_flag = cli_overlays
+    delivery_flag, deploy_flag, iac_flag, multi_model_flag = cli_overlays
     resolved_delivery, resolved_deploy, resolved_iac = _resolve_overlays_interactive(
         language, delivery_flag, deploy_flag, iac_flag
     )
@@ -570,6 +584,13 @@ def _gather_inputs_interactive(
     )
     mise = Confirm.ask("Pin toolchain versions with mise (mise.toml)?", default=False)
     vscode = Confirm.ask("Add shared VS Code config (extensions + format-on-save)?", default=False)
+    # Multi-model switching overlay (ADR-016, #351). The flag pre-accepts it; the
+    # richer init-step messaging lands in #352.
+    resolved_multi_model = multi_model_flag or Confirm.ask(
+        "Set up multi-model switching via claude-code-router "
+        "(run DeepSeek/Kimi/Ollama through Claude Code, with cost-routing)?",
+        default=False,
+    )
     while True:
         agents_raw = _prompt(
             "Agents to support (claude always; add codex/gemini/ollama, comma-separated)",
@@ -599,6 +620,7 @@ def _gather_inputs_interactive(
         delivery=resolved_delivery,
         deploy=resolved_deploy,
         iac=resolved_iac,
+        multi_model=resolved_multi_model,
     )
 
 
@@ -975,11 +997,7 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "iac_enabled": "true" if inputs.iac != "none" else "",
         # Cloud-OIDC integration seam (#326): set whenever a deploy or IaC workflow
         # authenticates to a cloud via OIDC, so the contract doc ships for them.
-        "cloud_oidc": (
-            "true"
-            if (inputs.deploy in _DEPLOY_OIDC or inputs.iac != "none")
-            else ""
-        ),
+        "cloud_oidc": ("true" if (inputs.deploy in _DEPLOY_OIDC or inputs.iac != "none") else ""),
         "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
         "installed_mcps": format_installed_mcps(selected_mcps),
         "installed_mcps_yaml": format_installed_mcps_yaml(selected_mcps),
@@ -1012,6 +1030,10 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "ollama": "true" if "ollama" in agents else "",
         "multi_agent": "true" if ("codex" in agents or "gemini" in agents) else "",
         "other_agents": "true" if len(agents) > 1 else "",
+        # Multi-model switching overlay (ADR-016, #351): gates the multi_model
+        # layer; recorded in config.yaml's variables block so `upgrade` re-derives
+        # the same layer set (PI-189), exactly like the agents overlay.
+        "multi_model": "true" if inputs.multi_model else "",
         # Distribution profile (ADR-013, #247): recorded + drives the delivery
         # and enforcement defaults. The enforcing behavior lands in #251.
         "profile": inputs.profile,
@@ -1080,6 +1102,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         delivery=delivery,
         deploy=deploy,
         iac=iac,
+        multi_model=args.multi_model,
     )
 
 
@@ -1149,7 +1172,7 @@ def main(argv: list[str] | None = None) -> int:
             no_plugin=args.no_plugin,
             profile=args.profile,
             no_egress=args.no_egress,
-            cli_overlays=(args.delivery, args.deploy, args.iac),
+            cli_overlays=(args.delivery, args.deploy, args.iac, args.multi_model),
         )
     target.mkdir(parents=True, exist_ok=True)
 
@@ -1157,7 +1180,9 @@ def main(argv: list[str] | None = None) -> int:
     # restores the shared hooks/skills copies via the fallback layer
     # (PI-165, ADR-010 cutover). The preset dict is copied so the loaded
     # definition stays pristine.
-    extra_layers = overlay_layers(inputs.agents, no_plugin=inputs.no_plugin)
+    extra_layers = overlay_layers(
+        inputs.agents, no_plugin=inputs.no_plugin, multi_model=inputs.multi_model
+    )
     if extra_layers:
         preset = {**preset, "layers": list(preset["layers"]) + extra_layers}
 
