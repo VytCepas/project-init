@@ -23,7 +23,7 @@ description: <What it does and when to use it. Third person. Include trigger key
 when_to_use: <Extra trigger context — action phrases the user might say.>
 argument-hint: "<expected arguments>"
 allowed-tools: Bash Read Write   # tools pre-approved while this skill is active
-model: sonnet                    # optional model override
+model: <model-id>                # optional override — provider-specific (e.g. sonnet/opus on Claude)
 effort: medium                   # low | medium | high | xhigh | max
 disable-model-invocation: true   # true = user-only; Claude won't auto-invoke
 user-invocable: false            # false = Claude-only background knowledge

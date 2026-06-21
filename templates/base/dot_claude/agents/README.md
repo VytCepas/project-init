@@ -10,7 +10,7 @@ Claude Code subagent definitions. Define custom subagent personas here when you 
 ---
 name: agent-name
 description: What this agent does and when to invoke it
-model: sonnet                    # optional: sonnet or opus
+model: <model-id>                # optional override — provider-specific (e.g. sonnet/opus on Claude)
 tools:                           # list of tools this agent can use
   - Read
   - Grep
