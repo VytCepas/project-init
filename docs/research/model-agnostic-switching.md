@@ -336,6 +336,27 @@ pattern; allowed by CLAUDE.md / ADR-001).
 - verify (`ccr status`, `ollama list`, a ping) and print the `claude` + `/model`
   cheat-sheet.
 
+### Day-2 model management (add / switch / remove) — #358
+
+Setup is not one-shot: users must add/switch/remove models afterwards, including
+models they didn't pick at init or their own Ollama models. A scaffolded `models`
+helper (bash + `jq`, deterministic, no LLM) wraps Ollama + CCR config edits:
+
+```
+models list                       # configured providers/models + pulled Ollama models
+models add ollama qwen3:14b       # ollama pull + register in CCR config (+ quant prompt)
+models add deepseek deepseek-reasoner   # add a cloud model not picked at init
+models rm ollama gemma:2b         # ollama rm + unregister
+models rm openai gpt-5-mini       # unregister from config
+ccr ui                            # CCR's web editor for hand-tuning routing
+```
+
+- Add **any** model (incl. unselected/custom Ollama models); `/model
+  ollama,<model>` switches live.
+- **Capability guard:** `models add ollama` warns/confirms if the model is <7B.
+- Only state touched is the global `~/.claude-code-router/config.json` (jq) +
+  `ollama`; fully reversible.
+
 ### Update & security model (third-party supply-chain)
 
 project-init owns a **vetted pinned CCR version**. Before bumping it:
@@ -382,7 +403,10 @@ covering *all* external tools project-init pins, not just CCR (see child issue
 5. **De-hardcode model IDs** — doc-consistency cleanup of the 6 example refs.
 6. **Tests** — scaffold the overlay into a temp dir; assert config/script/env
    render + gating + plugin-copy sync (`tools/sync_plugin.py`).
-7. **Scheduled third-party update + security-review task** — `tools/` task (cron
+7. **Day-2 model management (#358)** — scaffolded `models` helper to add/switch/
+   remove models (incl. unselected/custom Ollama) post-setup, wrapping Ollama +
+   CCR config edits; capability guard for <7B. Depends on the overlay (#351).
+8. **Scheduled third-party update + security-review task** — `tools/` task (cron
    /CI, no LLM at scaffold runtime) that checks pinned external tools (CCR first,
    then generalize) for new releases, runs a supply-chain + changelog security
    review, and opens a PR proposing the vetted version bump (reuses upgrade-as-PR,
