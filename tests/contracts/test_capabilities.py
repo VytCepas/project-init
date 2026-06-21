@@ -62,6 +62,27 @@ def test_skills_and_hooks_and_mcp_listed(tmp_path: Path):
     assert "| context7 | bunx @upstash/context7-mcp |" in text
 
 
+def test_base_skill_plan_is_listed(tmp_path: Path):
+    """The always-rendered base 'plan' skill must appear, not just fallback ones."""
+    t = _scaffold(tmp_path / "p", agents="claude")
+    assert "| plan |" in (t / _REL).read_text()
+    assert "plan" in {n for n, _ in capabilities.canonical_skills()}
+
+
+def test_gui_surface_hooks_listed(tmp_path: Path):
+    t = _scaffold(tmp_path / "p", agents="claude,cursor,antigravity")
+    text = (t / _REL).read_text()
+    assert "### GUI surface hooks" in text
+    assert ".cursor/hooks.json" in text
+    assert "beforeShellExecution" in text
+    assert ".agents/hooks.json (experimental)" in text
+
+
+def test_no_gui_hooks_section_without_gui_surfaces(tmp_path: Path):
+    t = _scaffold(tmp_path / "p", agents="claude,codex")
+    assert "### GUI surface hooks" not in (t / _REL).read_text()
+
+
 def test_mcp_section_empty_when_none(tmp_path: Path):
     t = _scaffold(tmp_path / "p", agents="claude", installed_mcps="none")
     text = (t / _REL).read_text()

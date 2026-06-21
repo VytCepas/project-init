@@ -35,13 +35,24 @@ def _skill_meta(skill_md: Path) -> tuple[str, str]:
 
 
 def canonical_skills() -> list[tuple[str, str]]:
-    """Return (name, description) for the shared skills.
+    """Return (name, description) for every skill the scaffold ships.
 
-    Every scaffold ships these (via the plugin or the fallback layer) — the
-    canonical skill source.
+    Both the always-rendered base skills (e.g. ``plan``, as ``SKILL.md.tmpl``)
+    and the shared fallback/plugin skill set — the canonical skill source.
+    Deduped by name, sorted.
     """
-    skills_dir = _TEMPLATES_DIR / "fallback" / "dot_claude" / "skills"
-    return [_skill_meta(p) for p in sorted(skills_dir.glob("*/SKILL.md"))]
+    dirs = (
+        _TEMPLATES_DIR / "base" / "dot_claude" / "skills",
+        _TEMPLATES_DIR / "fallback" / "dot_claude" / "skills",
+    )
+    seen: dict[str, tuple[str, str]] = {}
+    for skills_dir in dirs:
+        # SKILL.md and SKILL.md.tmpl (base 'plan' is templated; frontmatter is
+        # static so the name/description read fine).
+        for p in sorted(skills_dir.glob("*/SKILL.md*")):
+            name, desc = _skill_meta(p)
+            seen.setdefault(name, (name, desc))
+    return sorted(seen.values())
 
 
 def _script_name(command: str) -> str:
@@ -82,6 +93,29 @@ def canonical_hooks(variables: dict[str, str]) -> list[tuple[str, str]]:
                 if cmd:
                     out.append((event, _script_name(cmd)))
     return out
+
+
+def surface_hooks(variables: dict[str, str]) -> list[tuple[str, str]]:
+    """(hook file, events) for the GUI surfaces selected via --agents (#366).
+
+    Reflects the per-surface hook configs scaffold() emits for cursor/antigravity
+    so the inventory shows them alongside the native Claude hooks.
+    """
+    from project_init import surfaces
+
+    agents = [a.strip() for a in variables.get("agents", "").split(",") if a.strip()]
+    rows: list[tuple[str, str]] = []
+    for name in agents:
+        spec = surfaces.SURFACES.get(name)
+        if not spec or not spec.get("hooks_file"):
+            continue
+        config = json.loads(spec["hooks_render"]())
+        events = list(config.get("hooks") or config.get("safety-gate") or {})
+        label = spec["hooks_file"]
+        if spec.get("experimental"):
+            label += " (experimental)"
+        rows.append((label, ", ".join(events)))
+    return rows
 
 
 def _mcp_ids(variables: dict[str, str]) -> list[str]:
@@ -145,6 +179,14 @@ def render(variables: dict[str, str]) -> str:
         lines += _table(("Event", "Script"), hooks)
     else:
         lines.append("_No hooks wired._")
+    gui_hooks = surface_hooks(variables)
+    if gui_hooks:
+        lines += [
+            "",
+            "### GUI surface hooks",
+            "",
+            *_table(("Config file", "Events"), gui_hooks),
+        ]
     lines += ["", f"## MCP servers ({len(servers)})", ""]
     if servers:
         rows = [
