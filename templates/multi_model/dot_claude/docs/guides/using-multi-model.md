@@ -39,9 +39,14 @@ mismatch*, not "Claude Code is slow" (it's a strong harness):
 | **Gemini** | **A** — `--agents gemini` | first-party Gemini CLI; better quality natively |
 | **OpenAI / Codex** | **A** — `--agents codex` | first-party Codex CLI; better quality natively |
 
-Gemini & OpenAI are still reachable through CCR (`/model …`) for one-terminal
-convenience, but **there are no published CCR-vs-native benchmarks** — expect the
-mismatch penalty. Prefer their native harnesses for real work.
+Gemini & OpenAI are **not seeded** in the shipped CCR config (`config.json` only
+defines `anthropic`, `deepseek`, `kimi`, `ollama`) — they're better used via
+their native harnesses. You *can* reach them through CCR by adding a provider to
+`~/.claude-code-router/config.json` by hand (e.g. via `ccr ui`, typically through
+an OpenAI-compatible gateway such as OpenRouter), but **there are no published
+CCR-vs-native benchmarks** — expect the 15–22pt mismatch penalty. So
+`/model gemini,…` / `/model openai,…` work only after you configure them; out of
+the box, use `--agents gemini` / `codex` instead.
 
 ## Setup
 
