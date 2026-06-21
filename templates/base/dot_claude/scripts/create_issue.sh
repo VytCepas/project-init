@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+# Resolve the Python interpreter through the canonical helper (PI-361).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+PY="$SCRIPT_DIR/../hooks/_py.sh"
+
 VALID_TYPES="feat fix chore docs test"
 VALID_SCALES="epic task"
 VALID_PRIORITIES="high medium low"
@@ -452,7 +456,7 @@ sync_project_fields() {
   pdata_file=$(mktemp)
   printf '%s' "$project_data" > "$pdata_file"
 
-  project_id=$(python3 - "$pdata_file" <<'PYEOF' 2>/dev/null || true
+  project_id=$("$PY" - "$pdata_file" <<'PYEOF' 2>/dev/null || true
 import sys, json
 d = json.load(open(sys.argv[1])).get('data', {})
 p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
@@ -466,7 +470,7 @@ PYEOF
     return 0
   fi
 
-  item_id=$(python3 - "$pdata_file" "$issue_num" <<'PYEOF' 2>/dev/null || true
+  item_id=$("$PY" - "$pdata_file" "$issue_num" <<'PYEOF' 2>/dev/null || true
 import sys, json
 d = json.load(open(sys.argv[1])).get('data', {})
 p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
@@ -501,7 +505,7 @@ PYEOF
     [ -n "$option_name" ] || return 0
 
     local field_id option_id
-    field_id=$(python3 - "$pdata_file" "$field_name" <<'PYEOF' 2>/dev/null || true
+    field_id=$("$PY" - "$pdata_file" "$field_name" <<'PYEOF' 2>/dev/null || true
 import sys, json
 d = json.load(open(sys.argv[1])).get('data', {})
 p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}
@@ -517,7 +521,7 @@ PYEOF
       return 0
     fi
 
-    option_id=$(python3 - "$pdata_file" "$field_name" "$option_name" <<'PYEOF' 2>/dev/null || true
+    option_id=$("$PY" - "$pdata_file" "$field_name" "$option_name" <<'PYEOF' 2>/dev/null || true
 import sys, json
 d = json.load(open(sys.argv[1])).get('data', {})
 p = (d.get('user') or d.get('organization') or {}).get('projectV2') or {}

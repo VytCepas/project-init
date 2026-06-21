@@ -12,4 +12,4 @@ backstop, so they bind every agent and every human (ADR-007).
 ## Hook Executability Convention
 
 - **Shell hooks** (`.sh` files): Must have the executable bit (`+x`). They run directly via `bash path/to/hook.sh`.
-- **Python hooks** (`.py` files): Do NOT need the executable bit. They are invoked via `python3 path/to/hook.py`.
+- **Python hooks** (`.py` files): Do NOT need the executable bit. They are invoked through the `_py.sh` interpreter resolver, e.g. `_py.sh path/to/hook.py` (PI-361), so they run wherever Python is `python3`, `python`, or only available via `uv run`.

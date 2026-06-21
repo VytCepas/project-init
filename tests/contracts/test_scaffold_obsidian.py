@@ -164,7 +164,9 @@ class TestScaffoldObsidianOnly:
         # The SHA-verification logic lives in the Python module.
         shim = (self.target / ".claude" / "scripts" / "push_branch.sh").read_text()
         assert "dag_workflow.py" in shim
-        assert "exec python3" in shim
+        # PI-361: shim execs the interpreter via the _py.sh resolver.
+        assert "_py.sh" in shim
+        assert "python3" not in shim
         dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
         assert "ls-remote" in dag
         assert "expected_sha" in dag

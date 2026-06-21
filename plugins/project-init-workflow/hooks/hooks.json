@@ -27,7 +27,7 @@
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/prod_guard.py",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/_py.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/prod_guard.py",
             "timeout": 10
           }
         ]

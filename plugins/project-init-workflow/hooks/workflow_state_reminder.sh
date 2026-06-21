@@ -7,11 +7,14 @@ set -euo pipefail
 
 INPUT=$(cat)
 
+# Resolve the Python interpreter through the canonical helper (PI-361).
+PY="$(dirname "$0")/_py.sh"
+
 # Try to derive a current-state snapshot from dag_workflow.py.
 # Failures are non-fatal — the static rules are always injected.
-DAG_STATE=$(python3 "$(dirname "$0")/dag_workflow.py" nodes 2>/dev/null || true)
+DAG_STATE=$("$PY" "$(dirname "$0")/dag_workflow.py" nodes 2>/dev/null || true)
 
-printf '%s' "$INPUT" | DAG_STATE="$DAG_STATE" python3 -c '
+printf '%s' "$INPUT" | DAG_STATE="$DAG_STATE" "$PY" -c '
 import json
 import os
 import re

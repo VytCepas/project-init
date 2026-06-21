@@ -474,7 +474,13 @@ def cmd_finish(pr_number: int | None, review_cycle: int | None) -> int:
     rc = cmd_promote(pr_number)
     if rc != 0:
         return rc
-    monitor_args = [".claude/scripts/monitor_pr.sh", str(pr_number), "--merge"]
+    # Invoke via an explicit `bash` on an absolute path instead of exec'ing the
+    # .sh directly (PI-361): that avoids depending on the script's executable
+    # bit or shebang resolution (fragile on native Windows / Git Bash) and on
+    # the current working directory. cmd_finish always runs from the scaffolded
+    # .claude/hooks/ copy, so ../scripts/monitor_pr.sh resolves in every mode.
+    script = Path(__file__).resolve().parent.parent / "scripts" / "monitor_pr.sh"
+    monitor_args = ["bash", str(script), str(pr_number), "--merge"]
     if review_cycle is not None:
         monitor_args += ["--review-cycle", str(review_cycle)]
     return subprocess.run(monitor_args).returncode

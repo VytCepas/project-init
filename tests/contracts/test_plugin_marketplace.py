@@ -46,10 +46,14 @@ class TestPluginManifest:
             for h in entry["hooks"]
         ]
         assert commands, "plugin must wire at least one hook"
+        # A command may reference CLAUDE_PLUGIN_ROOT more than once — e.g. the
+        # _py.sh resolver plus the Python hook it runs (PI-361). Every such
+        # referenced path must exist.
         for command in commands:
-            assert "${CLAUDE_PLUGIN_ROOT}" in command
-            rel = command.split("${CLAUDE_PLUGIN_ROOT}")[1].strip('"').lstrip("/")
-            assert (_PLUGIN_ROOT / rel).is_file(), f"missing hook script: {rel}"
+            refs = re.findall(r'\$\{CLAUDE_PLUGIN_ROOT\}"?/([^\s"]+)', command)
+            assert refs, f"hook command must reference CLAUDE_PLUGIN_ROOT: {command}"
+            for rel in refs:
+                assert (_PLUGIN_ROOT / rel).is_file(), f"missing hook script: {rel}"
 
     def test_hook_events_match_template_wiring(self):
         """The plugin wires the same events the scaffolded settings wire, so
@@ -99,6 +103,8 @@ class TestPluginPayloadInSync:
         template_hooks["dag_workflow.py"] = (
             _TEMPLATE_CLAUDE / "hooks" / "dag_workflow.py"
         )
+        # _py.sh lives in base (always scaffolded) and is mirrored to the plugin.
+        template_hooks["_py.sh"] = _TEMPLATE_CLAUDE / "hooks" / "_py.sh"
         plugin_hooks = {
             p.name: p
             for p in (_PLUGIN_ROOT / "hooks").iterdir()

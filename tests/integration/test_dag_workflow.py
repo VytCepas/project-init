@@ -380,7 +380,11 @@ class TestScriptShims:
         assert path.is_file()
         text = path.read_text()
         assert "dag_workflow.py" in text
-        assert "exec python3" in text
+        # PI-361: the scaffolded shim execs the interpreter via the _py.sh
+        # resolver rather than a bare `python3`.
+        assert "exec " in text
+        assert "_py.sh" in text
+        assert "python3" not in text
 
 
 class TestScaffoldedTemplate:
