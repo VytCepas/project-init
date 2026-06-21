@@ -7,9 +7,11 @@
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# Resolve the Python interpreter through the canonical helper (PI-361).
+PY="$(dirname "$0")/_py.sh"
 INPUT=$(cat)
 
-FILE=$(printf '%s' "$INPUT" | python3 -c "
+FILE=$(printf '%s' "$INPUT" | "$PY" -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -48,7 +50,7 @@ case "$FILE" in
 esac
 
 if [ -n "$ERRORS" ]; then
-    python3 -c "
+    "$PY" -c "
 import json, sys
 file, errors = sys.argv[1], sys.argv[2]
 print(json.dumps({'additionalContext': f'Lint errors in {file} (after auto-fix attempt) — please fix before continuing:\n{errors}'}))

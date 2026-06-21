@@ -45,13 +45,17 @@ Create `.claude/hooks/<name>.sh`:
 # Hook receives JSON on stdin from Claude Code.
 INPUT=$(cat)
 
+# Resolve Python through the canonical helper so the hook runs wherever the
+# interpreter is `python3`, `python`, or only available via `uv run` (PI-361).
+PY="$(dirname "$0")/_py.sh"
+
 # exit 0 = allow (or no-op for non-blocking events)
 # stdout JSON with {"decision":"block","reason":"..."} = block (PreToolUse)
 # stdout JSON with {"additionalContext":"..."} = inject context
 # Always exit 0 — exit 1 means hook error, not a block
 
 # Example: block pushes to main
-CMD=$(echo "$INPUT" | python3 -c "
+CMD=$(echo "$INPUT" | "$PY" -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
@@ -63,7 +67,7 @@ print((data.get('tool_input', {}) or {}).get('command', '') or '')
 [ -z "$CMD" ] && exit 0
 
 if echo "$CMD" | grep -qE 'git push.*(main|master)'; then
-  python3 -c "import json,sys; print(json.dumps({'decision':'block','reason':sys.argv[1]}))" \
+  "$PY" -c "import json,sys; print(json.dumps({'decision':'block','reason':sys.argv[1]}))" \
     "Direct push to main is not allowed. Use a branch and PR."
   exit 0
 fi

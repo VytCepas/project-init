@@ -8,4 +8,4 @@
 
 set -euo pipefail
 
-exec python3 "$(dirname "$0")/dag_workflow.py" guard
+exec "$(dirname "$0")/_py.sh" "$(dirname "$0")/dag_workflow.py" guard

@@ -18,6 +18,8 @@ CLAUDE_PKG="@anthropic-ai/claude-code"
 
 # --- paths --------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Canonical Python-interpreter resolver shared with the hooks (PI-361).
+PY="$SCRIPT_DIR/../hooks/_py.sh"
 MM_DIR="$(cd "$SCRIPT_DIR/../multi-model" && pwd)"
 TEMPLATE_CONFIG="$MM_DIR/config.json"
 ENV_FILE="$MM_DIR/.env"
@@ -106,8 +108,8 @@ seed_config() {
   # Generate to a temp file and move into place: if the generator fails, the
   # existing global config is left intact (a redirect would truncate it first).
   local tmp="$GLOBAL_CONFIG.tmp.$$"
-  if have python3; then
-    python3 - "$TEMPLATE_CONFIG" >"$tmp" <<'PY'
+  if have python3 || have python || have uv; then
+    "$PY" - "$TEMPLATE_CONFIG" >"$tmp" <<'PY'
 import os, re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 sys.stdout.write(re.sub(r"\$([A-Z_][A-Z0-9_]*)",
@@ -117,7 +119,7 @@ PY
     envsubst <"$TEMPLATE_CONFIG" >"$tmp"
   else
     cp "$TEMPLATE_CONFIG" "$tmp"
-    warn "No python3/envsubst — copied config with \$VAR placeholders; export the keys in your shell so CCR can read them."
+    warn "No Python/envsubst — copied config with \$VAR placeholders; export the keys in your shell so CCR can read them."
   fi
   mv "$tmp" "$GLOBAL_CONFIG"
   chmod 600 "$GLOBAL_CONFIG" 2>/dev/null || true

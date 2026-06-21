@@ -5,9 +5,12 @@
 
 set -euo pipefail
 
+# Resolve the Python interpreter through the canonical helper (PI-361).
+PY="$(dirname "$0")/_py.sh"
+
 INPUT=$(cat)
 
-CMD=$(printf '%s' "$INPUT" | python3 -c "
+CMD=$(printf '%s' "$INPUT" | "$PY" -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -76,7 +79,7 @@ if command -v just >/dev/null 2>&1 && [ -f "$ROOT/justfile" ] \
 fi
 
 if [ -n "$ERRORS" ]; then
-    python3 -c "
+    "$PY" -c "
 import json, sys
 errors = sys.argv[1].replace('\\\\n', '\n')
 msg = 'Pre-commit lint check failed. Fix these errors before committing:\n\n' + errors

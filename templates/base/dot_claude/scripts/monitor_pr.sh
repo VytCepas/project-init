@@ -1,7 +1,7 @@
 #!/bin/bash
 # Wait for all CI checks on a PR, then optionally merge.
 # Only prints failures or the final pass line — no per-refresh noise.
-# Requires: gh, python3 (stdlib only — no jq dependency).
+# Requires: gh, a Python 3 (resolved via ../hooks/_py.sh; stdlib only — no jq).
 #
 # Usage:
 #   .claude/scripts/monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review]
@@ -31,6 +31,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/gh_host.sh"
+
+# Resolve the Python interpreter through the canonical helper (PI-361).
+PY="$SCRIPT_DIR/../hooks/_py.sh"
 
 PR_NUMBER="${1:-}"
 MODE="${2:-}"
@@ -62,7 +65,7 @@ while [ $# -gt 0 ]; do
 done
 
 _count_pending() {
-  echo "$1" | python3 -c "
+  echo "$1" | "$PY" -c "
 import json, sys
 data = json.load(sys.stdin)
 # Exclude review/decision; it is a derived commit status that only appears
@@ -72,7 +75,7 @@ print(sum(1 for c in data if c.get('name') != 'review/decision' and c.get('state
 }
 
 _print_failures() {
-  echo "$1" | python3 -c "
+  echo "$1" | "$PY" -c "
 import json, sys
 data = json.load(sys.stdin)
 bad = [
@@ -167,13 +170,13 @@ CI_TIMEOUT=900
 CI_ELAPSED=0
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
-  CHECK_COUNT=$(echo "$CHECKS" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
+  CHECK_COUNT=$(echo "$CHECKS" | "$PY" -c "import json,sys; print(len(json.load(sys.stdin)))")
   if [ "$CHECK_COUNT" -gt 0 ] && [ "$(_count_pending "$CHECKS")" -eq 0 ]; then
     break
   fi
   if [ "$CI_ELAPSED" -ge "$CI_TIMEOUT" ]; then
     echo "PR #$PR_NUMBER: CI did not settle within ${CI_TIMEOUT}s. Still pending:"
-    echo "$CHECKS" | python3 -c "import json,sys
+    echo "$CHECKS" | "$PY" -c "import json,sys
 for c in json.load(sys.stdin):
     if c.get('name') != 'review/decision' and c.get('state') in ('PENDING','IN_PROGRESS','EXPECTED'):
         print('  -', c.get('name'))" 2>/dev/null || true

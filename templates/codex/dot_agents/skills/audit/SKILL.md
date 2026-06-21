@@ -40,7 +40,7 @@ For every file in `.claude/hooks/`:
    - `exit 1` that isn't inside a `trap` or error path before JSON parsing → `[FAIL]`
    - `>&2` used for block output instead of stdout → `[FAIL]`
    - Missing `exit 0` at end of file → `[WARN]`
-3. **JSON parsing** — must use python3 (not jq) for portability. `grep -l 'jq ' *.sh` → `[FAIL]`
+3. **JSON parsing** — must use Python via the `_py.sh` resolver (not jq) for portability. `grep -l 'jq ' *.sh` → `[FAIL]`
 4. **Stdin reading** — must read `$CLAUDE_TOOL_USE_STDIN` or stdin JSON. Check the INPUT= line exists.
 5. **Referenced in settings.json** — every hook file should appear in `.claude/settings.json`. Orphaned hooks → `[WARN]`
 
