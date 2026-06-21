@@ -1,4 +1,4 @@
-{{#if deploy_container}}#!/bin/bash
+{{#if deploy_container}}#!/usr/bin/env bash
 # whats_deployed.sh — show what's deployed where, from the GitHub Deployments API
 # (ADR-015). The DESIRED model is deploy/environments.yaml; the ACTUAL state is
 # the latest deployment + status per environment. An agent reads this instead of

@@ -52,6 +52,27 @@ def test_all_scaffolded_shell_scripts_use_env_bash(scaffolded: Path):
         assert first == "#!/usr/bin/env bash", f"{sh}: non-portable shebang {first!r}"
 
 
+# Strips a leading conditional-render guard like `{{#if gemini}}` so the shebang
+# of overlay/conditional scripts (only emitted under --agents gemini, --deploy
+# container, --devcontainer, …) is checked too — the default-scaffold fixture
+# above can't reach them.
+_IF_GUARD = re.compile(r"^\{\{#if [^}]+\}\}")
+
+
+def _shell_templates() -> list[Path]:
+    out: list[Path] = []
+    for pattern in ("*.sh", "*.sh.tmpl"):
+        out += (_REPO_ROOT / "templates").rglob(pattern)
+    return sorted(out)
+
+
+@pytest.mark.parametrize("tmpl", _shell_templates(), ids=lambda p: str(p.name))
+def test_every_shell_template_uses_env_bash(tmpl: Path):
+    first = tmpl.read_text().splitlines()[0]
+    shebang = _IF_GUARD.sub("", first)  # drop a leading {{#if …}} wrapper
+    assert shebang == "#!/usr/bin/env bash", f"{tmpl}: non-portable shebang {first!r}"
+
+
 def test_gh_callers_have_presence_guard(scaffolded: Path):
     scripts = scaffolded / ".claude" / "scripts"
     gh_call = re.compile(r"(?<![\w-])gh\s")

@@ -1,4 +1,4 @@
-{{#if deploy_container}}#!/bin/bash
+{{#if deploy_container}}#!/usr/bin/env bash
 # setup_env_protection.sh — install SERVER-SIDE GitHub Environment protection on
 # the deploy environments (ADR-015, epic #316). The `production` environment is
 # the real boundary an agent cannot bypass; deploy.yml references it. Run once,
