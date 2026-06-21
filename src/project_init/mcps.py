@@ -17,6 +17,9 @@ MCP_CATALOG: list[dict] = [
         "name": "Context7",
         "description": "Live library documentation lookup",
         "command": "claude mcp add context7 bunx @upstash/context7-mcp",
+        # Canonical server spec (PI-366): the stdio invocation behind the
+        # install command, rendered per-surface into mcpServers / servers / TOML.
+        "server": {"command": "bunx", "args": ["@upstash/context7-mcp"]},
     },
 ]
 
@@ -26,11 +29,13 @@ DB_CATALOG: dict[str, dict] = {
         "id": "postgres",
         "name": "Postgres",
         "command": "claude mcp add postgres bunx @modelcontextprotocol/server-postgres",
+        "server": {"command": "bunx", "args": ["@modelcontextprotocol/server-postgres"]},
     },
     "sqlite": {
         "id": "sqlite",
         "name": "SQLite",
         "command": "claude mcp add sqlite bunx mcp-server-sqlite",
+        "server": {"command": "bunx", "args": ["mcp-server-sqlite"]},
     },
 }
 
@@ -39,7 +44,25 @@ PLAYWRIGHT_MCP: dict = {
     "id": "playwright",
     "name": "Playwright",
     "command": "claude mcp add playwright bunx @playwright/mcp",
+    "server": {"command": "bunx", "args": ["@playwright/mcp"]},
 }
+
+
+def servers_for_ids(ids: list[str]) -> dict[str, dict]:
+    """Canonical MCP server specs for the given catalog ids.
+
+    Returns ``{name: {command,args}|{url}}`` — the source the per-surface
+    generators render from (PI-366).
+    """
+    by_id: dict[str, dict] = {m["id"]: m for m in MCP_CATALOG}
+    by_id.update(DB_CATALOG)
+    by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
+    out: dict[str, dict] = {}
+    for i in ids:
+        entry = by_id.get(i)
+        if entry and entry.get("server"):
+            out[i] = dict(entry["server"])
+    return out
 
 
 def format_installed_mcps(selected: list[dict]) -> str:

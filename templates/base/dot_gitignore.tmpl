@@ -32,7 +32,10 @@ graphify-out/*
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
-{{/if vscode}}{{#if vscode_off}}.vscode/
+!.vscode/mcp.json
+{{/if vscode}}{{#if vscode_off}}# .vscode is personal, except a generated MCP config meant to be shared (PI-366).
+.vscode/*
+!.vscode/mcp.json
 {{/if vscode_off}}.idea/
 
 # Secrets

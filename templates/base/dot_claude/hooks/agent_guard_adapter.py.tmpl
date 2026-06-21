@@ -53,8 +53,16 @@ def main() -> int:
     except json.JSONDecodeError:
         return 0
     if isinstance(verdict, dict) and verdict.get("decision") == "block":
+        reason = verdict.get("reason", "")
         if dialect == "gemini":
-            verdict = {"decision": "deny", "reason": verdict.get("reason", "")}
+            verdict = {"decision": "deny", "reason": reason}
+        elif dialect == "cursor":
+            # Cursor signals a block via permission=deny (PI-366; exact schema
+            # unverified — fail-open means a wrong guess degrades safely).
+            verdict = {"permission": "deny", "userMessage": reason}
+        elif dialect == "antigravity":
+            # Antigravity safety-gate deny (experimental; unverified shape).
+            verdict = {"decision": "deny", "reason": reason}
         sys.stdout.write(json.dumps(verdict))
     return 0
 
