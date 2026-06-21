@@ -108,13 +108,16 @@ seed_config() {
   # Generate to a temp file and move into place: if the generator fails, the
   # existing global config is left intact (a redirect would truncate it first).
   local tmp="$GLOBAL_CONFIG.tmp.$$"
-  if have python3 || have python || have uv; then
-    "$PY" - "$TEMPLATE_CONFIG" >"$tmp" <<'PY'
+  # Let _py.sh decide whether a usable Python 3 exists (it rejects Python 2 and
+  # only uses uv when present); fall back to envsubst, then a literal copy.
+  if "$PY" - "$TEMPLATE_CONFIG" >"$tmp" 2>/dev/null <<'PY'
 import os, re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 sys.stdout.write(re.sub(r"\$([A-Z_][A-Z0-9_]*)",
                         lambda m: os.environ.get(m.group(1)) or m.group(0), text))
 PY
+  then
+    : # rendered via Python
   elif have envsubst; then
     envsubst <"$TEMPLATE_CONFIG" >"$tmp"
   else

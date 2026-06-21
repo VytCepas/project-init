@@ -152,3 +152,34 @@ def test_resolver_falls_back_to_python(tmp_path: Path):
     )
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == "ok"
+
+
+def test_resolver_rejects_python2_and_errors_clearly(tmp_path: Path):
+    """`python` resolving to Python 2 must be refused; with no py3/uv the
+    resolver fails with a clear message, not a bare interpreter crash."""
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash not available")
+    shim = tmp_path / "bin"
+    shim.mkdir()
+    (shim / "bash").symlink_to(bash)
+    # A fake `python` that reports as Python 2 to the version probe.
+    fake = shim / "python"
+    fake.write_text(
+        "#!/usr/bin/env bash\n"
+        'case "$*" in\n'
+        "  *version_info*) exit 1 ;;\n"  # not Python 3
+        '  *) echo "py2 ran"; exit 0 ;;\n'
+        "esac\n"
+    )
+    fake.chmod(0o755)
+    resolver = _BASE_HOOKS / "_py.sh"
+    proc = subprocess.run(
+        [bash, str(resolver), "-c", "print('should not run')"],
+        env={"PATH": str(shim)},  # only a py2 `python`, no python3, no uv
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode != 0, "must not run under Python 2"
+    assert "py2 ran" not in proc.stdout
+    assert "no Python 3" in proc.stderr
