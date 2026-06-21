@@ -13,7 +13,7 @@ project-init can decide what to emit beyond `.claude/` (epic #359, workstream B)
 
 | Surface | Reads `.claude/` natively? | Skills (`SKILL.md`) | Hooks | MCP | Instructions | Conf. |
 |---|---|---|---|---|---|---|
-| **Claude Code VS Code ext** (`anthropic.claude-code`) | **Yes — identical to CLI** (settings.json hooks, skills, CLAUDE.md) | `.claude/skills/` | `.claude/settings.json`, **honored**, PascalCase | Claude MCP (`claude mcp add` / `~/.claude`) | CLAUDE.md / AGENTS.md | HIGH |
+| **Claude Code VS Code ext** (`anthropic.claude-code`) | **Yes — identical to CLI** (settings.json hooks, skills, CLAUDE.md) | `.claude/skills/` | `.claude/settings.json`, **honored**, PascalCase | shareable project scope = **root `.mcp.json`** (`mcpServers`); `claude mcp add` defaults to a *private* `~/.claude.json` entry | CLAUDE.md / AGENTS.md | HIGH |
 | **VS Code Copilot agent mode** | **Partial** — CLAUDE.md (`chat.useClaudeMdFile`), `.claude/skills/`, `.claude/rules`, Claude-format hooks | `.github/skills/`, `.claude/skills/`, `.agents/skills/` | reads Claude hooks but **matcher ignored**, ~8 PascalCase events | **separate** — `.vscode/mcp.json`, top-level `servers` | AGENTS.md, CLAUDE.md | MED–HIGH |
 | **Cursor** (≥1.7 / 2.4) | **Skills only** | `.claude/skills/`, `.codex/skills/`, `.cursor/skills/`, `.agents/skills/` | `.cursor/hooks.json`, **own camelCase vocab**, NOT interchangeable | `.cursor/mcp.json`, `mcpServers` (portable) | AGENTS.md, `.cursor/rules/*.mdc` | HIGH |
 | **Codex** (CLI **and** IDE ext — shared config) | n/a (uses `.codex/` + `.agents/`) | `.agents/skills/` ✅ (our current target) | `.codex/hooks.json` or `config.toml`, PascalCase subset, `type:command` only | `.codex/config.toml` `[mcp_servers.*]` (**TOML**, not JSON) | AGENTS.md (primary consumer) | HIGH |
@@ -54,7 +54,7 @@ Current emission (verified by scaffolding `obsidian-only` + `--agents claude,cod
 
 | Surface | Already covered by current output | Gap to close (feeds #366) |
 |---|---|---|
-| Claude Code VS Code ext | **Everything** (same `.claude/`) | none |
+| Claude Code VS Code ext | hooks, skills, CLAUDE.md (same `.claude/`) | **shared project MCP**: emit a root `.mcp.json` (`mcpServers`) when MCPs are configured — `.claude/` alone does not carry shareable MCP (bare `claude mcp add` writes a private `~/.claude.json` entry) |
 | Copilot agent mode | CLAUDE.md, `.claude/skills`, hooks (matcher-blind), AGENTS.md | `.vscode/mcp.json` (`servers` map) if MCPs are configured; document that matchers are advisory here |
 | Cursor | `.claude/skills` (skills), AGENTS.md | `.cursor/hooks.json` (translate `PreToolUse(Bash)`→`beforeShellExecution`, `UserPromptSubmit`→`beforeSubmitPrompt`); `.cursor/mcp.json` (≈copy of `mcpServers`) |
 | Codex (CLI/IDE) | `.codex/hooks.json` ✅, `.agents/skills` ✅, AGENTS.md ✅ | MCP → `.codex/config.toml` `[mcp_servers.*]` if MCPs are configured |
@@ -73,8 +73,11 @@ Current emission (verified by scaffolding `obsidian-only` + `--agents claude,cod
   - Antigravity = `.agents/hooks.json` `safety-gate`, `PreToolUse` only.
   - **Matcher fidelity varies** (ignored on Copilot) → treat tool-scoped guards as advisory on surfaces that drop matchers; the git-level enforcement (ADR-007) remains the real boundary.
 - **MCP** has three schemas to target when MCPs are configured: `mcpServers`
-  (Claude, Cursor, Antigravity), `servers` (VS Code `.vscode/mcp.json`), and
-  TOML `[mcp_servers.*]` (Codex `config.toml`). Generators must key off this.
+  (Claude root `.mcp.json`, Cursor `.cursor/mcp.json`, Antigravity
+  `~/.gemini/config/mcp_config.json`), `servers` (VS Code `.vscode/mcp.json`),
+  and TOML `[mcp_servers.*]` (Codex `.codex/config.toml`). Generators must key
+  off this. Note even Claude needs an explicit root `.mcp.json` for *shareable*
+  project MCP — `.claude/` does not carry it.
 - **Local-vs-cloud caveat (feeds #367):** all of the above is local-surface
   config; cloud sandboxes honor only repo-committed files, and matcher-blind
   surfaces weaken in-editor guards — so git/CI stays the enforcement boundary.
@@ -86,7 +89,29 @@ Current emission (verified by scaffolding `obsidian-only` + `--agents claude,cod
 
 ## Sources
 
-VS Code: code.visualstudio.com/docs/agent-customization/{custom-instructions,agent-skills,hooks,mcp-servers}; code.claude.com/docs/en/{vs-code,hooks}.
-Cursor: cursor.com/docs/{hooks,skills,context/rules,context/mcp}.
-Codex: developers.openai.com/codex/{skills,hooks,mcp,config-reference,guides/agents-md}.
-Antigravity: antigravity.google/docs/* (JS-rendered, empty) + codelabs/blog secondary sources (confidence capped).
+Full URLs (verified reachable 2026-06-21).
+
+VS Code:
+- https://code.visualstudio.com/docs/agent-customization/custom-instructions
+- https://code.visualstudio.com/docs/agent-customization/agent-skills
+- https://code.visualstudio.com/docs/agent-customization/hooks
+- https://code.visualstudio.com/docs/agent-customization/mcp-servers
+- https://code.claude.com/docs/en/vs-code
+- https://code.claude.com/docs/en/hooks
+
+Cursor:
+- https://cursor.com/docs/hooks
+- https://cursor.com/docs/skills
+- https://cursor.com/docs/context/rules
+- https://cursor.com/docs/context/mcp
+
+Codex:
+- https://developers.openai.com/codex/skills
+- https://developers.openai.com/codex/hooks
+- https://developers.openai.com/codex/mcp
+- https://developers.openai.com/codex/config-reference
+- https://developers.openai.com/codex/guides/agents-md
+
+Antigravity: https://antigravity.google/docs/ (JS-rendered, returned empty) +
+codelabs/blog secondary sources — confidence capped accordingly; rows flagged
+**(verify live)**.
