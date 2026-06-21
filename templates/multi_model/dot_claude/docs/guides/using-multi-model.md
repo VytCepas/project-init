@@ -128,11 +128,22 @@ the list above is the *local* option, cheap in $ but not in RAM.
 
 ## Day-2: add / switch / remove models
 
-Setup isn't one-shot. Switch live with `/model provider,model`. To add a model
-you didn't pick at init (including your own Ollama models), edit
-`~/.claude-code-router/config.json` (or `ccr ui`) and `ollama pull` the model —
-keep the **<7B** floor in mind. Reverting is clean: stop using CCR (plain
-`claude`) or `rm ~/.claude-code-router/config.json` removes it entirely.
+Setup isn't one-shot. Switch live with `/model provider,model`. To add, list, or
+remove models afterwards — including models you didn't pick at init or your own
+Ollama ones — use the scaffolded helper (it pulls/removes Ollama models and edits
+the global CCR config for you, with the **<7B** guard):
+
+```bash
+.claude/scripts/models.sh list                       # providers/models + pulled Ollama
+.claude/scripts/models.sh add ollama qwen3:14b       # ollama pull + register
+.claude/scripts/models.sh add deepseek deepseek-reasoner   # register a cloud model
+.claude/scripts/models.sh rm ollama gemma:2b         # ollama rm + unregister
+.claude/scripts/models.sh ui                         # open ccr ui (GUI editor)
+# tip: alias models="$PWD/.claude/scripts/models.sh"  → then `models list`, etc.
+```
+
+Reverting is clean: stop using CCR (plain `claude`) or
+`rm ~/.claude-code-router/config.json` removes it entirely.
 
 ## Caveats (any non-Claude model)
 

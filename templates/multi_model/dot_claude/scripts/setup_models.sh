@@ -216,6 +216,9 @@ Done. Multi-model switching is set up.
   ccr ui                            # web editor for providers + routing
   ccr model                         # interactive model management
 
+  .claude/scripts/models.sh list                  # day-2: list configured + pulled models
+  .claude/scripts/models.sh add ollama qwen3:14b  # add/remove models after setup (needs jq)
+
 Background requests auto-route to DeepSeek (cheap) — the biggest silent saver.
 Edit providers/keys in ~/.claude-code-router/config.json (or .claude/multi-model/.env, then re-run).
 EOF
