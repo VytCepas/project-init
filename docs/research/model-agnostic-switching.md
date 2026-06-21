@@ -183,7 +183,8 @@ option. Local support is real but **gated on hardware**: cheap in $, not in RAM.
 ## 6. Router decision: adopt CCR (pinned, scaffolded — NOT vendored)
 
 **claude-code-router (CCR)** — a local proxy that lets Claude Code reach any
-provider via transformers; `/model provider,model` switches **live, mid-session,
+provider via request/response transformers (format translators between provider
+APIs — not ML model transformers); `/model provider,model` switches **live, mid-session,
 context intact**; auto-routes by request type
 (`default`/`background`/`think`/`longContext`/`webSearch`). The
 **highest-leverage rule is `background`** — Claude Code fires background requests
@@ -216,7 +217,7 @@ UX wanted (seamless mid-session switching + automatic cost-routing).
 
 ### Install path: bun preferred, npm fallback
 
-CCR is published to npm; bun is npm-compatible, so `bun install -g
+CCR is published to npm; bun is npm-compatible, so `bun add -g
 @musistudio/claude-code-router` works and is faster/lighter. Caveat: the machine
 needs bun first (`curl -fsSL https://bun.com/install | bash`), and Claude Code
 environments ship node/npm but not necessarily bun. So the setup script

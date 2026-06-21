@@ -60,7 +60,7 @@ routing (the `background → cheap model` rule is the high-leverage cost saver).
   `setup_models.sh` installer that installs a **pinned, vetted** CCR version.
   This gives version control and reproducibility without a fork; upstream keeps
   maintaining it.
-- **Install:** bun-preferred (`bun install -g`), npm fallback; pinned either way.
+- **Install:** bun-preferred (`bun add -g`), npm fallback; pinned either way.
 - **Custom proxy rejected.** Building our own would reimplement CCR's fragile
   format-translation layer for no gain.
 - **LiteLLM rejected for the core** — heavier/enterprise-shaped; its budget gates
@@ -101,7 +101,7 @@ informed choice or declines (clean-by-default).
 project-init owns the vetted pinned CCR version. A scheduled `tools/` task
 (cron/CI; no LLM) checks for new releases, runs a security review (supply-chain
 scan + changelog/diff), and opens a PR proposing the bump; downstream projects
-inherit the vetted pin via upgrade-as-PR (#348). No auto-pull onto the request
+inherit the vetted pin via upgrade-as-PR (PI-241, #348). No auto-pull onto the request
 path. Generalizes to all pinned third-party tools (#356).
 
 ## Consequences
