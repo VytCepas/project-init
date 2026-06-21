@@ -61,6 +61,9 @@ def hook_scripts() -> list[Path]:
         if p.is_file() and p.suffix in {".sh", ".py"}
     ]
     scripts.append(TEMPLATE_CLAUDE / "hooks" / "dag_workflow.py")
+    # _py.sh lives in base (always scaffolded to .claude/hooks so the lifecycle
+    # scripts resolve it in plugin mode too, PI-361); ship it in the plugin too.
+    scripts.append(TEMPLATE_CLAUDE / "hooks" / "_py.sh")
     return sorted(scripts)
 
 

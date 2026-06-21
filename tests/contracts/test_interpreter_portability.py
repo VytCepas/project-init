@@ -18,10 +18,14 @@ from pathlib import Path
 
 import pytest
 
+from project_init.scaffold import load_preset, scaffold
+from tests.helpers import fallback_preset, fallback_variables, make_variables
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 _FALLBACK_HOOKS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "hooks"
 _PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-workflow" / "hooks"
+_BASE_HOOKS = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks"
 _BASE_SCRIPTS = _REPO_ROOT / "templates" / "base" / "dot_claude" / "scripts"
 _MULTI_MODEL = (
     _REPO_ROOT / "templates" / "multi_model" / "dot_claude" / "scripts" / "setup_models.sh"
@@ -63,7 +67,8 @@ def test_shell_scripts_route_python_through_resolver(script: Path):
 
 
 def test_resolver_exists_and_is_executable():
-    for d in (_FALLBACK_HOOKS, _PLUGIN_HOOKS):
+    # _py.sh lives in base (always scaffolded) and is mirrored into the plugin.
+    for d in (_BASE_HOOKS, _PLUGIN_HOOKS):
         py = d / "_py.sh"
         assert py.exists(), f"missing resolver: {py}"
         assert os.access(py, os.X_OK), f"{py} must be executable"
@@ -71,6 +76,29 @@ def test_resolver_exists_and_is_executable():
         assert "command -v python3" in text
         assert "command -v python" in text
         assert "uv run python" in text, f"{py}: needs the uv-only-host fallback"
+
+
+@pytest.mark.parametrize(
+    ("preset", "variables"),
+    [
+        # True plugin mode (no fallback layer) — the case Codex flagged: the
+        # base lifecycle scripts reference ../hooks/_py.sh, which must exist.
+        (load_preset("obsidian-only"), make_variables(plugin_mode="true", no_plugin="")),
+        # --no-plugin mode (fallback layer present).
+        (fallback_preset(), fallback_variables()),
+    ],
+    ids=["plugin-mode", "no-plugin-mode"],
+)
+def test_resolver_is_scaffolded_for_base_lifecycle_scripts(preset, variables, tmp_path):
+    target = tmp_path / "p"
+    scaffold(target, preset, variables, strict=True)
+    resolver = target / ".claude" / "hooks" / "_py.sh"
+    assert resolver.exists(), "_py.sh must be scaffolded in every mode"
+    assert os.access(resolver, os.X_OK), "_py.sh must be executable"
+    # The shim references ../hooks/_py.sh — that resolved path must exist.
+    shim = target / ".claude" / "scripts" / "push_branch.sh"
+    assert "_py.sh" in shim.read_text()
+    assert (shim.parent / ".." / "hooks" / "_py.sh").resolve().is_file()
 
 
 def test_json_hook_configs_use_resolver():
@@ -115,7 +143,7 @@ def test_resolver_falls_back_to_python(tmp_path: Path):
     shim.mkdir()
     (shim / "python").symlink_to(real_py)
     (shim / "bash").symlink_to(bash)
-    resolver = _FALLBACK_HOOKS / "_py.sh"
+    resolver = _BASE_HOOKS / "_py.sh"
     proc = subprocess.run(
         [bash, str(resolver), "-c", "print('ok')"],
         env={"PATH": str(shim)},  # no python3, only python

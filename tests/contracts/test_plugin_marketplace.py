@@ -103,6 +103,8 @@ class TestPluginPayloadInSync:
         template_hooks["dag_workflow.py"] = (
             _TEMPLATE_CLAUDE / "hooks" / "dag_workflow.py"
         )
+        # _py.sh lives in base (always scaffolded) and is mirrored to the plugin.
+        template_hooks["_py.sh"] = _TEMPLATE_CLAUDE / "hooks" / "_py.sh"
         plugin_hooks = {
             p.name: p
             for p in (_PLUGIN_ROOT / "hooks").iterdir()
