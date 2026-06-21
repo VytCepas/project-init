@@ -40,8 +40,10 @@ nav:
     - Environment promotion chains (superseded): adr/adr-014-environment-promotion-chains.md
     - Env & deploy model: adr/adr-015-env-deploy-model.md
     - Model-agnostic switching (CCR): adr/adr-016-model-agnostic-switching.md
+    - Per-surface config generator: adr/adr-017-per-surface-config-generator.md
   - Development:
     - Template system: development/template-system.md
+    - Non-CLI surface matrix: development/non-cli-surface-matrix.md
     - Testing: development/testing.md
     - Measurement methodology: development/measurement-methodology.md
     - Build reproducibility: development/build-reproducibility.md
