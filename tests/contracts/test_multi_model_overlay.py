@@ -95,6 +95,17 @@ class TestMultiModelOn:
     def test_readme_present(self):
         assert (self.mm / "README.md").is_file()
 
+    def test_guide_renders_with_key_content(self):
+        guide = self.target / ".claude" / "docs" / "guides" / "using-multi-model.md"
+        assert guide.is_file()
+        text = guide.read_text(encoding="utf-8")
+        # The guide must carry the load-bearing decisions: the two architectures,
+        # the <7B Ollama floor, and the Anthropic-only caching caveat.
+        assert "native harness" in text.lower()
+        assert "7B" in text or "7b" in text
+        assert "caching" in text.lower()
+        assert "setup_models.sh" in text
+
 
 class TestMultiModelOff:
     @pytest.fixture(autouse=True)

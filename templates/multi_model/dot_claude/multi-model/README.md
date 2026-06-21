@@ -35,7 +35,8 @@ claude                                                          # opens as usual
   first-party harness), so routing them through CCR is appropriate.
 - **Gemini & OpenAI/Codex** perform better in their own native harnesses
   (`--agents gemini` / `codex`). They are reachable through CCR only as a
-  convenience, with a quality caveat — see the model-switching guide.
+  convenience, with a quality caveat — see the
+  [model-switching guide](../docs/guides/using-multi-model.md).
 - **Ollama** is local and gated on hardware: a ~24–32B agent-tuned model is the
   practical floor for reliable tool-calling; anything below ~7B loops on
   "Invalid tool parameters".
