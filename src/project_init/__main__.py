@@ -415,6 +415,47 @@ def _print_profile_notice(profile: str, *, no_plugin: bool, no_egress: bool) -> 
     )
 
 
+def _choose_multi_model_interactive() -> bool:
+    """Explain multi-model switching + the alternatives, then ask (ADR-016, #352).
+
+    States plainly what the overlay does, how it helps, and the honest
+    alternatives (Gemini/OpenAI are better in their native --agents harnesses;
+    Ollama runs locally), so the user makes an informed choice or declines —
+    declining leaves a clean project. Non-interactive callers pass the flag and
+    never reach here.
+    """
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import Confirm
+
+    console = Console()
+    body = (
+        "Run other models [bold]through the Claude Code harness[/bold] — one "
+        "terminal, live switching, and automatic [bold]cost-routing[/bold] "
+        "(background work goes to a cheap model). Your hooks, CI gates, and "
+        "standards stay identical — they run below the model.\n\n"
+        "  [dim]claude[/dim]                          [dim]# opens as usual[/dim]\n"
+        "  [dim]/model deepseek,deepseek-chat[/dim]   [dim]# switch mid-session, context kept[/dim]\n"
+        "  [dim]/model ollama,qwen3-coder:30b[/dim]\n"
+        "  [dim]/model anthropic,claude-opus-4-8[/dim] [dim]# back to Claude[/dim]\n\n"
+        "[cyan]Helps:[/cyan] control cost / test models without leaving the terminal.\n"
+        "[cyan]Alternatives:[/cyan]\n"
+        "  • [bold]Gemini & OpenAI/Codex[/bold] already have native harnesses "
+        "([dim]--agents gemini[/dim] / [dim]codex[/dim]) — better quality there; "
+        "route them through CCR only for one-terminal convenience.\n"
+        "  • [bold]Ollama[/bold] models also run natively/locally.\n"
+        "  • Say yes and the scaffolded [dim]setup_models.sh[/dim] installs CCR "
+        "(pinned), seeds the config, and can pull local models for you.\n\n"
+        "[cyan]Updates:[/cyan] the pinned CCR version flows from project-init via "
+        "upgrade-as-PR; set up another way and you update it yourself.\n"
+        "Clean by default — decline and nothing is added."
+    )
+    console.print(
+        Panel(body, title="Multi-model switching (claude-code-router)", border_style="cyan")
+    )
+    return Confirm.ask("Set up multi-model switching via claude-code-router?", default=False)
+
+
 def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
     """Warn that user-owned files were kept; renders landed as .new siblings."""
     from rich.console import Console
@@ -584,13 +625,9 @@ def _gather_inputs_interactive(
     )
     mise = Confirm.ask("Pin toolchain versions with mise (mise.toml)?", default=False)
     vscode = Confirm.ask("Add shared VS Code config (extensions + format-on-save)?", default=False)
-    # Multi-model switching overlay (ADR-016, #351). The flag pre-accepts it; the
-    # richer init-step messaging lands in #352.
-    resolved_multi_model = multi_model_flag or Confirm.ask(
-        "Set up multi-model switching via claude-code-router "
-        "(run DeepSeek/Kimi/Ollama through Claude Code, with cost-routing)?",
-        default=False,
-    )
+    # Multi-model switching overlay (ADR-016, #351/#352). The flag pre-accepts it;
+    # otherwise the wizard explains what it does + the alternatives, then asks.
+    resolved_multi_model = multi_model_flag or _choose_multi_model_interactive()
     while True:
         agents_raw = _prompt(
             "Agents to support (claude always; add codex/gemini/ollama, comma-separated)",
