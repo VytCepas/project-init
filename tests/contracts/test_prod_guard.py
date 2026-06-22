@@ -12,7 +12,7 @@ from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_HOOK = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "hooks" / "prod_guard.py"
+_HOOK = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "prod_guard.py"
 
 DESTRUCTIVE = [
     "terraform destroy -auto-approve",

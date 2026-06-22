@@ -266,3 +266,15 @@ class TestAgentGuardAdapter:
         )
         assert proc.returncode == 0
         assert proc.stdout.strip() == ""
+
+    def test_prod_guard_blocks_destructive_cross_surface(self, tmp_path: Path):
+        """PI-394: prod_guard now fires on non-Claude surfaces via the adapter
+        (autonomous/block). `terraform destroy` is a prod_guard rule, NOT a
+        lifecycle rule — so a deny proves prod_guard ran."""
+        target = _scaffold_agents(tmp_path / "p", "codex")
+        assert (target / ".claude" / "hooks" / "prod_guard.py").is_file(), (
+            "prod_guard.py must ship to plugin-mode targets so the adapter can run it"
+        )
+        out = self._run_adapter(target, "codex", "terraform destroy -auto-approve")
+        assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "prod_guard" in out["hookSpecificOutput"]["permissionDecisionReason"]
