@@ -76,7 +76,7 @@ and `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`.
 |---|---|---|
 | Claude Code VS Code ext | hooks, skills, CLAUDE.md (same `.claude/`) | **shared project MCP**: emit a root `.mcp.json` (`mcpServers`) when MCPs are configured — `.claude/` alone does not carry shareable MCP (bare `claude mcp add` writes a private `~/.claude.json` entry) |
 | Copilot agent mode | CLAUDE.md, `.claude/skills`, hooks (matcher-blind), AGENTS.md | `.vscode/mcp.json` (`servers` map) if MCPs are configured; document that matchers are advisory here |
-| Cursor | `.claude/skills` (skills), AGENTS.md | `.cursor/hooks.json` (translate `PreToolUse(Bash)`→`beforeShellExecution`, `UserPromptSubmit`→`beforeSubmitPrompt`); `.cursor/mcp.json` (≈copy of `mcpServers`) |
+| Cursor | `.claude/skills` (skills), AGENTS.md | `.cursor/hooks.json` (`PreToolUse(Bash)`→`beforeShellExecution`, deny via `{"permission":"deny","user_message"}`; PI-385); `.cursor/mcp.json` (≈copy of `mcpServers`) |
 | Codex (CLI/IDE) | `.codex/hooks.json` ✅, `.agents/skills` ✅, AGENTS.md ✅ | MCP → `.codex/config.toml` `[mcp_servers.*]` if MCPs are configured |
 | Antigravity | `.agents/skills` ✅, `.agents/hooks.json` ✅, `.agents/mcp_config.json` ✅, AGENTS.md ✅ (PI-386) | hook blocking-contract still experimental — live-verify in #385 |
 

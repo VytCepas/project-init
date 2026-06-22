@@ -235,6 +235,7 @@ class TestAgentGuardAdapter:
         out = self._run_adapter(target, "cursor", "git push origin main")
         assert out["permission"] == "deny"
         assert "main/master" in out["user_message"]
+        assert "main/master" in out["agent_message"]
 
     def test_antigravity_emits_decision_deny(self, tmp_path: Path):
         """PI-385: `toolCall.args.CommandLine` stdin → `{decision: deny, reason}`."""
@@ -246,3 +247,17 @@ class TestAgentGuardAdapter:
     def test_innocuous_command_not_blocked(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "codex")
         assert self._run_adapter(target, "codex", "ls -la") is None
+
+    def test_malformed_payload_is_fail_open(self, tmp_path: Path):
+        """PI-385: non-dict JSON stdin must not crash the hook (stays fail-open)."""
+        target = _scaffold_agents(tmp_path / "p", "codex")
+        adapter = target / ".claude" / "hooks" / "agent_guard_adapter.py"
+        proc = subprocess.run(
+            [sys.executable, str(adapter), "codex"],
+            input="[]",
+            capture_output=True,
+            text=True,
+            cwd=target,
+        )
+        assert proc.returncode == 0
+        assert proc.stdout.strip() == ""

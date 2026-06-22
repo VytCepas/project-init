@@ -30,11 +30,20 @@ from pathlib import Path
 
 
 def _extract_command(payload: dict) -> str:
-    """Pull the shell command out of whichever stdin shape the surface sent."""
+    """Pull the shell command out of whichever stdin shape the surface sent.
+
+    Type-guards every level: malformed JSON (non-dict payload/tool_input/args)
+    yields "" rather than raising, keeping the hook fail-open.
+    """
+    if not isinstance(payload, dict):
+        return ""
     tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
+    if not isinstance(tool_input, dict):
+        tool_input = {}
     tool_call = payload.get("toolCall")
     call_args = tool_call.get("args") if isinstance(tool_call, dict) else None
-    call_args = call_args or {}
+    if not isinstance(call_args, dict):
+        call_args = {}
     command = (
         tool_input.get("command")
         or tool_input.get("cmd")
