@@ -88,16 +88,17 @@ def render_mcp_toml(servers: dict[str, dict]) -> str:
 def render_cursor_hooks() -> str:
     """Render `.cursor/hooks.json` (version 1).
 
-    Maps the shared guard onto Cursor's camelCase events: the shell guard to
-    ``beforeShellExecution`` and the workflow reminder to ``beforeSubmitPrompt``.
+    Wires the shared command guard onto Cursor's ``beforeShellExecution`` event
+    (top-level ``command`` stdin → ``{"permission": "deny", ...}`` stdout; PI-385,
+    confirmed from docs). No ``beforeSubmitPrompt`` hook: that event carries no
+    shell command and uses a different deny shape (``{"continue": false}``), so the
+    command guard can't act on it. Fail-open (no ``failClosed``) — git/CI is the
+    real boundary (ADR-007).
     """
     config = {
         "version": 1,
         "hooks": {
             "beforeShellExecution": [
-                {"command": f"{_GUARD} cursor", "type": "command"}
-            ],
-            "beforeSubmitPrompt": [
                 {"command": f"{_GUARD} cursor", "type": "command"}
             ],
         },
@@ -108,8 +109,11 @@ def render_cursor_hooks() -> str:
 def render_antigravity_hooks() -> str:
     """Render `.agents/hooks.json` for Antigravity's ``safety-gate`` model.
 
-    EXPERIMENTAL — only ``PreToolUse`` is confirmed; the exact decision I/O is
-    unverified, so the adapter stays fail-open.
+    PI-385: the ``PreToolUse`` path + stdout deny shape (``{"decision":"deny"}``)
+    and the stdin command location (``toolCall.args.CommandLine``) are confirmed
+    from Google's migration docs, and the adapter parses/emits them. Still flagged
+    ``experimental`` because the official rendered docs were un-fetchable and this
+    isn't verified against a live ``agy`` binary; adapter stays fail-open.
     """
     config = {
         "safety-gate": {

@@ -197,13 +197,20 @@ class TestSyncedCopiesInRepo:
 
 
 class TestAgentGuardAdapter:
-    """PI-388: the shared adapter translates a dag_workflow deny into each
-    surface's dialect, sourced from the documented PreToolUse hookSpecificOutput
-    shape. `git push origin main` blocks unconditionally (no redirect script)."""
+    """PI-385/388: the shared adapter parses each surface's REAL stdin shape and
+    translates a dag_workflow deny into that surface's dialect. `git push origin
+    main` blocks unconditionally (no redirect script)."""
 
     def _run_adapter(self, target: Path, dialect: str, command: str) -> dict | None:
         adapter = target / ".claude" / "hooks" / "agent_guard_adapter.py"
-        payload = json.dumps({"tool_input": {"command": command}})
+        # Each surface sends its own stdin shape (PI-385, confirmed from docs).
+        surface_payloads = {
+            "cursor": {"command": command},  # beforeShellExecution: top-level
+            "antigravity": {"toolCall": {"args": {"CommandLine": command}}},
+        }
+        payload = json.dumps(
+            surface_payloads.get(dialect, {"tool_input": {"command": command}})
+        )
         proc = subprocess.run(
             [sys.executable, str(adapter), dialect],
             input=payload,
@@ -222,7 +229,16 @@ class TestAgentGuardAdapter:
         assert hso["permissionDecision"] == "deny"
         assert "main/master" in hso["permissionDecisionReason"]
 
+    def test_cursor_emits_permission_deny(self, tmp_path: Path):
+        """PI-385: top-level `command` stdin → `{permission: deny, user_message}`."""
+        target = _scaffold_agents(tmp_path / "p", "cursor")
+        out = self._run_adapter(target, "cursor", "git push origin main")
+        assert out["permission"] == "deny"
+        assert "main/master" in out["user_message"]
+        assert "main/master" in out["agent_message"]
+
     def test_antigravity_emits_decision_deny(self, tmp_path: Path):
+        """PI-385: `toolCall.args.CommandLine` stdin → `{decision: deny, reason}`."""
         target = _scaffold_agents(tmp_path / "p", "antigravity")
         out = self._run_adapter(target, "antigravity", "git push origin main")
         assert out["decision"] == "deny"
@@ -231,3 +247,17 @@ class TestAgentGuardAdapter:
     def test_innocuous_command_not_blocked(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "codex")
         assert self._run_adapter(target, "codex", "ls -la") is None
+
+    def test_malformed_payload_is_fail_open(self, tmp_path: Path):
+        """PI-385: non-dict JSON stdin must not crash the hook (stays fail-open)."""
+        target = _scaffold_agents(tmp_path / "p", "codex")
+        adapter = target / ".claude" / "hooks" / "agent_guard_adapter.py"
+        proc = subprocess.run(
+            [sys.executable, str(adapter), "codex"],
+            input="[]",
+            capture_output=True,
+            text=True,
+            cwd=target,
+        )
+        assert proc.returncode == 0
+        assert proc.stdout.strip() == ""
