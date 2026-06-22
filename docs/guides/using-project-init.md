@@ -68,7 +68,7 @@ Start with `obsidian-only` when in doubt. Upgrade later by re-running with `--pr
 your-project/
 ├── CLAUDE.md                    # Agent entry point — read first
 ├── AGENTS.md                    # Redirect for non-Claude agents
-├── GEMINI.md                    # Redirect for Gemini agents
+├── GEMINI.md                    # Redirect for Google agents (Antigravity / Gemini)
 └── .claude/
     ├── project-init.md          # Workflow and conventions
     ├── config.yaml              # Record of wizard answers

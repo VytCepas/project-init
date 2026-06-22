@@ -5,6 +5,13 @@
 > we landed on. Source for the eventual ADR-016 and the #315 child issues.
 >
 > Status: **design agreed, not yet implemented.** Date: 2026-06.
+>
+> **Update (PI-386/399, 2026-06-22):** this report predates the Gemini-CLI
+> retirement. Google sunset Gemini CLI's free/Pro/Ultra tiers on 2026-06-18, so
+> `--agents gemini` was removed — read every `--agents gemini` below as
+> **`--agents antigravity`** (`agy`, Google's successor harness). Gemini-the-model
+> is still routable via CCR (it's a seeded provider; PI-396), separate from the
+> harness.
 
 ---
 
