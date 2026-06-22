@@ -169,6 +169,11 @@ class TestSupportTierDocs:
             target / ".claude" / "docs" / "guides" / "developer-onboarding.md"
         ).read_text()
         assert "Multi-agent support tiers" in onboarding
+        # PI-384: phone/remote guidance is scaffolded and ties enforcement to
+        # local-vs-cloud execution.
+        assert "Working from a phone or tablet" in onboarding
+        assert "Remote Control" in onboarding
+        assert "repo-committed config" in onboarding
 
 
 class TestSyncedCopiesInRepo:

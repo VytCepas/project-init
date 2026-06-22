@@ -108,3 +108,14 @@ best-effort. If the project was scaffolded with extra agents (`--agents`):
 
 The git hooks and CI checks are the real enforcement boundary for every
 agent — agent-side hooks are fast-feedback guardrails only.
+
+## Working from a phone or tablet
+
+To continue a Claude Code session from your phone, use **Remote Control**
+(`claude remote-control`, or `/remote-control` in a live session) — it drives a
+session that still runs **on your machine**, so these hooks, your MCP servers, and
+git credentials stay active, and it needs no inbound ports. **Claude Code on the
+web / cloud sessions** run in a sandbox that honors only repo-committed config (not
+your local setup), so git + CI are the guaranteed guardrails there. For a fully
+headless box or a non-Claude tool, attach over `tmux` + a mesh VPN (e.g. Tailscale)
+instead.
