@@ -7,10 +7,11 @@ scripts. Derived copies:
 
 - plugins/project-init-workflow/ (PI-129): the plugin payload — what
   default (plugin-mode) scaffolds actually run
-- templates/codex/dot_agents/skills/ and templates/antigravity/dot_agents/skills/
-  (PI-137, PI-386): Codex/Antigravity read .agents/skills — byte-identical
-  copies so those surfaces work even in plugin-mode scaffolds with no
-  .claude/skills (Antigravity discovers them natively — no command pointers)
+- templates/{codex,antigravity,amp}/dot_agents/skills/ and
+  templates/junie/dot_junie/skills/ (PI-137, PI-386, PI-397): Codex/Antigravity/Amp
+  read .agents/skills, Junie reads .junie/skills — byte-identical copies so each
+  surface works standalone (all discover <dir>/<name>/SKILL.md natively, no
+  command pointers)
 
 Templated files (e.g. plan/SKILL.md.tmpl) are project-specific and stay
 scaffold-only.

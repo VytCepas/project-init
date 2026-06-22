@@ -23,9 +23,9 @@ CLI (and, per the #365 spike, the Anthropic Claude Code VS Code extension, which
 shares the CLI's config). The other agent surfaces our users run — Cursor, the
 OpenAI Codex IDE, Google Antigravity, GitHub Copilot agent mode — read different
 files, with different schemas. Today project-init reaches them only incidentally:
-it emits `.codex/hooks.json` + `.agents/skills/` (Codex) and a `.gemini-extension/`
-overlay (Gemini), but nothing for Cursor or Antigravity, and no MCP config in any
-runnable form. The user's principle for this epic is **agnostic = visible to all
+it emits `.codex/hooks.json` + `.agents/skills/` (Codex) and (until PI-386) a
+`.gemini-extension/` overlay for the now-removed Gemini CLI, but nothing for Cursor
+or Antigravity, and no MCP config in any runnable form. The user's principle for this epic is **agnostic = visible to all
 surfaces**: one canonical definition should reach every surface, and adding a
 surface should be a one-line change.
 
