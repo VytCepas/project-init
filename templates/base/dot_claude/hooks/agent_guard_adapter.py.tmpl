@@ -4,8 +4,10 @@
 Codex (PreToolUse via .codex/hooks.json) and the GUI surfaces (cursor,
 antigravity) reuse the same COMMAND_RULES enforcement Claude Code gets from
 github_command_guard.sh. Payloads differ slightly per surface, so this shim
-extracts the shell command, feeds a Claude-shaped payload into dag_workflow.py
-guard, and translates the verdict to the caller's dialect:
+extracts the shell command, runs it through BOTH Claude-side guards —
+dag_workflow.py guard (lifecycle COMMAND_RULES) and prod_guard.py
+(destructive-command deny-list, autonomous mode; PI-394) — and translates a deny
+to the caller's dialect:
 
   codex  -> {"hookSpecificOutput": {permissionDecision: "deny", ...}}
             (the documented PreToolUse schema; Codex accepts it)
@@ -57,6 +59,40 @@ def _extract_command(payload: dict) -> str:
     return str(command)
 
 
+def _run_guard(name: str, payload: dict, *args: str) -> object:
+    """Run a sibling guard script with a JSON payload; return its parsed verdict.
+
+    Fail-open: a missing script or any error yields None (the command proceeds).
+    """
+    script = Path(__file__).with_name(name)
+    if not script.exists():
+        return None
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(script), *args],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return json.loads(proc.stdout.strip() or "null")
+    except Exception:
+        return None
+
+
+def _deny_reason(verdict: object) -> str | None:
+    """Deny reason from a PreToolUse verdict (documented hookSpecificOutput or the
+    legacy {"decision": "block"} shape), or None if it isn't a deny."""
+    if not isinstance(verdict, dict):
+        return None
+    hso = verdict.get("hookSpecificOutput")
+    if isinstance(hso, dict) and hso.get("permissionDecision") == "deny":
+        return hso.get("permissionDecisionReason", "")
+    if verdict.get("decision") == "block":
+        return verdict.get("reason", "")
+    return None
+
+
 def main() -> int:
     dialect = sys.argv[1] if len(sys.argv) > 1 else "codex"
     try:
@@ -66,48 +102,46 @@ def main() -> int:
     command = _extract_command(payload)
     if not command:
         return 0
+    cwd = payload.get("cwd") if isinstance(payload, dict) else None
 
-    guard = Path(__file__).with_name("dag_workflow.py")
-    proc = subprocess.run(
-        [sys.executable, str(guard), "guard"],
-        input=json.dumps({"tool_input": {"command": command}}),
-        capture_output=True,
-        text=True,
-        check=False,
+    # Lifecycle COMMAND_RULES guard first; only run the destructive-command guard
+    # if it didn't already deny — avoids a second subprocess on a blocked command
+    # (PI-394). Agent surfaces are non-interactive, so prod_guard runs in autonomous
+    # mode → a destructive command blocks outright rather than "ask"ing. Both emit
+    # the documented PreToolUse shape.
+    reason = _deny_reason(
+        _run_guard("dag_workflow.py", {"tool_input": {"command": command}}, "guard")
     )
-    try:
-        verdict = json.loads(proc.stdout.strip() or "null")
-    except json.JSONDecodeError:
+    if reason is None:
+        reason = _deny_reason(
+            _run_guard(
+                "prod_guard.py",
+                {
+                    "tool_input": {"command": command},
+                    "permission_mode": "bypassPermissions",
+                    "cwd": cwd or ".",
+                },
+            )
+        )
+    if reason is None:
         return 0
-    if not isinstance(verdict, dict):
-        return 0
-    # dag_workflow.py emits the documented PreToolUse shape; tolerate the
-    # legacy {"decision": "block"} form too in case of version skew. Guard the
-    # type so a corrupt hookSpecificOutput can't raise (stay fail-open).
-    hso = verdict.get("hookSpecificOutput")
-    if not isinstance(hso, dict):
-        hso = {}
-    denied = hso.get("permissionDecision") == "deny" or verdict.get("decision") == "block"
-    if denied:
-        reason = hso.get("permissionDecisionReason") or verdict.get("reason", "")
-        if dialect == "cursor":
-            # Cursor beforeShellExecution deny (PI-385: confirmed from docs —
-            # permission + snake_case user_message/agent_message).
-            out = {"permission": "deny", "user_message": reason, "agent_message": reason}
-        elif dialect == "antigravity":
-            # Antigravity safety-gate deny (PI-385: stdout confirmed from docs;
-            # surface still flagged experimental pending live-binary verification).
-            out = {"decision": "deny", "reason": reason}
-        else:
-            # codex: the documented PreToolUse schema (Codex accepts it).
-            out = {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": reason,
-                }
+
+    if dialect == "cursor":
+        # Cursor beforeShellExecution deny (PI-385: permission + snake_case msgs).
+        out = {"permission": "deny", "user_message": reason, "agent_message": reason}
+    elif dialect == "antigravity":
+        # Antigravity safety-gate deny (PI-385).
+        out = {"decision": "deny", "reason": reason}
+    else:
+        # codex: the documented PreToolUse schema (Codex accepts it).
+        out = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reason,
             }
-        sys.stdout.write(json.dumps(out))
+        }
+    sys.stdout.write(json.dumps(out))
     return 0
 
 

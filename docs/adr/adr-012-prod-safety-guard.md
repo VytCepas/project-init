@@ -55,3 +55,14 @@ reach. This is the only claim strong enough to call a guarantee.
   and the interactive "ask" path keep the cost one keystroke.
 - Docs must keep stating the guardrail-vs-boundary distinction wherever
   the guard is mentioned, so nobody mistakes pattern-matching for safety.
+
+## Update (PI-394)
+
+`prod_guard.py` moved to the always-scaffolded `base` layer (was `fallback`)
+so it ships to plugin-mode targets too, and the shared
+`agent_guard_adapter.py` now runs it for the non-Claude surfaces
+(Codex/Cursor/Antigravity), not just Claude. Those surfaces are
+non-interactive, so the adapter invokes prod_guard in autonomous mode →
+destructive commands **block** outright (no "ask" path on a surface that
+can't render one). Still a guardrail, not a boundary: git/CI + credential
+separation remain the guarantee (ADR-007).

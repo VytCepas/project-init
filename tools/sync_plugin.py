@@ -57,6 +57,9 @@ def hook_scripts() -> list[Path]:
     # _py.sh lives in base (always scaffolded to .claude/hooks so the lifecycle
     # scripts resolve it in plugin mode too, PI-361); ship it in the plugin too.
     scripts.append(TEMPLATE_CLAUDE / "hooks" / "_py.sh")
+    # prod_guard.py moved to base (PI-394): always scaffolded so the cross-surface
+    # adapter can exec it for Codex/Cursor/Antigravity, not just Claude.
+    scripts.append(TEMPLATE_CLAUDE / "hooks" / "prod_guard.py")
     return sorted(scripts)
 
 

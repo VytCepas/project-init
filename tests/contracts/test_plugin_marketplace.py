@@ -105,6 +105,8 @@ class TestPluginPayloadInSync:
         )
         # _py.sh lives in base (always scaffolded) and is mirrored to the plugin.
         template_hooks["_py.sh"] = _TEMPLATE_CLAUDE / "hooks" / "_py.sh"
+        # prod_guard.py moved to base (PI-394) so the adapter can run it cross-surface.
+        template_hooks["prod_guard.py"] = _TEMPLATE_CLAUDE / "hooks" / "prod_guard.py"
         plugin_hooks = {
             p.name: p
             for p in (_PLUGIN_ROOT / "hooks").iterdir()
