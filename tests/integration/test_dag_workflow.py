@@ -139,7 +139,7 @@ class TestGuardSteering:
         scripts.mkdir(parents=True)
         (scripts / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard({"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path)
-        assert out is not None
+        assert _denied(out)
         assert "monitor_pr.sh" in _deny_reason(out)
 
     def test_blocks_gh_api_merge(self, tmp_path: Path):
@@ -150,7 +150,7 @@ class TestGuardSteering:
             {"tool_input": {"command": "gh api repos/foo/bar/pulls/42/merge -X PUT"}},
             cwd=tmp_path,
         )
-        assert out is not None
+        assert _denied(out)
         assert "monitor_pr.sh" in _deny_reason(out)
 
     def test_blocks_raw_git_push_when_wrapper_exists(self, tmp_path: Path):
@@ -158,7 +158,7 @@ class TestGuardSteering:
         scripts.mkdir(parents=True)
         (scripts / "push_branch.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard({"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path)
-        assert out is not None
+        assert _denied(out)
         assert "push_branch.sh" in _deny_reason(out)
 
     def test_no_redirect_when_wrapper_missing(self, tmp_path: Path):

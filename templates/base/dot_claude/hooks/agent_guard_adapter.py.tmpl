@@ -58,8 +58,11 @@ def main() -> int:
     if not isinstance(verdict, dict):
         return 0
     # dag_workflow.py emits the documented PreToolUse shape; tolerate the
-    # legacy {"decision": "block"} form too in case of version skew.
-    hso = verdict.get("hookSpecificOutput") or {}
+    # legacy {"decision": "block"} form too in case of version skew. Guard the
+    # type so a corrupt hookSpecificOutput can't raise (stay fail-open).
+    hso = verdict.get("hookSpecificOutput")
+    if not isinstance(hso, dict):
+        hso = {}
     denied = hso.get("permissionDecision") == "deny" or verdict.get("decision") == "block"
     if denied:
         reason = hso.get("permissionDecisionReason") or verdict.get("reason", "")

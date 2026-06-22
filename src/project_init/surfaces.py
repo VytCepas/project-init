@@ -54,26 +54,29 @@ def render_mcp_json(servers: dict[str, dict], *, key: str) -> str:
 def render_mcp_toml(servers: dict[str, dict]) -> str:
     """MCP config as Codex ``config.toml`` ``[mcp_servers.<name>]`` tables.
 
-    Stdlib only (no toml writer): values are simple strings/lists/inline tables,
-    so manual emission is safe and keeps the scaffolder dependency-free. Passes
-    through ``env`` (stdio) and ``bearer_token_env_var`` (HTTP) so servers that
-    need a secret aren't silently dropped (PI-388).
+    Stdlib only (no toml writer): every string is emitted via ``json.dumps`` —
+    TOML basic strings share JSON's escaping for quotes, backslashes, and
+    control chars — so values can't produce invalid TOML. Passes through ``env``
+    (stdio) and ``bearer_token_env_var`` (HTTP) so servers that need a secret
+    aren't silently dropped (PI-388).
     """
     lines: list[str] = []
     for name in sorted(servers):
         spec = servers[name]
         lines.append(f"[mcp_servers.{name}]")
         if "command" in spec:
-            lines.append(f'command = "{spec["command"]}"')
+            lines.append(f"command = {json.dumps(spec['command'])}")
             if spec.get("args"):
-                rendered = ", ".join(f'"{a}"' for a in spec["args"])
+                rendered = ", ".join(json.dumps(a) for a in spec["args"])
                 lines.append(f"args = [{rendered}]")
         if "url" in spec:
-            lines.append(f'url = "{spec["url"]}"')
+            lines.append(f"url = {json.dumps(spec['url'])}")
             if spec.get("bearer_token_env_var"):
-                lines.append(f'bearer_token_env_var = "{spec["bearer_token_env_var"]}"')
+                lines.append(f"bearer_token_env_var = {json.dumps(spec['bearer_token_env_var'])}")
         if spec.get("env"):
-            rendered_env = ", ".join(f'"{k}" = "{v}"' for k, v in spec["env"].items())
+            rendered_env = ", ".join(
+                f"{json.dumps(k)} = {json.dumps(v)}" for k, v in spec["env"].items()
+            )
             lines.append(f"env = {{{rendered_env}}}")
         lines.append("")
     return "\n".join(lines)
