@@ -16,7 +16,11 @@ class TestListPresets:
         for p in list_presets():
             assert "name" in p
             assert "description" in p
-            assert "layers" in p
+            # `layers` may be inherited via `extends` (e.g. the `governed`
+            # preset), which list_presets() returns unresolved — so assert the
+            # required layer set on the fully resolved preset.
+            resolved = load_preset(p["name"])
+            assert resolved.get("layers")
 
 
 class TestLoadPreset:

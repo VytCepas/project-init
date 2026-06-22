@@ -200,14 +200,19 @@ _AGENT_LAYERS = ("codex", "antigravity", "amp", "junie")
 
 
 def overlay_layers(
-    agents: str | list[str], *, no_plugin: bool, multi_model: bool = False
+    agents: str | list[str],
+    *,
+    no_plugin: bool,
+    multi_model: bool = False,
+    governance: bool = False,
 ) -> list[str]:
     """Extra template layers appended to a preset beyond its base definition.
 
     The per-agent overlays (PI-137), prefixed with the ``fallback`` layer when
-    plugins are off, plus the opt-in ``multi_model`` overlay (ADR-016, #351).
-    One source for both the scaffolder and the ``upgrade`` re-render, so they can
-    never derive a different layer set (PI-189).
+    plugins are off, plus the opt-in ``multi_model`` overlay (ADR-016, #351) and
+    the opt-in ``governance`` overlay (ADR-018, #410). One source for both the
+    scaffolder and the ``upgrade`` re-render, so they can never derive a
+    different layer set (PI-189).
     """
     chosen = {a.strip() for a in (agents.split(",") if isinstance(agents, str) else agents)}
     extra = [a for a in _AGENT_LAYERS if a in chosen]
@@ -215,6 +220,8 @@ def overlay_layers(
         extra = ["fallback", *extra]
     if multi_model:
         extra = [*extra, "multi_model"]
+    if governance:
+        extra = [*extra, "governance"]
     return extra
 
 

@@ -1,0 +1,14 @@
+# Preset: Governed — AI-governance overlay on the Obsidian-only base (ADR-018, #410)
+# For projects that build or operate an AI system and want governance-as-code:
+# an AI usage policy, approved-tools/data-handling docs, a system card + AIBOM,
+# and a presence-triggered CI gate. Inherits the Obsidian-only memory stack;
+# the `governance = true` var drives the governance overlay layer at scaffold
+# and upgrade time (the CLI --governance flag does the same, and takes precedence).
+
+name = "governed"
+description = "AI-governance overlay (governance-as-code) on the Obsidian-only base."
+
+extends = "obsidian-only"
+
+[vars]
+governance = true

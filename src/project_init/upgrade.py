@@ -142,6 +142,8 @@ def _overlay_off_defaults() -> dict[str, str]:
         "cloud_oidc": "",
         # Multi-model overlay (ADR-016): off for records predating the question.
         "multi_model": "",
+        # AI-governance overlay (ADR-018): off for records predating the question.
+        "governance": "",
         "want_devcontainer": "",
         "project_owner": "",
         "license": "none",
@@ -622,6 +624,7 @@ def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Pa
         variables.get("agents", "claude"),
         no_plugin=bool(variables.get("no_plugin")),
         multi_model=bool(variables.get("multi_model")),
+        governance=bool(variables.get("governance")),
     )
     if extra:
         preset = {**preset, "layers": list(preset["layers"]) + extra}

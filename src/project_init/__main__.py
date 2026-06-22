@@ -58,6 +58,10 @@ class ScaffoldInputs:
     # Multi-model switching overlay (ADR-016, epic #315, opt-in): scaffolds the
     # claude-code-router config + setup_models.sh installer. Off by default.
     multi_model: bool = False
+    # AI-governance overlay (ADR-018, epic #276, opt-in): scaffolds the
+    # governance-as-code layer (AUP/system-card docs + CI gate). Off by default.
+    # Distinct from the PI-145 CODEOWNERS/LICENSE governance prompts.
+    governance: bool = False
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -127,6 +131,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "claude-code-router config + setup_models.sh installer to run other "
             "models (DeepSeek/Kimi/Ollama) through the Claude Code harness with "
             "live /model switching and background cost-routing. Clean by default."
+        ),
+    )
+    p.add_argument(
+        "--governance",
+        action="store_true",
+        help=(
+            "Scaffold the opt-in AI-governance overlay (ADR-018): governance-as-"
+            "code — an AI usage policy, approved-tools/data-handling docs, a "
+            "system card + AIBOM, and a presence-triggered CI gate that adopts "
+            "NIST AI RMF / EU AI Act conventions. Off by default."
         ),
     )
     p.add_argument(
@@ -431,6 +445,38 @@ def _choose_multi_model_interactive() -> bool:
     return Confirm.ask("Set up multi-model switching via claude-code-router?", default=False)
 
 
+def _choose_governance_interactive() -> bool:
+    """Explain the AI-governance overlay, then ask (ADR-018, #410).
+
+    States what the overlay ships — governance-as-code (AUP + approved-tools/
+    data-handling docs, a system card + AIBOM, a presence-triggered CI gate that
+    adopts NIST AI RMF / EU AI Act conventions) — so the user makes an informed
+    choice or declines; declining leaves a clean project. Passing --governance
+    pre-accepts via the flag and skips this. Most projects are not AI products,
+    so it is strictly opt-in and off by default.
+    """
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import Confirm
+
+    console = Console()
+    body = (
+        "Ship [bold]governance-as-code[/bold] — a failing CI check, not a PDF — "
+        "for projects that build or operate an AI system.\n\n"
+        "  [dim]AI_USAGE_POLICY.md[/dim]      [dim]# 1-page AUP (NIST-aligned)[/dim]\n"
+        "  [dim]approved-tools.md[/dim]       [dim]# allow/deny models, endpoints, data[/dim]\n"
+        "  [dim]SYSTEM_CARD + AIBOM[/dim]     [dim]# what you run, derived + declared[/dim]\n"
+        "  [dim]governance CI gate[/dim]      [dim]# fails on a real card missing fields[/dim]\n\n"
+        "[cyan]Adopts:[/cyan] NIST AI RMF, ISO/IEC 42001, EU AI Act, OWASP LLM/Agentic "
+        "Top 10 — referenced, not re-authored.\n"
+        "[cyan]Note:[/cyan] most projects are not AI products — keep this off unless "
+        "yours calls an LLM API over data.\n"
+        "Clean by default — decline and nothing is added."
+    )
+    console.print(Panel(body, title="AI governance (governance-as-code)", border_style="cyan"))
+    return Confirm.ask("Set up the AI-governance overlay?", default=False)
+
+
 def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
     """Warn that user-owned files were kept; renders landed as .new siblings."""
     from rich.console import Console
@@ -559,13 +605,19 @@ def _gather_inputs_interactive(
     no_plugin: bool,
     profile: str | None,
     no_egress: bool = False,
-    cli_overlays: tuple[str | None, str | None, str | None, bool] = (None, None, None, False),
+    cli_overlays: tuple[str | None, str | None, str | None, bool, bool] = (
+        None,
+        None,
+        None,
+        False,
+        False,
+    ),
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
     ``cli_overlays`` pre-seeds the overlay flags (delivery, deploy, iac,
-    multi_model) from the CLI; the string slots may be None to prompt, and
-    multi_model=True skips the multi-model prompt (ADR-016, #351).
+    multi_model, governance) from the CLI; the string slots may be None to
+    prompt, and multi_model/governance=True skip their prompts (ADR-016/ADR-018).
     """
     resolved_profile = profile or _choose_profile_interactive()
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
@@ -574,7 +626,7 @@ def _gather_inputs_interactive(
     language = _prompt("Language (python/node/go/none)", default="none")
     if language not in {"python", "node", "go", "none"}:
         language = "none"
-    delivery_flag, deploy_flag, iac_flag, multi_model_flag = cli_overlays
+    delivery_flag, deploy_flag, iac_flag, multi_model_flag, governance_flag = cli_overlays
     resolved_delivery, resolved_deploy, resolved_iac = _resolve_overlays_interactive(
         language, delivery_flag, deploy_flag, iac_flag
     )
@@ -600,6 +652,9 @@ def _gather_inputs_interactive(
     # Multi-model switching overlay (ADR-016, #351/#352). The flag pre-accepts it;
     # otherwise the wizard explains what it does + the alternatives, then asks.
     resolved_multi_model = multi_model_flag or _choose_multi_model_interactive()
+    # AI-governance overlay (ADR-018, #410). The flag pre-accepts it; otherwise
+    # the wizard explains what it ships, then asks (strictly opt-in).
+    resolved_governance = governance_flag or _choose_governance_interactive()
     while True:
         agents_raw = _prompt(
             "Agents/surfaces (claude always; add codex/ollama/cursor/antigravity/vscode, comma-separated)",
@@ -630,6 +685,7 @@ def _gather_inputs_interactive(
         deploy=resolved_deploy,
         iac=resolved_iac,
         multi_model=resolved_multi_model,
+        governance=resolved_governance,
     )
 
 
@@ -1064,6 +1120,15 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         # layer; recorded in config.yaml's variables block so `upgrade` re-derives
         # the same layer set (PI-189), exactly like the agents overlay.
         "multi_model": "true" if inputs.multi_model else "",
+        # AI-governance overlay (ADR-018, #410): gates the governance layer and is
+        # recorded so `upgrade` re-derives the same set. Unlike multi_model it can
+        # also come from a preset's [vars] (the `governed` preset) — the CLI flag
+        # takes precedence, falling back to the preset var. Mirror this resolution
+        # in overlay_layers() at the call sites (scaffold + upgrade) so the layer
+        # and the recorded variable can never disagree.
+        "governance": "true"
+        if (inputs.governance or preset.get("vars", {}).get("governance"))
+        else "",
         # Distribution profile (ADR-013, #247): recorded + drives the delivery
         # and enforcement defaults. The enforcing behavior lands in #251.
         "profile": inputs.profile,
@@ -1133,6 +1198,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         deploy=deploy,
         iac=iac,
         multi_model=args.multi_model,
+        governance=args.governance,
     )
 
 
@@ -1202,7 +1268,13 @@ def main(argv: list[str] | None = None) -> int:
             no_plugin=args.no_plugin,
             profile=args.profile,
             no_egress=args.no_egress,
-            cli_overlays=(args.delivery, args.deploy, args.iac, args.multi_model),
+            cli_overlays=(
+                args.delivery,
+                args.deploy,
+                args.iac,
+                args.multi_model,
+                args.governance,
+            ),
         )
     target.mkdir(parents=True, exist_ok=True)
 
@@ -1210,8 +1282,16 @@ def main(argv: list[str] | None = None) -> int:
     # restores the shared hooks/skills copies via the fallback layer
     # (PI-165, ADR-010 cutover). The preset dict is copied so the loaded
     # definition stays pristine.
+    # Governance can be turned on by the CLI flag OR by the `governed` preset's
+    # [vars] (ADR-018, #410). The flag wins; otherwise fall back to the preset
+    # var. Resolve it here so the appended layer matches the recorded variable
+    # that _build_variables() computes with the same precedence.
+    governance_on = inputs.governance or bool(preset.get("vars", {}).get("governance"))
     extra_layers = overlay_layers(
-        inputs.agents, no_plugin=inputs.no_plugin, multi_model=inputs.multi_model
+        inputs.agents,
+        no_plugin=inputs.no_plugin,
+        multi_model=inputs.multi_model,
+        governance=governance_on,
     )
     if extra_layers:
         preset = {**preset, "layers": list(preset["layers"]) + extra_layers}
