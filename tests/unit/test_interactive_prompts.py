@@ -51,6 +51,6 @@ def test_choose_multi_model_interactive_shows_messaging(monkeypatch, capsys):
     out = capsys.readouterr().out
     # Single-token substrings survive 80-col panel wrapping.
     assert "/model" in out
-    assert "deepseek,deepseek-chat" in out
+    assert "deepseek,deepseek-v4-flash" in out
     assert "Alternatives" in out
     assert "codex" in out  # the native-harness alternative is surfaced
