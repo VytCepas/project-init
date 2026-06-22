@@ -46,7 +46,6 @@ Available flags:
 | `--preset` | `obsidian-only`, `obsidian-graphify` | (asked interactively) |
 | `--language` | `python`, `node`, `go`, `none` | `none` |
 | `--mcps` | `context7` (comma-separated) | none |
-| `--db` | `none`, `postgres`, `sqlite` | `none` |
 | `--browser` | flag (Playwright MCP) | off |
 | `--strict` | flag (fail on unrendered placeholders) | off |
 

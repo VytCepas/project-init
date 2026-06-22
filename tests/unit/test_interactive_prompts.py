@@ -37,19 +37,6 @@ def test_choose_mcps_interactive_empty_skips(monkeypatch):
     assert __main__._choose_mcps_interactive(MCP_CATALOG) == []
 
 
-@pytest.mark.parametrize(
-    ("choice", "expected"),
-    [(1, None), (2, "postgres"), (3, "sqlite")],
-)
-def test_choose_db_interactive_maps_choices(monkeypatch, choice, expected):
-    monkeypatch.setattr("rich.prompt.IntPrompt.ask", lambda *a, **k: choice)
-    result = __main__._choose_db_interactive()
-    if expected is None:
-        assert result is None
-    else:
-        assert result["id"] == expected
-
-
 @pytest.mark.parametrize("answer", [True, False])
 def test_choose_multi_model_interactive_returns_confirm(monkeypatch, answer):
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: answer)

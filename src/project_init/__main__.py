@@ -10,7 +10,6 @@ from pathlib import Path
 
 from project_init import __plugin_version__, __repo_url__, __version__
 from project_init.mcps import (
-    DB_CATALOG,
     MCP_CATALOG,
     PLAYWRIGHT_MCP,
     format_installed_mcps,
@@ -134,12 +133,6 @@ def _build_parser() -> argparse.ArgumentParser:
         "--mcps",
         default="",
         help="Comma-separated MCP IDs from the core catalog (e.g. context7)",
-    )
-    p.add_argument(
-        "--db",
-        choices=["none", "postgres", "sqlite"],
-        default="none",
-        help="Database MCP to add (default: none)",
     )
     p.add_argument(
         "--browser",
@@ -289,25 +282,6 @@ def _choose_mcps_interactive(catalog: list[dict]) -> list[dict]:
     return selected
 
 
-def _choose_db_interactive() -> dict | None:
-    from rich.console import Console
-    from rich.prompt import IntPrompt
-
-    console = Console()
-    console.print("\n[bold]Database MCP:[/bold]")
-    console.print("  [cyan]1[/cyan]. None")
-    console.print("  [cyan]2[/cyan]. Postgres")
-    console.print("  [cyan]3[/cyan]. SQLite")
-    console.print()
-
-    choice = IntPrompt.ask("Choose", default=1)
-    if choice == 2:
-        return DB_CATALOG["postgres"]
-    if choice == 3:
-        return DB_CATALOG["sqlite"]
-    return None
-
-
 def _choose_browser_interactive() -> bool:
     from rich.prompt import Confirm
 
@@ -333,7 +307,6 @@ def _choose_profile_interactive() -> str:
 
 def _resolve_mcps_non_interactive(
     mcps_arg: str,
-    db_arg: str,
     browser_arg: bool,
 ) -> list[dict]:
     """Parse non-interactive MCP flags into a flat list of selected MCPs.
@@ -361,9 +334,6 @@ def _resolve_mcps_non_interactive(
         valid = ", ".join(catalog_by_id.keys())
         msg = f"unknown MCP id(s): {', '.join(unknown)}. Valid: {valid}"
         raise ValueError(msg)
-
-    if db_arg and db_arg != "none" and db_arg in DB_CATALOG:
-        selected.append(DB_CATALOG[db_arg])
 
     if browser_arg:
         selected.append(PLAYWRIGHT_MCP)
@@ -607,11 +577,8 @@ def _gather_inputs_interactive(
         language, delivery_flag, deploy_flag, iac_flag
     )
 
-    # MCP selection — three steps.
+    # MCP selection — catalog multi-select + optional browser MCP.
     selected_mcps = _choose_mcps_interactive(MCP_CATALOG)
-    db_mcp = _choose_db_interactive()
-    if db_mcp:
-        selected_mcps = selected_mcps + [db_mcp]
     if _choose_browser_interactive():
         selected_mcps = selected_mcps + [PLAYWRIGHT_MCP]
 
@@ -1130,7 +1097,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
     if not args.non_interactive:
         return None
     try:
-        selected_mcps = _resolve_mcps_non_interactive(args.mcps, args.db, args.browser)
+        selected_mcps = _resolve_mcps_non_interactive(args.mcps, args.browser)
         agents = resolve_agents(args.agents)
     except ValueError as e:
         parser.error(str(e))

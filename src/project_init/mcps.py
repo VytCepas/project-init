@@ -16,34 +16,23 @@ MCP_CATALOG: list[dict] = [
         "id": "context7",
         "name": "Context7",
         "description": "Live library documentation lookup",
-        "command": "claude mcp add context7 bunx @upstash/context7-mcp",
+        "command": "claude mcp add context7 -- bunx @upstash/context7-mcp",
         # Canonical server spec (PI-366): the stdio invocation behind the
         # install command, rendered per-surface into mcpServers / servers / TOML.
         "server": {"command": "bunx", "args": ["@upstash/context7-mcp"]},
     },
 ]
 
-# Database MCPs — mutually exclusive, offered as a single-choice follow-up.
-DB_CATALOG: dict[str, dict] = {
-    "postgres": {
-        "id": "postgres",
-        "name": "Postgres",
-        "command": "claude mcp add postgres bunx @modelcontextprotocol/server-postgres",
-        "server": {"command": "bunx", "args": ["@modelcontextprotocol/server-postgres"]},
-    },
-    "sqlite": {
-        "id": "sqlite",
-        "name": "SQLite",
-        "command": "claude mcp add sqlite bunx mcp-server-sqlite",
-        "server": {"command": "bunx", "args": ["mcp-server-sqlite"]},
-    },
-}
+# Database MCPs are intentionally absent (PI-387): the reference postgres/sqlite
+# servers were archived with unpatched SQL-injection CVEs, and a DB MCP overlaps
+# with the agent's native Bash psql/sqlite3 access (same rationale that excludes
+# filesystem above). Projects needing one can add it themselves.
 
 # Browser automation MCP — offered as a yes/no follow-up.
 PLAYWRIGHT_MCP: dict = {
     "id": "playwright",
     "name": "Playwright",
-    "command": "claude mcp add playwright bunx @playwright/mcp",
+    "command": "claude mcp add playwright -- bunx @playwright/mcp",
     "server": {"command": "bunx", "args": ["@playwright/mcp"]},
 }
 
@@ -55,7 +44,6 @@ def servers_for_ids(ids: list[str]) -> dict[str, dict]:
     generators render from (PI-366).
     """
     by_id: dict[str, dict] = {m["id"]: m for m in MCP_CATALOG}
-    by_id.update(DB_CATALOG)
     by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
     out: dict[str, dict] = {}
     for i in ids:
