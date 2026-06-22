@@ -9,7 +9,7 @@ paths keep this repo's hook-based enforcement live**. Verified against vendor do
 | You want… | Use | Enforcement (hooks/DAG guard) |
 |---|---|---|
 | Steer an in-progress session from your phone, full local env | **Remote Control** | ✅ runs on your machine |
-| Kick off a task with no local machine on | Claude Code on the web / cloud session | ⚠️ sandbox honors repo-committed config only; git/CI is the boundary |
+| Kick off a task with no local machine on | Claude Code on the web / cloud session | ⚠️ repo-committed hooks can run in-sandbox; no local config — git/CI is the boundary |
 | Fully headless box, or a non-Claude tool | **tmux + Tailscale** | ✅ (it's your local shell) |
 
 The decisive fact: **enforcement depends on *where the session executes*, not which
@@ -57,12 +57,19 @@ WSL VM isn't reachable at the host IP without help.
    connection never kills the session.
 2. **Transport — Tailscale (cleanest):** install Tailscale **on the Windows host**
    (not inside WSL — `tailscaled` in WSL2 fights the TUN device), and on the phone,
-   same account. Run `sshd` inside WSL on an alt port; connect to the host's tailnet
-   name. No port-forwarding, works over cellular.
-   - Add **mosh** for flaky mobile links (local echo + roaming). mosh needs UDP, so
-     it only works over Tailscale or WSL2 mirrored mode — **not** `netsh portproxy`.
-   - iOS Tailscale grabs port 22; the clean fix is a Windows OpenSSH server on alt
-     ports that `ForceCommand`s into `wsl.exe`.
+   same account. The host is now reachable at its tailnet name — but **WSL's `sshd`
+   sits behind WSL2's NAT**, so the tailnet connection lands on the *Windows host*,
+   not WSL, unless you bridge it. Pick one:
+   - **WSL2 mirrored networking** (`networkingMode=mirrored` in `.wslconfig`) so WSL
+     shares the host's network stack and tailnet — simplest, and it passes UDP (so
+     mosh works);
+   - a Windows `netsh portproxy` from a host port → `<WSL-ip>:22` (TCP only — no mosh); or
+   - a Windows OpenSSH server that `ForceCommand`s into `wsl.exe` (this also solves
+     iOS Tailscale grabbing port 22).
+
+   Then connect to `<host-tailnet-name>:<port>` — no inbound internet ports, works
+   over cellular. Add **mosh** for flaky links (local echo + roaming); it needs UDP,
+   so use mirrored mode (not portproxy).
 3. **Alternatives:** WSL2 `networkingMode=mirrored` (LAN-only, no NAT); Cloudflare
    Tunnel / `sshx` / `tmate` (no open ports, browser terminal); `code tunnel` →
    `vscode.dev` (full editor + integrated terminal from a tablet).
