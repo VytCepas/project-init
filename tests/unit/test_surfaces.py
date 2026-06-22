@@ -65,7 +65,8 @@ def test_cursor_hooks_use_camelcase_events_and_adapter():
     cfg = json.loads(surfaces.render_cursor_hooks())
     assert cfg["version"] == 1
     assert "beforeShellExecution" in cfg["hooks"]
-    assert "beforeSubmitPrompt" in cfg["hooks"]
+    # PI-385: beforeSubmitPrompt dropped (no command; different deny shape).
+    assert "beforeSubmitPrompt" not in cfg["hooks"]
     cmd = cfg["hooks"]["beforeShellExecution"][0]["command"]
     assert "agent_guard_adapter.py cursor" in cmd
 

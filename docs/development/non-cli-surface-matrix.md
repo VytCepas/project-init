@@ -46,6 +46,17 @@ project-init can decide what to emit beyond `.claude/` (epic #359, workstream B)
    for skills, AGENTS.md native (v1.20.3+), MCP at `~/.gemini/config/mcp_config.json`.
    Only `PreToolUse` is confirmed; the full event set is unverified.
 
+   > **Update — PI-385 (2026-06-22):** the deny **contracts** are now confirmed from
+   > vendor docs and the adapter parses/emits them, pinned by simulation tests
+   > (`TestAgentGuardAdapter`): **Cursor** `beforeShellExecution` — top-level
+   > `{"command"}` stdin → `{"permission":"deny","user_message","agent_message"}`;
+   > **Antigravity** `PreToolUse` — `toolCall.args.CommandLine` stdin →
+   > `{"decision":"deny","reason"}`; **Antigravity** project MCP at
+   > `.agents/mcp_config.json` (PI-386). Both stay **fail-open** by design (no Cursor
+   > `failClosed`) — a hook crash must not wedge a shell; git/CI is the boundary
+   > (ADR-007). Antigravity remains flagged `experimental` only because it isn't yet
+   > verified against a live `agy` binary (the contract itself is doc-confirmed).
+
 ## What project-init emits today vs. what each surface needs
 
 > **Update — PI-386 (2026-06-22):** Gemini CLI was removed. Google sunset its

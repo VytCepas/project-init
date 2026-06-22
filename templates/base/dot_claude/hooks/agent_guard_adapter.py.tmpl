@@ -9,11 +9,16 @@ guard, and translates the verdict to the caller's dialect:
 
   codex  -> {"hookSpecificOutput": {permissionDecision: "deny", ...}}
             (the documented PreToolUse schema; Codex accepts it)
-  cursor -> {"permission": "deny", ...}      (PI-385: shape unverified)
-  antigravity -> {"decision": "deny", ...}   (PI-385: experimental)
+  cursor -> {"permission": "deny", "user_message": ...}  (beforeShellExecution)
+  antigravity -> {"decision": "deny", "reason": ...}      (safety-gate PreToolUse)
 
-Fail-open by design: on any parse error the command proceeds — git hooks
-and CI remain the real enforcement boundary (ADR-007).
+Stdin differs per surface too (PI-385, confirmed from vendor docs): Codex/Claude
+send {"tool_input": {"command"}}, Cursor beforeShellExecution sends a top-level
+{"command"}, Antigravity sends {"toolCall": {"args": {"CommandLine"}}}.
+
+Fail-open by design: on any parse error the command proceeds — git hooks and CI
+remain the real enforcement boundary (ADR-007). The GUI surfaces keep this posture
+(no Cursor `failClosed`): a hook crash must never wedge a user's shell.
 
 Usage (wired by the scaffolded hook configs): agent_guard_adapter.py <dialect>
 """
@@ -25,8 +30,19 @@ from pathlib import Path
 
 
 def _extract_command(payload: dict) -> str:
+    """Pull the shell command out of whichever stdin shape the surface sent."""
     tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
-    command = tool_input.get("command") or tool_input.get("cmd") or ""
+    tool_call = payload.get("toolCall")
+    call_args = tool_call.get("args") if isinstance(tool_call, dict) else None
+    call_args = call_args or {}
+    command = (
+        tool_input.get("command")
+        or tool_input.get("cmd")
+        or payload.get("command")  # Cursor beforeShellExecution (top-level)
+        or call_args.get("CommandLine")  # Antigravity shell tool
+        or call_args.get("command")
+        or ""
+    )
     if isinstance(command, list):
         command = " ".join(str(part) for part in command)
     return str(command)
@@ -66,11 +82,12 @@ def main() -> int:
     if denied:
         reason = hso.get("permissionDecisionReason") or verdict.get("reason", "")
         if dialect == "cursor":
-            # Cursor signals a block via permission=deny (PI-366; exact schema
-            # unverified — fail-open means a wrong guess degrades safely).
-            out = {"permission": "deny", "userMessage": reason}
+            # Cursor beforeShellExecution deny (PI-385: confirmed from docs —
+            # permission + snake_case user_message/agent_message).
+            out = {"permission": "deny", "user_message": reason, "agent_message": reason}
         elif dialect == "antigravity":
-            # Antigravity safety-gate deny (experimental; unverified shape).
+            # Antigravity safety-gate deny (PI-385: stdout confirmed from docs;
+            # surface still flagged experimental pending live-binary verification).
             out = {"decision": "deny", "reason": reason}
         else:
             # codex: the documented PreToolUse schema (Codex accepts it).
