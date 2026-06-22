@@ -32,6 +32,8 @@ FALLBACK_CLAUDE = REPO_ROOT / "templates" / "fallback" / "dot_claude"
 PLUGIN_ROOT = REPO_ROOT / "plugins" / "project-init-workflow"
 CODEX_SKILLS = REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
 ANTIGRAVITY_SKILLS = REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills"
+AMP_SKILLS = REPO_ROOT / "templates" / "amp" / "dot_agents" / "skills"
+JUNIE_SKILLS = REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
 
 
 def shared_skill_dirs() -> list[Path]:
@@ -64,13 +66,19 @@ def hook_scripts() -> list[Path]:
 
 
 def _sync_agent_skills() -> list[str]:
-    """Byte-identical SKILL.md trees at .agents/skills for Codex and Antigravity.
+    """Byte-identical SKILL.md trees per surface (Codex/Antigravity/Amp/Junie).
 
-    Each layer ships its own copy so either surface works standalone (Antigravity
-    discovers .agents/skills/*/SKILL.md natively — no command pointers, PI-386).
+    Codex/Antigravity/Amp use `.agents/skills`; Junie uses `.junie/skills`. Each
+    layer ships its own copy so the surface works standalone — all discover
+    `<dir>/<name>/SKILL.md` natively, no command pointers (PI-386, PI-397).
     """
     synced = []
-    for label, dest in (("codex", CODEX_SKILLS), ("antigravity", ANTIGRAVITY_SKILLS)):
+    for label, dest in (
+        ("codex", CODEX_SKILLS),
+        ("antigravity", ANTIGRAVITY_SKILLS),
+        ("amp", AMP_SKILLS),
+        ("junie", JUNIE_SKILLS),
+    ):
         if dest.exists():
             shutil.rmtree(dest)
         for skill_dir in shared_skill_dirs():

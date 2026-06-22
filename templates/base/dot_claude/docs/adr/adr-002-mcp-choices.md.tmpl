@@ -23,7 +23,7 @@ The DB MCPs were removed in PI-387: the reference servers (`@modelcontextprotoco
 **Selected at init:** {{installed_mcps}}
 
 Retained MCPs:
-- **Context7** — targeted library doc lookups; no CLI equivalent. Default install is stdio (`bunx`); for Claude web/mobile (which support HTTP MCP only) use the hosted endpoint: `claude mcp add --transport http context7 https://mcp.context7.com/mcp`.
+- **Context7** — targeted library doc lookups; no CLI equivalent. Default install is stdio (`bunx`). For Claude web/mobile/Cowork (HTTP MCP only — stdio servers are invisible there) select the `context7-http` catalog entry instead, which emits the hosted Streamable-HTTP endpoint `https://mcp.context7.com/mcp` (PI-397).
 - **Playwright** — browser automation; no CLI equivalent
 
 ## Consequences

@@ -178,6 +178,8 @@ class TestSyncTool:
         # Keep the derived overlay sources out of this test's blast radius.
         monkeypatch.setattr(sync_plugin, "CODEX_SKILLS", fake_root / "codex-skills")
         monkeypatch.setattr(sync_plugin, "ANTIGRAVITY_SKILLS", fake_root / "antigravity-skills")
+        monkeypatch.setattr(sync_plugin, "AMP_SKILLS", fake_root / "amp-skills")
+        monkeypatch.setattr(sync_plugin, "JUNIE_SKILLS", fake_root / "junie-skills")
 
         (fake_fallback / "hooks" / "pre_commit_gate.sh").unlink()
         sync_plugin.sync()

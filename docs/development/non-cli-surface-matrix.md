@@ -79,6 +79,15 @@ and `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`.
 | Cursor | `.claude/skills` (skills), AGENTS.md | `.cursor/hooks.json` (`PreToolUse(Bash)`→`beforeShellExecution`, deny via `{"permission":"deny","user_message"}`; PI-385); `.cursor/mcp.json` (≈copy of `mcpServers`) |
 | Codex (CLI/IDE) | `.codex/hooks.json` ✅, `.agents/skills` ✅, AGENTS.md ✅ | MCP → `.codex/config.toml` `[mcp_servers.*]` if MCPs are configured |
 | Antigravity | `.agents/skills` ✅, `.agents/hooks.json` ✅, `.agents/mcp_config.json` ✅, AGENTS.md ✅ (PI-386) | hook blocking-contract still experimental — live-verify in #385 |
+| Amp | `.agents/skills` ✅, `.amp/settings.json` (`amp.mcpServers`) ✅, AGENTS.md ✅ (PI-397) | — (MCP-only surface; no hooks) |
+| JetBrains Junie | `.junie/skills` ✅, `.junie/mcp/mcp.json` (`mcpServers`) ✅, AGENTS.md ✅ (PI-397) | — (MCP-only surface; no hooks) |
+
+> **Update — PI-397:** added Amp + Junie as MCP surfaces (their committable
+> project-MCP files map straight off the canonical spec; stdio is byte-identical
+> to Claude, HTTP entries drop the `type` field — both infer transport). Added an
+> HTTP/streamable catalog entry (`context7-http` → `https://mcp.context7.com/mcp`)
+> for Claude web/mobile/Cowork, where stdio servers are invisible; `type: http`
+> for Claude/VS Code, never SSE (deprecated). MCP spec current revision: 2025-11-25.
 
 ## Implications for the ADR (#364)
 

@@ -84,6 +84,28 @@ def test_antigravity_marked_experimental_cursor_not():
     assert surfaces.SURFACES["cursor"]["experimental"] is False
 
 
+def test_amp_and_junie_mcp_files_drop_type_http():
+    """PI-397: Amp (.amp/settings.json, key amp.mcpServers) and Junie
+    (.junie/mcp/mcp.json, key mcpServers) emit url-only HTTP entries (no `type`),
+    while Claude's .mcp.json keeps `type: http`."""
+    servers = {"context7-http": {"type": "http", "url": "https://mcp.context7.com/mcp"}}
+    files = surfaces.planned_files(["claude", "amp", "junie"], servers)
+
+    amp = json.loads(files[".amp/settings.json"])
+    assert amp["amp.mcpServers"]["context7-http"] == {"url": "https://mcp.context7.com/mcp"}
+
+    junie = json.loads(files[".junie/mcp/mcp.json"])
+    assert junie["mcpServers"]["context7-http"] == {"url": "https://mcp.context7.com/mcp"}
+
+    claude = json.loads(files[".mcp.json"])
+    assert claude["mcpServers"]["context7-http"]["type"] == "http"
+
+
+def test_amp_junie_not_experimental():
+    assert surfaces.SURFACES["amp"]["experimental"] is False
+    assert surfaces.SURFACES["junie"]["experimental"] is False
+
+
 def test_planned_files_for_selection():
     servers = servers_for_ids(["context7"])
     files = surfaces.planned_files(
