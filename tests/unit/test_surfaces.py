@@ -7,6 +7,7 @@ project_init.surfaces and the MCP server-spec lookup in project_init.mcps.
 from __future__ import annotations
 
 import json
+import tomllib
 
 from project_init import surfaces
 from project_init.mcps import servers_for_ids
@@ -36,6 +37,28 @@ def test_render_mcp_toml_codex_shape():
     assert 'command = "bunx"' in toml
     assert 'args = ["@upstash/context7-mcp"]' in toml
     assert "[mcp_servers.postgres]" in toml
+
+
+def test_render_mcp_toml_passes_env_and_bearer_token():
+    """PI-388: secrets must not be dropped — env (stdio) + bearer (HTTP)."""
+    servers = {
+        "stdio_srv": {"command": "bunx", "args": ["pkg"], "env": {"API_KEY": "v"}},
+        "http_srv": {"url": "https://mcp.example.com/", "bearer_token_env_var": "TOK"},
+    }
+    parsed = tomllib.loads(surfaces.render_mcp_toml(servers))
+    assert parsed["mcp_servers"]["stdio_srv"]["env"] == {"API_KEY": "v"}
+    assert parsed["mcp_servers"]["http_srv"]["bearer_token_env_var"] == "TOK"
+
+
+def test_render_mcp_toml_escapes_special_characters():
+    """Quotes/backslashes in values (incl. env keys/values) must yield valid
+    TOML (json.dumps escaping) — Codex P2: `env = {"TOKEN" = "a"b"}` is invalid."""
+    servers = {
+        "srv": {"command": "bunx", "args": ['a"b', "c\\d"], "env": {"TOKEN": 'a"b'}},
+    }
+    parsed = tomllib.loads(surfaces.render_mcp_toml(servers))
+    assert parsed["mcp_servers"]["srv"]["args"] == ['a"b', "c\\d"]
+    assert parsed["mcp_servers"]["srv"]["env"] == {"TOKEN": 'a"b'}
 
 
 def test_cursor_hooks_use_camelcase_events_and_adapter():

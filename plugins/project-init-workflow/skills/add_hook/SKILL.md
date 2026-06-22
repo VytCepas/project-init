@@ -50,7 +50,8 @@ INPUT=$(cat)
 PY="$(dirname "$0")/_py.sh"
 
 # exit 0 = allow (or no-op for non-blocking events)
-# stdout JSON with {"decision":"block","reason":"..."} = block (PreToolUse)
+# PreToolUse block: stdout JSON {"hookSpecificOutput":{"hookEventName":
+#   "PreToolUse","permissionDecision":"deny","permissionDecisionReason":"..."}}
 # stdout JSON with {"additionalContext":"..."} = inject context
 # Always exit 0 — exit 1 means hook error, not a block
 
@@ -67,7 +68,7 @@ print((data.get('tool_input', {}) or {}).get('command', '') or '')
 [ -z "$CMD" ] && exit 0
 
 if echo "$CMD" | grep -qE 'git push.*(main|master)'; then
-  "$PY" -c "import json,sys; print(json.dumps({'decision':'block','reason':sys.argv[1]}))" \
+  "$PY" -c "import json,sys; print(json.dumps({'hookSpecificOutput':{'hookEventName':'PreToolUse','permissionDecision':'deny','permissionDecisionReason':sys.argv[1]}}))" \
     "Direct push to main is not allowed. Use a branch and PR."
   exit 0
 fi
