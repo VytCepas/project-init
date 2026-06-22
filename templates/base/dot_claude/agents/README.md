@@ -18,7 +18,7 @@ agent's system prompt. **Only `name` and `description` are required.**
 
 ```yaml
 ---
-name: agent-name                 # lowercase + hyphens; hooks see this as agent_type
+name: agent-name                 # lowercase + hyphens; this is the subagent_type
 description: What this agent does and when to delegate to it
 model: inherit                   # sonnet | opus | haiku | fable | <full-id> | inherit (default)
 tools: Read, Grep, Glob, Bash    # comma-separated; inherits all if omitted
