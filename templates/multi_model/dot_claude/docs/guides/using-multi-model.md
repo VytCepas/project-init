@@ -36,17 +36,16 @@ mismatch*, not "Claude Code is slow" (it's a strong harness):
 | **DeepSeek** | **B** (CCR) | no first-party harness; Anthropic-compatible endpoint published *to be driven by Claude Code*; cheap |
 | **Kimi / Moonshot** | **B** (CCR) | same as DeepSeek; Kimi K2-Code is tuned to be driven by external harnesses |
 | **Ollama** (local) | **B** (CCR) | a model *runner*, not a harness; suitability is per-model (see below) |
-| **Gemini** | **A** — `--agents antigravity` | Gemini CLI retired 2026-06-18; Antigravity (`agy`) is the native Google harness |
-| **OpenAI / Codex** | **A** — `--agents codex` | first-party Codex CLI; better quality natively |
+| **Gemini** | **B** (CCR) | seeded `gemini` provider via Google's Gemini API (`GEMINI_API_KEY`, paid — the free-tier Gemini CLI was retired 2026-06-18). Antigravity (`agy`) is the higher-fidelity native alternative |
+| **OpenAI / Codex** | **A** — `--agents codex` | first-party Codex CLI; better quality natively (not seeded in CCR) |
 
-Gemini & OpenAI are **not seeded** in the shipped CCR config (`config.json` only
-defines `anthropic`, `deepseek`, `kimi`, `ollama`) — they're better used via
-their native harnesses. You *can* reach them through CCR by adding a provider to
-`~/.claude-code-router/config.json` by hand (e.g. via `ccr ui`, typically through
-an OpenAI-compatible gateway such as OpenRouter), but **there are no published
-CCR-vs-native benchmarks** — expect the 15–22pt mismatch penalty. So
-`/model gemini,…` / `/model openai,…` work only after you configure them; out of
-the box, use `--agents antigravity` (Google) / `codex` (OpenAI) instead.
+**OpenAI** is the only major provider **not seeded** — use the native `--agents codex`.
+**Gemini** *is* seeded (the `gemini` provider), but its tool-calling/streaming via
+translation is less battle-tested than Claude/DeepSeek, so Antigravity (`agy`) stays
+the higher-fidelity Gemini path. Add any other OpenAI/Anthropic-compatible provider by
+editing `~/.claude-code-router/config.json` (`ccr ui`, or a gateway like OpenRouter);
+expect a quality penalty routing a first-party-harness model through CCR (no published
+CCR-vs-native benchmarks).
 
 ## Setup
 
@@ -68,7 +67,7 @@ shell so plain `claude` routes through CCR.
 ```bash
 ccr start                          # run the local proxy (or use `ccr code`)
 claude                             # opens as usual (if you wired the shell)
-/model deepseek,deepseek-chat      # switch mid-session, context kept
+/model deepseek,deepseek-v4-flash  # switch mid-session, context kept
 /model ollama,qwen3-coder:30b
 /model anthropic,claude-opus-4-8   # back to Claude
 ccr ui                             # web editor for providers + routing
@@ -84,6 +83,8 @@ while `default` stays on Claude so your primary experience is unchanged.
 - **DeepSeek** — `DEEPSEEK_API_KEY` from <https://platform.deepseek.com/api_keys>.
 - **Kimi / Moonshot** — `MOONSHOT_API_KEY` from <https://platform.moonshot.ai>.
   Mainland-China accounts use `https://api.moonshot.cn` (edit `config.json`).
+- **Gemini** — `GEMINI_API_KEY` from <https://aistudio.google.com/apikey> (paid;
+  the free-tier Gemini CLI on-ramp is gone).
 - **Anthropic** — `ANTHROPIC_API_KEY` (you likely already have one).
 - **Ollama** — no key; it's local.
 
@@ -136,7 +137,7 @@ the global CCR config for you, with the **<7B** guard):
 ```bash
 .claude/scripts/models.sh list                       # providers/models + pulled Ollama
 .claude/scripts/models.sh add ollama qwen3:14b       # ollama pull + register
-.claude/scripts/models.sh add deepseek deepseek-reasoner   # register a cloud model
+.claude/scripts/models.sh add deepseek deepseek-v4-pro     # register a cloud model
 .claude/scripts/models.sh rm ollama gemma:2b         # ollama rm + unregister
 .claude/scripts/models.sh ui                         # open ccr ui (GUI editor)
 # tip: alias models="$PWD/.claude/scripts/models.sh"  → then `models list`, etc.
@@ -157,12 +158,18 @@ Reverting is clean: stop using CCR (plain `claude`) or
 - **No published CCR-vs-native benchmarks** — expect the 15–22pt penalty when
   routing a first-party-harness model through CCR.
 
-## Hard budget caps?
+## Other ways to route (besides CCR)
 
-CCR does cost-*routing*, not spend *limits*. If you need enforced budget gates,
-[LiteLLM](https://docs.litellm.ai) adds spend caps and guardrails — heavier and
-enterprise-shaped. It's the documented upgrade path for governance/measurement,
-not the default switching mechanism.
+- **Native gateway (no proxy to install).** Claude Code can talk to an Anthropic-format
+  gateway directly: set `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN`, and
+  `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1` to populate the `/model` picker from the
+  gateway's `/v1/models` (Claude Code v2.1.129+). Lighter than CCR if you already run a
+  gateway; no transformer config.
+- **Hard budget caps → LiteLLM.** CCR does cost-*routing*, not spend *limits*.
+  [LiteLLM](https://docs.litellm.ai) adds enforced caps + guardrails (heavier,
+  enterprise-shaped) — the documented governance/measurement upgrade path, not the
+  default switcher. **Pin `litellm>=1.83.0`**: releases `1.82.7`/`1.82.8` shipped a
+  credential-stealing payload; `1.83.0` is the first clean post-incident build.
 
 — See ADR-016 for the full decision record and `../../multi-model/README.md` for
 the overlay's files.

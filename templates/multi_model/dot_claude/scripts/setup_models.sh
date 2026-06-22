@@ -214,7 +214,7 @@ Done. Multi-model switching is set up.
   claude                            # opens as usual (if you wired the shell)
   ccr code                          # …or launch Claude Code through CCR explicitly
 
-  /model deepseek,deepseek-chat     # switch mid-session, context kept
+  /model deepseek,deepseek-v4-flash # switch mid-session, context kept
   /model ollama,qwen3-coder:30b
   /model anthropic,claude-opus-4-8  # back to Claude
 

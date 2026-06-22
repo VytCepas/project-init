@@ -17,17 +17,24 @@
       "name": "deepseek",
       "api_base_url": "https://api.deepseek.com/chat/completions",
       "api_key": "$DEEPSEEK_API_KEY",
-      "models": ["deepseek-chat", "deepseek-reasoner"],
+      "models": ["deepseek-v4-pro", "deepseek-v4-flash"],
       "transformer": {
         "use": ["deepseek"],
-        "deepseek-chat": { "use": ["tooluse"] }
+        "deepseek-v4-flash": { "use": ["tooluse"] }
       }
     },
     {
       "name": "kimi",
       "api_base_url": "https://api.moonshot.ai/v1/chat/completions",
       "api_key": "$MOONSHOT_API_KEY",
-      "models": ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+      "models": ["kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"]
+    },
+    {
+      "name": "gemini",
+      "api_base_url": "https://generativelanguage.googleapis.com/v1beta/models/",
+      "api_key": "$GEMINI_API_KEY",
+      "models": ["gemini-3.1-pro-preview", "gemini-3.5-flash"],
+      "transformer": { "use": ["gemini"] }
     },
     {
       "name": "ollama",
@@ -38,8 +45,8 @@
   ],
   "Router": {
     "default": "anthropic,claude-opus-4-8",
-    "background": "deepseek,deepseek-chat",
-    "think": "deepseek,deepseek-reasoner",
+    "background": "deepseek,deepseek-v4-flash",
+    "think": "deepseek,deepseek-v4-pro",
     "longContext": "anthropic,claude-opus-4-8",
     "longContextThreshold": 60000
   }

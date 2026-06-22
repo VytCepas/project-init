@@ -19,4 +19,7 @@ DEEPSEEK_API_KEY=
 # Note: mainland-China accounts use https://api.moonshot.cn (edit config.json).
 MOONSHOT_API_KEY=
 
+# Gemini — https://aistudio.google.com/apikey  (paid; free-tier Gemini CLI retired)
+GEMINI_API_KEY=
+
 # Ollama is local — no key needed (config uses the literal "ollama").
