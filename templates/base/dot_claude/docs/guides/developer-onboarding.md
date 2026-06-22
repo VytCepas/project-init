@@ -115,6 +115,7 @@ To continue a Claude Code session from your phone, use **Remote Control**
 (`claude remote-control`, or `/remote-control` in a live session) — it drives a
 session that still runs **on your machine**, so these hooks, your MCP servers, and
 git credentials stay active, and it needs no inbound ports. **Claude Code on the
-web / cloud sessions** run in a sandbox where these hooks do **not** run — there,
-git + CI are your only guardrails. For a fully headless box or a non-Claude tool,
-attach over `tmux` + a mesh VPN (e.g. Tailscale) instead.
+web / cloud sessions** run in a sandbox that honors only repo-committed config (not
+your local setup), so git + CI are the guaranteed guardrails there. For a fully
+headless box or a non-Claude tool, attach over `tmux` + a mesh VPN (e.g. Tailscale)
+instead.

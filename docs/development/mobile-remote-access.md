@@ -9,15 +9,18 @@ paths keep this repo's hook-based enforcement live**. Verified against vendor do
 | You want… | Use | Enforcement (hooks/DAG guard) |
 |---|---|---|
 | Steer an in-progress session from your phone, full local env | **Remote Control** | ✅ runs on your machine |
-| Kick off a task with no local machine on | Claude Code on the web / cloud session | ❌ cloud sandbox — hooks don't run |
+| Kick off a task with no local machine on | Claude Code on the web / cloud session | ⚠️ sandbox honors repo-committed config only; git/CI is the boundary |
 | Fully headless box, or a non-Claude tool | **tmux + Tailscale** | ✅ (it's your local shell) |
 
-The decisive fact: **enforcement is tied to *where the session executes*, not which
-device you hold.** The scaffolded hooks (`github_command_guard.sh`, the DAG guard,
-`prod_guard.py`) only run where a real shell runs — your machine. See the
-local-vs-cloud boundary in [`non-cli-surface-matrix.md`](non-cli-surface-matrix.md)
-and the generated `CAPABILITIES.md` (ADR-007: git/CI is the boundary cloud surfaces
-still honor).
+The decisive fact: **enforcement depends on *where the session executes*, not which
+device you hold.** A session on your machine applies your full local config — the
+scaffolded hooks (`github_command_guard.sh`, the DAG guard, `prod_guard.py`) plus
+anything in `~/.claude`. A cloud sandbox honors only **repo-committed** files:
+committed hooks may run inside the VM, but your local user config, resources, and
+credentials don't — so per ADR-007 **git/CI is the guaranteed enforcement boundary**
+for cloud surfaces. See the local-vs-cloud caveat in
+[`non-cli-surface-matrix.md`](non-cli-surface-matrix.md) and the generated
+`CAPABILITIES.md`.
 
 ## Option A — Remote Control (recommended for Claude Code)
 
@@ -74,5 +77,6 @@ in Termux is unreliable on ARM). Termius/JuiceSSH work but lack mosh.
   network plumbing, full enforcement).
 - Machine must keep running **after you disconnect**, or a **non-Claude** tool →
   **tmux + Tailscale**.
-- No local machine at all → **Claude Code on the web** — but accept that the
-  scaffolded hooks don't run there; git + CI are your only guardrails.
+- No local machine at all → **Claude Code on the web** — the sandbox honors only
+  repo-committed config (not your local setup), so git + CI are your guaranteed
+  guardrails there.
