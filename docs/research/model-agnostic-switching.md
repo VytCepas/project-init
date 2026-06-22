@@ -14,7 +14,9 @@
 > The successor is **Antigravity** (`agy`, `--agents antigravity`,
 > `templates/antigravity/`), which reads the same `.agents/` tree. Gemini-the-model
 > remains routable via CCR (a seeded provider; PI-396) — that's separate from the
-> retired harness.
+> retired harness. **Model IDs below are also point-in-time** — PI-396 moved the
+> shipped config to `deepseek-v4-*` and `kimi-k2.7-*`; treat any `deepseek-chat`,
+> `deepseek-reasoner`, or `moonshot-v1-*` mention here as historical, not current.
 
 ---
 

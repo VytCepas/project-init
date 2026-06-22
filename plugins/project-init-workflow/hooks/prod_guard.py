@@ -152,6 +152,8 @@ def main() -> int:
         payload = json.loads(sys.stdin.read() or "{}")
     except json.JSONDecodeError:
         return 0
+    if not isinstance(payload, dict):
+        return 0  # non-dict JSON (e.g. a list) → fail open, never raise
     command = ((payload.get("tool_input") or {}).get("command") or "").strip()
     if not command:
         return 0

@@ -137,6 +137,21 @@ class TestVerdicts:
         assert result.returncode == 0
         assert result.stdout == ""
 
+    def test_non_dict_json_stdin_fails_open(self, tmp_path: Path):
+        """Valid JSON that isn't an object (e.g. a list) must not crash — the
+        broad fail-open `try` is around evaluate(), so payload.get() needs its own
+        type guard (Codex review)."""
+        result = subprocess.run(
+            ["python3", str(_HOOK)],
+            input="[]",
+            capture_output=True,
+            text=True,
+            cwd=tmp_path,
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == ""
+
     def test_corrupt_allowlist_fails_open_but_still_guards(self, tmp_path: Path):
         config = tmp_path / ".claude" / "config.yaml"
         config.parent.mkdir(parents=True)
