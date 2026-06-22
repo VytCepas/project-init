@@ -9,7 +9,7 @@ Model Context Protocol (MCP) servers extend Claude Code's toolset. Each server l
 
 ## Decision
 
-Three MCPs are intentionally absent to reduce token overhead:
+The following MCPs are intentionally absent — to reduce token overhead, and (for the DB MCPs) to avoid an unmaintained, CVE-prone dependency:
 
 | MCP | Tokens saved | Replacement |
 |---|---|---|
