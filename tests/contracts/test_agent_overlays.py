@@ -26,6 +26,7 @@ def _scaffold_agents(target: Path, *agent_names: str) -> Path:
     overrides = {
         "agents": ",".join(agents),
         "codex": "true" if "codex" in agents else "",
+        "antigravity": "true" if "antigravity" in agents else "",
         "ollama": "true" if "ollama" in agents else "",
         "multi_agent": "true"
         if any(a in agents for a in ("codex", "antigravity", "cursor"))
