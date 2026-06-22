@@ -148,8 +148,8 @@ class TestFirstScaffoldProtectsExistingFiles:
 
     def test_multi_agent_scaffold_has_no_spurious_new_siblings(self, tmp_path: Path):
         """PI-179 (review): cross-layer path collisions (e.g. .agents/skills/*
-        in both codex and gemini overlays) must NOT be mistaken for user files —
-        later layers legitimately overwrite earlier ones with no `.new`."""
+        in both codex and antigravity overlays) must NOT be mistaken for user
+        files — later layers legitimately overwrite earlier ones with no `.new`."""
         target = tmp_path / "proj"
         rc = main(
             [
@@ -164,7 +164,7 @@ class TestFirstScaffoldProtectsExistingFiles:
                 "--language",
                 "python",
                 "--agents",
-                "claude,codex,gemini,ollama",
+                "claude,codex,antigravity,ollama",
                 "--no-plugin",
             ]
         )

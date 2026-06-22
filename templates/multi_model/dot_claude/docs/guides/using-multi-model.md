@@ -36,7 +36,7 @@ mismatch*, not "Claude Code is slow" (it's a strong harness):
 | **DeepSeek** | **B** (CCR) | no first-party harness; Anthropic-compatible endpoint published *to be driven by Claude Code*; cheap |
 | **Kimi / Moonshot** | **B** (CCR) | same as DeepSeek; Kimi K2-Code is tuned to be driven by external harnesses |
 | **Ollama** (local) | **B** (CCR) | a model *runner*, not a harness; suitability is per-model (see below) |
-| **Gemini** | **A** — `--agents gemini` | first-party Gemini CLI; better quality natively |
+| **Gemini** | **A** — `--agents antigravity` | Gemini CLI retired 2026-06-18; Antigravity (`agy`) is the native Google harness |
 | **OpenAI / Codex** | **A** — `--agents codex` | first-party Codex CLI; better quality natively |
 
 Gemini & OpenAI are **not seeded** in the shipped CCR config (`config.json` only
@@ -46,7 +46,7 @@ their native harnesses. You *can* reach them through CCR by adding a provider to
 an OpenAI-compatible gateway such as OpenRouter), but **there are no published
 CCR-vs-native benchmarks** — expect the 15–22pt mismatch penalty. So
 `/model gemini,…` / `/model openai,…` work only after you configure them; out of
-the box, use `--agents gemini` / `codex` instead.
+the box, use `--agents antigravity` (Google) / `codex` (OpenAI) instead.
 
 ## Setup
 

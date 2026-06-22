@@ -175,8 +175,7 @@ class TestSyncTool:
         monkeypatch.setattr(sync_plugin, "PLUGIN_ROOT", fake_plugin)
         # Keep the derived overlay sources out of this test's blast radius.
         monkeypatch.setattr(sync_plugin, "CODEX_SKILLS", fake_root / "codex-skills")
-        monkeypatch.setattr(sync_plugin, "GEMINI_SKILLS", fake_root / "gemini-skills")
-        monkeypatch.setattr(sync_plugin, "GEMINI_COMMANDS", fake_root / "gemini-cmds")
+        monkeypatch.setattr(sync_plugin, "ANTIGRAVITY_SKILLS", fake_root / "antigravity-skills")
 
         (fake_fallback / "hooks" / "pre_commit_gate.sh").unlink()
         sync_plugin.sync()

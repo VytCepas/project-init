@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -17,9 +16,7 @@ from tests.helpers import make_variables
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _TEMPLATE_SKILLS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills"
 _CODEX_SKILLS = _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
-_GEMINI_COMMANDS = (
-    _REPO_ROOT / "templates" / "gemini" / "dot_gemini-extension" / "commands"
-)
+_ANTIGRAVITY_SKILLS = _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills"
 
 
 def _scaffold_agents(target: Path, *agent_names: str) -> Path:
@@ -29,9 +26,11 @@ def _scaffold_agents(target: Path, *agent_names: str) -> Path:
     overrides = {
         "agents": ",".join(agents),
         "codex": "true" if "codex" in agents else "",
-        "gemini": "true" if "gemini" in agents else "",
+        "antigravity": "true" if "antigravity" in agents else "",
         "ollama": "true" if "ollama" in agents else "",
-        "multi_agent": "true" if ("codex" in agents or "gemini" in agents) else "",
+        "multi_agent": "true"
+        if any(a in agents for a in ("codex", "antigravity", "cursor"))
+        else "",
         "other_agents": "true" if len(agents) > 1 else "",
     }
     scaffold(target, preset, make_variables(**overrides), strict=True)
@@ -40,7 +39,7 @@ def _scaffold_agents(target: Path, *agent_names: str) -> Path:
 
 class TestAgentSelection:
     def test_claude_always_included_and_ordered(self):
-        assert resolve_agents("gemini,codex") == ["claude", "codex", "gemini"]
+        assert resolve_agents("antigravity,codex") == ["claude", "codex", "antigravity"]
         assert resolve_agents("claude") == ["claude"]
 
     def test_unknown_agent_rejected(self):
@@ -68,8 +67,11 @@ class TestAgentSelection:
         assert result.agents == ["claude", "codex"], "valid retry must be honored"
         assert "unknown agent(s): windsurf" in capsys.readouterr().out
 
-    def test_only_codex_and_gemini_contribute_layers(self):
-        assert agent_layers(["claude", "codex", "gemini", "ollama"]) == ["codex", "gemini"]
+    def test_only_codex_and_antigravity_contribute_layers(self):
+        assert agent_layers(["claude", "codex", "antigravity", "ollama"]) == [
+            "codex",
+            "antigravity",
+        ]
         assert agent_layers(["claude", "ollama"]) == []
 
     def test_overlay_layers_is_the_single_source(self):
@@ -78,9 +80,15 @@ class TestAgentSelection:
         from project_init.scaffold import overlay_layers
 
         assert overlay_layers(["claude", "codex"], no_plugin=False) == ["codex"]
-        assert overlay_layers("claude,codex,gemini", no_plugin=False) == ["codex", "gemini"]
+        assert overlay_layers("claude,codex,antigravity", no_plugin=False) == [
+            "codex",
+            "antigravity",
+        ]
         assert overlay_layers(["claude"], no_plugin=True) == ["fallback"]
-        assert overlay_layers("claude,gemini", no_plugin=True) == ["fallback", "gemini"]
+        assert overlay_layers("claude,antigravity", no_plugin=True) == [
+            "fallback",
+            "antigravity",
+        ]
         assert overlay_layers(["claude", "ollama"], no_plugin=False) == []
         # agent_layers is now a thin delegator to the shared helper.
         assert agent_layers(["claude", "codex"]) == overlay_layers(
@@ -118,40 +126,28 @@ class TestCodexOverlay:
         assert (target / ".claude" / "hooks" / "agent_guard_adapter.py").is_file()
 
 
-class TestGeminiOverlay:
-    def test_extension_manifest_valid(self, tmp_path: Path):
-        target = _scaffold_agents(tmp_path / "p", "gemini")
-        manifest = json.loads(
-            (target / ".gemini-extension" / "gemini-extension.json").read_text()
-        )
-        assert manifest["name"] == "my-project-workflow"
-        assert manifest["version"]
+class TestAntigravityOverlay:
+    """PI-386: Antigravity is the Google surface — ships .agents/skills (layer) +
+    .agents/hooks.json (+ MCP) via surfaces; the dead Gemini-CLI overlay is gone."""
 
-    def test_commands_point_at_existing_skills(self, tmp_path: Path):
-        target = _scaffold_agents(tmp_path / "p", "gemini")
-        commands = sorted((target / ".gemini-extension" / "commands").glob("*.toml"))
-        assert commands, "gemini overlay must ship pointer commands"
-        for command in commands:
-            parsed = tomllib.loads(command.read_text())
-            assert parsed["description"]
-            referenced = f".agents/skills/{command.stem}/SKILL.md"
-            assert referenced in parsed["prompt"]
-            assert (target / referenced).is_file(), (
-                "gemini layer must ship the .agents skills it points at"
-            )
+    def test_ships_agents_skills(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "antigravity")
+        skills = sorted((target / ".agents" / "skills").glob("*/SKILL.md"))
+        assert skills, "antigravity overlay must ship .agents/skills"
+        for skill in skills:
+            source = _TEMPLATE_SKILLS / skill.parent.name / "SKILL.md"
+            assert skill.read_bytes() == source.read_bytes()
 
-    def test_hooks_use_gemini_dialect(self, tmp_path: Path):
-        target = _scaffold_agents(tmp_path / "p", "gemini")
-        config = json.loads(
-            (target / ".gemini-extension" / "hooks" / "hooks.json").read_text()
-        )
-        (entry,) = config["hooks"]["BeforeTool"]
-        assert "agent_guard_adapter.py gemini" in entry["hooks"][0]["command"]
+    def test_emits_hooks(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "antigravity")
+        config = json.loads((target / ".agents" / "hooks.json").read_text())
+        entry = config["safety-gate"]["PreToolUse"][0]
+        assert "agent_guard_adapter.py antigravity" in entry["hooks"][0]["command"]
 
-    def test_setup_script_links_extension(self, tmp_path: Path):
-        target = _scaffold_agents(tmp_path / "p", "gemini")
-        script = target / ".claude" / "scripts" / "setup_gemini.sh"
-        assert "gemini extensions link .gemini-extension" in script.read_text()
+    def test_no_dead_gemini_cli_artifacts(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "antigravity")
+        assert not (target / ".gemini-extension").exists()
+        assert not (target / ".claude" / "scripts" / "setup_gemini.sh").exists()
 
 
 class TestOllamaTier:
@@ -160,14 +156,13 @@ class TestOllamaTier:
         target = _scaffold_agents(tmp_path / "p", "ollama")
         assert not (target / ".agents").exists()
         assert not (target / ".codex").exists()
-        assert not (target / ".gemini-extension").exists()
         agents_md = (target / "AGENTS.md").read_text()
         assert "Ollama-based agents" in agents_md
 
 
 class TestSupportTierDocs:
     def test_caveat_stated_for_any_overlay(self, tmp_path: Path):
-        target = _scaffold_agents(tmp_path / "p", "codex", "gemini")
+        target = _scaffold_agents(tmp_path / "p", "codex", "antigravity")
         agents_md = (target / "AGENTS.md").read_text()
         assert "only the Claude Code path is functionally CI-tested" in agents_md
         onboarding = (
@@ -191,10 +186,14 @@ class TestSyncedCopiesInRepo:
                 f"codex skill {name} drifted — run `just sync-plugin`"
             )
 
-    def test_gemini_command_sources_in_sync(self):
-        template_names = {p.parent.name for p in _TEMPLATE_SKILLS.glob("*/SKILL.md")}
-        command_names = {p.stem for p in _GEMINI_COMMANDS.glob("*.toml")}
-        assert command_names == template_names, "run `just sync-plugin`"
+    def test_antigravity_skill_sources_in_sync(self):
+        template = {p.parent.name: p for p in _TEMPLATE_SKILLS.glob("*/SKILL.md")}
+        antigravity = {p.parent.name: p for p in _ANTIGRAVITY_SKILLS.glob("*/SKILL.md")}
+        assert set(template) == set(antigravity)
+        for name, path in template.items():
+            assert antigravity[name].read_bytes() == path.read_bytes(), (
+                f"antigravity skill {name} drifted — run `just sync-plugin`"
+            )
 
 
 class TestAgentGuardAdapter:
@@ -223,9 +222,9 @@ class TestAgentGuardAdapter:
         assert hso["permissionDecision"] == "deny"
         assert "main/master" in hso["permissionDecisionReason"]
 
-    def test_gemini_emits_decision_deny(self, tmp_path: Path):
-        target = _scaffold_agents(tmp_path / "p", "gemini")
-        out = self._run_adapter(target, "gemini", "git push origin main")
+    def test_antigravity_emits_decision_deny(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "antigravity")
+        out = self._run_adapter(target, "antigravity", "git push origin main")
         assert out["decision"] == "deny"
         assert "main/master" in out["reason"]
 

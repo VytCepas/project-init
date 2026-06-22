@@ -23,7 +23,7 @@ import json
 from pathlib import Path
 
 # The shared, fail-open guard adapter (reused across surfaces); the scaffolder
-# already ships it at this path for codex/gemini.
+# already ships it at this path for codex/antigravity.
 _GUARD = ".claude/hooks/_py.sh .claude/hooks/agent_guard_adapter.py"
 
 # --- canonical MCP rendering -------------------------------------------------
@@ -125,9 +125,10 @@ def render_antigravity_hooks() -> str:
 
 
 # --- the surface table -------------------------------------------------------
-# One entry per surface that needs project-scoped emission. Claude (CLI/ext) and
-# Codex/Gemini (existing overlays) are intentionally absent. Each entry declares
-# what files to write; the scaffold engine consumes this. (ADR-017 §2.)
+# One entry per surface that needs project-scoped hook/MCP emission. Claude
+# (CLI/ext) and Codex (overlay) are intentionally absent. Antigravity appears here
+# (hooks + MCP) and also ships an .agents/skills template layer (PI-386). Each entry
+# declares what files to write; the scaffold engine consumes this. (ADR-017 §2.)
 
 SURFACES: dict[str, dict] = {
     "cursor": {
@@ -144,10 +145,10 @@ SURFACES: dict[str, dict] = {
         "experimental": True,
         "hooks_file": ".agents/hooks.json",
         "hooks_render": render_antigravity_hooks,
-        # Antigravity MCP is global (~/.gemini) — not project-scoped; documented,
-        # not emitted. Skills cross-read from .agents/skills.
-        "mcp_file": None,
-        "mcp_render": None,
+        # Antigravity reads project-scoped MCP from .agents/mcp_config.json (PI-386);
+        # skills come from the antigravity template layer's .agents/skills.
+        "mcp_file": ".agents/mcp_config.json",
+        "mcp_render": ("json", "mcpServers"),
     },
 }
 

@@ -1,5 +1,0 @@
-description = "Adds a deterministic hook that fires automatically on tool events. Use when asked to enforce a rule on every commit, block a dangerous pattern, validate output, or gate any tool call."
-prompt = """
-Read .agents/skills/add_hook/SKILL.md and follow its
-instructions exactly for this request: {{args}}
-"""

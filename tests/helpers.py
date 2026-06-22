@@ -69,7 +69,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "vscode_off": "true",
         "agents": "claude",
         "codex": "",
-        "gemini": "",
+        "antigravity": "",
         "ollama": "",
         "multi_agent": "",
         "other_agents": "",

@@ -9,6 +9,13 @@
   (harness-agnostic `--agents` overlays)
 - Grounded in: `docs/development/non-cli-surface-matrix.md` (spike #365)
 
+> **Update — PI-386 (2026-06-22):** the Gemini CLI overlay referenced in the
+> Context below (`.gemini-extension/`) was removed. Google sunset Gemini CLI's
+> free/Pro/Ultra tiers on 2026-06-18; **Antigravity** (`agy`) is the Google
+> target and reads the same `.agents/` tree, so it became a self-sufficient
+> surface (an `.agents/skills/` layer + `.agents/hooks.json` +
+> `.agents/mcp_config.json`). The generator pattern in this ADR is unchanged.
+
 ## Context
 
 The scaffolded `.claude/` output is consumed losslessly only by the Claude Code

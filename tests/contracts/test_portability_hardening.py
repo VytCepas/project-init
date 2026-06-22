@@ -90,7 +90,7 @@ def test_audit_stat_guidance_is_portable():
     for mirror in (
         _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills" / "audit" / "SKILL.md",
         _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills" / "audit" / "SKILL.md",
-        _REPO_ROOT / "templates" / "gemini" / "dot_agents" / "skills" / "audit" / "SKILL.md",
+        _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills" / "audit" / "SKILL.md",
     ):
         text = mirror.read_text()
         assert "stat -f '%Lp'" in text, f"{mirror}: missing BSD/macOS stat fallback"

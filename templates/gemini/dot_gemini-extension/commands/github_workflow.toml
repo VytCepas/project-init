@@ -1,5 +1,0 @@
-description = "Guides the agent through the full GitHub PR lifecycle — branch naming, push, review responses, and merge. Loaded automatically before any push, PR creation, review response, or merge action."
-prompt = """
-Read .agents/skills/github_workflow/SKILL.md and follow its
-instructions exactly for this request: {{args}}
-"""
