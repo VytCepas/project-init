@@ -14,11 +14,11 @@ from project_init.mcps import servers_for_ids
 
 
 def test_servers_for_ids_resolves_catalog_specs():
-    servers = servers_for_ids(["context7", "postgres", "sqlite", "playwright"])
-    assert set(servers) == {"context7", "postgres", "sqlite", "playwright"}
+    servers = servers_for_ids(["context7", "playwright"])
+    assert set(servers) == {"context7", "playwright"}
     assert servers["context7"] == {"command": "bunx", "args": ["@upstash/context7-mcp"]}
-    # Unknown ids are dropped, not errors.
-    assert servers_for_ids(["nope"]) == {}
+    # Unknown ids (incl. the removed postgres/sqlite, PI-387) are dropped, not errors.
+    assert servers_for_ids(["nope", "postgres", "sqlite"]) == {}
     assert servers_for_ids([]) == {}
 
 
@@ -32,11 +32,11 @@ def test_render_mcp_json_mcpservers_and_servers_keys():
 
 
 def test_render_mcp_toml_codex_shape():
-    toml = surfaces.render_mcp_toml(servers_for_ids(["context7", "postgres"]))
+    toml = surfaces.render_mcp_toml(servers_for_ids(["context7", "playwright"]))
     assert "[mcp_servers.context7]" in toml
     assert 'command = "bunx"' in toml
     assert 'args = ["@upstash/context7-mcp"]' in toml
-    assert "[mcp_servers.postgres]" in toml
+    assert "[mcp_servers.playwright]" in toml
 
 
 def test_render_mcp_toml_passes_env_and_bearer_token():

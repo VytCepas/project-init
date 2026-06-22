@@ -57,7 +57,6 @@ class TestAgentSelection:
         )
         monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
         monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
-        monkeypatch.setattr(cli, "_choose_db_interactive", lambda: None)
         monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
         monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
         monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
