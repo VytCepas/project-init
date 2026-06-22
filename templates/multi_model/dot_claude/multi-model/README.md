@@ -37,7 +37,7 @@ claude                                                          # opens as usual
 - **Claude / DeepSeek / Kimi / Ollama** target the Claude Code harness (or have no
   first-party harness), so routing them through CCR is appropriate.
 - **Gemini & OpenAI/Codex** perform better in their own native harnesses
-  (`--agents gemini` / `codex`). They are reachable through CCR only as a
+  (`--agents antigravity` — Gemini CLI was retired 2026-06-18 — / `codex`). They are reachable through CCR only as a
   convenience, with a quality caveat — see the
   [model-switching guide](../docs/guides/using-multi-model.md).
 - **Ollama** is local and gated on hardware: a ~24–32B agent-tuned model is the
