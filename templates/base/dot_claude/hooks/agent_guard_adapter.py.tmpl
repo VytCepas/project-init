@@ -7,8 +7,11 @@ from github_command_guard.sh. Payloads differ slightly per agent, so this
 shim extracts the shell command, feeds a Claude-shaped payload into
 dag_workflow.py guard, and translates the verdict to the caller's dialect:
 
-  codex  -> {"decision": "block", ...} (Codex accepts Claude's shape)
+  codex  -> {"hookSpecificOutput": {permissionDecision: "deny", ...}}
+            (the documented PreToolUse schema; Codex accepts it)
   gemini -> {"decision": "deny",  ...}
+  cursor -> {"permission": "deny", ...}      (PI-385: shape unverified)
+  antigravity -> {"decision": "deny", ...}   (PI-385: experimental)
 
 Fail-open by design: on any parse error the command proceeds — git hooks
 and CI remain the real enforcement boundary (ADR-007).
@@ -52,18 +55,33 @@ def main() -> int:
         verdict = json.loads(proc.stdout.strip() or "null")
     except json.JSONDecodeError:
         return 0
-    if isinstance(verdict, dict) and verdict.get("decision") == "block":
-        reason = verdict.get("reason", "")
+    if not isinstance(verdict, dict):
+        return 0
+    # dag_workflow.py emits the documented PreToolUse shape; tolerate the
+    # legacy {"decision": "block"} form too in case of version skew.
+    hso = verdict.get("hookSpecificOutput") or {}
+    denied = hso.get("permissionDecision") == "deny" or verdict.get("decision") == "block"
+    if denied:
+        reason = hso.get("permissionDecisionReason") or verdict.get("reason", "")
         if dialect == "gemini":
-            verdict = {"decision": "deny", "reason": reason}
+            out = {"decision": "deny", "reason": reason}
         elif dialect == "cursor":
             # Cursor signals a block via permission=deny (PI-366; exact schema
             # unverified — fail-open means a wrong guess degrades safely).
-            verdict = {"permission": "deny", "userMessage": reason}
+            out = {"permission": "deny", "userMessage": reason}
         elif dialect == "antigravity":
             # Antigravity safety-gate deny (experimental; unverified shape).
-            verdict = {"decision": "deny", "reason": reason}
-        sys.stdout.write(json.dumps(verdict))
+            out = {"decision": "deny", "reason": reason}
+        else:
+            # codex: the documented PreToolUse schema (Codex accepts it).
+            out = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+        sys.stdout.write(json.dumps(out))
     return 0
 
 

@@ -43,6 +43,15 @@ def _run_guard(payload: dict, cwd: Path | None = None) -> dict | None:
     return json.loads(proc.stdout) if proc.stdout.strip() else None
 
 
+def _denied(out: dict | None) -> bool:
+    """True if the guard denied via the documented PreToolUse schema (PI-388)."""
+    return bool(out) and out.get("hookSpecificOutput", {}).get("permissionDecision") == "deny"
+
+
+def _deny_reason(out: dict | None) -> str:
+    return (out or {}).get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+
+
 def test_root_monitor_pr_checks_merge_exit_code():
     """PI-203: the repo's own monitor_pr.sh must check the merge exit code
     (via _run_gh) and not report false success — it had gone stale, piping the
@@ -115,14 +124,12 @@ class TestGuardSteering:
 
     def test_blocks_push_to_main(self, tmp_path: Path):
         out = _run_guard({"tool_input": {"command": "git push origin main"}}, cwd=tmp_path)
-        assert out is not None
-        assert out["decision"] == "block"
-        assert "main/master" in out["reason"]
+        assert _denied(out)
+        assert "main/master" in _deny_reason(out)
 
     def test_blocks_push_to_master(self, tmp_path: Path):
         out = _run_guard({"tool_input": {"command": "git push master"}}, cwd=tmp_path)
-        assert out is not None
-        assert out["decision"] == "block"
+        assert _denied(out)
 
     def test_blocks_gh_pr_merge(self, tmp_path: Path):
         # No scripts dir in tmp_path → message references monitor_pr.sh which
@@ -133,7 +140,7 @@ class TestGuardSteering:
         (scripts / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard({"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path)
         assert out is not None
-        assert "monitor_pr.sh" in out["reason"]
+        assert "monitor_pr.sh" in _deny_reason(out)
 
     def test_blocks_gh_api_merge(self, tmp_path: Path):
         scripts = tmp_path / ".claude" / "scripts"
@@ -144,7 +151,7 @@ class TestGuardSteering:
             cwd=tmp_path,
         )
         assert out is not None
-        assert "monitor_pr.sh" in out["reason"]
+        assert "monitor_pr.sh" in _deny_reason(out)
 
     def test_blocks_raw_git_push_when_wrapper_exists(self, tmp_path: Path):
         scripts = tmp_path / ".claude" / "scripts"
@@ -152,7 +159,7 @@ class TestGuardSteering:
         (scripts / "push_branch.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard({"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path)
         assert out is not None
-        assert "push_branch.sh" in out["reason"]
+        assert "push_branch.sh" in _deny_reason(out)
 
     def test_no_redirect_when_wrapper_missing(self, tmp_path: Path):
         # No .claude/scripts dir → suppress redirect for raw git push

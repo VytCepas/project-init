@@ -5,8 +5,9 @@ Subcommands:
   check <node>          exit 0 if every prerequisite of <node> is satisfied,
                         exit 2 otherwise (with reason on stdout).
   guard                 read PreToolUse hook input JSON from stdin, map the
-                        Bash command to a target node, emit
-                        {decision: block, reason: ...} if disallowed.
+                        Bash command to a target node, emit a PreToolUse
+                        hookSpecificOutput with permissionDecision: deny if
+                        disallowed (the documented Claude Code schema).
   nodes                 list every DAG node and its prerequisites.
   push [<branch>] [N]   push current (or named) branch with retry + remote-SHA
                         verification (handles transient GitHub 5xx).
@@ -329,7 +330,13 @@ def guard(payload: dict) -> dict | None:
             ok, why = prereqs_satisfied(target)
             if not ok:
                 reason = f"{message}\n\nDAG prerequisite for {target} not met: {why}."
-        return {"decision": "block", "reason": reason}
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reason,
+            }
+        }
     return None
 
 

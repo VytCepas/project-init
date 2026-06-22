@@ -135,12 +135,11 @@ def evaluate(command: str, permission_mode: str, allow: list[re.Pattern[str]]) -
                 "(Guardrail only — real protection is credential separation, "
                 "see .claude/docs/guides/secrets.md.)"
             )
-            if permission_mode in _AUTONOMOUS_MODES:
-                return {"decision": "block", "reason": reason}
+            decision = "deny" if permission_mode in _AUTONOMOUS_MODES else "ask"
             return {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
-                    "permissionDecision": "ask",
+                    "permissionDecision": decision,
                     "permissionDecisionReason": reason,
                 }
             }

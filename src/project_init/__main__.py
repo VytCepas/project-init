@@ -439,7 +439,7 @@ def _choose_multi_model_interactive() -> bool:
         "standards stay identical — they run below the model.\n\n"
         "  [dim]claude[/dim]                          [dim]# opens as usual[/dim]\n"
         "  [dim]/model deepseek,deepseek-chat[/dim]   [dim]# switch mid-session, context kept[/dim]\n"
-        "  [dim]/model ollama,qwen3-coder:30b[/dim]\n"
+        "  [dim]/model ollama,qwen3-coder:30b[/dim]      [dim]# or qwen3-coder-next (newer)[/dim]\n"
         "  [dim]/model anthropic,claude-opus-4-8[/dim] [dim]# back to Claude[/dim]\n\n"
         "[cyan]Helps:[/cyan] control cost / test models without leaving the terminal.\n"
         "[cyan]Alternatives:[/cyan]\n"

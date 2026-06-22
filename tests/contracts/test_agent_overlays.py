@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -194,3 +196,40 @@ class TestSyncedCopiesInRepo:
         template_names = {p.parent.name for p in _TEMPLATE_SKILLS.glob("*/SKILL.md")}
         command_names = {p.stem for p in _GEMINI_COMMANDS.glob("*.toml")}
         assert command_names == template_names, "run `just sync-plugin`"
+
+
+class TestAgentGuardAdapter:
+    """PI-388: the shared adapter translates a dag_workflow deny into each
+    surface's dialect, sourced from the documented PreToolUse hookSpecificOutput
+    shape. `git push origin main` blocks unconditionally (no redirect script)."""
+
+    def _run_adapter(self, target: Path, dialect: str, command: str) -> dict | None:
+        adapter = target / ".claude" / "hooks" / "agent_guard_adapter.py"
+        payload = json.dumps({"tool_input": {"command": command}})
+        proc = subprocess.run(
+            [sys.executable, str(adapter), dialect],
+            input=payload,
+            capture_output=True,
+            text=True,
+            cwd=target,
+        )
+        assert proc.returncode == 0, proc.stderr
+        return json.loads(proc.stdout) if proc.stdout.strip() else None
+
+    def test_codex_emits_documented_pretooluse_schema(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "codex")
+        out = self._run_adapter(target, "codex", "git push origin main")
+        hso = out["hookSpecificOutput"]
+        assert hso["hookEventName"] == "PreToolUse"
+        assert hso["permissionDecision"] == "deny"
+        assert "main/master" in hso["permissionDecisionReason"]
+
+    def test_gemini_emits_decision_deny(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "gemini")
+        out = self._run_adapter(target, "gemini", "git push origin main")
+        assert out["decision"] == "deny"
+        assert "main/master" in out["reason"]
+
+    def test_innocuous_command_not_blocked(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "codex")
+        assert self._run_adapter(target, "codex", "ls -la") is None

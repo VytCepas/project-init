@@ -54,8 +54,10 @@ def render_mcp_json(servers: dict[str, dict], *, key: str) -> str:
 def render_mcp_toml(servers: dict[str, dict]) -> str:
     """MCP config as Codex ``config.toml`` ``[mcp_servers.<name>]`` tables.
 
-    Stdlib only (no toml writer): values are simple strings/lists, so manual
-    emission is safe and keeps the scaffolder dependency-free.
+    Stdlib only (no toml writer): values are simple strings/lists/inline tables,
+    so manual emission is safe and keeps the scaffolder dependency-free. Passes
+    through ``env`` (stdio) and ``bearer_token_env_var`` (HTTP) so servers that
+    need a secret aren't silently dropped (PI-388).
     """
     lines: list[str] = []
     for name in sorted(servers):
@@ -68,6 +70,11 @@ def render_mcp_toml(servers: dict[str, dict]) -> str:
                 lines.append(f"args = [{rendered}]")
         if "url" in spec:
             lines.append(f'url = "{spec["url"]}"')
+            if spec.get("bearer_token_env_var"):
+                lines.append(f'bearer_token_env_var = "{spec["bearer_token_env_var"]}"')
+        if spec.get("env"):
+            rendered_env = ", ".join(f'"{k}" = "{v}"' for k, v in spec["env"].items())
+            lines.append(f"env = {{{rendered_env}}}")
         lines.append("")
     return "\n".join(lines)
 

@@ -209,6 +209,15 @@ class TestCreateIssueSkill:
         assert 'pr", "create"' in dag or "pr_create" in dag
 
 
+def _denied(out: dict | None) -> bool:
+    """True if the guard denied via the documented PreToolUse schema (PI-388)."""
+    return bool(out) and out.get("hookSpecificOutput", {}).get("permissionDecision") == "deny"
+
+
+def _deny_reason(out: dict | None) -> str:
+    return (out or {}).get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+
+
 class TestGitHubWorkflowHooks:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
@@ -233,15 +242,15 @@ class TestGitHubWorkflowHooks:
 
     def test_github_command_guard_blocks_raw_issue_create(self):
         out = self._run_hook("github_command_guard.sh", "gh issue create --title X")
-        assert out is not None and out["decision"] == "block"
+        assert _denied(out)
 
     def test_github_command_guard_blocks_raw_pr_merge(self):
         out = self._run_hook("github_command_guard.sh", "gh pr merge 42 --squash")
-        assert out is not None and out["decision"] == "block"
+        assert _denied(out)
 
     def test_github_command_guard_blocks_raw_pr_merge_auto(self):
         out = self._run_hook("github_command_guard.sh", "gh pr merge 42 --auto")
-        assert out is not None and out["decision"] == "block"
+        assert _denied(out)
 
     def test_github_command_guard_blocks_gh_api_merge_with_flags(self):
         """PI-198: a `--method PUT` before the endpoint (the natural way to
@@ -250,7 +259,7 @@ class TestGitHubWorkflowHooks:
             "github_command_guard.sh",
             "gh api --method PUT repos/o/r/pulls/42/merge",
         )
-        assert out is not None and out["decision"] == "block"
+        assert _denied(out)
 
     def test_github_command_guard_blocks_gh_api_merge_with_jq_pipe(self):
         """PI-198 review: a pipe inside a quoted flag (e.g. `--jq '.a|.b'`) before
@@ -259,27 +268,27 @@ class TestGitHubWorkflowHooks:
             "github_command_guard.sh",
             "gh api --jq '.a|.b' --method PUT repos/o/r/pulls/42/merge",
         )
-        assert out is not None and out["decision"] == "block"
+        assert _denied(out)
 
     def test_github_command_guard_blocks_raw_pr_create(self):
         out = self._run_hook(
             "github_command_guard.sh",
             'gh pr create --title "[PI-42][fix] Example" --body "Closes #42"',
         )
-        assert out is not None and out["decision"] == "block"
-        assert "create_nojira_pr.sh" in out["reason"]
+        assert _denied(out)
+        assert "create_nojira_pr.sh" in _deny_reason(out)
 
     def test_github_command_guard_blocks_raw_pr_ready(self):
         out = self._run_hook("github_command_guard.sh", "gh pr ready 42")
-        assert out is not None and out["decision"] == "block"
+        assert _denied(out)
 
     def test_github_command_guard_blocks_raw_git_push(self):
         out = self._run_hook("github_command_guard.sh", "git push -u origin fix/PI-42-example")
-        assert out is not None and out["decision"] == "block"
+        assert _denied(out)
 
     def test_github_command_guard_blocks_pr_checks_watch(self):
         out = self._run_hook("github_command_guard.sh", "gh pr checks 42 --watch")
-        assert out is not None and out["decision"] == "block"
+        assert _denied(out)
 
     def test_github_command_guard_allows_monitor_pr_merge(self):
         out = self._run_hook(

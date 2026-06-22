@@ -78,9 +78,10 @@ class TestVerdicts:
     @pytest.mark.parametrize("command", DESTRUCTIVE)
     def test_destructive_blocks_in_autonomous(self, tmp_path: Path, command: str):
         verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
-        assert verdict == {"decision": "block", "reason": verdict["reason"]}
-        assert "prod_guard" in verdict["reason"]
-        assert "credential separation" in verdict["reason"]
+        hso = verdict["hookSpecificOutput"]
+        assert hso["permissionDecision"] == "deny"
+        assert "prod_guard" in hso["permissionDecisionReason"]
+        assert "credential separation" in hso["permissionDecisionReason"]
 
     @pytest.mark.parametrize("command", SAFE)
     def test_safe_commands_pass(self, tmp_path: Path, command: str):
