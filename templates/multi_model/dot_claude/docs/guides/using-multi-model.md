@@ -14,7 +14,7 @@ There are two fundamentally different architectures, with opposite trade-offs:
 
 | | **A. Native harness per model** (`--agents`) | **B. One harness, swap the endpoint** (this overlay) |
 |---|---|---|
-| How | launch that model's own CLI (Codex, Gemini CLI) | stay in Claude Code, route the model behind it via CCR |
+| How | launch that model's own harness (Codex CLI, Antigravity `agy`) | stay in Claude Code, route the model behind it via CCR |
 | Switching | start a different tool | live `/model provider,model`, context kept |
 | Skills | re-authored per harness | one Claude-format set |
 | Model uses its… | **native** tool-call logic ✅ | **Claude's** tool-call format, imposed ⚠️ |

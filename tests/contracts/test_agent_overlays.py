@@ -298,14 +298,29 @@ class TestAgentGuardAdapter:
         assert proc.returncode == 0
         assert proc.stdout.strip() == ""
 
-    def test_prod_guard_blocks_destructive_cross_surface(self, tmp_path: Path):
-        """PI-394: prod_guard now fires on non-Claude surfaces via the adapter
+    @pytest.mark.parametrize(
+        ("dialect", "decision_key", "reason_key"),
+        [
+            ("codex", "hookSpecificOutput", "hookSpecificOutput"),
+            ("cursor", "permission", "user_message"),
+            ("antigravity", "decision", "reason"),
+        ],
+    )
+    def test_prod_guard_blocks_destructive_cross_surface(
+        self, tmp_path: Path, dialect: str, decision_key: str, reason_key: str
+    ):
+        """PI-394: prod_guard fires on EACH non-Claude surface via the adapter
         (autonomous/block). `terraform destroy` is a prod_guard rule, NOT a
-        lifecycle rule — so a deny proves prod_guard ran."""
-        target = _scaffold_agents(tmp_path / "p", "codex")
+        lifecycle rule — so a deny proves prod_guard ran. (Codex review: cover all
+        three dialects, not just codex.)"""
+        target = _scaffold_agents(tmp_path / "p", dialect)
         assert (target / ".claude" / "hooks" / "prod_guard.py").is_file(), (
             "prod_guard.py must ship to plugin-mode targets so the adapter can run it"
         )
-        out = self._run_adapter(target, "codex", "terraform destroy -auto-approve")
-        assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
-        assert "prod_guard" in out["hookSpecificOutput"]["permissionDecisionReason"]
+        out = self._run_adapter(target, dialect, "terraform destroy -auto-approve")
+        if decision_key == "hookSpecificOutput":  # codex documented shape
+            assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+            assert "prod_guard" in out["hookSpecificOutput"]["permissionDecisionReason"]
+        else:  # cursor permission:deny / antigravity decision:deny
+            assert out[decision_key] == "deny"
+            assert "prod_guard" in out[reason_key]
