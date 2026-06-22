@@ -51,10 +51,14 @@ def test_render_mcp_toml_passes_env_and_bearer_token():
 
 
 def test_render_mcp_toml_escapes_special_characters():
-    """Quotes/backslashes in values must yield valid TOML (json.dumps escaping)."""
-    servers = {"srv": {"command": "bunx", "args": ['a"b', "c\\d"]}}
+    """Quotes/backslashes in values (incl. env keys/values) must yield valid
+    TOML (json.dumps escaping) — Codex P2: `env = {"TOKEN" = "a"b"}` is invalid."""
+    servers = {
+        "srv": {"command": "bunx", "args": ['a"b', "c\\d"], "env": {"TOKEN": 'a"b'}},
+    }
     parsed = tomllib.loads(surfaces.render_mcp_toml(servers))
     assert parsed["mcp_servers"]["srv"]["args"] == ['a"b', "c\\d"]
+    assert parsed["mcp_servers"]["srv"]["env"] == {"TOKEN": 'a"b'}
 
 
 def test_cursor_hooks_use_camelcase_events_and_adapter():
