@@ -66,10 +66,11 @@ def hook_scripts() -> list[Path]:
 
 
 def _sync_agent_skills() -> list[str]:
-    """Byte-identical SKILL.md trees at .agents/skills for Codex and Antigravity.
+    """Byte-identical SKILL.md trees per surface (Codex/Antigravity/Amp/Junie).
 
-    Each layer ships its own copy so either surface works standalone (Antigravity
-    discovers .agents/skills/*/SKILL.md natively — no command pointers, PI-386).
+    Codex/Antigravity/Amp use `.agents/skills`; Junie uses `.junie/skills`. Each
+    layer ships its own copy so the surface works standalone — all discover
+    `<dir>/<name>/SKILL.md` natively, no command pointers (PI-386, PI-397).
     """
     synced = []
     for label, dest in (

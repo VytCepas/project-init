@@ -28,7 +28,10 @@ MCP_CATALOG: list[dict] = [
         "works on Claude web/mobile/Cowork (stdio servers are invisible there)",
         # HTTP/remote server (PI-397): rendered with type:http for Claude/VS Code,
         # url-only for Amp/Junie/Codex. Never SSE (deprecated in the MCP spec).
-        "command": "claude mcp add --transport http context7 https://mcp.context7.com/mcp",
+        # Register under the same name as the rendered config key (the id) so the
+        # printed command and the emitted server entry agree — and so it never
+        # collides with the stdio `context7` entry if a user selects both.
+        "command": "claude mcp add --transport http context7-http https://mcp.context7.com/mcp",
         "server": {"type": "http", "url": "https://mcp.context7.com/mcp"},
     },
 ]

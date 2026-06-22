@@ -169,6 +169,9 @@ SURFACES: dict[str, dict] = {
         "hooks_render": None,
         # Amp reads project MCP from .amp/settings.json under the flat dotted key
         # `amp.mcpServers` (stdio/url, no `type`); skills from .agents/skills (PI-397).
+        # NOTE: .amp/settings.json may hold other Amp keys. emit() never clobbers an
+        # existing file — it writes a `.new` sibling on any diff (PI-179) — so a user
+        # with prior settings reviews/merges manually; a fresh scaffold writes it clean.
         "mcp_file": ".amp/settings.json",
         "mcp_render": ("json", "amp.mcpServers", True),
     },
