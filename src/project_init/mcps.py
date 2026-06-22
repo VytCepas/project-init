@@ -21,6 +21,16 @@ MCP_CATALOG: list[dict] = [
         # install command, rendered per-surface into mcpServers / servers / TOML.
         "server": {"command": "bunx", "args": ["@upstash/context7-mcp"]},
     },
+    {
+        "id": "context7-http",
+        "name": "Context7 (hosted HTTP)",
+        "description": "Live library docs over Streamable HTTP — the transport that "
+        "works on Claude web/mobile/Cowork (stdio servers are invisible there)",
+        # HTTP/remote server (PI-397): rendered with type:http for Claude/VS Code,
+        # url-only for Amp/Junie/Codex. Never SSE (deprecated in the MCP spec).
+        "command": "claude mcp add --transport http context7 https://mcp.context7.com/mcp",
+        "server": {"type": "http", "url": "https://mcp.context7.com/mcp"},
+    },
 ]
 
 # Database MCPs are intentionally absent (PI-387): the reference postgres/sqlite

@@ -17,6 +17,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _TEMPLATE_SKILLS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills"
 _CODEX_SKILLS = _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
 _ANTIGRAVITY_SKILLS = _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills"
+_AMP_SKILLS = _REPO_ROOT / "templates" / "amp" / "dot_agents" / "skills"
+_JUNIE_SKILLS = _REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
 
 
 def _scaffold_agents(target: Path, *agent_names: str) -> Path:
@@ -176,6 +178,23 @@ class TestSupportTierDocs:
         assert "repo-committed config" in onboarding
 
 
+class TestAmpJunieOverlay:
+    """PI-397: Amp and Junie ship a skills layer (MCP-file emission is covered in
+    tests/unit/test_surfaces.py via planned_files)."""
+
+    def test_amp_ships_agents_skills(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "amp")
+        assert sorted((target / ".agents" / "skills").glob("*/SKILL.md")), (
+            "amp overlay must ship .agents/skills"
+        )
+
+    def test_junie_ships_junie_skills(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "junie")
+        assert sorted((target / ".junie" / "skills").glob("*/SKILL.md")), (
+            "junie overlay must ship .junie/skills"
+        )
+
+
 class TestSyncedCopiesInRepo:
     """The overlay sources are derived files — `just sync-plugin` keeps them
     aligned with templates/base/dot_claude/skills."""
@@ -199,6 +218,18 @@ class TestSyncedCopiesInRepo:
             assert antigravity[name].read_bytes() == path.read_bytes(), (
                 f"antigravity skill {name} drifted — run `just sync-plugin`"
             )
+
+    def test_amp_and_junie_skill_sources_in_sync(self):
+        """PI-397: Amp (.agents/skills) and Junie (.junie/skills) carry the same
+        canonical SKILL.md set, synced via `just sync-plugin`."""
+        template = {p.parent.name: p for p in _TEMPLATE_SKILLS.glob("*/SKILL.md")}
+        for label, skills_dir in (("amp", _AMP_SKILLS), ("junie", _JUNIE_SKILLS)):
+            mirror = {p.parent.name: p for p in skills_dir.glob("*/SKILL.md")}
+            assert set(template) == set(mirror), f"{label} skill set drifted"
+            for name, path in template.items():
+                assert mirror[name].read_bytes() == path.read_bytes(), (
+                    f"{label} skill {name} drifted — run `just sync-plugin`"
+                )
 
 
 class TestAgentGuardAdapter:

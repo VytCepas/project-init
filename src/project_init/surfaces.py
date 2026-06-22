@@ -42,12 +42,19 @@ def mcp_server_specs(selected: list[dict]) -> dict[str, dict]:
     return out
 
 
-def render_mcp_json(servers: dict[str, dict], *, key: str) -> str:
+def render_mcp_json(servers: dict[str, dict], *, key: str, drop_type: bool = False) -> str:
     """MCP config as JSON.
 
-    ``key`` is ``mcpServers`` (Claude root .mcp.json, Cursor) or ``servers``
-    (VS Code .vscode/mcp.json).
+    ``key`` is the top-level wrapper: ``mcpServers`` (Claude root .mcp.json,
+    Cursor, Junie), ``servers`` (VS Code), or ``amp.mcpServers`` (Amp). With
+    ``drop_type=True`` the ``type`` field is stripped from each server — Amp and
+    Junie infer transport from ``command`` vs ``url`` and take no ``type`` (PI-397).
     """
+    if drop_type:
+        servers = {
+            name: {k: v for k, v in spec.items() if k != "type"}
+            for name, spec in servers.items()
+        }
     return json.dumps({key: servers}, indent=2, sort_keys=True) + "\n"
 
 
@@ -130,9 +137,10 @@ def render_antigravity_hooks() -> str:
 
 # --- the surface table -------------------------------------------------------
 # One entry per surface that needs project-scoped hook/MCP emission. Claude
-# (CLI/ext) and Codex (overlay) are intentionally absent. Antigravity appears here
-# (hooks + MCP) and also ships an .agents/skills template layer (PI-386). Each entry
-# declares what files to write; the scaffold engine consumes this. (ADR-017 §2.)
+# (CLI/ext) and Codex (overlay) are intentionally absent. Antigravity (hooks + MCP)
+# and Amp/Junie (MCP-only) also ship their skills via template layers (PI-386/397).
+# Each entry declares what files to write; the scaffold engine consumes this.
+# (ADR-017 §2.)
 
 SURFACES: dict[str, dict] = {
     "cursor": {
@@ -154,6 +162,26 @@ SURFACES: dict[str, dict] = {
         "mcp_file": ".agents/mcp_config.json",
         "mcp_render": ("json", "mcpServers"),
     },
+    "amp": {
+        "label": "Amp",
+        "experimental": False,
+        "hooks_file": None,
+        "hooks_render": None,
+        # Amp reads project MCP from .amp/settings.json under the flat dotted key
+        # `amp.mcpServers` (stdio/url, no `type`); skills from .agents/skills (PI-397).
+        "mcp_file": ".amp/settings.json",
+        "mcp_render": ("json", "amp.mcpServers", True),
+    },
+    "junie": {
+        "label": "JetBrains Junie",
+        "experimental": False,
+        "hooks_file": None,
+        "hooks_render": None,
+        # Junie reads project MCP from .junie/mcp/mcp.json (`mcpServers`, no `type`);
+        # skills from .junie/skills (PI-397).
+        "mcp_file": ".junie/mcp/mcp.json",
+        "mcp_render": ("json", "mcpServers", True),
+    },
 }
 
 # MCP-only targets: surfaces whose hooks/skills are native but whose MCP config
@@ -165,11 +193,11 @@ MCP_ONLY_TARGETS: dict[str, tuple[str, str]] = {
 }
 
 
-def render_mcp_for(kind_key: tuple[str, str], servers: dict[str, dict]) -> str:
-    """Render MCP config for a ``(format, key)`` spec."""
-    fmt, key = kind_key
+def render_mcp_for(kind_key: tuple, servers: dict[str, dict]) -> str:
+    """Render MCP config for a ``(format, key[, drop_type])`` spec."""
+    fmt, key, *rest = kind_key
     if fmt == "json":
-        return render_mcp_json(servers, key=key)
+        return render_mcp_json(servers, key=key, drop_type=bool(rest and rest[0]))
     if fmt == "toml":
         return render_mcp_toml(servers)
     raise ValueError(f"unknown MCP format: {fmt}")

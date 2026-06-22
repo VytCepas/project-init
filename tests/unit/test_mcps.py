@@ -43,12 +43,26 @@ class TestMCPs:
             assert "npm" not in cmd, f"npm found in command: {cmd}"
 
     def test_all_commands_use_bunx_with_separator(self):
+        """Stdio entries use `bunx` with the `--` separator (PI-387); HTTP entries
+        use `--transport http` instead (PI-397)."""
         from project_init.mcps import MCP_CATALOG, PLAYWRIGHT_MCP
-        all_commands = [m["command"] for m in MCP_CATALOG] + [PLAYWRIGHT_MCP["command"]]
-        for cmd in all_commands:
-            assert "bunx" in cmd, f"bunx not found in command: {cmd}"
-            # PI-387: current `claude mcp add <name> -- <cmd>` separator form.
-            assert " -- " in cmd, f"missing `--` separator in command: {cmd}"
+        for entry in [*MCP_CATALOG, PLAYWRIGHT_MCP]:
+            cmd = entry["command"]
+            if "url" in entry.get("server", {}):  # HTTP/remote entry
+                assert "--transport http" in cmd, f"HTTP entry must use --transport http: {cmd}"
+            else:
+                assert "bunx" in cmd, f"bunx not found in command: {cmd}"
+                assert " -- " in cmd, f"missing `--` separator in command: {cmd}"
+
+    def test_http_catalog_entry_exists(self):
+        """PI-397: an HTTP/streamable catalog entry for cloud surfaces (web/mobile
+        can't run stdio); never SSE."""
+        from project_init.mcps import MCP_CATALOG
+        http = [m for m in MCP_CATALOG if m["server"].get("type") == "http"]
+        assert http, "expected at least one HTTP MCP catalog entry"
+        for m in http:
+            assert m["server"]["url"].startswith("https://")
+            assert "--transport http" in m["command"]
 
     def test_format_installed_mcps_empty(self):
         from project_init.mcps import format_installed_mcps

@@ -158,11 +158,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default="claude",
         help=(
             "Comma-separated agents/surfaces the project supports: claude "
-            "(always included), codex, ollama, cursor, antigravity, vscode. "
-            "Codex gets a native overlay; antigravity gets an .agents/ skills "
-            "layer + generated hooks/MCP; cursor gets generated hooks+MCP; vscode "
-            "gets MCP config; ollama is instructions-level only (PI-137, PI-366, "
-            "PI-386; antigravity hooks experimental)"
+            "(always included), codex, ollama, cursor, antigravity, vscode, amp, "
+            "junie. Codex gets a native overlay; antigravity gets an .agents/ "
+            "skills layer + generated hooks/MCP; cursor gets generated hooks+MCP; "
+            "amp/junie get a skills layer + generated MCP config; vscode gets MCP "
+            "config; ollama is instructions-level only (PI-137, PI-366, PI-386, "
+            "PI-397; antigravity hooks experimental)"
         ),
     )
     p.add_argument(
@@ -785,10 +786,10 @@ def _choose_iac_interactive() -> str:
     return _IAC_OPTIONS[choice - 1]
 
 
-# claude/codex/ollama are CLI harnesses; cursor/antigravity/vscode get generated
-# per-surface config (ADR-017 / PI-366). Antigravity also ships an .agents/skills
-# layer (PI-386). Gemini CLI was removed (PI-386): its free/Pro/Ultra tiers were
-# sunset 2026-06-18; Antigravity (agy) is the Google target and reads .agents/.
+# claude/codex/ollama are CLI harnesses; cursor/antigravity/vscode/amp/junie get
+# generated per-surface config (ADR-017 / PI-366). Antigravity/Amp/Junie also ship
+# a skills layer (PI-386/397). Gemini CLI was removed (PI-386): its free/Pro/Ultra
+# tiers were sunset 2026-06-18; Antigravity (agy) is the Google target.
 _VALID_AGENTS = (
     "claude",
     "codex",
@@ -796,6 +797,8 @@ _VALID_AGENTS = (
     "cursor",
     "antigravity",
     "vscode",
+    "amp",
+    "junie",
 )
 
 
