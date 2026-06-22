@@ -152,6 +152,21 @@ class TestVerdicts:
         assert result.returncode == 0, result.stderr
         assert result.stdout == ""
 
+    def test_non_dict_tool_input_fails_open(self, tmp_path: Path):
+        """payload is a dict but `tool_input` is a non-dict (list/string): the
+        `(... or {}).get()` form would raise on a truthy non-dict, so tool_input
+        needs its own type guard too (Copilot review)."""
+        result = subprocess.run(
+            ["python3", str(_HOOK)],
+            input='{"tool_input": ["not", "a", "dict"]}',
+            capture_output=True,
+            text=True,
+            cwd=tmp_path,
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == ""
+
     def test_corrupt_allowlist_fails_open_but_still_guards(self, tmp_path: Path):
         config = tmp_path / ".claude" / "config.yaml"
         config.parent.mkdir(parents=True)

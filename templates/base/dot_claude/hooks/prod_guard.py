@@ -154,7 +154,10 @@ def main() -> int:
         return 0
     if not isinstance(payload, dict):
         return 0  # non-dict JSON (e.g. a list) → fail open, never raise
-    command = ((payload.get("tool_input") or {}).get("command") or "").strip()
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        tool_input = {}  # tool_input present but non-dict → fail open, never raise
+    command = (tool_input.get("command") or "").strip()
     if not command:
         return 0
     mode = payload.get("permission_mode") or payload.get("permissionMode") or ""
