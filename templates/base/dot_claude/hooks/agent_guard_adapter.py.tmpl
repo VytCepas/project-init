@@ -104,23 +104,25 @@ def main() -> int:
         return 0
     cwd = payload.get("cwd") if isinstance(payload, dict) else None
 
-    # Run both Claude-side guards on the extracted command: the lifecycle
-    # COMMAND_RULES guard, then the destructive-command guard (PI-394). Agent
-    # surfaces are non-interactive, so prod_guard runs in autonomous mode → a
-    # destructive command is blocked outright rather than "ask"ed. Both emit the
-    # documented PreToolUse shape; first deny wins.
-    verdicts = [
-        _run_guard("dag_workflow.py", {"tool_input": {"command": command}}, "guard"),
-        _run_guard(
-            "prod_guard.py",
-            {
-                "tool_input": {"command": command},
-                "permission_mode": "bypassPermissions",
-                "cwd": cwd or ".",
-            },
-        ),
-    ]
-    reason = next((r for r in map(_deny_reason, verdicts) if r is not None), None)
+    # Lifecycle COMMAND_RULES guard first; only run the destructive-command guard
+    # if it didn't already deny — avoids a second subprocess on a blocked command
+    # (PI-394). Agent surfaces are non-interactive, so prod_guard runs in autonomous
+    # mode → a destructive command blocks outright rather than "ask"ing. Both emit
+    # the documented PreToolUse shape.
+    reason = _deny_reason(
+        _run_guard("dag_workflow.py", {"tool_input": {"command": command}}, "guard")
+    )
+    if reason is None:
+        reason = _deny_reason(
+            _run_guard(
+                "prod_guard.py",
+                {
+                    "tool_input": {"command": command},
+                    "permission_mode": "bypassPermissions",
+                    "cwd": cwd or ".",
+                },
+            )
+        )
     if reason is None:
         return 0
 
