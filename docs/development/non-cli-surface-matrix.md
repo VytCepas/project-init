@@ -48,9 +48,18 @@ project-init can decide what to emit beyond `.claude/` (epic #359, workstream B)
 
 ## What project-init emits today vs. what each surface needs
 
-Current emission (verified by scaffolding `obsidian-only` + `--agents claude,codex,gemini`):
+> **Update — PI-386 (2026-06-22):** Gemini CLI was removed. Google sunset its
+> free/Pro/Ultra tiers on 2026-06-18; **Antigravity** (`agy`) is now the Google
+> target and reads the same `.agents/` tree. Antigravity is a self-sufficient
+> surface: an `.agents/skills/` layer + generated `.agents/hooks.json`
+> (experimental) + project-scoped **`.agents/mcp_config.json`** (replacing the
+> old global `~/.gemini/config/mcp_config.json` assumption). The `.gemini-extension/`
+> overlay and `setup_gemini.sh` are gone.
+
+Current emission (verified by scaffolding `obsidian-only` + `--agents claude,codex,antigravity`):
 `.claude/` (Claude CLI), `.codex/hooks.json` + `.agents/skills/` (Codex),
-`.gemini-extension/` + `.agents/skills/` (Gemini), and `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`.
+`.agents/skills/` + `.agents/hooks.json` + `.agents/mcp_config.json` (Antigravity),
+and `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`.
 
 | Surface | Already covered by current output | Gap to close (feeds #366) |
 |---|---|---|
@@ -58,7 +67,7 @@ Current emission (verified by scaffolding `obsidian-only` + `--agents claude,cod
 | Copilot agent mode | CLAUDE.md, `.claude/skills`, hooks (matcher-blind), AGENTS.md | `.vscode/mcp.json` (`servers` map) if MCPs are configured; document that matchers are advisory here |
 | Cursor | `.claude/skills` (skills), AGENTS.md | `.cursor/hooks.json` (translate `PreToolUse(Bash)`→`beforeShellExecution`, `UserPromptSubmit`→`beforeSubmitPrompt`); `.cursor/mcp.json` (≈copy of `mcpServers`) |
 | Codex (CLI/IDE) | `.codex/hooks.json` ✅, `.agents/skills` ✅, AGENTS.md ✅ | MCP → `.codex/config.toml` `[mcp_servers.*]` if MCPs are configured |
-| Antigravity | `.agents/skills` (skills), AGENTS.md | `.agents/hooks.json` (`PreToolUse` only); confirm paths live before building |
+| Antigravity | `.agents/skills` ✅, `.agents/hooks.json` ✅, `.agents/mcp_config.json` ✅, AGENTS.md ✅ (PI-386) | hook blocking-contract still experimental — live-verify in #385 |
 
 ## Implications for the ADR (#364)
 

@@ -194,8 +194,9 @@ def generate_preset(name: str, *, extends: str, description: str = "", version: 
 
 
 # Agents whose native wiring ships as a template layer (PI-137); ollama is
-# instructions-level only. Single source for scaffold + upgrade (PI-189).
-_AGENT_LAYERS = ("codex", "gemini")
+# instructions-level only. Antigravity ships .agents/skills via this layer and its
+# hooks/MCP via surfaces.py (PI-386). Single source for scaffold + upgrade (PI-189).
+_AGENT_LAYERS = ("codex", "antigravity")
 
 
 def overlay_layers(

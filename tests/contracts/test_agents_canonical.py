@@ -102,7 +102,7 @@ class TestGithubWorkflowProductionBoundary:
     _SKILLS = [
         _REPO / "templates/fallback/dot_claude/skills/github_workflow/SKILL.md",
         _REPO / "templates/codex/dot_agents/skills/github_workflow/SKILL.md",
-        _REPO / "templates/gemini/dot_agents/skills/github_workflow/SKILL.md",
+        _REPO / "templates/antigravity/dot_agents/skills/github_workflow/SKILL.md",
         _REPO / "plugins/project-init-workflow/skills/github_workflow/SKILL.md",
     ]
 

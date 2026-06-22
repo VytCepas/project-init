@@ -111,7 +111,7 @@ def _overlay_off_defaults() -> dict[str, str]:
         "vscode": "",
         "agents": "claude",
         "codex": "",
-        "gemini": "",
+        "antigravity": "",
         "ollama": "",
         "multi_agent": "",
         "other_agents": "",
@@ -559,6 +559,28 @@ def _backfill_variables(variables: dict) -> dict:
     return v
 
 
+def _migrate_agents(variables: dict) -> dict:
+    """Migrate a recorded agents list for removed/renamed surfaces (PI-386).
+
+    Gemini CLI was removed; map a recorded ``gemini`` agent to ``antigravity``
+    (the Google surface that reads the same ``.agents/`` tree) so an existing
+    scaffold upgrades to the live surface instead of silently losing it. Also
+    drops the stale ``gemini`` template flag.
+    """
+    raw = variables.get("agents", "claude")
+    migrated: list[str] = []
+    for part in (a.strip() for a in raw.split(",")):
+        if not part:
+            continue
+        name = "antigravity" if part == "gemini" else part
+        if name not in migrated:
+            migrated.append(name)
+    out = dict(variables)
+    out["agents"] = ",".join(migrated)
+    out.pop("gemini", None)
+    return out
+
+
 def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
     """Return (preset_name, variables, manifest, migrated) for *target*."""
     config_path = target / _CONFIG_REL
@@ -572,9 +594,9 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
     parsed = _parse_record_block(text)
     if parsed is not None:
         preset_name, variables, manifest = parsed
-        return preset_name, _backfill_variables(variables), manifest, False
+        return preset_name, _migrate_agents(_backfill_variables(variables)), manifest, False
     preset_name, variables, manifest = _migrate_semantic_config(text.splitlines())
-    return preset_name, _backfill_variables(variables), manifest, True
+    return preset_name, _migrate_agents(_backfill_variables(variables)), manifest, True
 
 
 def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:
@@ -919,7 +941,7 @@ _ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
     ((".claude", "docs"), "claude-docs", "In-repo docs (.claude/docs)"),
     ((".claude",), "claude-core", "Claude Code core config"),
     ((".codex",), "codex-agent", "Codex agent wiring"),
-    ((".gemini",), "gemini-agent", "Gemini agent wiring"),
+    ((".agents",), "agents-dir", "Agent skills/hooks (.agents/ — Codex, Antigravity)"),
     (("docs",), "docs", "Project documentation site"),
 )
 

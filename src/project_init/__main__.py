@@ -158,10 +158,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default="claude",
         help=(
             "Comma-separated agents/surfaces the project supports: claude "
-            "(always included), codex, gemini, ollama, cursor, antigravity, "
-            "vscode. Codex/Gemini get native overlays; cursor/antigravity get "
-            "generated hooks+MCP config; vscode gets MCP config; ollama is "
-            "instructions-level only (PI-137, PI-366; antigravity experimental)"
+            "(always included), codex, ollama, cursor, antigravity, vscode. "
+            "Codex gets a native overlay; antigravity gets an .agents/ skills "
+            "layer + generated hooks/MCP; cursor gets generated hooks+MCP; vscode "
+            "gets MCP config; ollama is instructions-level only (PI-137, PI-366, "
+            "PI-386; antigravity hooks experimental)"
         ),
     )
     p.add_argument(
@@ -391,7 +392,7 @@ def _choose_multi_model_interactive() -> bool:
     """Explain multi-model switching + the alternatives, then ask (ADR-016, #352).
 
     States plainly what the overlay does, how it helps, and the honest
-    alternatives (Gemini/OpenAI are better in their native --agents harnesses;
+    alternatives (OpenAI/Codex is better in its native --agents harness;
     Ollama runs locally), so the user makes an informed choice or declines —
     declining leaves a clean project. Passing --multi-model (in either mode)
     pre-accepts via the flag and skips this; only an interactive run without the
@@ -413,9 +414,9 @@ def _choose_multi_model_interactive() -> bool:
         "  [dim]/model anthropic,claude-opus-4-8[/dim] [dim]# back to Claude[/dim]\n\n"
         "[cyan]Helps:[/cyan] control cost / test models without leaving the terminal.\n"
         "[cyan]Alternatives:[/cyan]\n"
-        "  • [bold]Gemini & OpenAI/Codex[/bold] already have native harnesses "
-        "([dim]--agents gemini[/dim] / [dim]codex[/dim]) — better quality there; "
-        "route them through CCR only for one-terminal convenience.\n"
+        "  • [bold]OpenAI/Codex[/bold] has a native harness "
+        "([dim]--agents codex[/dim]) — better quality there; route it through CCR "
+        "only for one-terminal convenience.\n"
         "  • [bold]Ollama[/bold] models also run natively/locally.\n"
         "  • Say yes and the scaffolded [dim]setup_models.sh[/dim] installs CCR "
         "(pinned), seeds the config, and can pull local models for you.\n\n"
@@ -600,7 +601,7 @@ def _gather_inputs_interactive(
     resolved_multi_model = multi_model_flag or _choose_multi_model_interactive()
     while True:
         agents_raw = _prompt(
-            "Agents/surfaces (claude always; add codex/gemini/ollama/cursor/antigravity/vscode, comma-separated)",
+            "Agents/surfaces (claude always; add codex/ollama/cursor/antigravity/vscode, comma-separated)",
             default="claude",
         )
         try:
@@ -784,12 +785,13 @@ def _choose_iac_interactive() -> str:
     return _IAC_OPTIONS[choice - 1]
 
 
-# claude/codex/gemini/ollama are CLI harnesses; cursor/antigravity/vscode are
-# GUI surfaces that get generated per-surface config (ADR-017 / PI-366).
+# claude/codex/ollama are CLI harnesses; cursor/antigravity/vscode get generated
+# per-surface config (ADR-017 / PI-366). Antigravity also ships an .agents/skills
+# layer (PI-386). Gemini CLI was removed (PI-386): its free/Pro/Ultra tiers were
+# sunset 2026-06-18; Antigravity (agy) is the Google target and reads .agents/.
 _VALID_AGENTS = (
     "claude",
     "codex",
-    "gemini",
     "ollama",
     "cursor",
     "antigravity",
@@ -1043,16 +1045,16 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         # on upgrade re-render; per-agent flags gate conditional blocks.
         "agents": ",".join(agents),
         "codex": "true" if "codex" in agents else "",
-        "gemini": "true" if "gemini" in agents else "",
         "ollama": "true" if "ollama" in agents else "",
-        # No per-surface template flags for cursor/antigravity/vscode: their
-        # config is generated from the `agents` list by surfaces.emit (PI-366),
-        # not by templates. ("vscode" here would also collide with the existing
-        # VS Code editor-settings var.)
+        # Antigravity has a flag (it ships an .agents/skills layer + an AGENTS.md
+        # support note, PI-386). No flags for cursor/vscode: their config is
+        # generated from the `agents` list by surfaces.emit (PI-366), not by
+        # templates. ("vscode" here would also collide with the VS Code var.)
+        "antigravity": "true" if "antigravity" in agents else "",
         # The guard adapter is needed by every surface that wires a hook to it
-        # (codex/gemini + the GUI surfaces cursor/antigravity); PI-366.
+        # (codex + the GUI surfaces cursor/antigravity); PI-366.
         "multi_agent": "true"
-        if any(a in agents for a in ("codex", "gemini", "cursor", "antigravity"))
+        if any(a in agents for a in ("codex", "cursor", "antigravity"))
         else "",
         "other_agents": "true" if len(agents) > 1 else "",
         # Multi-model switching overlay (ADR-016, #351): gates the multi_model

@@ -51,7 +51,7 @@ def test_migrate_and_backfill_share_off_defaults():
     assert d["agents"] == "claude"
     assert d["no_plugin"] == "true"
     assert d["license"] == "none"
-    assert all(d[k] == "" for k in ("devcontainer", "mise", "vscode", "codex", "gemini"))
+    assert all(d[k] == "" for k in ("devcontainer", "mise", "vscode", "codex"))
 
 
 class TestDeliveryModel:

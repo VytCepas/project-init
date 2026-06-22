@@ -53,4 +53,4 @@ def test_choose_multi_model_interactive_shows_messaging(monkeypatch, capsys):
     assert "/model" in out
     assert "deepseek,deepseek-chat" in out
     assert "Alternatives" in out
-    assert "gemini" in out  # the native-harness alternative is surfaced
+    assert "codex" in out  # the native-harness alternative is surfaced

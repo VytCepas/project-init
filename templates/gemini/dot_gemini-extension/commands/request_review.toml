@@ -1,5 +1,0 @@
-description = "Mark the current draft PR ready for review"
-prompt = """
-Read .agents/skills/request_review/SKILL.md and follow its
-instructions exactly for this request: {{args}}
-"""

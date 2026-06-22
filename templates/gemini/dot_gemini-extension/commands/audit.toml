@@ -1,5 +1,0 @@
-description = "Full project health audit — scans hooks, skills, scripts, rules, CI config, docs, and GitHub workflow for inconsistencies, broken references, and common mistakes. Creates a GitHub issue with findings and optionally starts fixing them."
-prompt = """
-Read .agents/skills/audit/SKILL.md and follow its
-instructions exactly for this request: {{args}}
-"""

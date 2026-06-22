@@ -159,10 +159,10 @@ class TestCLIOverlayFlags:
 
     def test_agents_flag_renders_overlays(self, tmp_path: Path):
         target = tmp_path / "p"
-        assert self._run(target, "--agents", "codex,gemini,ollama") == 0
+        assert self._run(target, "--agents", "codex,antigravity,ollama") == 0
         assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()
         assert (target / ".codex" / "hooks.json").is_file()
-        assert (target / ".gemini-extension" / "gemini-extension.json").is_file()
+        assert (target / ".agents" / "hooks.json").is_file()
         assert (target / ".claude" / "hooks" / "agent_guard_adapter.py").is_file()
 
     def test_agents_default_is_claude_only(self, tmp_path: Path):
@@ -170,7 +170,6 @@ class TestCLIOverlayFlags:
         assert self._run(target) == 0
         assert not (target / ".agents").exists()
         assert not (target / ".codex").exists()
-        assert not (target / ".gemini-extension").exists()
 
     def test_unknown_agent_rejected(self, tmp_path: Path):
         with pytest.raises(SystemExit):

@@ -1,15 +1,14 @@
 {{#if multi_agent}}#!/usr/bin/env python3
 """Adapt non-Claude agent hook payloads for the shared dag_workflow guard.
 
-Codex (PreToolUse via .codex/hooks.json) and Gemini CLI (BeforeTool via the
-project extension) reuse the same COMMAND_RULES enforcement Claude Code gets
-from github_command_guard.sh. Payloads differ slightly per agent, so this
-shim extracts the shell command, feeds a Claude-shaped payload into
-dag_workflow.py guard, and translates the verdict to the caller's dialect:
+Codex (PreToolUse via .codex/hooks.json) and the GUI surfaces (cursor,
+antigravity) reuse the same COMMAND_RULES enforcement Claude Code gets from
+github_command_guard.sh. Payloads differ slightly per surface, so this shim
+extracts the shell command, feeds a Claude-shaped payload into dag_workflow.py
+guard, and translates the verdict to the caller's dialect:
 
   codex  -> {"hookSpecificOutput": {permissionDecision: "deny", ...}}
             (the documented PreToolUse schema; Codex accepts it)
-  gemini -> {"decision": "deny",  ...}
   cursor -> {"permission": "deny", ...}      (PI-385: shape unverified)
   antigravity -> {"decision": "deny", ...}   (PI-385: experimental)
 
@@ -66,9 +65,7 @@ def main() -> int:
     denied = hso.get("permissionDecision") == "deny" or verdict.get("decision") == "block"
     if denied:
         reason = hso.get("permissionDecisionReason") or verdict.get("reason", "")
-        if dialect == "gemini":
-            out = {"decision": "deny", "reason": reason}
-        elif dialect == "cursor":
+        if dialect == "cursor":
             # Cursor signals a block via permission=deny (PI-366; exact schema
             # unverified — fail-open means a wrong guess degrades safely).
             out = {"permission": "deny", "userMessage": reason}

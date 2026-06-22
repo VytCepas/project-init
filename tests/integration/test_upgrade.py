@@ -26,6 +26,22 @@ from project_init.upgrade import (
 _MANIFEST_LINE_RE = re.compile(r"^(  manifest: )(.*)$", re.MULTILINE)
 
 
+def test_migrate_agents_maps_gemini_to_antigravity():
+    """PI-386: a recorded `gemini` agent upgrades to `antigravity` (dedup), and
+    the stale `gemini` flag is dropped, so existing scaffolds don't break."""
+    from project_init.upgrade import _migrate_agents
+
+    out = _migrate_agents({"agents": "claude,gemini,codex", "gemini": "true"})
+    assert out["agents"] == "claude,antigravity,codex"
+    assert "gemini" not in out
+    # gemini + an explicit antigravity dedup to one antigravity
+    assert _migrate_agents({"agents": "claude,gemini,antigravity"})["agents"] == (
+        "claude,antigravity"
+    )
+    # no gemini → unchanged
+    assert _migrate_agents({"agents": "claude,codex"})["agents"] == "claude,codex"
+
+
 def _scaffold(target: Path) -> None:
     rc = main(
         [

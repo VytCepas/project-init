@@ -1,5 +1,0 @@
-description = "Creates a GitHub Issue, branch, and draft PR before implementation begins. Use before any non-trivial task to keep work traceable — one issue, one branch, one PR."
-prompt = """
-Read .agents/skills/start_task/SKILL.md and follow its
-instructions exactly for this request: {{args}}
-"""
