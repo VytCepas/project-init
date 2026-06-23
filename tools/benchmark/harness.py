@@ -208,7 +208,10 @@ def run_task(
         if isinstance(out, dict):
             session_id = out.get("session_id") or ""
             cost = out.get("total_cost_usd")
-            result_text = out.get("result") or ""  # final agent text (for the regex check)
+            # Final agent text for the regex check; guard non-string payloads so
+            # re.search never gets a dict/list.
+            result_obj = out.get("result")
+            result_text = result_obj if isinstance(result_obj, str) else ""
     except (ValueError, TypeError):
         pass
     return {

@@ -20,11 +20,31 @@ from __future__ import annotations
 
 import re
 import shlex
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from tools.benchmark.transcript import parse as parse_transcript
+
+
+def _resolve_uv(argv: list[str]) -> list[str]:
+    """Replace a leading ``uv`` with its absolute path.
+
+    ``uv run`` strips ``uv`` from the child's PATH, so a scorer subprocess that
+    invokes ``uv run pytest`` can hit ``FileNotFoundError`` — a false-negative
+    ``success``. Resolve via PATH, then the common install locations (mirrors
+    ``tests/helpers.find_uv``).
+    """
+    if not argv or argv[0] != "uv":
+        return argv
+    uv = shutil.which("uv")
+    if not uv:
+        for candidate in (Path.home() / ".local" / "bin" / "uv", Path("/usr/local/bin/uv")):
+            if candidate.exists():
+                uv = str(candidate)
+                break
+    return [uv, *argv[1:]] if uv else argv
 
 
 @dataclass
@@ -70,7 +90,10 @@ def _run_pytest_check(check: dict, target_dir: Path) -> bool:
     expect_exit = int(check.get("expect_exit", 0))
     try:
         proc = subprocess.run(
-            _pytest_argv(command, nodes), cwd=str(target_dir), capture_output=True, timeout=600
+            _resolve_uv(_pytest_argv(command, nodes)),
+            cwd=str(target_dir),
+            capture_output=True,
+            timeout=600,
         )
     except (OSError, subprocess.SubprocessError):
         return False

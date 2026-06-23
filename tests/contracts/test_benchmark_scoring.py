@@ -94,6 +94,20 @@ class TestPytestArgv:
         assert argv == ["uv", "run", "pytest", "-q", "test_slug.py"]
 
 
+class TestResolveUv:
+    def test_resolves_leading_uv_to_abs_path(self):
+        """uv run strips uv from PATH, so the scorer must resolve it (Copilot review)."""
+        argv = scoring._resolve_uv(["uv", "run", "pytest"])
+        # uv is available in the dev env → first token becomes an absolute path.
+        assert argv[0] != "uv"
+        assert Path(argv[0]).is_absolute()
+        assert argv[1:] == ["run", "pytest"]
+
+    def test_non_uv_argv_untouched(self):
+        assert scoring._resolve_uv(["pytest", "-q"]) == ["pytest", "-q"]
+        assert scoring._resolve_uv([]) == []
+
+
 class TestRegexCheck:
     def test_matches_agent_output(self):
         assert scoring.score_check(load_task("qa"), Path("."), "Use the justfile recipes.") is True
