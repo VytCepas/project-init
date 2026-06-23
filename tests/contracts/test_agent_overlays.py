@@ -191,6 +191,10 @@ class TestSupportTierDocs:
         assert "advisory" in onboarding.lower()
         # And it must not claim the guards unconditionally "run via" .codex/hooks.json.
         assert "guards run via `.codex/hooks.json`" not in agents_md
+        # #447 review (P2): the prod_guard line must not also assert the guard
+        # "always blocks" on the non-Claude surfaces — that contradicts the
+        # advisory note for Codex in the same rendered file.
+        assert "always blocks" not in agents_md
 
 
 class TestAmpJunieOverlay:
