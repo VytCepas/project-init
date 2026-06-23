@@ -10,6 +10,7 @@ that prod_guard logs while STILL blocking a destructive command (regression).
 from __future__ import annotations
 
 import json
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -34,7 +35,8 @@ _WIRED_HOOKS = {
 
 def _call_helper(root: Path, *args: str, stdin: str | None = None) -> subprocess.CompletedProcess:
     """Source the helper and invoke usage_log with CLAUDE_PROJECT_DIR=root."""
-    script = f'. "{_HELPER}"\nusage_log {" ".join(args)}\n'
+    quoted = " ".join(shlex.quote(a) for a in args)
+    script = f". {shlex.quote(str(_HELPER))}\nusage_log {quoted}\n"
     return subprocess.run(
         ["bash", "-c", script],
         input=stdin,
@@ -84,6 +86,29 @@ class TestHelperGating:
         log = tmp_path / ".claude" / "observability" / "usage.jsonl"
         row = json.loads(log.read_text().splitlines()[0])
         assert row["session"] == "sess-42"
+
+    def test_control_chars_stay_single_valid_json_line(self, tmp_path: Path):
+        """A tab/newline in a field must be escaped, not split the JSONL line
+        or produce invalid JSON (Copilot review)."""
+        (tmp_path / ".claude" / "observability").mkdir(parents=True)
+        script = f". {shlex.quote(str(_HELPER))}\nusage_log pre_commit_gate PreToolUse\n"
+        subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            env={
+                "PATH": "/usr/bin:/bin",
+                "CLAUDE_PROJECT_DIR": str(tmp_path),
+                "CLAUDE_SESSION_ID": "ab\tcd\nef",
+            },
+            cwd=str(tmp_path),
+            timeout=30,
+        )
+        raw = (tmp_path / ".claude" / "observability" / "usage.jsonl").read_text()
+        # Exactly one physical line — the embedded newline did not split it.
+        assert len([line for line in raw.splitlines() if line.strip()]) == 1
+        row = json.loads(raw)  # valid JSON despite the control chars
+        assert row["session"] == "ab\tcd\nef"  # round-trips intact
 
     def test_never_consumes_stdin(self, tmp_path: Path):
         """usage_log must not read stdin — the payload belongs to the real hook

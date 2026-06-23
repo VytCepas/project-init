@@ -20,11 +20,19 @@
 # is emitted only when $CLAUDE_SESSION_ID is set; the analyzer otherwise joins
 # by timestamp + project. Fully fail-open: any error is swallowed.
 
-# _usage_log_json_escape <string> — minimal JSON string escaping (\\ and ").
+# _usage_log_json_escape <string> — JSON string escaping. Backslash and quote
+# first, then the control chars that would otherwise split the line or produce
+# invalid JSONL (a tab/newline in a path or $CLAUDE_SESSION_ID). $'...' is
+# ANSI-C quoting, available on bash 3.2.
 _usage_log_json_escape() {
   local s=$1
   s=${s//\\/\\\\}
   s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  s=${s//$'\b'/\\b}
+  s=${s//$'\f'/\\f}
   printf '%s' "$s"
 }
 
