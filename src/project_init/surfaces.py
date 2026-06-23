@@ -58,6 +58,24 @@ def render_mcp_json(servers: dict[str, dict], *, key: str, drop_type: bool = Fal
     return json.dumps({key: servers}, indent=2, sort_keys=True) + "\n"
 
 
+def render_antigravity_mcp(servers: dict[str, dict]) -> str:
+    """MCP config for Antigravity's ``.agents/mcp_config.json``.
+
+    Antigravity (Windsurf/Codeium + Gemini lineage) keys HTTP/streamable servers
+    by ``serverUrl`` — no ``type``, not ``url`` — unlike Cursor/Claude which use
+    ``type``+``url`` (an HTTP entry written as ``{"type":"http","url":...}`` fails
+    to load). Stdio servers (``command``/``args``) are emitted unchanged (#431).
+    """
+    mapped: dict[str, dict] = {}
+    for name, spec in servers.items():
+        if "url" in spec:
+            rest = {k: v for k, v in spec.items() if k not in ("type", "url")}
+            mapped[name] = {"serverUrl": spec["url"], **rest}
+        else:
+            mapped[name] = dict(spec)
+    return json.dumps({"mcpServers": mapped}, indent=2, sort_keys=True) + "\n"
+
+
 def render_mcp_toml(servers: dict[str, dict]) -> str:
     """MCP config as Codex ``config.toml`` ``[mcp_servers.<name>]`` tables.
 
@@ -159,8 +177,9 @@ SURFACES: dict[str, dict] = {
         "hooks_render": render_antigravity_hooks,
         # Antigravity reads project-scoped MCP from .agents/mcp_config.json (PI-386);
         # skills come from the antigravity template layer's .agents/skills.
+        # HTTP servers need the serverUrl key (not type+url) — dedicated renderer (#431).
         "mcp_file": ".agents/mcp_config.json",
-        "mcp_render": ("json", "mcpServers"),
+        "mcp_render": ("antigravity", "mcpServers"),
     },
     "amp": {
         "label": "Amp",
@@ -203,6 +222,8 @@ def render_mcp_for(kind_key: tuple, servers: dict[str, dict]) -> str:
         return render_mcp_json(servers, key=key, drop_type=bool(rest and rest[0]))
     if fmt == "toml":
         return render_mcp_toml(servers)
+    if fmt == "antigravity":
+        return render_antigravity_mcp(servers)
     raise ValueError(f"unknown MCP format: {fmt}")
 
 

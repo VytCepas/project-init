@@ -101,6 +101,29 @@ def test_amp_and_junie_mcp_files_drop_type_http():
     assert claude["mcpServers"]["context7-http"]["type"] == "http"
 
 
+def test_antigravity_http_mcp_uses_serverurl():
+    """#431: Antigravity keys HTTP/streamable servers by `serverUrl` (no `type`,
+    not `url`); an entry written as {type:http,url:...} fails to load. Stdio
+    (command/args) entries are emitted unchanged, and Claude's .mcp.json keeps
+    the type+url form (contrast)."""
+    servers = {
+        "context7-http": {"type": "http", "url": "https://mcp.context7.com/mcp"},
+        "context7": {"command": "bunx", "args": ["@upstash/context7-mcp"]},
+    }
+    files = surfaces.planned_files(["claude", "antigravity"], servers)
+
+    agy = json.loads(files[".agents/mcp_config.json"])
+    assert agy["mcpServers"]["context7-http"] == {"serverUrl": "https://mcp.context7.com/mcp"}
+    assert "type" not in agy["mcpServers"]["context7-http"]
+    assert "url" not in agy["mcpServers"]["context7-http"]
+    # stdio entries pass through untouched
+    assert agy["mcpServers"]["context7"] == {"command": "bunx", "args": ["@upstash/context7-mcp"]}
+    # Claude still uses type+url — the Antigravity mapping is surface-specific.
+    claude = json.loads(files[".mcp.json"])
+    assert claude["mcpServers"]["context7-http"]["type"] == "http"
+    assert claude["mcpServers"]["context7-http"]["url"] == "https://mcp.context7.com/mcp"
+
+
 def test_amp_junie_not_experimental():
     assert surfaces.SURFACES["amp"]["experimental"] is False
     assert surfaces.SURFACES["junie"]["experimental"] is False

@@ -46,8 +46,13 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: plan
     runs-on: ubuntu-24.04
-    # The infra-apply GitHub Environment is the human gate (required reviewers /
-    # wait timer). An agent cannot apply to prod infra without clearing it.
+    # Apply runs under the infra-apply GitHub Environment — the recommended human
+    # gate. Arm it (required reviewers / wait timer) via repo Settings →
+    # Environments to actually gate this job. NOTE: GitHub auto-creates a
+    # referenced-but-missing environment with NO protection rules, so until it is
+    # configured this does not block apply; on individual/standalone accounts only
+    # an advisory wait timer is available, not required reviewers (ADR-007: git +
+    # CI are the enforcement that always binds).
     environment: infra-apply
     permissions:
       contents: read

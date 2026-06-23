@@ -783,14 +783,14 @@ def apply_drift(
         # Clean 3-way merge: write the combined content in place.
         dest = target / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(report.merge_results[rel], encoding="utf-8")
+        dest.write_text(report.merge_results[rel], encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
     for rel in report.conflicts:
         # Prefer the conflict-marked merge (shows the overlap) when one exists,
         # else the raw new render. Either way the user's file is left intact.
         if rel in report.merge_results:
             sibling = _new_sibling(target / rel, report.merge_results[rel].encode("utf-8"))
             sibling.parent.mkdir(parents=True, exist_ok=True)
-            sibling.write_text(report.merge_results[rel], encoding="utf-8")
+            sibling.write_text(report.merge_results[rel], encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
             _mirror_mode(staging / rel, sibling)
         else:
             _copy_rendered(staging / rel, _new_sibling(target / rel, (staging / rel).read_bytes()))
@@ -802,7 +802,7 @@ def apply_drift(
         text = config_path.read_text(encoding="utf-8")
         text = _VERSION_LINE_RE.sub(rf"\g<1>{variables['project_init_version']}", text, count=1)
         text = _ensure_observability_fields(text, variables)
-        config_path.write_text(text, encoding="utf-8")
+        config_path.write_text(text, encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
 
     # Only files whose on-disk content now equals the render are recorded —
     # conflicted/merged files stay user-owned, so the next upgrade flags them

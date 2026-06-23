@@ -794,6 +794,42 @@ class TestThreeWayMergeApply:
         # Base advances to the new render so the next upgrade re-merges cleanly.
         assert read_base(target)["justfile"] == live
 
+    def test_apply_writes_lf_on_merged_sibling_and_config(self, tmp_path: Path, monkeypatch):
+        """#435: apply_drift must write merged files, .new siblings, and
+        config.yaml with newline="\\n" so native-Windows Python doesn't emit
+        CRLF (PI-362) — CRLF in a merged shell hook breaks `/usr/bin/env bash`.
+        CPython gates the '\\n'->'\\r\\n' write translation behind #ifdef
+        MS_WINDOWS, so a raw byte check can't reproduce it on Linux/CI; spy on
+        Path.write_text and assert the newline kwarg on each delivered write."""
+        target = tmp_path / "p"
+        _scaffold(target)
+
+        # Clean 3-way merge on justfile -> report.merged -> in-place write.
+        justfile = target / "justfile"
+        live = justfile.read_text()
+        older = "".join(live.splitlines(keepends=True)[:-1])
+        _set_base(target, "justfile", older)
+        justfile.write_text("# USER-ADDED-LINE\n" + older)
+
+        # Overlapping edit on .gitignore -> report.conflicts -> .new sibling.
+        gitignore = target / ".gitignore"
+        _set_base(target, ".gitignore", "# pristine base shared by neither side\n")
+        gitignore.write_text("# my local ignores\n")
+
+        recorded: dict[str, object] = {}
+        real_write_text = Path.write_text
+
+        def spy(self, data, *args, **kwargs):
+            recorded[self.name] = kwargs.get("newline", "MISSING")
+            return real_write_text(self, data, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "write_text", spy)
+        assert main(["upgrade", str(target), "--apply"]) == 0
+
+        assert recorded.get("justfile") == "\n", "merged in-place write must be LF"
+        assert recorded.get(".gitignore.new") == "\n", ".new sibling write must be LF"
+        assert recorded.get("config.yaml") == "\n", "config.yaml rewrite must be LF"
+
     def test_apply_backfills_base_for_unchanged_files(self, tmp_path: Path):
         """A project that predates the sidecar (or had it deleted) must gain a
         full merge base after one --apply — not just for drifted files — so a

@@ -50,6 +50,21 @@ class TestIacOverlayPresent:
         assert "workflow_dispatch" in wf                  # manual, not on merge
         assert "id-token: write" in wf                    # OIDC
 
+    def test_infra_apply_gate_documented_as_advisory(self, tmp_path: Path):
+        """#439: the infra-apply environment is referenced but no scaffolded
+        tooling arms it, and GitHub creates a referenced-but-missing environment
+        unprotected. The docs must not claim it is an unconditional gate; they
+        must say it has to be armed and is unprotected by default."""
+        target = _iac(tmp_path / "p")
+        wf = (target / ".github" / "workflows" / "infra.yml").read_text()
+        readme = (target / "infra" / "README.md").read_text()
+        # The old absolute over-promise must be gone.
+        assert "An agent cannot apply to prod infra without clearing it" not in wf
+        # ...replaced by the honest "arm it / does not block by default" framing.
+        assert "arm it" in wf.lower()
+        assert "does not block apply" in wf.lower()
+        assert "unprotected" in readme.lower()
+
     def test_precommit_targets_tofu(self, tmp_path: Path):
         pc = (_iac(tmp_path / "p") / "infra" / ".pre-commit-config.yaml").read_text()
         assert "pre-commit-terraform" in pc
