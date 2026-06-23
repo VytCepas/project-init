@@ -9,8 +9,8 @@
   dual-ship), ADR-013 (distribution & governance model — fork/org machinery),
   ADR-016 (model-agnostic switching / CCR — the AIBOM's CCR source), ADR-017
   (per-surface generator / `CAPABILITIES.md` — the generated-file pattern)
-- Grounded in: `PLAN-276-governance.md` + `PLAN-REVIEW-LOG-276-governance.md`
-  (4-round Codex-reviewed plan, APPROVED)
+- Grounded in: a 4-round Codex-reviewed plan (APPROVED), implemented across
+  PRs #415 (#410), #416 (#412) and this ADR (#417 / #413)
 
 > **ADR numbering:** ADR-018 is this governance overlay. The observability
 > overlay (epic #269 Track A, #407) takes **ADR-019** — both were drafted
