@@ -23,8 +23,10 @@ Fail-open by design: any internal error lets the command proceed.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
+import time
 from pathlib import Path
 
 # (pattern, label) — matched against the full command string. ``_SEG``
@@ -122,6 +124,51 @@ def _allow_patterns(root: Path) -> list[re.Pattern[str]]:
         return []
 
 
+def _find_obs_dir(start: Path) -> Path | None:
+    """Locate the overlay marker dir (.claude/observability/), or None.
+
+    Prefers ``$CLAUDE_PROJECT_DIR``; otherwise walks up from *start* (the Bash
+    cwd, which may be a subdirectory after ``cd``), mirroring ``_find_config``.
+    """
+    env = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env:
+        obs = Path(env) / ".claude" / "observability"
+        return obs if obs.is_dir() else None
+    for candidate in (start, *start.parents):
+        obs = candidate / ".claude" / "observability"
+        if obs.is_dir():
+            return obs
+    return None
+
+
+def usage_log(payload: dict, root: Path) -> None:
+    """Append a self-log line iff the observability overlay is installed (#406).
+
+    Shipped-always-dormant: no-ops unless ``.claude/observability/`` exists.
+    Uses the *already-parsed* ``payload`` (no second stdin read) and is fully
+    fail-open — it must never raise or block the guard.
+    """
+    try:
+        obs = _find_obs_dir(root)
+        if obs is None:
+            return
+        line = {
+            # time.gmtime keeps this portable across every Python 3 (no
+            # datetime.UTC, which is 3.11+) — scaffolded projects may run older.
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "hook": "prod_guard",
+            "event": "PreToolUse",
+            "project": str(obs.parent.parent),
+        }
+        session = payload.get("session_id") or os.environ.get("CLAUDE_SESSION_ID")
+        if session:
+            line["session"] = session
+        with (obs / "usage.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(line) + "\n")
+    except Exception:  # noqa: BLE001 — logging must never break the guard
+        return
+
+
 def evaluate(command: str, permission_mode: str, allow: list[re.Pattern[str]]) -> dict | None:
     """Return the hook verdict for *command*, or None to let it through."""
     if any(p.search(command) for p in allow):
@@ -162,6 +209,9 @@ def main() -> int:
         return 0
     mode = payload.get("permission_mode") or payload.get("permissionMode") or ""
     root = Path(payload.get("cwd") or ".")
+    # Self-log this firing from the same parsed payload (no second stdin read,
+    # #406). Dormant unless the observability overlay is installed; fail-open.
+    usage_log(payload, root)
     try:
         verdict = evaluate(command, mode, _allow_patterns(root))
     except Exception:  # noqa: BLE001 — guardrail must never break the session

@@ -5,6 +5,12 @@
 
 set -euo pipefail
 
+# Self-log this firing (dormant unless the observability overlay is installed;
+# reads no stdin, so the payload below is untouched).
+# shellcheck source=/dev/null
+. "$(dirname "$0")/_usage_log.sh" 2>/dev/null && \
+  usage_log workflow_state_reminder UserPromptSubmit </dev/null || true
+
 INPUT=$(cat)
 
 # Resolve the Python interpreter through the canonical helper (PI-361).

@@ -11,6 +11,12 @@ STAMP=".claude/.session_setup_stamp"
 LOG=".claude/logs/session_setup.log"
 mkdir -p .claude/logs
 
+# Self-log this firing (dormant unless the observability overlay is installed;
+# reads no stdin, so the SessionStart payload is untouched).
+# shellcheck source=/dev/null
+. "$(dirname "$0")/_usage_log.sh" 2>/dev/null && \
+  usage_log session_setup SessionStart "$ROOT" </dev/null || true
+
 # macOS BSD coreutils ship `shasum`, not GNU `sha256sum`. Pick whichever the
 # host provides; fall back to POSIX `cksum` so the fingerprint is always defined
 # even on a minimal host with neither hasher (an empty fingerprint would force a
