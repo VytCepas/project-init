@@ -303,6 +303,21 @@ jobs:
           # GITLEAKS_LICENSE is required only for organization-owned repos
           # (free key from gitleaks.io). Personal accounts need no license.
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+{{#if governance}}
+  # ADR-018 (#412): governance-as-code. Presence-triggered — validates every real
+  # .claude/governance/**/SYSTEM_CARD.md and fails on missing/placeholder fields,
+  # out-of-range values, the prohibited+allowed:true illegal combo, an unfilled
+  # declarations file, or a stale last_reviewed. A project with no real card
+  # passes. This CI job is the enforcement boundary (any local hook is
+  # best-effort); the gate is stdlib-only, so no language toolchain is needed.
+  governance:
+    name: AI governance gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate system cards
+        run: bash .claude/scripts/governance_gate.sh
+{{/if governance}}
 
 # Optimization #3: Conditional job execution
 # Example configurations for different scenarios (see full details in CLAUDE.md):

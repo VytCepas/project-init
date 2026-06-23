@@ -643,28 +643,41 @@ def scaffold(
     # Per-surface config generation (ADR-017 / PI-366): emit hooks + MCP for the
     # selected GUI surfaces from the canonical surface table + MCP catalog. Runs
     # against the committed target (after _commit_staged in strict mode).
-    from project_init import surfaces
+    created += _emit_generated_files(target, variables, conflicts)
+
+    return created
+
+
+def _emit_generated_files(
+    target: Path, variables: dict[str, str], conflicts: list[tuple[Path, Path]]
+) -> list[Path]:
+    """Post-copy generated files.
+
+    Derived from the canonical sources, never hand-edited, regenerated each
+    scaffold/upgrade so they cannot drift.
+    """
+    from project_init import capabilities, surfaces
     from project_init.mcps import servers_for_ids
 
     agents = [a.strip() for a in variables.get("agents", "").split(",") if a.strip()]
     mcp_raw = variables.get("installed_mcps", "none")
     mcp_ids = (
-        []
-        if mcp_raw in ("", "none")
-        else [s.strip() for s in mcp_raw.split(",") if s.strip()]
+        [] if mcp_raw in ("", "none") else [s.strip() for s in mcp_raw.split(",") if s.strip()]
     )
-    created += surfaces.emit(
+    # Per-surface hooks/MCP for the selected GUI surfaces (ADR-017 / PI-366).
+    created = surfaces.emit(
         target,
         agents=agents,
         servers=servers_for_ids(mcp_ids),
         conflicts=conflicts,
     )
-
-    # Surface-independent capabilities inventory (PI-374): a generated
-    # CAPABILITIES.md derived from the canonical skill/hook/MCP sources + the
-    # chosen options, regenerated each run so it never drifts.
-    from project_init import capabilities
-
+    # Surface-independent capabilities inventory (PI-374).
     created += capabilities.emit(target, variables)
+    # Governance AIBOM (ADR-018, #412): installed MCPs + detected CCR routes. The
+    # user-owned ai-declarations.md (seeded by the overlay copy, preserved via
+    # config.yaml globs) is never touched here.
+    if variables.get("governance"):
+        from project_init import governance
 
+        created += governance.emit(target, variables)
     return created
