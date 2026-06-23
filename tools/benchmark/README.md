@@ -26,6 +26,7 @@ the `rich` report is #275.
 | `prices.py` | `cost_for` / `apply_cost` — $ from tokens × the static table (#272) |
 | `latency.py` | per-step latency + P50/P99 aggregation over repeats (#272) |
 | `scoring.py` | `score` — deterministic success + first_try + rework_cycles from the `[check]` specs (#273) |
+| `report.py` | the `rich` cost–benefit verdict: bare-vs-scaffolded deltas, Pareto flag, diminishing returns, overhead (#275) |
 | `model_prices.json` | vendored, litellm-shaped price table for the $ axis (#272) |
 | `results/` | raw per-run JSONL (gitignored) |
 
@@ -94,6 +95,31 @@ deterministic signal from the task's authored `[check]` spec:
 No LLM judge (ADR-001): test exit codes, file existence, a regex. `record-from`
 fills `rework_cycles` from the transcript but leaves `success`/`first_try` null
 (it has no target to check); use `run` for the full score.
+
+## The cost–benefit report (#275)
+
+The headline deliverable — turns the records into a **verdict**, not raw numbers:
+
+```sh
+uv run python -m tools.benchmark.report --records tools/benchmark/results/records.jsonl
+# attribute fixed overhead per always-loaded file from a scaffolded project:
+uv run python -m tools.benchmark.report --overhead-from /path/to/scaffolded-project
+```
+
+It renders (all from the records — no scaffold runtime):
+
+- **bare vs scaffolded, side by side** — cost, tokens, P50 latency, pass%,
+  first-try%, rework, tool calls, with a ✓ on the Pareto-efficient configs.
+- a **plain-language verdict per target** — *"costs +X% tokens, +Y% \$, buys
+  +Zpp first-try … — (efficient|dominated)"* — every cost delta paired with what
+  it bought.
+- a **Pareto flag** (minimize cost, maximize pass-rate; the cheapest config and
+  any strictly-more-accurate one are efficient; the rest are dominated).
+- a **diminishing-returns** walk (cheapest → dearest) flagging the knee where a
+  pricier preset buys no more accuracy.
+- optional **fixed-overhead per-artifact attribution** (`--overhead-from`):
+  approximate always-loaded context tokens per file (chars/4), so the heaviest
+  CLAUDE.md / skill files can be trimmed.
 
 ## Caveats (from the methodology)
 
