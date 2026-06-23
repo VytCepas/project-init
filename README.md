@@ -38,7 +38,7 @@ that is cheap, but it is not natively so — be explicit about what each agent g
 | Tier | What you get | Applies to |
 |---|---|---|
 | **Native** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring — read directly from `.claude/` | Claude Code (CLI + the Anthropic VS Code extension) |
-| **Generated per-surface config** | One canonical hook/MCP spec rendered to each surface's native files (ADR-017): Codex `.codex/`, Cursor `.cursor/`, Antigravity `.agents/` (experimental), VS Code `.vscode/mcp.json`, Amp `.amp/settings.json`, Junie `.junie/mcp/mcp.json`. Skills cross-read natively. GUI hooks are **best-effort/fail-open** | Codex (CLI+IDE), Cursor, Antigravity, VS Code Copilot, Amp, JetBrains Junie |
+| **Generated per-surface config** | One canonical hook/MCP spec rendered to each surface's native files (ADR-017): Codex `.codex/`, Cursor `.cursor/`, Antigravity `.agents/` (experimental), VS Code `.vscode/mcp.json`, Amp `.amp/settings.json`, Junie `.junie/mcp/mcp.json`. Skills cross-read natively. Agent hooks (incl. the Codex CLI) are **best-effort/fail-open** | Codex (CLI+IDE), Cursor, Antigravity, VS Code Copilot, Amp, JetBrains Junie |
 | **Instructions + portable** | `AGENTS.md`/`GEMINI.md` redirect to `CLAUDE.md`; lifecycle scripts (plain bash), memory/vault (markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent; git hooks bind once `.claude/scripts/install_hooks.sh` has run (server-side actions need branch protection) | Everything, including Ollama-based agents |
 
 ### Surface support matrix
@@ -51,7 +51,7 @@ Which scaffolded config each surface actually reads (full detail + sources:
 | Claude Code CLI / VS Code ext | `CLAUDE.md` | `.claude/skills` | `.claude/settings.json` (honored) | root `.mcp.json` | yes |
 | VS Code Copilot | `CLAUDE.md`/`AGENTS.md` | `.claude/skills` | Claude hooks (matchers ignored) | `.vscode/mcp.json` (`servers`) | yes |
 | Cursor | `AGENTS.md` | `.claude/skills` | `.cursor/hooks.json` (best-effort) | `.cursor/mcp.json` | yes |
-| Codex (CLI + IDE) | `AGENTS.md` | `.agents/skills` | `.codex/hooks.json` | `.codex/config.toml` | yes |
+| Codex (CLI + IDE) | `AGENTS.md` | `.agents/skills` | `.codex/hooks.json` (advisory) | `.codex/config.toml` | yes |
 | Antigravity (`agy`) | `AGENTS.md` / `GEMINI.md` | `.agents/skills` | `.agents/hooks.json` (experimental) | `.agents/mcp_config.json` | yes |
 | Amp | `AGENTS.md` | `.agents/skills` | — | `.amp/settings.json` (`amp.mcpServers`) | yes |
 | JetBrains Junie | `AGENTS.md` | `.junie/skills` | — | `.junie/mcp/mcp.json` | yes |
@@ -76,8 +76,9 @@ The execution model — not the surface name — decides what binds:
 
 Two honest caveats hold across all of it:
 
-- **GUI hook enforcement is best-effort, not a guarantee.** Generated hooks are
-  fail-open and some surfaces ignore matchers; an agent reading `AGENTS.md` is
+- **Agent hook enforcement (including the Codex CLI) is best-effort, not a guarantee.** Generated hooks are
+  fail-open, some surfaces ignore matchers, and some (e.g. codex 0.138.0) may not
+  fire project-scoped hooks without an enable step; an agent reading `AGENTS.md` is
   *asked* to follow the rules. The **git hooks + CI checks are the only
   enforcement that binds every surface** — that is the real boundary (ADR-007).
 - **Automated testing covers the Claude Code artifacts + the rendered per-surface
@@ -164,7 +165,7 @@ The wizard asks (interactive mode only):
 - License (`--license mit|apache-2.0|proprietary|none`) — renders a LICENSE with the current year and the owner (or project name); `none` skips the file
 - No-plugin fallback (`--no-plugin`) — copies the shared hooks/skills into `.claude/` and wires them in `settings.json` instead of relying on the `project-init-workflow` plugin (offline / no-trust environments)
 - Devcontainer (`--devcontainer`) — renders `.devcontainer/` for Codespaces, fresh clones, and remote agent containers (see below)
-- Agents & surfaces (`--agents claude,codex,ollama,cursor,antigravity,vscode,amp,junie`) — which agents/editors the project supports; default `claude`. **Amp** and **JetBrains Junie** get a skills layer plus generated MCP config (`.amp/settings.json` key `amp.mcpServers`; `.junie/mcp/mcp.json`). Selecting the `context7-http` MCP emits an HTTP/streamable entry (`type: http`) — the transport that works on Claude web/mobile/Cowork, where stdio servers are invisible. Codex gets the shared skills at `.agents/skills/` plus the command guard via `.codex/hooks.json`; **Antigravity** (`agy`, Google's CLI/IDE) gets the shared skills at `.agents/skills/`, the command guard via `.agents/hooks.json` (experimental), and project MCP at `.agents/mcp_config.json`; Ollama-based agents are instructions-level only. (Gemini CLI was removed in PI-386 — Google sunset its free/Pro/Ultra tiers on 2026-06-18; Antigravity, which reads the same `.agents/` tree, is the Google target.) Other GUI surfaces get generated per-surface config from one canonical source (ADR-017): **Cursor** → `.cursor/hooks.json` + `.cursor/mcp.json`, **VS Code** → `.vscode/mcp.json`; selecting any MCP also emits a root `.mcp.json` (Claude's shareable project scope) and `.codex/config.toml` when Codex is on. Skills are read natively by all of these. GUI hooks are best-effort/fail-open (their exact blocking I/O wasn't live-verified); git hooks + CI remain the only enforcement that binds every surface. Only the Claude path is functionally CI-tested — overlays are contract-tested on the rendered files
+- Agents & surfaces (`--agents claude,codex,ollama,cursor,antigravity,vscode,amp,junie`) — which agents/editors the project supports; default `claude`. **Amp** and **JetBrains Junie** get a skills layer plus generated MCP config (`.amp/settings.json` key `amp.mcpServers`; `.junie/mcp/mcp.json`). Selecting the `context7-http` MCP emits an HTTP/streamable entry (`type: http`) — the transport that works on Claude web/mobile/Cowork, where stdio servers are invisible. Codex gets the shared skills at `.agents/skills/` plus the command guard wired via `.codex/hooks.json` (advisory — codex 0.138.0 may not fire project hooks without an enable step); **Antigravity** (`agy`, Google's CLI/IDE) gets the shared skills at `.agents/skills/`, the command guard via `.agents/hooks.json` (experimental), and project MCP at `.agents/mcp_config.json`; Ollama-based agents are instructions-level only. (Gemini CLI was removed in PI-386 — Google sunset its free/Pro/Ultra tiers on 2026-06-18; Antigravity, which reads the same `.agents/` tree, is the Google target.) Other GUI surfaces get generated per-surface config from one canonical source (ADR-017): **Cursor** → `.cursor/hooks.json` + `.cursor/mcp.json`, **VS Code** → `.vscode/mcp.json`; selecting any MCP also emits a root `.mcp.json` (Claude's shareable project scope) and `.codex/config.toml` when Codex is on. Skills are read natively by all of these. Agent hooks (incl. the Codex CLI) are best-effort/fail-open (their exact blocking I/O wasn't live-verified — e.g. codex 0.138.0 may not fire project hooks without an enable step); git hooks + CI remain the only enforcement that binds every surface. Only the Claude path is functionally CI-tested — overlays are contract-tested on the rendered files
 - Toolchain pinning (`--mise`) — renders `mise.toml` pinning runtime/tool versions. Ownership rule: mise owns versions only; uv/bun own dependencies, just owns commands, `.env` owns environment
 - Editor config (`--vscode`) — renders `.vscode/extensions.json` + a minimal `settings.json` (format-on-save wired to the preset formatter); nothing personal, and the `.gitignore` shares only these two files
 

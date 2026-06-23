@@ -240,7 +240,7 @@ def prereqs_satisfied(node: str, _seen: set[str] | None = None) -> tuple[bool, s
 # DAG validation; otherwise, prereqs of target_node are appended to the reason.
 COMMAND_RULES: list[tuple[re.Pattern[str], str | None, str]] = [
     (
-        re.compile(r"git\s+push\s+(?:\S+\s+)?(?:origin\s+)?(?:main|master)\b"),
+        re.compile(r"git\s+push\b[^|;&\n]*?[\s:](?:refs/heads/)?(?:main|master)(?![\w./-])"),
         None,
         "Direct pushes to main/master are blocked. Open a feature branch and PR.",
     ),
@@ -305,7 +305,14 @@ def _redirect_target_exists(reason: str) -> bool:
     m = re.search(r"\.claude/scripts/([\w.-]+)", reason)
     if not m:
         return True
-    return (Path(".claude/scripts") / m.group(1)).exists()
+    # Anchor on this hook's own location (.claude/hooks/dag_workflow.py ->
+    # .claude/scripts/), NOT the process CWD. The guard can run from any
+    # subdirectory (the Bash tool's working dir persists across calls) and the
+    # codex/cursor/antigravity adapter invokes it via subprocess; a CWD-relative
+    # path let every script-redirect rule be silently skipped from a subdir,
+    # bypassing the guard on all surfaces (#429).
+    scripts_dir = Path(__file__).resolve().parent.parent / "scripts"
+    return (scripts_dir / m.group(1)).exists()
 
 
 def guard(payload: dict) -> dict | None:

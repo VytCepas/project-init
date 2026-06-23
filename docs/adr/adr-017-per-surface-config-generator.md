@@ -88,7 +88,7 @@ Adding a surface = appending one entry.
 | Claude Code CLI / Desktop / VS Code ext | none for hooks/skills (native `.claude/`); **root `.mcp.json`** only when MCPs are configured (shareable project scope) |
 | VS Code Copilot agent mode | reads `.claude/` natively; `.vscode/mcp.json` (`servers`) when MCPs configured; matchers advisory |
 | Cursor | `.cursor/hooks.json` (camelCase translation) + `.cursor/mcp.json`; skills already via `.claude/skills` |
-| Codex IDE / CLI | already correct (`.codex/hooks.json` + `.agents/skills`); add `.codex/config.toml` `[mcp_servers.*]` when MCPs configured |
+| Codex IDE / CLI | schema-correct emission (`.codex/hooks.json` + `.agents/skills`); add `.codex/config.toml` `[mcp_servers.*]` when MCPs configured. NB: codex 0.138.0 may not fire project-scoped hooks without an enable step (advisory; git + CI are the boundary, ADR-007) |
 | Antigravity | `.agents/hooks.json` (`PreToolUse` only, confirmed) + MCP variant; skills via `.agents/skills` |
 | (future) | one surface-table entry |
 
