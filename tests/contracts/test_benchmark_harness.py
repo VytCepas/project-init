@@ -213,6 +213,21 @@ class TestTargetSetup:
         assert list(target.iterdir()) == []
 
 
+class TestUnpricedWarning:
+    def test_record_from_warns_on_unpriced_model(self, tmp_path: Path, capsys):
+        """Both CLI paths must warn (not silently emit null cost) — Copilot review."""
+        tx = tmp_path / "t.jsonl"
+        tx.write_text(json.dumps(
+            {"type": "assistant", "message": {"model": "gpt-4o", "usage": {}}}
+        ) + "\n")
+        rc = harness.main([
+            "record-from", "--task", "qa", "--target", "bare",
+            "--transcript", str(tx), "--out", str(tmp_path / "r.jsonl"),
+        ])
+        assert rc == 0
+        assert "no price row for model 'gpt-4o'" in capsys.readouterr().err
+
+
 class TestRunTaskGuard:
     def test_run_task_requires_claude_cli(self, tmp_path: Path, monkeypatch):
         # Deterministic regardless of whether claude is installed locally.

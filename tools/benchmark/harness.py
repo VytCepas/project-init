@@ -29,6 +29,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from tools.benchmark.prices import apply_cost, load_prices
 from tools.benchmark.record import RunRecord, write_records
 from tools.benchmark.transcript import parse as parse_transcript
 
@@ -252,6 +253,14 @@ def build_record(ctx: RunContext, transcript_path: Path) -> RunRecord:
 # --- CLI ------------------------------------------------------------------
 
 
+def _warn_if_unpriced(record: RunRecord) -> None:
+    """Emit the documented warning when a record's model has no price row."""
+    if record.cost_usd is None:
+        sys.stderr.write(
+            f"benchmark: no price row for model {record.model!r} — cost_usd left null\n"
+        )
+
+
 def _cmd_record_from(args: argparse.Namespace) -> int:
     """Normalize an existing transcript into a record (no agent needed)."""
     transcript = Path(args.transcript).expanduser()
@@ -267,6 +276,8 @@ def _cmd_record_from(args: argparse.Namespace) -> int:
         ),
         transcript,
     )
+    apply_cost(record, load_prices(Path(args.prices) if args.prices else None))
+    _warn_if_unpriced(record)
     out = Path(args.out) if args.out else _RESULTS_DIR / "records.jsonl"
     write_records([record], out)
     sys.stdout.write(json.dumps(record.to_dict(), indent=2) + "\n")
@@ -282,6 +293,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     tasks = load_all_tasks() if args.task == "all" else {args.task: load_task(args.task)}
     targets = ["bare", *args.preset]
     out = Path(args.out) if args.out else _RESULTS_DIR / "records.jsonl"
+    prices = load_prices(Path(args.prices) if args.prices else None)
     records: list[RunRecord] = []
     with tempfile.TemporaryDirectory(prefix="pi-benchmark-") as tmp:
         tmp_root = Path(tmp)
@@ -311,10 +323,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
                         ),
                         transcript,
                     )
+                    apply_cost(record, prices)
+                    _warn_if_unpriced(record)
                     records.append(record)
+                    cost = f"${record.cost_usd:.4f}" if record.cost_usd is not None else "$?"
                     sys.stdout.write(
                         f"{target}/{task_id} run {run_index}: "
-                        f"{record.total_tokens} tok, {record.tool_calls} tool calls, "
+                        f"{record.total_tokens} tok, {cost}, {record.tool_calls} tool calls, "
                         f"{record.wall_clock_s:.1f}s\n"
                     )
     if records:
@@ -342,6 +357,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--model", default=_DEFAULT_MODEL)
     run.add_argument("--repeats", type=int, default=5, help="repeats per (task,target) for variance")
     run.add_argument("--out", help="output JSONL (default: tools/benchmark/results/records.jsonl)")
+    run.add_argument("--prices", help="price table JSON (default: tools/benchmark/model_prices.json)")
     run.set_defaults(func=_cmd_run)
 
     rec = sub.add_parser("record-from", help="normalize an existing transcript (no agent)")
@@ -353,6 +369,7 @@ def main(argv: list[str] | None = None) -> int:
     rec.add_argument("--model", default="", help="override; default = transcript's model")
     rec.add_argument("--run-index", type=int, default=0, dest="run_index")
     rec.add_argument("--out", help="output JSONL (default: tools/benchmark/results/records.jsonl)")
+    rec.add_argument("--prices", help="price table JSON (default: tools/benchmark/model_prices.json)")
     rec.set_defaults(func=_cmd_record_from)
 
     args = parser.parse_args(argv)

@@ -20,10 +20,12 @@ the `rich` report is #275.
 | File | Purpose |
 |---|---|
 | `record.py` | `RunRecord` — the normalized per-run schema + JSONL read/write (the contract #272/#273/#275 consume) |
-| `transcript.py` | parse a Claude Code transcript JSONL → capture aggregates (tokens/tools/turns/span) |
+| `transcript.py` | parse a Claude Code transcript JSONL → capture aggregates (tokens/tools/turns/span/timestamps) |
 | `harness.py` | target setup + `claude -p` orchestration + `build_record` + the CLI |
 | `tasks/*.toml` | the task set: `feat`, `fix`, `qa`, `noop` (probe). `[check]` is for #273 |
-| `model_prices.json` | (added in #272) vendored MIT price table for the $ axis |
+| `prices.py` | `cost_for` / `apply_cost` — $ from tokens × the static table (#272) |
+| `latency.py` | per-step latency + P50/P99 aggregation over repeats (#272) |
+| `model_prices.json` | vendored, litellm-shaped price table for the $ axis (#272) |
 | `results/` | raw per-run JSONL (gitignored) |
 
 ## Running it
@@ -57,6 +59,24 @@ One JSON object per `(task, target, run)`. #271 populates the **capture** fields
 later-owned fields are present but `None` until their issue lands:
 `cost_usd` (#272), `success` / `first_try` / `rework_cycles` (#273). Downstream
 code reads `RunRecord`, never raw transcripts.
+
+## Cost & latency (#272)
+
+- **Cost** is derived from `model_prices.json` × the four captured token classes
+  (input, output, cache-read, cache-creation priced independently, so prompt-cache
+  economics show up honestly). `cost_usd` is filled on every record the CLI emits;
+  an unpriced model leaves it `null` with a warning rather than guessing.
+- **The price table is updatable without code changes.** It is litellm-shaped
+  (`input_cost_per_token`, `output_cost_per_token`, `cache_read_input_token_cost`,
+  `cache_creation_input_token_cost`), keyed by model id (matched exact-then-
+  longest-substring). Refresh it from litellm's MIT
+  `model_prices_and_context_window.json` or the published Claude pricing; point at
+  an alternate file with `--prices <path>`.
+- **Latency**: `wall_clock_s` per run is the authoritative per-task figure
+  (harness-measured). `latency.step_latencies()` derives per-step deltas from
+  transcript timestamps (best-effort — unstable schema), and `latency.summarize()`
+  aggregates a metric over repeats into `{n, p50, p99}`, reporting `n=1` honestly
+  instead of faking a distribution. The #275 report consumes these.
 
 ## Caveats (from the methodology)
 

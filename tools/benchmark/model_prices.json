@@ -1,0 +1,39 @@
+{
+  "_comment": "Vendored, litellm-shaped price table (USD per token) for the benchmark $ axis (#272). Refresh deliberately from litellm's model_prices_and_context_window.json (MIT) or platform.claude.com/docs/pricing; keys are model ids, matched exact-then-substring. cache_read ~= 0.1x input; cache_creation (5-min write) ~= 1.25x input.",
+  "claude-opus-4-8": {
+    "input_cost_per_token": 5e-06,
+    "output_cost_per_token": 2.5e-05,
+    "cache_read_input_token_cost": 5e-07,
+    "cache_creation_input_token_cost": 6.25e-06
+  },
+  "claude-opus-4-7": {
+    "input_cost_per_token": 5e-06,
+    "output_cost_per_token": 2.5e-05,
+    "cache_read_input_token_cost": 5e-07,
+    "cache_creation_input_token_cost": 6.25e-06
+  },
+  "claude-opus-4-6": {
+    "input_cost_per_token": 5e-06,
+    "output_cost_per_token": 2.5e-05,
+    "cache_read_input_token_cost": 5e-07,
+    "cache_creation_input_token_cost": 6.25e-06
+  },
+  "claude-sonnet-4-6": {
+    "input_cost_per_token": 3e-06,
+    "output_cost_per_token": 1.5e-05,
+    "cache_read_input_token_cost": 3e-07,
+    "cache_creation_input_token_cost": 3.75e-06
+  },
+  "claude-haiku-4-5": {
+    "input_cost_per_token": 1e-06,
+    "output_cost_per_token": 5e-06,
+    "cache_read_input_token_cost": 1e-07,
+    "cache_creation_input_token_cost": 1.25e-06
+  },
+  "claude-fable-5": {
+    "input_cost_per_token": 1e-05,
+    "output_cost_per_token": 5e-05,
+    "cache_read_input_token_cost": 1e-06,
+    "cache_creation_input_token_cost": 1.25e-05
+  }
+}
