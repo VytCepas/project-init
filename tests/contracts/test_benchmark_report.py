@@ -77,6 +77,27 @@ class TestPareto:
         assert "obsidian-graphify" not in eff
 
 
+class TestParetoTiesAndIncomparable:
+    def test_equal_cost_and_accuracy_both_efficient(self):
+        """Tied points dominate neither — both are on the frontier (Codex review)."""
+        recs = [
+            _rec("a", cost_usd=0.10, total_tokens=100, success=True),
+            _rec("b", cost_usd=0.10, total_tokens=100, success=True),
+        ]
+        eff = report.pareto_efficient(report.aggregate(recs))
+        assert eff == {"a", "b"}
+
+    def test_unpriced_target_is_incomparable_not_dominated(self):
+        """A target missing a Pareto axis must not be labelled 'dominated' (Codex review)."""
+        summ = report.aggregate([
+            _rec("bare", cost_usd=0.10, total_tokens=100, success=True, first_try=True),
+            _rec("mystery", cost_usd=None, total_tokens=100, success=True, first_try=True),
+        ])
+        eff = report.pareto_efficient(summ)
+        line = report.verdict(summ["bare"], summ["mystery"], eff)
+        assert "incomparable" in line and "dominated" not in line
+
+
 class TestVerdict:
     def test_pairs_cost_with_what_it_bought(self):
         summ = report.aggregate(_sample())
@@ -111,6 +132,16 @@ class TestFixedOverhead:
         assert any(name.endswith("demo/SKILL.md") for name, _ in rows)
         # Sorted descending by token estimate.
         assert [t for _, t in rows] == sorted((t for _, t in rows), reverse=True)
+
+    def test_includes_start_here_files(self, tmp_path: Path):
+        """.claude/project-init.md is typically the heaviest always-loaded file
+        and must be attributed (Codex review)."""
+        pi = tmp_path / ".claude" / "project-init.md"
+        pi.parent.mkdir(parents=True)
+        pi.write_text("z" * 800)  # ~200 tokens — the heaviest
+        (tmp_path / "CLAUDE.md").write_text("x" * 400)  # ~100
+        rows = report.fixed_overhead(tmp_path)
+        assert rows[0][0] == ".claude/project-init.md" and rows[0][1] == 200
 
 
 class TestRenderAndCli:

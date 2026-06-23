@@ -25,7 +25,16 @@ from tools.benchmark.record import RunRecord, read_records
 # Token cost is approximated (chars / 4) — labelled approximate; exact counts
 # need a tokenizer we won't add (no network, no tiktoken). This is the
 # "which files cost the most context" attribution, not a billing figure.
-_OVERHEAD_CANDIDATES = ("CLAUDE.md", "AGENTS.md", "GEMINI.md")
+# Includes the start-here files AGENTS.md points agents at — .claude/project-init.md
+# is typically the *largest* always-loaded artifact, so omitting it undercounts
+# the fixed context (Codex review).
+_OVERHEAD_CANDIDATES = (
+    "CLAUDE.md",
+    "AGENTS.md",
+    "GEMINI.md",
+    ".claude/project-init.md",
+    ".claude/memory/MEMORY.md",
+)
 _CHARS_PER_TOKEN = 4
 
 
@@ -83,21 +92,25 @@ def aggregate(records: list[RunRecord]) -> dict[str, Summary]:
 def pareto_efficient(summaries: dict[str, Summary]) -> set[str]:
     """Targets on the cost–accuracy frontier (minimize cost, maximize pass_rate).
 
-    Classic skyline: sort ascending by cost, sweep once keeping the running-max
-    accuracy; a target is efficient if its accuracy strictly exceeds every
-    cheaper target (the cheapest is always efficient). Targets missing either
-    axis can't be placed and are omitted from the frontier.
+    A target is efficient iff no other target *dominates* it — i.e. none is both
+    no costlier and no less accurate with at least one strictly better. Equal-
+    cost/equal-accuracy ties dominate neither, so all tied points are efficient
+    (Codex review). Targets missing either axis can't be placed and are omitted.
     """
     placeable = [
         s for s in summaries.values() if s.mean_cost_usd is not None and s.pass_rate is not None
     ]
-    placeable.sort(key=lambda s: (s.mean_cost_usd, -s.pass_rate))
     efficient: set[str] = set()
-    best_acc = float("-inf")
-    for s in placeable:
-        if s.pass_rate > best_acc:
-            efficient.add(s.target)
-            best_acc = s.pass_rate
+    for a in placeable:
+        dominated = any(
+            b is not a
+            and b.mean_cost_usd <= a.mean_cost_usd
+            and b.pass_rate >= a.pass_rate
+            and (b.mean_cost_usd < a.mean_cost_usd or b.pass_rate > a.pass_rate)
+            for b in placeable
+        )
+        if not dominated:
+            efficient.add(a.target)
     return efficient
 
 
@@ -112,6 +125,15 @@ def _pp_delta(base: float | None, other: float | None) -> float | None:
     if base is None or other is None:
         return None
     return (other - base) * 100
+
+
+def _frontier_flag(other: Summary, efficient: set[str]) -> str:
+    """Frontier label: efficient / dominated / incomparable (missing a Pareto axis)."""
+    if other.target in efficient:
+        return "efficient"
+    if other.mean_cost_usd is None or other.pass_rate is None:
+        return "incomparable"  # can't be placed on the frontier — not "dominated"
+    return "dominated"
 
 
 def verdict(bare: Summary, other: Summary, efficient: set[str]) -> str:
@@ -136,10 +158,9 @@ def verdict(bare: Summary, other: Summary, efficient: set[str]) -> str:
     )
     if rw is not None:
         parts.append(f"{rw:+.1f} rework")
-    flag = "efficient" if other.target in efficient else "dominated"
     body = ", ".join(parts) if parts else "no comparable metrics"
     # Parens, not brackets — rich would parse "[efficient]" as a markup tag.
-    return f"{other.target}: {body} — ({flag})"
+    return f"{other.target}: {body} — ({_frontier_flag(other, efficient)})"
 
 
 def diminishing_returns(summaries: dict[str, Summary]) -> list[str]:
@@ -230,10 +251,13 @@ def render(records: list[RunRecord], *, overhead_from: Path | None = None) -> No
         console.print("[yellow]No records to report.[/yellow]")
         return
     efficient = pareto_efficient(summaries)
-    # Bare first (the baseline), then the rest by cost.
+    # Bare first (the baseline), then by cost ascending; unknown-cost configs last.
     order = sorted(
         summaries.values(),
-        key=lambda s: (s.target != "bare", s.mean_cost_usd if s.mean_cost_usd is not None else 0.0),
+        key=lambda s: (
+            s.target != "bare",
+            s.mean_cost_usd if s.mean_cost_usd is not None else float("inf"),
+        ),
     )
     _render_comparison(console, order, efficient)
 
