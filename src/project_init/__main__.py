@@ -62,6 +62,10 @@ class ScaffoldInputs:
     # governance-as-code layer (AUP/system-card docs + CI gate). Off by default.
     # Distinct from the PI-145 CODEOWNERS/LICENSE governance prompts.
     governance: bool = False
+    # Observability overlay (ADR-019, epic #269 Track A, opt-in): scaffolds the
+    # file-based usage-report layer (transcript parser + guarded self-log +
+    # stdlib HTML report). Off by default; no Docker/OTEL.
+    observability: bool = False
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -142,6 +146,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "tools / data-handling / code-provenance docs, and a NIST RMF "
             "crosswalk — adopting NIST AI RMF / EU AI Act conventions. The system "
             "card, AIBOM, and CI gate land in follow-ups. Off by default."
+        ),
+    )
+    p.add_argument(
+        "--observability",
+        action="store_true",
+        help=(
+            "Scaffold the opt-in observability overlay (ADR-019): a file-based "
+            "usage report. Parses Claude Code transcript JSONL plus a guarded "
+            "hook self-log into a stdlib HTML report — no Docker, no OTEL, no "
+            "egress. Off by default."
         ),
     )
     p.add_argument(
@@ -503,6 +517,35 @@ def _choose_governance_interactive() -> bool:
     return Confirm.ask("Set up the AI-governance overlay?", default=False)
 
 
+def _choose_observability_interactive() -> bool:
+    """Explain the observability overlay, then ask (ADR-019, #404).
+
+    States what the overlay ships — a file-based usage report built from the
+    Claude Code transcript JSONL and a guarded hook self-log, rendered to a
+    stdlib HTML report (no Docker, no OTEL, no egress) — so the user makes an
+    informed choice or declines; declining leaves a clean project. Passing
+    --observability pre-accepts via the flag and skips this. Off by default.
+    """
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import Confirm
+
+    console = Console()
+    body = (
+        "Get a [bold]file-based usage report[/bold] for your agent sessions — "
+        "tokens, tool calls, and activity — with [bold]no Docker, no OTEL, and "
+        "no egress[/bold]. Everything stays on disk.\n\n"
+        "[bold]Scaffolds:[/bold]\n"
+        "  [dim]usage_report.py[/dim]    [dim]# stdlib parser over transcript JSONL[/dim]\n"
+        "  [dim]observability.sh[/dim]   [dim]# one command → an HTML report[/dim]\n"
+        "  [dim]hook self-log[/dim]      [dim]# guarded, stdin-safe activity log[/dim]\n\n"
+        "[cyan]Helps:[/cyan] see what your agents actually do without a backend.\n"
+        "Clean by default — decline and nothing is added."
+    )
+    console.print(Panel(body, title="Observability (file-based usage report)", border_style="cyan"))
+    return Confirm.ask("Set up the observability overlay?", default=False)
+
+
 def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
     """Warn that user-owned files were kept; renders landed as .new siblings."""
     from rich.console import Console
@@ -631,10 +674,11 @@ def _gather_inputs_interactive(
     no_plugin: bool,
     profile: str | None,
     no_egress: bool = False,
-    cli_overlays: tuple[str | None, str | None, str | None, bool, bool] = (
+    cli_overlays: tuple[str | None, str | None, str | None, bool, bool, bool] = (
         None,
         None,
         None,
+        False,
         False,
         False,
     ),
@@ -642,8 +686,9 @@ def _gather_inputs_interactive(
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
     ``cli_overlays`` pre-seeds the overlay flags (delivery, deploy, iac,
-    multi_model, governance) from the CLI; the string slots may be None to
-    prompt, and multi_model/governance=True skip their prompts (ADR-016/ADR-018).
+    multi_model, governance, observability) from the CLI; the string slots may
+    be None to prompt, and multi_model/governance/observability=True skip their
+    prompts (ADR-016/ADR-018/ADR-019).
     """
     resolved_profile = profile or _choose_profile_interactive()
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
@@ -652,7 +697,14 @@ def _gather_inputs_interactive(
     language = _prompt("Language (python/node/go/none)", default="none")
     if language not in {"python", "node", "go", "none"}:
         language = "none"
-    delivery_flag, deploy_flag, iac_flag, multi_model_flag, governance_flag = cli_overlays
+    (
+        delivery_flag,
+        deploy_flag,
+        iac_flag,
+        multi_model_flag,
+        governance_flag,
+        observability_flag,
+    ) = cli_overlays
     resolved_delivery, resolved_deploy, resolved_iac = _resolve_overlays_interactive(
         language, delivery_flag, deploy_flag, iac_flag
     )
@@ -681,6 +733,9 @@ def _gather_inputs_interactive(
     # AI-governance overlay (ADR-018, #410). The flag pre-accepts it; otherwise
     # the wizard explains what it ships, then asks (strictly opt-in).
     resolved_governance = governance_flag or _choose_governance_interactive()
+    # Observability overlay (ADR-019, #404). The flag pre-accepts it; otherwise
+    # the wizard explains what it ships, then asks (strictly opt-in).
+    resolved_observability = observability_flag or _choose_observability_interactive()
     while True:
         agents_raw = _prompt(
             "Agents/surfaces (claude always; add codex/ollama/cursor/antigravity/vscode, comma-separated)",
@@ -712,6 +767,7 @@ def _gather_inputs_interactive(
         iac=resolved_iac,
         multi_model=resolved_multi_model,
         governance=resolved_governance,
+        observability=resolved_observability,
     )
 
 
@@ -1155,6 +1211,10 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "governance": "true"
         if (inputs.governance or preset.get("vars", {}).get("governance"))
         else "",
+        # Observability overlay (ADR-019, #404): gates the observability layer
+        # and is recorded so `upgrade` re-derives the same set, exactly like
+        # multi_model. A flag-only overlay (no preset var in v1).
+        "observability": "true" if inputs.observability else "",
         # Distribution profile (ADR-013, #247): recorded + drives the delivery
         # and enforcement defaults. The enforcing behavior lands in #251.
         "profile": inputs.profile,
@@ -1225,6 +1285,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         iac=iac,
         multi_model=args.multi_model,
         governance=args.governance,
+        observability=args.observability,
     )
 
 
@@ -1305,6 +1366,7 @@ def main(argv: list[str] | None = None) -> int:
                 # enables the layer regardless). Keeps the prompt honest and the
                 # recorded variable aligned with the effective layer set.
                 args.governance or bool(preset.get("vars", {}).get("governance")),
+                args.observability,
             ),
         )
     target.mkdir(parents=True, exist_ok=True)
@@ -1323,6 +1385,7 @@ def main(argv: list[str] | None = None) -> int:
         no_plugin=inputs.no_plugin,
         multi_model=inputs.multi_model,
         governance=governance_on,
+        observability=inputs.observability,
     )
     if extra_layers:
         preset = {**preset, "layers": list(preset["layers"]) + extra_layers}

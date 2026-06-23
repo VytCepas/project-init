@@ -136,6 +136,7 @@ def _chosen_options(variables: dict[str, str]) -> list[tuple[str, str]]:
         ("IaC", g("iac", "none") or "none"),
         ("Multi-model (CCR)", "on" if g("multi_model") else "off"),
         ("AI governance", "on" if g("governance") else "off"),
+        ("Observability", "on" if g("observability") else "off"),
         ("Distribution", "no-plugin" if g("no_plugin") else "plugin"),
         ("MCP servers", g("installed_mcps", "none") or "none"),
         ("Memory stack", g("memory_stack", "obsidian-only") or "obsidian-only"),

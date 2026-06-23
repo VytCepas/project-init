@@ -75,6 +75,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "other_agents": "",
         "multi_model": "",
         "governance": "",
+        "observability": "",
         # Matches the CLI default: plugin-first (PI-165). Tests exercising
         # the copied payload use fallback_variables()/fallback_preset().
         "plugin_mode": "true",

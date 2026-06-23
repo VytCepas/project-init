@@ -54,3 +54,20 @@ def test_choose_multi_model_interactive_shows_messaging(monkeypatch, capsys):
     assert "deepseek,deepseek-v4-flash" in out
     assert "Alternatives" in out
     assert "codex" in out  # the native-harness alternative is surfaced
+
+
+@pytest.mark.parametrize("answer", [True, False])
+def test_choose_observability_interactive_returns_confirm(monkeypatch, answer):
+    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: answer)
+    assert __main__._choose_observability_interactive() is answer
+
+
+def test_choose_observability_interactive_shows_messaging(monkeypatch, capsys):
+    """#404: the wizard must explain what it ships (file-based, no backend) before
+    asking, so the choice is informed."""
+    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
+    __main__._choose_observability_interactive()
+    out = capsys.readouterr().out
+    # Single-token substrings survive 80-col panel wrapping.
+    assert "usage_report.py" in out
+    assert "egress" in out.lower()
