@@ -23,16 +23,26 @@ ISO/IEC 42001, the EU AI Act, and the OWASP LLM/Agentic Top 10.
 - [`NIST_RMF_CROSSWALK.md`](NIST_RMF_CROSSWALK.md) — maps the above to the NIST
   AI RMF functions (Govern/Map/Measure/Manage) + ISO 42001 / EU AI Act pointers.
 
-## Still to come
+**Product track (#412)** — the system card, AIBOM, and CI gate:
 
-- **Product track (#412)** — a **system card** (`examples/SYSTEM_CARD.example.md`
-  + a copy-me template) carrying a flat-scalar governance manifest; a two-file
-  **AIBOM** (`ai-bom.generated.md`, regenerated each scaffold/upgrade, plus the
-  user-owned `ai-declarations.md`); and a presence-triggered CI gate
-  (`governance_gate.sh`) that fails only on a *real* system card with missing or
-  invalid fields. A freshly scaffolded project ships only the example/template,
-  so the gate is a genuine opt-in and the project passes until a team writes a
-  real card.
+- [`examples/SYSTEM_CARD.example.md`](examples/SYSTEM_CARD.example.md) +
+  [`examples/SYSTEM_CARD.template.md`](examples/SYSTEM_CARD.template.md) — a
+  reference card and a copy-me template carrying a flat-scalar **governance
+  manifest**. Copy the template to `.claude/governance/SYSTEM_CARD.md` to create
+  a real, gated card.
+- `ai-bom.generated.md` — a generated **AIBOM** (installed MCP servers + detected
+  CCR routes), regenerated each scaffold/upgrade. Do not hand-edit.
+- [`ai-declarations.md`](ai-declarations.md) — the user-owned counterpart for
+  models/APIs called directly; seeded once and preserved.
+- `../scripts/governance_gate.sh` (+ `governance_gate.py`) — a **presence-
+  triggered CI gate**: it validates every *real* `SYSTEM_CARD.md` and fails on
+  missing/placeholder fields, out-of-range values, the `prohibited`+`allowed:true`
+  illegal combo, an unfilled declarations file, or a stale `last_reviewed`. A
+  freshly scaffolded project ships only the example/template, so the gate is a
+  genuine opt-in — it passes until a team deliberately writes a real card. The
+  CI `governance` job is the enforcement boundary.
+- [`config.example.json`](config.example.json) — copy to `config.json` to
+  override the gate's staleness window (default 180 days).
 
 See the supporting inventory of what was actually installed in
 [`../CAPABILITIES.md`](../CAPABILITIES.md) — note it is an *inventory*, not the

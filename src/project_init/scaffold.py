@@ -35,6 +35,19 @@ _ANY_PLACEHOLDER_RE = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
 _PRESERVE_DIRS = {"memory", "vault"}
 # Except READMEs — those are always refreshed.
 _ALWAYS_OVERWRITE = {"README.md"}
+# User-owned governance files (ADR-018, #412): seeded once, then never
+# overwritten on re-run/upgrade. Preserved *intrinsically* (not via config.yaml
+# globs) so the seed-once lifecycle holds even for a project that adopts
+# governance after its initial scaffold, when config.yaml — already carrying a
+# record — is not re-rendered (Codex #416). The generated ai-bom.generated.md is
+# deliberately absent here: it must refresh every run.
+_GOVERNANCE_USER_FILES = frozenset(
+    {
+        ".claude/governance/SYSTEM_CARD.md",
+        ".claude/governance/ai-declarations.md",
+        ".claude/governance/config.json",
+    }
+)
 # The owner-edited record file. On a re-scaffold it is preserved (not re-rendered)
 # once it carries the scaffold record, so hand-edits — preserve list, project_key,
 # declined_additions, safety.allow — survive (#296); write_scaffold_record then
@@ -333,6 +346,8 @@ def _should_preserve(rel_path: Path, target: Path, preserve_globs: list[str] | N
         return False
     if rel_path.name in _ALWAYS_OVERWRITE:
         return False
+    if rel_path.as_posix() in _GOVERNANCE_USER_FILES:
+        return True
     # A re-scaffold must not clobber a hand-edited config.yaml that already
     # carries a scaffold record (#296); write_scaffold_record updates the record
     # block in place afterwards. A first scaffold (no record) still renders it.
@@ -643,28 +658,41 @@ def scaffold(
     # Per-surface config generation (ADR-017 / PI-366): emit hooks + MCP for the
     # selected GUI surfaces from the canonical surface table + MCP catalog. Runs
     # against the committed target (after _commit_staged in strict mode).
-    from project_init import surfaces
+    created += _emit_generated_files(target, variables, conflicts)
+
+    return created
+
+
+def _emit_generated_files(
+    target: Path, variables: dict[str, str], conflicts: list[tuple[Path, Path]] | None
+) -> list[Path]:
+    """Post-copy generated files.
+
+    Derived from the canonical sources, never hand-edited, regenerated each
+    scaffold/upgrade so they cannot drift.
+    """
+    from project_init import capabilities, surfaces
     from project_init.mcps import servers_for_ids
 
     agents = [a.strip() for a in variables.get("agents", "").split(",") if a.strip()]
     mcp_raw = variables.get("installed_mcps", "none")
     mcp_ids = (
-        []
-        if mcp_raw in ("", "none")
-        else [s.strip() for s in mcp_raw.split(",") if s.strip()]
+        [] if mcp_raw in ("", "none") else [s.strip() for s in mcp_raw.split(",") if s.strip()]
     )
-    created += surfaces.emit(
+    # Per-surface hooks/MCP for the selected GUI surfaces (ADR-017 / PI-366).
+    created = surfaces.emit(
         target,
         agents=agents,
         servers=servers_for_ids(mcp_ids),
         conflicts=conflicts,
     )
-
-    # Surface-independent capabilities inventory (PI-374): a generated
-    # CAPABILITIES.md derived from the canonical skill/hook/MCP sources + the
-    # chosen options, regenerated each run so it never drifts.
-    from project_init import capabilities
-
+    # Surface-independent capabilities inventory (PI-374).
     created += capabilities.emit(target, variables)
+    # Governance AIBOM (ADR-018, #412): installed MCPs + detected CCR routes. The
+    # user-owned ai-declarations.md (seeded by the overlay copy, preserved via
+    # config.yaml globs) is never touched here.
+    if variables.get("governance"):
+        from project_init import governance
 
+        created += governance.emit(target, variables)
     return created

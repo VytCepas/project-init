@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from project_init.scaffold import (
+    _GOVERNANCE_USER_FILES,
     _PRESERVE_DIRS,
     _RECORD_MARKER,
     _matches_preserve_glob,
@@ -324,6 +325,8 @@ def _three_way_merge(base: str, ours: str, theirs: str) -> tuple[str, bool]:
 
 def _is_preserved(rel: Path, preserve_globs: list[str] | None = None) -> bool:
     if any(part in _PRESERVE_DIRS for part in rel.parts):
+        return True
+    if rel.as_posix() in _GOVERNANCE_USER_FILES:
         return True
     return _matches_preserve_glob(rel, preserve_globs or [])
 

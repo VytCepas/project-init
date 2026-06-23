@@ -1,0 +1,4 @@
+{
+  "_comment": "Optional governance-gate config. Copy this file to .claude/governance/config.json to override defaults. This example is NOT read by the gate; only a real config.json is. Flat scalar keys only.",
+  "staleness_days": 180
+}
