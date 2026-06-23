@@ -3,9 +3,9 @@
 The built-in overlay ([using-observability.md](using-observability.md)) is a
 **local, on-demand snapshot**. That is a deliberate ceiling (ADR-019): no
 Docker, no daemon, no egress. This guide is the **documented exit path** for
-teams that outgrow it — it is **documentation only**. project-init scaffolds **no
-collector, no server, and no agent** for any of the options below; wiring one up
-is your decision and your operational burden.
+teams that outgrow it — it is **documentation only**.
+project-init scaffolds **no collector, no server, and no agent** for any of the
+options below; wiring one up is your decision and your operational burden.
 
 ## When to upgrade
 
