@@ -305,13 +305,18 @@ def _redirect_target_exists(reason: str) -> bool:
     m = re.search(r"\.claude/scripts/([\w.-]+)", reason)
     if not m:
         return True
-    # Anchor on this hook's own location (.claude/hooks/dag_workflow.py ->
-    # .claude/scripts/), NOT the process CWD. The guard can run from any
-    # subdirectory (the Bash tool's working dir persists across calls) and the
-    # codex/cursor/antigravity adapter invokes it via subprocess; a CWD-relative
-    # path let every script-redirect rule be silently skipped from a subdir,
-    # bypassing the guard on all surfaces (#429).
-    scripts_dir = Path(__file__).resolve().parent.parent / "scripts"
+    # Resolve the PROJECT's wrapper-scripts dir, never the process CWD (#429).
+    # Prefer $CLAUDE_PROJECT_DIR — Claude Code sets it on every hook invocation,
+    # including the default plugin mode where this file lives under the plugin
+    # root, not the project (#447 review). Otherwise — the codex/cursor/
+    # antigravity adapter path, which runs the project's own .claude/hooks/ copy
+    # and sets no such var — anchor on this file's location (.claude/hooks ->
+    # .claude/scripts). Mirrors prod_guard.py's project-root resolution.
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+    if project_dir:
+        scripts_dir = Path(project_dir) / ".claude" / "scripts"
+    else:
+        scripts_dir = Path(__file__).resolve().parent.parent / "scripts"
     return (scripts_dir / m.group(1)).exists()
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -64,14 +65,23 @@ def _project_with_hook(root: Path) -> Path:
     return dest
 
 
-def _run_guard_hook(hook: Path, payload: dict, cwd: Path | None = None) -> dict | None:
-    """Run a specific dag_workflow.py copy's guard via subprocess."""
+def _run_guard_hook(
+    hook: Path, payload: dict, cwd: Path | None = None, env: dict | None = None
+) -> dict | None:
+    """Run a specific dag_workflow.py copy's guard via subprocess.
+
+    By default CLAUDE_PROJECT_DIR is stripped so the guard falls back to its
+    __file__-relative scripts dir (the codex/cursor/antigravity adapter path);
+    pass ``env`` to exercise the $CLAUDE_PROJECT_DIR plugin-mode branch."""
+    if env is None:
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"}
     proc = subprocess.run(
         [sys.executable, str(hook), "guard"],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
         cwd=cwd,
+        env=env,
     )
     assert proc.returncode == 0, f"guard exited {proc.returncode}: {proc.stderr}"
     return json.loads(proc.stdout) if proc.stdout.strip() else None
@@ -207,6 +217,28 @@ class TestGuardSteering:
         subdir.mkdir(parents=True)
         out = _run_guard_hook(
             hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=subdir
+        )
+        assert _denied(out)
+        assert "monitor_pr.sh" in _deny_reason(out)
+
+    def test_redirect_resolves_via_project_dir_in_plugin_mode(self, tmp_path: Path):
+        """#447 review (P1): in the default plugin path the hook runs from the
+        plugin root (``${CLAUDE_PLUGIN_ROOT}/hooks/``), not the project's
+        ``.claude/hooks/``. It must resolve wrapper scripts via
+        $CLAUDE_PROJECT_DIR — anchoring on __file__ alone would point at the
+        plugin dir (no scripts/ there) and silently skip every redirect rule."""
+        # Hook installed at a plugin-style location with NO sibling scripts dir.
+        plugin_hooks = tmp_path / "plugin" / "hooks"
+        plugin_hooks.mkdir(parents=True)
+        hook = plugin_hooks / "dag_workflow.py"
+        hook.write_bytes(SOURCE_HOOK.read_bytes())
+        # The real project (with the wrapper) lives elsewhere.
+        project = tmp_path / "project"
+        (project / ".claude" / "scripts").mkdir(parents=True)
+        (project / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(project)}
+        out = _run_guard_hook(
+            hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path, env=env
         )
         assert _denied(out)
         assert "monitor_pr.sh" in _deny_reason(out)
