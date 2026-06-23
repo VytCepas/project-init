@@ -78,7 +78,8 @@ always overwritten (Codex r1 #4/#5, r2 #2):
 ### 4. Presence-triggered, multi-field CI gate (CI-first)
 
 `governance_gate.sh` (+ `governance_gate.py`, stdlib via `_py.sh`) validates every
-*real* `SYSTEM_CARD.md` (only the top-level `examples/` is excluded) and fails on:
+*real* `SYSTEM_CARD.md` (only the top-level `.claude/governance/examples/`
+directory is excluded) and fails on:
 missing/placeholder fields; out-of-range `role`/`classification`/`allowed`/
 `human_oversight`/`logging`; the `prohibited`+`allowed:true` combo; a
 `models_declared` reference that is absolute, contains `..`, escapes
@@ -97,7 +98,7 @@ hook is best-effort (matches ADR-007's "git+CI is the boundary").
 `_is_preserved` (upgrade) — **not** via rendered `config.yaml` preserve globs.
 Rendering globs would miss a project that adopts governance after its initial
 scaffold, because `config.yaml` is not re-rendered once it carries a record
-(Codex #416). The generated `ai-bom.generated.md` is deliberately excluded so it
+(Codex review on PR #416). The generated `ai-bom.generated.md` is deliberately excluded so it
 keeps refreshing.
 
 ## Rejected / out of scope
