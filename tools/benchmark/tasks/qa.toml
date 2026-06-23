@@ -1,0 +1,16 @@
+# Benchmark task: factual question about the repo (methodology "qa").
+# Where CLAUDE.md / memory / INDEX should help the scaffolded target most.
+id = "qa"
+description = "Answer a factual question about the repo"
+prompt = """
+What is the canonical command surface for this project — i.e. which tool's
+recipes are the canonical way to run setup, lint, format, test, and docs? Answer
+in one sentence naming the tool.
+"""
+
+# Consumed by accuracy scoring (#273), ignored by the #271 collection harness.
+# Regex match against the agent's final text output — the scaffolded target
+# should know this from CLAUDE.md; a bare target likely won't.
+[check]
+type = "regex"
+pattern = "(?i)\\bjust(file)?\\b"
