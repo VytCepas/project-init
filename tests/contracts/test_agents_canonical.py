@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
+from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables
 
 
@@ -71,6 +71,26 @@ class TestPortableReferencesResolve:
         assert referenced, "expected path references in AGENTS.md"
         for rel in referenced:
             assert (target / rel).exists(), f"AGENTS.md references missing path: {rel}"
+
+    def test_gemini_skills_index_link_gated_by_plugin_mode(self, tmp_path: Path):
+        """#437: GEMINI.md must not dangle a `.claude/skills/INDEX.md` link in
+        the default plugin scaffold — INDEX.md ships only via the fallback layer
+        (--no-plugin). In plugin mode the link must be absent; in --no-plugin
+        mode it must be present and resolve."""
+        # Plugin mode (default): no INDEX.md link, and no such file.
+        plug = tmp_path / "plug"
+        scaffold(plug, load_preset("obsidian-only"), make_variables())
+        gemini_plug = (plug / "GEMINI.md").read_text()
+        assert "skills/INDEX.md" not in gemini_plug
+        assert not (plug / ".claude" / "skills" / "INDEX.md").exists()
+        # --no-plugin mode: INDEX.md is linked and present.
+        np = tmp_path / "np"
+        preset = load_preset("obsidian-only")
+        preset = {**preset, "layers": list(preset["layers"]) + overlay_layers("claude", no_plugin=True)}
+        scaffold(np, preset, make_variables(no_plugin="true"), strict=True)
+        gemini_np = (np / "GEMINI.md").read_text()
+        assert "skills/INDEX.md" in gemini_np
+        assert (np / ".claude" / "skills" / "INDEX.md").exists()
 
     def test_no_unrendered_placeholders_in_instruction_files(self, target: Path):
         placeholder = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
