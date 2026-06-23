@@ -253,6 +253,25 @@ def _prompt(label: str, default: str = "") -> str:
     return Prompt.ask(label, default=default) or default
 
 
+def _default_preset_index(presets: list[dict]) -> int:
+    """1-based index of the preset to default to at the interactive prompt.
+
+    Presets are listed sorted by filename, so an opt-in overlay preset like
+    `governed` (which sorts before `obsidian-*`) must NOT become the Enter
+    default — that would silently enable a strictly-opt-in, off-by-default
+    overlay for a user who just presses Enter (Codex review #415 P2). Prefer the
+    documented default `obsidian-only`; otherwise the first preset that does not
+    enable an opt-in overlay; otherwise position 1.
+    """
+    for i, p in enumerate(presets, 1):
+        if p.get("name") == "obsidian-only":
+            return i
+    for i, p in enumerate(presets, 1):
+        if not p.get("vars", {}).get("governance"):
+            return i
+    return 1
+
+
 def _choose_preset_interactive(presets: list[dict]) -> dict:
     from rich.console import Console
     from rich.prompt import IntPrompt
@@ -263,10 +282,11 @@ def _choose_preset_interactive(presets: list[dict]) -> dict:
         console.print(f"  [cyan]{i}[/cyan]. {p['name']} — {p['description']}")
     console.print()
 
-    choice = IntPrompt.ask("Choose a preset", default=1)
+    default_idx = _default_preset_index(presets)
+    choice = IntPrompt.ask("Choose a preset", default=default_idx)
     if choice < 1 or choice > len(presets):
-        console.print("[red]Invalid choice. Using preset 1.[/red]")
-        choice = 1
+        console.print(f"[red]Invalid choice. Using preset {default_idx}.[/red]")
+        choice = default_idx
     return presets[choice - 1]
 
 

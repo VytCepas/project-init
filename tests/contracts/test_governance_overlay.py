@@ -206,6 +206,31 @@ class TestInteractiveResolution:
         assert result.governance is False
 
 
+class TestPresetPickerDefault:
+    """The `governed` preset must not become the Enter-default just because it
+    sorts before `obsidian-*` by filename (Codex review #415 P2)."""
+
+    def test_default_is_obsidian_only_not_governed(self):
+        import project_init.__main__ as cli
+        from project_init.scaffold import list_presets
+
+        presets = list_presets()
+        # Sanity: governed really does sort first, so this guards a live risk.
+        assert presets[0]["name"] == "governed"
+        default = presets[cli._default_preset_index(presets) - 1]
+        assert default["name"] == "obsidian-only"
+        assert not default.get("vars", {}).get("governance")
+
+    def test_falls_back_to_first_non_governing_preset(self):
+        import project_init.__main__ as cli
+
+        presets = [
+            {"name": "gov", "vars": {"governance": True}},
+            {"name": "plain", "vars": {}},
+        ]
+        assert cli._default_preset_index(presets) == 2
+
+
 class TestUpgradeRoundTrip:
     def test_layer_survives_re_render_from_recorded_variable(self, tmp_path: Path, capsys):
         """A governed project re-renders drift-free: `upgrade` reconstructs the
