@@ -253,6 +253,12 @@ class TestGuardSteering:
             "git push origin :main",
             "git push origin HEAD:master",
             "git push --force -u origin main",
+            # Quoted refspecs (the shell strips the quotes, so these still push
+            # to main) must not slip past the raw-string match (#447 review).
+            "git push origin HEAD:'main'",
+            'git push origin HEAD:"main"',
+            "git push origin 'HEAD:main'",
+            "git push origin HEAD:'refs/heads/main'",
         ],
     )
     def test_blocks_push_to_main_evasion_forms(self, cmd: str, tmp_path: Path):

@@ -240,7 +240,7 @@ def prereqs_satisfied(node: str, _seen: set[str] | None = None) -> tuple[bool, s
 # DAG validation; otherwise, prereqs of target_node are appended to the reason.
 COMMAND_RULES: list[tuple[re.Pattern[str], str | None, str]] = [
     (
-        re.compile(r"git\s+push\b[^|;&\n]*?[\s:](?:refs/heads/)?(?:main|master)(?![\w./-])"),
+        re.compile(r"git\s+push\b[^|;&\n]*?[\s:]['\"]?(?:refs/heads/)?(?:main|master)(?![\w./-])"),
         None,
         "Direct pushes to main/master are blocked. Open a feature branch and PR.",
     ),
