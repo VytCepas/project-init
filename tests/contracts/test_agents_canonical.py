@@ -83,11 +83,13 @@ class TestPortableReferencesResolve:
         gemini_plug = (plug / "GEMINI.md").read_text()
         assert "skills/INDEX.md" not in gemini_plug
         assert not (plug / ".claude" / "skills" / "INDEX.md").exists()
-        # --no-plugin mode: INDEX.md is linked and present.
+        # --no-plugin mode: INDEX.md is linked and present. Clear plugin_mode as
+        # the real CLI does (plugin_mode and no_plugin are coupled: __main__.py
+        # sets `plugin_mode = "" if no_plugin`) so this is not an impossible mix.
         np = tmp_path / "np"
         preset = load_preset("obsidian-only")
         preset = {**preset, "layers": list(preset["layers"]) + overlay_layers("claude", no_plugin=True)}
-        scaffold(np, preset, make_variables(no_plugin="true"), strict=True)
+        scaffold(np, preset, make_variables(plugin_mode="", no_plugin="true"), strict=True)
         gemini_np = (np / "GEMINI.md").read_text()
         assert "skills/INDEX.md" in gemini_np
         assert (np / ".claude" / "skills" / "INDEX.md").exists()
