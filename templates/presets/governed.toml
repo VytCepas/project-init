@@ -6,7 +6,7 @@
 # and upgrade time (the CLI --governance flag does the same, and takes precedence).
 
 name = "governed"
-description = "AI-governance overlay (governance-as-code) on the Obsidian-only base."
+description = "Governance policy layer (AUP + approved-tools/data-handling docs) on the Obsidian-only base."
 
 extends = "obsidian-only"
 

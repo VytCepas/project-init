@@ -138,9 +138,10 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Scaffold the opt-in AI-governance overlay (ADR-018): governance-as-"
-            "code — an AI usage policy, approved-tools/data-handling docs, a "
-            "system card + AIBOM, and a presence-triggered CI gate that adopts "
-            "NIST AI RMF / EU AI Act conventions. Off by default."
+            "code. Ships the policy layer today — an AI usage policy, approved-"
+            "tools / data-handling / code-provenance docs, and a NIST RMF "
+            "crosswalk — adopting NIST AI RMF / EU AI Act conventions. The system "
+            "card, AIBOM, and CI gate land in follow-ups. Off by default."
         ),
     )
     p.add_argument(
@@ -461,14 +462,19 @@ def _choose_governance_interactive() -> bool:
 
     console = Console()
     body = (
-        "Ship [bold]governance-as-code[/bold] — a failing CI check, not a PDF — "
-        "for projects that build or operate an AI system.\n\n"
+        "Ship [bold]governance-as-code[/bold] — versioned, reviewed policy that "
+        "travels with the repo — for projects that build or operate an AI "
+        "system.\n\n"
+        "[bold]Scaffolds today:[/bold]\n"
         "  [dim]AI_USAGE_POLICY.md[/dim]      [dim]# 1-page AUP (NIST-aligned)[/dim]\n"
         "  [dim]approved-tools.md[/dim]       [dim]# allow/deny models, endpoints, data[/dim]\n"
-        "  [dim]SYSTEM_CARD + AIBOM[/dim]     [dim]# what you run, derived + declared[/dim]\n"
-        "  [dim]governance CI gate[/dim]      [dim]# fails on a real card missing fields[/dim]\n\n"
+        "  [dim]data-handling.md[/dim]        [dim]# what data may reach AI tools[/dim]\n"
+        "  [dim]ai-code-provenance.md[/dim]   [dim]# attribution + licence checks[/dim]\n"
+        "  [dim]NIST_RMF_CROSSWALK.md[/dim]   [dim]# maps to Govern/Map/Measure/Manage[/dim]\n\n"
         "[cyan]Adopts:[/cyan] NIST AI RMF, ISO/IEC 42001, EU AI Act, OWASP LLM/Agentic "
         "Top 10 — referenced, not re-authored.\n"
+        "[cyan]Coming:[/cyan] a system card + AIBOM and a presence-triggered CI gate "
+        "(failing check) in follow-up increments.\n"
         "[cyan]Note:[/cyan] most projects are not AI products — keep this off unless "
         "yours calls an LLM API over data.\n"
         "Clean by default — decline and nothing is added."
@@ -1273,7 +1279,12 @@ def main(argv: list[str] | None = None) -> int:
                 args.deploy,
                 args.iac,
                 args.multi_model,
-                args.governance,
+                # Pre-seed governance from the CLI flag OR the chosen preset's
+                # [vars] so a `governed`-preset run skips the prompt instead of
+                # asking and then silently overriding the answer (the preset var
+                # enables the layer regardless). Keeps the prompt honest and the
+                # recorded variable aligned with the effective layer set.
+                args.governance or bool(preset.get("vars", {}).get("governance")),
             ),
         )
     target.mkdir(parents=True, exist_ok=True)

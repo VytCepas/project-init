@@ -161,6 +161,51 @@ class TestFlagAndPresetResolution:
         assert variables["governance"] == "true"
 
 
+class TestInteractiveResolution:
+    """The interactive wizard must not prompt-then-override (Copilot review #415).
+
+    When the `governed` preset already enables governance, the wizard pre-seeds
+    the prompt-skip from the preset var — so the recorded answer matches the
+    effective layer set instead of asking and silently overriding a decline.
+    """
+
+    @staticmethod
+    def _mock_leaves(monkeypatch):
+        import project_init.__main__ as cli
+
+        answers = iter(["proj", "desc", "python", "@owner", "none", "claude"])
+        monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
+        monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
+        monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
+        monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
+        monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
+        # Every Confirm.ask (devcontainer/mise/vscode/multi-model/governance) → decline.
+        monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
+        return cli
+
+    def test_preset_seeded_governance_skips_prompt_and_stays_on(self, monkeypatch):
+        cli = self._mock_leaves(monkeypatch)
+        # governance slot pre-seeded True (as _preset_main does for `governed`).
+        result = cli._gather_inputs_interactive(
+            default_name="proj",
+            no_plugin=False,
+            profile="individual",
+            cli_overlays=(None, None, None, False, True),
+        )
+        assert result.governance is True
+
+    def test_unseeded_governance_honors_decline(self, monkeypatch):
+        cli = self._mock_leaves(monkeypatch)
+        # No pre-seed and the user declines (Confirm.ask → False) → off.
+        result = cli._gather_inputs_interactive(
+            default_name="proj",
+            no_plugin=False,
+            profile="individual",
+            cli_overlays=(None, None, None, False, False),
+        )
+        assert result.governance is False
+
+
 class TestUpgradeRoundTrip:
     def test_layer_survives_re_render_from_recorded_variable(self, tmp_path: Path, capsys):
         """A governed project re-renders drift-free: `upgrade` reconstructs the
