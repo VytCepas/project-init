@@ -66,11 +66,16 @@ def is_placeholder(value: str) -> bool:
 
 
 def find_cards(gov_dir: Path) -> list[Path]:
-    """Real system cards (named SYSTEM_CARD.md), excluding the shipped examples/."""
+    """Real system cards (named SYSTEM_CARD.md), excluding the shipped examples/.
+
+    Only the top-level ``.claude/governance/examples/`` is excluded — a card
+    stored under a deeper directory that happens to be named ``examples`` is
+    still a real card.
+    """
     return [
         p
         for p in gov_dir.rglob("SYSTEM_CARD.md")
-        if "examples" not in p.relative_to(gov_dir).parts
+        if p.relative_to(gov_dir).parts[0] != "examples"
     ]
 
 
@@ -113,6 +118,8 @@ def _check_staleness(value: str, max_age: int) -> list[str]:
     except ValueError:
         return [f"last_reviewed is not a valid date: {value!r}"]
     age = (date.today() - reviewed).days
+    if age < 0:
+        return [f"last_reviewed is in the future: {value!r}"]
     if age > max_age:
         return [f"last_reviewed is stale ({age} days old > {max_age}-day window); re-review"]
     return []

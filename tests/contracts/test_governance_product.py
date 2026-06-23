@@ -16,7 +16,12 @@ from pathlib import Path
 import pytest
 
 from project_init import governance
-from project_init.scaffold import load_preset, overlay_layers, read_preserve_globs, scaffold
+from project_init.scaffold import (
+    _GOVERNANCE_USER_FILES,
+    load_preset,
+    overlay_layers,
+    scaffold,
+)
 from tests.helpers import make_variables
 
 _GOV = Path(".claude") / "governance"
@@ -126,13 +131,16 @@ class TestAIBOM:
 # Declarations lifecycle (seed-once + preserve)
 # --------------------------------------------------------------------------- #
 class TestDeclarationsLifecycle:
-    def test_seeded_and_registered_in_preserve_globs(self, tmp_path: Path):
+    def test_seeded_and_intrinsically_preserved(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
         assert (target / _GOV / "ai-declarations.md").is_file()
-        globs = read_preserve_globs(target)
-        assert ".claude/governance/ai-declarations.md" in globs
-        assert ".claude/governance/SYSTEM_CARD.md" in globs
-        assert ".claude/governance/config.json" in globs
+        # Preserved intrinsically (not via config.yaml globs), so the lifecycle
+        # holds even for projects that adopt governance after initial scaffold.
+        assert ".claude/governance/ai-declarations.md" in _GOVERNANCE_USER_FILES
+        assert ".claude/governance/SYSTEM_CARD.md" in _GOVERNANCE_USER_FILES
+        assert ".claude/governance/config.json" in _GOVERNANCE_USER_FILES
+        # The generated AIBOM must NOT be preserved — it has to refresh.
+        assert ".claude/governance/ai-bom.generated.md" not in _GOVERNANCE_USER_FILES
 
     def test_user_edits_survive_rescaffold(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
@@ -140,7 +148,17 @@ class TestDeclarationsLifecycle:
         decl.write_text("# my real declarations\n", encoding="utf-8")
         # Re-scaffold onto the same target — the preserved file is not clobbered.
         _scaffold(target)
-        assert decl.read_text() == "# my real declarations\n"
+        assert decl.read_text(encoding="utf-8") == "# my real declarations\n"
+
+    def test_user_edits_survive_upgrade(self, tmp_path: Path):
+        from project_init.__main__ import main
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        decl = target / _GOV / "ai-declarations.md"
+        decl.write_text("# real declarations\n", encoding="utf-8")
+        assert main(["upgrade", str(target), "--apply", "--accept-new", "all"]) == 0
+        assert decl.read_text(encoding="utf-8") == "# real declarations\n"
 
 
 # --------------------------------------------------------------------------- #
@@ -167,11 +185,39 @@ class TestGate:
         assert r.returncode == 0
         assert "examples/" not in r.stdout
 
+    def test_card_in_deeper_examples_dir_is_still_gated(self, tmp_path: Path):
+        # Only the top-level examples/ is excluded; a real card under a deeper
+        # directory named examples must still be validated (Copilot review #416).
+        target = _scaffold(tmp_path / "p")
+        deep = target / _GOV / "team" / "examples"
+        deep.mkdir(parents=True)
+        (deep / "SYSTEM_CARD.md").write_text("---\nrole: bogus\n---\n", encoding="utf-8")
+        r = _run_gate(target)
+        assert r.returncode == 1
+        assert "team/examples/SYSTEM_CARD.md" in r.stdout
+
+    def test_future_last_reviewed_fails(self, tmp_path: Path):
+        # A future date must not bypass the staleness guard (Copilot review #416).
+        target = _scaffold(tmp_path / "p")
+        card = _valid_card(target)
+        card.write_text(
+            "\n".join(
+                "last_reviewed: 2099-01-01" if line.startswith("last_reviewed:") else line
+                for line in card.read_text(encoding="utf-8").splitlines()
+            ),
+            encoding="utf-8",
+        )
+        r = _run_gate(target)
+        assert r.returncode == 1
+        assert "future" in r.stdout
+
     def test_missing_field_fails(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
         card = _valid_card(target)
         text = "\n".join(
-            line for line in card.read_text().splitlines() if not line.startswith("owner:")
+            line
+            for line in card.read_text(encoding="utf-8").splitlines()
+            if not line.startswith("owner:")
         )
         card.write_text(text, encoding="utf-8")
         r = _run_gate(target)
@@ -181,7 +227,7 @@ class TestGate:
     def test_prohibited_allowed_true_fails(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
         card = _valid_card(target)
-        text = card.read_text()
+        text = card.read_text(encoding="utf-8")
         text = text.replace("classification: limited", "classification: prohibited")
         text = text.replace("allowed: true", "allowed: true")  # already true
         card.write_text(text, encoding="utf-8")
@@ -192,7 +238,10 @@ class TestGate:
     def test_out_of_range_role_fails(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
         card = _valid_card(target)
-        card.write_text(card.read_text().replace("role: deployer", "role: overlord"))
+        card.write_text(
+            card.read_text(encoding="utf-8").replace("role: deployer", "role: overlord"),
+            encoding="utf-8",
+        )
         r = _run_gate(target)
         assert r.returncode == 1
         assert "role must be one of" in r.stdout
@@ -204,8 +253,9 @@ class TestGate:
         card.write_text(
             "\n".join(
                 f"last_reviewed: {old}" if line.startswith("last_reviewed:") else line
-                for line in card.read_text().splitlines()
-            )
+                for line in card.read_text(encoding="utf-8").splitlines()
+            ),
+            encoding="utf-8",
         )
         r = _run_gate(target)
         assert r.returncode == 1
@@ -218,18 +268,23 @@ class TestGate:
         card.write_text(
             "\n".join(
                 f"last_reviewed: {old}" if line.startswith("last_reviewed:") else line
-                for line in card.read_text().splitlines()
-            )
+                for line in card.read_text(encoding="utf-8").splitlines()
+            ),
+            encoding="utf-8",
         )
         # A generous window in a real config.json lets the old card pass.
-        (target / _GOV / "config.json").write_text(json.dumps({"staleness_days": 1000}))
+        (target / _GOV / "config.json").write_text(
+            json.dumps({"staleness_days": 1000}), encoding="utf-8"
+        )
         r = _run_gate(target)
         assert r.returncode == 0, r.stdout
 
     def test_unfilled_declarations_fails(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
         _valid_card(target)
-        (target / _GOV / "ai-declarations.md").write_text("PLACEHOLDER — fill me\n")
+        (target / _GOV / "ai-declarations.md").write_text(
+            "PLACEHOLDER — fill me\n", encoding="utf-8"
+        )
         r = _run_gate(target)
         assert r.returncode == 1
         assert "not filled in" in r.stdout
@@ -245,10 +300,11 @@ class TestGate:
         target = _scaffold(tmp_path / "p")
         card = _valid_card(target)
         card.write_text(
-            card.read_text().replace(
+            card.read_text(encoding="utf-8").replace(
                 "models_declared: .claude/governance/ai-declarations.md",
                 f"models_declared: {bad}",
-            )
+            ),
+            encoding="utf-8",
         )
         r = _run_gate(target)
         assert r.returncode == 1

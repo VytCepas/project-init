@@ -41,11 +41,7 @@ tooling:
 # Extra files never overwritten or reported as drift on `upgrade` (and on
 # `project-init` re-runs) (#243): a single-line JSON array of globs.
 # memory/ and vault/ are always preserved.
-{{#if governance}}# Governance overlay (ADR-018): the system card, declarations file, and gate
-# config are user-owned — keep upgrade/re-runs from overwriting them. Add more
-# globs to this list as needed (keep it a single-line JSON array).
-preserve: [".claude/governance/SYSTEM_CARD.md", ".claude/governance/ai-declarations.md", ".claude/governance/config.json"]
-{{/if governance}}# preserve: ["ci.yml", "justfile", "docs/*.md"]
+# preserve: ["ci.yml", "justfile", "docs/*.md"]
 
 updates:
   # Addition-group consent state (#249): IDs the owner has declined are stored

@@ -35,6 +35,19 @@ _ANY_PLACEHOLDER_RE = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
 _PRESERVE_DIRS = {"memory", "vault"}
 # Except READMEs — those are always refreshed.
 _ALWAYS_OVERWRITE = {"README.md"}
+# User-owned governance files (ADR-018, #412): seeded once, then never
+# overwritten on re-run/upgrade. Preserved *intrinsically* (not via config.yaml
+# globs) so the seed-once lifecycle holds even for a project that adopts
+# governance after its initial scaffold, when config.yaml — already carrying a
+# record — is not re-rendered (Codex #416). The generated ai-bom.generated.md is
+# deliberately absent here: it must refresh every run.
+_GOVERNANCE_USER_FILES = frozenset(
+    {
+        ".claude/governance/SYSTEM_CARD.md",
+        ".claude/governance/ai-declarations.md",
+        ".claude/governance/config.json",
+    }
+)
 # The owner-edited record file. On a re-scaffold it is preserved (not re-rendered)
 # once it carries the scaffold record, so hand-edits — preserve list, project_key,
 # declined_additions, safety.allow — survive (#296); write_scaffold_record then
@@ -333,6 +346,8 @@ def _should_preserve(rel_path: Path, target: Path, preserve_globs: list[str] | N
         return False
     if rel_path.name in _ALWAYS_OVERWRITE:
         return False
+    if rel_path.as_posix() in _GOVERNANCE_USER_FILES:
+        return True
     # A re-scaffold must not clobber a hand-edited config.yaml that already
     # carries a scaffold record (#296); write_scaffold_record updates the record
     # block in place afterwards. A first scaffold (no record) still renders it.
@@ -649,7 +664,7 @@ def scaffold(
 
 
 def _emit_generated_files(
-    target: Path, variables: dict[str, str], conflicts: list[tuple[Path, Path]]
+    target: Path, variables: dict[str, str], conflicts: list[tuple[Path, Path]] | None
 ) -> list[Path]:
     """Post-copy generated files.
 
