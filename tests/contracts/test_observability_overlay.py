@@ -85,6 +85,21 @@ class TestObservabilityOn:
         assert "egress" in text.lower()
         assert "OTEL" in text
 
+    def test_guides_scaffold(self, tmp_path: Path):
+        target = _scaffold(tmp_path / "p", observability=True)
+        guides = target / ".claude" / "docs" / "guides"
+        using = guides / "using-observability.md"
+        upgrading = guides / "upgrading-observability.md"
+        assert using.is_file() and upgrading.is_file()
+        # The using-guide must carry the load-bearing caveats.
+        utext = using.read_text(encoding="utf-8")
+        assert "Claude Code only" in utext  # scope
+        assert "Approximate" in utext  # cost honesty
+        # The upgrade guide is the OTEL path and must disclaim shipping a collector.
+        gtext = upgrading.read_text(encoding="utf-8")
+        assert "OTEL" in gtext or "OpenTelemetry" in gtext
+        assert "documentation only" in gtext.lower()
+
 
 class TestObservabilityOff:
     def test_no_layer_dir(self, tmp_path: Path):

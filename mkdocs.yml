@@ -42,6 +42,7 @@ nav:
     - Model-agnostic switching (CCR): adr/adr-016-model-agnostic-switching.md
     - Per-surface config generator: adr/adr-017-per-surface-config-generator.md
     - AI-governance overlay: adr/adr-018-ai-governance-overlay.md
+    - Local observability overlay: adr/adr-019-local-observability-overlay.md
   - Development:
     - Template system: development/template-system.md
     - Non-CLI surface matrix: development/non-cli-surface-matrix.md
