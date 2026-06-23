@@ -41,6 +41,7 @@ nav:
     - Env & deploy model: adr/adr-015-env-deploy-model.md
     - Model-agnostic switching (CCR): adr/adr-016-model-agnostic-switching.md
     - Per-surface config generator: adr/adr-017-per-surface-config-generator.md
+    - AI-governance overlay: adr/adr-018-ai-governance-overlay.md
   - Development:
     - Template system: development/template-system.md
     - Non-CLI surface matrix: development/non-cli-surface-matrix.md
