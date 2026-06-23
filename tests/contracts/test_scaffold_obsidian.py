@@ -188,6 +188,40 @@ class TestScaffoldObsidianOnly:
         assert guard_idx != -1, "empty-slug fallback missing"
         assert guard_idx < branch_idx, "empty-slug fallback must precede the branch name"
 
+    def test_start_issue_sh_widens_short_project_key(self):
+        """#432: a single-word repo name yields a 1-char initials key that the
+        branch regex accepts but the commit-msg hook (>=2 chars) then rejects on
+        every commit. The script must widen/guard the key to a valid shape
+        before it becomes part of ISSUE_REF."""
+        content = (self.target / ".claude" / "scripts" / "start_issue.sh").read_text()
+        assert '"${#PROJECT_KEY}" -lt 2' in content, "short-key widening missing"
+        guard_idx = content.find("^[A-Z][A-Z0-9]{1,9}$")
+        ref_idx = content.find('ISSUE_REF="${PROJECT_KEY}-${ISSUE_NUMBER}"')
+        assert guard_idx != -1, "shared key-shape guard missing"
+        assert guard_idx < ref_idx, "key guard must precede ISSUE_REF"
+
+    def test_start_issue_sh_seeds_empty_commit_before_pr(self):
+        """#433: a freshly-created branch has no commits, so `gh pr create`
+        fails with 'No commits between main and <branch>'. The script must seed
+        a commit before opening the draft PR it promises.
+
+        #446: the seed must be index-isolated (built via commit-tree from HEAD's
+        own tree), never a plain `git commit --allow-empty`, which would also
+        commit whatever the user happens to have staged."""
+        content = (self.target / ".claude" / "scripts" / "start_issue.sh").read_text()
+        seed_idx = content.find("git commit-tree")
+        pr_idx = content.find("gh pr create")
+        assert seed_idx != -1, "index-isolated commit-tree seed missing"
+        assert seed_idx < pr_idx, "seed must precede gh pr create"
+        # A plain --allow-empty would capture staged work — it must not be
+        # invoked (a comment may still reference it to explain the choice).
+        command_lines = [
+            ln for ln in content.splitlines() if not ln.lstrip().startswith("#")
+        ]
+        assert not any("git commit --allow-empty" in ln for ln in command_lines), (
+            "seed must not use `git commit --allow-empty` (captures staged work)"
+        )
+
     def test_project_init_md_has_script_commands(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
         assert "create_issue.sh" in content

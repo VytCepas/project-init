@@ -401,6 +401,46 @@ exit 2
         assert "--no-review" in result.stdout or "skipping review gate" in result.stdout
         assert "Merged PR #42" in result.stdout
 
+    def test_monitor_pr_does_not_merge_while_checks_queued(self, tmp_path: Path):
+        """#428: a just-queued GitHub Actions check reports state=QUEUED /
+        bucket=pending. The CI-wait must keep polling — not break and merge
+        before CI runs. With the only check perpetually QUEUED the fixed script
+        stays in the wait loop (so it times out here); the old state-allowlist
+        version counted QUEUED as settled, broke on the first poll, and merged
+        within ~1s (returning before the timeout)."""
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        fake_gh = fake_bin / "gh"
+        fake_gh.write_text(
+            """#!/usr/bin/env bash
+if [ "$1 $2" = "pr checks" ]; then
+  echo '[{"name":"ci","state":"QUEUED","bucket":"pending"}]'
+  exit 0
+fi
+if [ "$1 $2" = "pr merge" ]; then
+  echo "MERGED PR #42"
+  exit 0
+fi
+exit 2
+""",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(0o755)
+
+        script = self.target / ".claude" / "scripts" / "monitor_pr.sh"
+        env = {**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"}
+        with pytest.raises(subprocess.TimeoutExpired) as exc:
+            subprocess.run(
+                [str(script), "42", "--merge", "--no-review"],
+                capture_output=True,
+                text=True,
+                cwd=self.target,
+                env=env,
+                timeout=4,
+            )
+        # It must not have reached the merge while the check was still queued.
+        assert "MERGED" not in (exc.value.stdout or "")
+
     def test_workflow_state_reminder_reads_prompt_stdin(self):
         hook = self.target / ".claude" / "hooks" / "workflow_state_reminder.sh"
         payload = json.dumps({"prompt": "please finish this PR"})
@@ -444,6 +484,8 @@ class TestCommitMsgHookFormats:
             "fix(APP-99): Handle null pointer in auth",
             "chore: Bump dev dependency",
             "feat(PI-9)!: Drop python 3.10",
+            "chore(WIDG-1): start work",  # #432: widened single-word repo key
+            "chore(PROJ-1): start work",  # #432: PROJ fallback key
             "[PI-42][feat] Add OAuth login",  # legacy, accepted in transition
             "[nojira][fix] Fix typo",  # legacy, accepted in transition
             "Merge branch 'main' into feat/PI-1-x",
@@ -460,6 +502,7 @@ class TestCommitMsgHookFormats:
             "feat(pi-42): lowercase key",
             "feat(PI-42) Missing colon",
             "feat(PI-42):",  # no description
+            "feat(W-1): one-char key",  # #432: 1-char key the fix prevents
         ],
     )
     def test_rejects_invalid_formats(self, message):

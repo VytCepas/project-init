@@ -73,7 +73,11 @@ import json, sys
 data = json.load(sys.stdin)
 # Exclude review/decision; it is a derived commit status that only appears
 # after a review event. We detect review state directly via reviewDecision.
-print(sum(1 for c in data if c.get('name') != 'review/decision' and c.get('state') in ('PENDING', 'IN_PROGRESS', 'EXPECTED')))
+# Gate on gh's authoritative 'bucket' rollup (pass/fail/pending/skipping/
+# cancel), not a hand-rolled state allowlist: just-queued Actions report
+# state=QUEUED (and WAITING/REQUESTED for env-gated jobs), all bucket=pending.
+# An allowlist that omitted those let the CI-wait break before CI ran (#428).
+print(sum(1 for c in data if c.get('name') != 'review/decision' and c.get('bucket') == 'pending'))
 "
 }
 
@@ -181,7 +185,7 @@ while true; do
     echo "PR #$PR_NUMBER: CI did not settle within ${CI_TIMEOUT}s. Still pending:"
     echo "$CHECKS" | "$PY" -c "import json,sys
 for c in json.load(sys.stdin):
-    if c.get('name') != 'review/decision' and c.get('state') in ('PENDING','IN_PROGRESS','EXPECTED'):
+    if c.get('name') != 'review/decision' and c.get('bucket') == 'pending':
         print('  -', c.get('name'))" 2>/dev/null || true
     echo "Re-run once the check registers, or investigate why it never started."
     exit 1

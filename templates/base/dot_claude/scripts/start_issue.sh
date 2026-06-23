@@ -80,7 +80,17 @@ derive_project_key() {
 
 PROJECT_KEY=$(derive_project_key)
 PROJECT_KEY=$(echo "$PROJECT_KEY" | tr '[:lower:]' '[:upper:]' | tr -cd 'A-Z0-9')
-if [ -z "$PROJECT_KEY" ]; then
+# A single-word repo name yields a 1-char initials key (e.g. "widget" -> "W").
+# That passes the branch-name regex but the commit-msg hook then rejects every
+# commit — its scope regex requires >=2 chars: [A-Z][A-Z0-9]{1,9}- (#432).
+# Widen a too-short key to the repo name's leading alphanumerics first.
+if [ "${#PROJECT_KEY}" -lt 2 ]; then
+  PROJECT_KEY=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+    | tr '[:lower:]' '[:upper:]' | tr -cd 'A-Z0-9' | cut -c1-4)
+fi
+# Final guard: the key must satisfy the shared key regex (>=2 chars, leading
+# letter). Empty, still-too-short, or digit-leading -> stable PROJ fallback.
+if ! echo "$PROJECT_KEY" | grep -qE '^[A-Z][A-Z0-9]{1,9}$'; then
   PROJECT_KEY="PROJ"
 fi
 
@@ -128,6 +138,23 @@ else
   git checkout -b "$BRANCH"
 fi
 
+# --- Seed an empty commit so the draft PR has a diff base ---
+# GitHub refuses a PR with no commits between base and head ("No commits between
+# main and <branch>"), so a freshly-created branch cannot open the draft PR this
+# script promises until it has >=1 commit. Seed one when the branch is level
+# with the base; real work simply adds commits on top (#433).
+#
+# Build the seed from HEAD's own tree with commit-tree so it is empty by
+# construction and cannot capture the user's staged index — a plain
+# `git commit --allow-empty` still commits whatever is currently staged, which
+# would silently fold unrelated work into the generated seed commit (#446).
+BASE_BRANCH=$(base_branch)
+if [ -z "$(git rev-list "${BASE_BRANCH}..HEAD" 2>/dev/null || true)" ]; then
+  SEED_COMMIT=$(git commit-tree "HEAD^{tree}" -p HEAD \
+    -m "chore(${ISSUE_REF}): start #${ISSUE_NUMBER} — ${CLEAN_TITLE}")
+  git reset --soft "$SEED_COMMIT"
+fi
+
 # --- Push and set upstream (retry + remote-SHA verification) ---
 .claude/scripts/push_branch.sh "$BRANCH"
 
@@ -136,7 +163,6 @@ fi
 PR_TITLE="${TYPE}(${ISSUE_REF}): ${CLEAN_TITLE}"
 PR_BODY="Closes #${ISSUE_NUMBER}"
 
-BASE_BRANCH=$(base_branch)
 PR_URL=$(gh pr create \
   --draft \
   --base "$BASE_BRANCH" \
