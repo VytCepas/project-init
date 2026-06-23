@@ -52,6 +52,26 @@ trees, from the actual standards:
 > data-source choice should be a formal ADR, promote it to **ADR-014** and bump
 > the self-improvement ADR (#278) to ADR-015.
 
+## Relationship to the observability overlay (Track A)
+
+Track A of this epic shipped a **scaffolded** observability overlay (ADR-019,
+#404–#407): `templates/observability/dot_claude/observability/usage_report.py`
+parses the **same** Claude Code transcript JSONL described below, over the same
+local sources, into the same cost/adoption/reliability signals. Track B reuses
+that **parsing method**, not the code:
+
+- The **scaffolded analyzer stays stdlib-only** — it ships into other people's
+  projects and runs via `_py.sh` against any Python 3.
+- The **repo benchmark harness** (`tools/benchmark/`, dev tooling) may use `rich`
+  and the vendored price table, and orchestrates *runs* (bare vs scaffolded) the
+  in-project analyzer never does.
+
+So the transcript-field contract in the next section is shared by both; keep the
+two parsers consistent (one transcript schema, both fail-tolerant) but separate
+(different dependency budgets). The overlay is the per-project "what did my
+agents do?" view; this harness is the one-shot "do the presets earn their keep?"
+study.
+
 ## Data sources
 
 Verified against Claude Code 2.1.181.
