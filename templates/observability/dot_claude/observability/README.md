@@ -11,15 +11,37 @@ and off by default.
 
 ## What's here
 
-This first increment (#404) ships only the overlay wiring so the layer
-composes and survives the `upgrade` round-trip. The report tooling lands in
-follow-up increments:
+- [`usage_report.py`](usage_report.py) — a **stdlib-only** analyzer (no
+  third-party imports; runs via `_py.sh`). It parses the always-present Claude
+  Code transcript JSONL plus an optional hook self-log into four buckets —
+  **Adoption** (per-skill / tool / sub-agent / hook counts), **Cost** (USD via
+  an embedded static price table + cache-read ratio, labelled approximate),
+  **Productivity** (LoC approx from Edit/Write, commits from local git only),
+  and **Reliability** (tool error rate). **Aggregate-only by construction**: it
+  extracts only names, counts, and numbers — never prompt text, tool-input
+  bodies, command strings, or file contents. **Zero-egress**: transcript + local
+  `git` only, never `gh` or the network.
+- [`../scripts/observability.sh`](../scripts/observability.sh) — the entry
+  point: `observability.sh report [--open] [--transcript …] [--session-id …]`.
+  Resolves Python via `_py.sh`; `--open` is best-effort (xdg-open / open /
+  explorer) and fail-open.
+- `.keep` — the **activation marker**. The presence of this
+  `.claude/observability/` directory flips the guarded hook self-log on (see the
+  self-log increment, #406).
+- `dashboard.html` — the generated, **self-contained** report (inline CSS, no
+  CDN, no JS, no external URL). Written here by `observability.sh report`; not
+  committed.
+- `usage.jsonl` — the hook self-log, written by the guarded hooks once they land
+  (#406). `usage_report.py` reads it for the Hooks bucket when present.
 
-- `usage_report.py` — a stdlib analyzer over the Claude Code transcript JSONL
-  (#405).
-- `observability.sh` — one command that renders an HTML usage report (#405).
-- a guarded, stdin-safe hook self-log feeding the report (#406).
-- using/upgrading guides + ADR-019 (#407).
+## Usage
 
-Until those land, enabling `--observability` reserves the layer (this README)
-without adding runtime behaviour.
+```sh
+.claude/scripts/observability.sh report          # text summary + dashboard.html
+.claude/scripts/observability.sh report --open    # also open the HTML report
+```
+
+Transcript discovery is automatic (derives the Claude project slug from the repo
+path, falls back to matching the transcript `cwd`); pass `--transcript <path>`
+or `--session-id <id>` to override. If no transcript is found it errors clearly
+rather than producing an empty report.
