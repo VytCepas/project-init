@@ -253,9 +253,8 @@ def build_record(ctx: RunContext, transcript_path: Path) -> RunRecord:
 # --- CLI ------------------------------------------------------------------
 
 
-def _price(record: RunRecord, prices_path: str | None) -> None:
-    """Fill record.cost_usd from the price table; warn (don't fail) if unpriced."""
-    apply_cost(record, load_prices(Path(prices_path) if prices_path else None))
+def _warn_if_unpriced(record: RunRecord) -> None:
+    """Emit the documented warning when a record's model has no price row."""
     if record.cost_usd is None:
         sys.stderr.write(
             f"benchmark: no price row for model {record.model!r} — cost_usd left null\n"
@@ -277,7 +276,8 @@ def _cmd_record_from(args: argparse.Namespace) -> int:
         ),
         transcript,
     )
-    _price(record, args.prices)
+    apply_cost(record, load_prices(Path(args.prices) if args.prices else None))
+    _warn_if_unpriced(record)
     out = Path(args.out) if args.out else _RESULTS_DIR / "records.jsonl"
     write_records([record], out)
     sys.stdout.write(json.dumps(record.to_dict(), indent=2) + "\n")
@@ -324,6 +324,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                         transcript,
                     )
                     apply_cost(record, prices)
+                    _warn_if_unpriced(record)
                     records.append(record)
                     cost = f"${record.cost_usd:.4f}" if record.cost_usd is not None else "$?"
                     sys.stdout.write(

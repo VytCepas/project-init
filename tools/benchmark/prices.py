@@ -51,18 +51,21 @@ def _rates_for(model: str, prices: dict[str, dict[str, float]]) -> dict[str, flo
 
 
 def cost_for(record: RunRecord, prices: dict[str, dict[str, float]]) -> float | None:
-    """USD for a record's token usage, or None if the model isn't in the table."""
+    """USD for a record's token usage, or None if the model isn't in the table.
+
+    Rounded to 6 dp so float-rate arithmetic doesn't leak noise
+    (``30.000000000000004``) to callers / exact-equality comparisons.
+    """
     rates = _rates_for(record.model, prices)
     if rates is None:
         return None
     total = 0.0
     for token_field, cost_key in _TOKEN_COST_KEYS:
         total += getattr(record, token_field) * float(rates.get(cost_key, 0.0))
-    return total
+    return round(total, 6)
 
 
 def apply_cost(record: RunRecord, prices: dict[str, dict[str, float]]) -> RunRecord:
-    """Set ``record.cost_usd`` in place (rounded) and return it; None if unpriced."""
-    cost = cost_for(record, prices)
-    record.cost_usd = round(cost, 6) if cost is not None else None
+    """Set ``record.cost_usd`` in place (None if unpriced) and return the record."""
+    record.cost_usd = cost_for(record, prices)
     return record
