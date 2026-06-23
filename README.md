@@ -10,8 +10,8 @@ Inside any target project:
 
 ```
 <your-project>/
-├── CLAUDE.md          # canonical agent instructions; points into .claude/
-├── AGENTS.md          # thin redirect to CLAUDE.md for non-Claude agents
+├── AGENTS.md          # canonical agent instructions; points into .claude/
+├── CLAUDE.md          # thin redirect to AGENTS.md (+ Claude-only compact instructions)
 └── .claude/
     ├── project-init.md      # workflow + conventions
     ├── config.yaml          # record of options chosen at init
@@ -39,7 +39,7 @@ that is cheap, but it is not natively so — be explicit about what each agent g
 |---|---|---|
 | **Native** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring — read directly from `.claude/` | Claude Code (CLI + the Anthropic VS Code extension) |
 | **Generated per-surface config** | One canonical hook/MCP spec rendered to each surface's native files (ADR-017): Codex `.codex/`, Cursor `.cursor/`, Antigravity `.agents/` (experimental), VS Code `.vscode/mcp.json`, Amp `.amp/settings.json`, Junie `.junie/mcp/mcp.json`. Skills cross-read natively. Agent hooks (incl. the Codex CLI) are **best-effort/fail-open** | Codex (CLI+IDE), Cursor, Antigravity, VS Code Copilot, Amp, JetBrains Junie |
-| **Instructions + portable** | `AGENTS.md`/`GEMINI.md` redirect to `CLAUDE.md`; lifecycle scripts (plain bash), memory/vault (markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent; git hooks bind once `.claude/scripts/install_hooks.sh` has run (server-side actions need branch protection) | Everything, including Ollama-based agents |
+| **Instructions + portable** | `AGENTS.md` is canonical; `CLAUDE.md`/`GEMINI.md` redirect to it; lifecycle scripts (plain bash), memory/vault (markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent; git hooks bind once `.claude/scripts/install_hooks.sh` has run (server-side actions need branch protection) | Everything, including Ollama-based agents |
 
 ### Surface support matrix
 
@@ -343,9 +343,9 @@ adopters know what this tool owns and where it defers:
 - **`AGENTS.md` vs `CLAUDE.md`**: Claude Code still reads only `CLAUDE.md`
   ([anthropics/claude-code#34235](https://github.com/anthropics/claude-code/issues/34235)),
   while most other tools read the `AGENTS.md` standard — which is why this
-  repo and scaffolded projects keep both: today `AGENTS.md` (and `GEMINI.md`)
-  redirect readers to the canonical `CLAUDE.md`; inverting that so `AGENTS.md`
-  becomes canonical is planned in #136.
+  repo and scaffolded projects keep both: `AGENTS.md` is the canonical source of
+  truth and `CLAUDE.md` (and `GEMINI.md`) redirect to it — Claude Code still
+  reads `CLAUDE.md` only because of the issue above (the #136 inversion shipped).
 
 ## Further reading
 

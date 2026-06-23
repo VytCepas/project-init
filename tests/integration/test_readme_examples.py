@@ -86,3 +86,18 @@ def test_readme_documents_env_model_flags():
     readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
     for flag in ("--delivery", "--deploy", "--iac", "--multi-model"):
         assert flag in readme, f"README.md missing {flag}"
+
+
+def test_readme_states_agents_md_canonical():
+    """#434: #136 shipped — AGENTS.md is canonical and CLAUDE.md/GEMINI.md
+    redirect to it. The README must not still describe the inverse (CLAUDE.md
+    canonical / AGENTS.md a redirect), which contradicts the generated output."""
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
+    # Stale inverse fragments must be gone.
+    assert "thin redirect to CLAUDE.md" not in readme
+    assert "redirect to `CLAUDE.md`" not in readme
+    assert "redirect readers to the canonical `CLAUDE.md`" not in readme
+    assert "planned in #136" not in readme  # the inversion shipped
+    # Canonical-AGENTS statements must be present.
+    assert "AGENTS.md` is the portability backbone" in readme
+    assert "`CLAUDE.md`/`GEMINI.md` redirect to it" in readme
