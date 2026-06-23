@@ -11,7 +11,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # base layer at .claude/hooks/_py.sh.
 PY="$HERE/../hooks/_py.sh"
 REPORT="$HERE/../observability/usage_report.py"
-ROOT="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || pwd)"
+# Project root: prefer the git toplevel; otherwise resolve from this script's
+# fixed location (.claude/scripts/) so a non-git checkout still targets the
+# scaffolded project, not wherever the user happened to invoke from.
+ROOT="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || (cd "$HERE/../.." && pwd))"
 
 cmd="${1:-report}"
 [ "$#" -gt 0 ] && shift || true

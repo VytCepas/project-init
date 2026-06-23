@@ -39,8 +39,8 @@ def _scaffold(target: Path) -> Path:
 def _load_report(target: Path) -> ModuleType:
     path = target / _OBS / "usage_report.py"
     spec = importlib.util.spec_from_file_location("usage_report_fixture", path)
-    mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
@@ -68,6 +68,10 @@ def _write_transcript(path: Path) -> None:
                      "input": {"content": f"{_LEAK_FILE}\nline2\nline3"}},
                     {"type": "tool_use", "id": "t6", "name": "Edit",
                      "input": {"new_string": "a\nb"}},
+                    # Task with no subagent_type — its free-text description must
+                    # NOT leak into the report (bucketed as "unknown").
+                    {"type": "tool_use", "id": "t7", "name": "Task",
+                     "input": {"description": _LEAK_PROMPT}},
                 ],
             },
         },
@@ -109,7 +113,10 @@ class TestBuckets:
 
         adoption = report["adoption"]
         assert adoption["skills"] == {"github_workflow": 1}
-        assert adoption["subagents"] == {"Explore": 1}
+        # Task with a description but no subagent_type buckets as "unknown" — the
+        # description text is never used as a key (no tool-input leak).
+        assert adoption["subagents"] == {"Explore": 1, "unknown": 1}
+        assert _LEAK_PROMPT not in adoption["subagents"]
         assert adoption["tools"]["Bash"] == 1 and adoption["tools"]["Write"] == 1
         assert adoption["mcp_tools"] == {"mcp__ctx__query": 1}
         assert adoption["hooks"] == {"prod_guard": 2}
@@ -126,7 +133,7 @@ class TestBuckets:
         assert prod["commits"] == 3 and prod["merge_commits"] == 1
 
         rel = report["reliability"]
-        assert rel["tool_calls"] == 6
+        assert rel["tool_calls"] == 7
         assert rel["errors"] == 1
         assert rel["errors_by_tool"] == {"Bash": 1}
         assert "OTEL" in rel["accept_reject"]
@@ -173,6 +180,13 @@ class TestInvariants:
         script = target / ".claude" / "scripts" / "observability.sh"
         assert script.is_file()
         assert os.access(script, os.X_OK)
+
+    def test_generated_artifacts_are_gitignored(self, tmp_path: Path):
+        target = _scaffold(tmp_path / "p")
+        ignore = (target / _OBS / ".gitignore").read_text(encoding="utf-8")
+        # The transcript-derived report and the self-log must never be committed.
+        assert "dashboard.html" in ignore
+        assert "usage.jsonl" in ignore
 
     def test_stdlib_only_imports(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")

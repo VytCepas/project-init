@@ -1,0 +1,4 @@
+# Observability overlay (ADR-019) — generated / local-only artifacts.
+# These are derived from the local transcript and must never be committed.
+dashboard.html
+usage.jsonl

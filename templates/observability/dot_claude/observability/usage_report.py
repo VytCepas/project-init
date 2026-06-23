@@ -117,16 +117,19 @@ def discover_transcript(
 
 def _iter_entries(path: Path):
     """Yield parsed JSON objects from a JSONL file, skipping unparseable lines."""
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            obj = json.loads(line)
-        except (ValueError, TypeError):
-            continue
-        if isinstance(obj, dict):
-            yield obj
+    # Stream line-by-line — transcripts can be very large; never read the whole
+    # file into memory (also keeps the cwd-discovery fallback cheap).
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(obj, dict):
+                yield obj
 
 
 def _transcript_cwd(path: Path) -> str | None:
@@ -185,7 +188,9 @@ def parse_transcript(path: Path) -> dict:
                 if not isinstance(block, dict) or block.get("type") != "tool_use":
                     continue
                 name = block.get("name") or "?"
-                inp = block.get("input") or {}
+                inp = block.get("input")
+                if not isinstance(inp, dict):
+                    inp = {}
                 tool_calls += 1
                 tid = block.get("id")
                 if isinstance(tid, str):
@@ -193,7 +198,9 @@ def parse_transcript(path: Path) -> dict:
                 if name == "Skill":
                     skills[inp.get("skill") or "?"] = skills.get(inp.get("skill") or "?", 0) + 1
                 elif name in ("Task", "Agent"):
-                    key = inp.get("subagent_type") or inp.get("description") or "?"
+                    # Bucket only by the declared agent type — never the free-text
+                    # `description`, which is tool-input and must not leak (aggregate-only).
+                    key = inp.get("subagent_type") or "unknown"
                     subagents[key] = subagents.get(key, 0) + 1
                 elif name.startswith("mcp__"):
                     mcp_tools[name] = mcp_tools.get(name, 0) + 1
