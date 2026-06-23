@@ -79,6 +79,16 @@ def _fold_assistant(agg: TranscriptAggregates, msg: dict, seen_models: list[str]
             agg.tool_calls += 1
 
 
+def message_timestamps(path: Path) -> list[str]:
+    """Every entry's ISO ``timestamp`` in order (for per-step latency, #272)."""
+    out: list[str] = []
+    for obj in _iter_entries(path):
+        ts = obj.get("timestamp")
+        if isinstance(ts, str):
+            out.append(ts)
+    return out
+
+
 def parse(path: Path) -> TranscriptAggregates:
     """Fold a transcript into capture aggregates (tokens, tools, turns, span)."""
     agg = TranscriptAggregates()
