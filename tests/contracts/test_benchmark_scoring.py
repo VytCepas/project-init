@@ -45,6 +45,55 @@ class TestPytestCheck:
         assert scoring.score_check(load_task("feat"), tmp_path) is False
 
 
+class TestFixNodeLevel:
+    """SWE-bench-style fix task must validate the named nodes, not just exit 0
+    (Codex review P1 — deleting the failing test must not score a pass)."""
+
+    def _seeded_fix_target(self, tmp_path: Path):
+        from tools.benchmark.harness import prepare_target
+
+        return prepare_target(tmp_path / "fix", "bare", load_task("fix"), model="m")
+
+    def test_unfixed_fails(self, tmp_path: Path):
+        target = self._seeded_fix_target(tmp_path)
+        assert scoring.score_check(load_task("fix"), target) is False
+
+    def test_correct_fix_passes(self, tmp_path: Path):
+        target = self._seeded_fix_target(tmp_path)
+        (target / "calc.py").write_text("def divide(a, b):\n    return None if b == 0 else a / b\n")
+        assert scoring.score_check(load_task("fix"), target) is True
+
+    def test_deleting_failing_test_does_not_pass(self, tmp_path: Path):
+        """Agent removes test_divide_by_zero entirely — aggregate pytest would
+        exit 0, but the node-level check must catch the missing fail_to_pass node."""
+        target = self._seeded_fix_target(tmp_path)
+        (target / "calc.py").write_text("def divide(a, b):\n    return None if b == 0 else a / b\n")
+        (target / "test_calc.py").write_text(
+            "from calc import divide\n\ndef test_divide_basic():\n    assert divide(6, 2) == 3\n"
+        )
+        assert scoring.score_check(load_task("fix"), target) is False
+
+    def test_breaking_pass_to_pass_fails(self, tmp_path: Path):
+        target = self._seeded_fix_target(tmp_path)
+        # Fix the zero case but regress the basic one.
+        (target / "calc.py").write_text("def divide(a, b):\n    return None\n")
+        assert scoring.score_check(load_task("fix"), target) is False
+
+
+class TestPytestArgv:
+    def test_targets_node_ids_dropping_bare_file(self):
+        argv = scoring._pytest_argv(
+            "uv run pytest -q test_calc.py",
+            ["test_calc.py::test_a", "test_calc.py::test_b"],
+        )
+        assert argv == ["uv", "run", "pytest", "-q",
+                        "test_calc.py::test_a", "test_calc.py::test_b"]
+
+    def test_no_nodes_runs_command_as_authored(self):
+        argv = scoring._pytest_argv("uv run pytest -q test_slug.py", [])
+        assert argv == ["uv", "run", "pytest", "-q", "test_slug.py"]
+
+
 class TestRegexCheck:
     def test_matches_agent_output(self):
         assert scoring.score_check(load_task("qa"), Path("."), "Use the justfile recipes.") is True

@@ -36,18 +36,41 @@ class Score:
     rework_cycles: int | None
 
 
+def _pytest_argv(command: str, nodes: list[str]) -> list[str]:
+    """Build the pytest argv, targeting explicit node ids when given.
+
+    For SWE-bench-style tasks the check names ``fail_to_pass`` / ``pass_to_pass``
+    node ids: we run *those exact nodes* (keeping the runner + flags, dropping the
+    bare file arg) so an agent that deletes or rewrites the failing test can't
+    score a pass via the aggregate command — a missing node id makes pytest exit
+    non-zero. Without node lists, the command runs as authored.
+    """
+    tokens = shlex.split(command)
+    if not nodes:
+        return tokens
+    keep = [t for t in tokens if not (t.endswith(".py") and "::" not in t)]
+    return [*keep, *nodes]
+
+
 def _run_pytest_check(check: dict, target_dir: Path) -> bool:
-    """True iff all ``must_exist`` files are present AND the command exits as expected."""
+    """True iff ``must_exist`` files are present AND the pytest invocation exits as expected.
+
+    When ``fail_to_pass``/``pass_to_pass`` are listed, the invocation targets
+    those node ids explicitly (see :func:`_pytest_argv`): exit 0 then means the
+    previously-failing node now passes *and* every named passing node stayed
+    green — a missing/renamed node fails the run.
+    """
     for rel in check.get("must_exist", []):
         if not (target_dir / rel).exists():
             return False
     command = check.get("command")
     if not command:
         return False
+    nodes = [*check.get("fail_to_pass", []), *check.get("pass_to_pass", [])]
     expect_exit = int(check.get("expect_exit", 0))
     try:
         proc = subprocess.run(
-            shlex.split(command), cwd=str(target_dir), capture_output=True, timeout=600
+            _pytest_argv(command, nodes), cwd=str(target_dir), capture_output=True, timeout=600
         )
     except (OSError, subprocess.SubprocessError):
         return False
