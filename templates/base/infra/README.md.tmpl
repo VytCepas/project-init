@@ -13,5 +13,9 @@ tofu apply     # apply (manual / environment-gated in CI — never on merge)
 - **Commit `.terraform.lock.hcl`** (provider checksums). Never commit `*.tfstate`,
   `*.tfvars`, or credentials.
 - CI (`.github/workflows/infra.yml`) runs `fmt`/`validate`/`plan` on PRs; apply is
-  manual and gated by the `infra-apply` environment.
+  manual (`workflow_dispatch`). To gate it, **arm** the `infra-apply` environment
+  (required reviewers / wait timer) in repo Settings → Environments — GitHub
+  auto-creates a referenced-but-missing environment **unprotected**, so until you
+  configure it the apply is not blocked. (On individual/standalone accounts only
+  an advisory wait timer is available, not required reviewers.)
 {{/if iac_enabled}}
