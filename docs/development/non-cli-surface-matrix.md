@@ -35,10 +35,14 @@ project-init can decide what to emit beyond `.claude/` (epic #359, workstream B)
    `afterFileEdit`, …) — not interchangeable with Claude's. Cursor **does** read
    `.claude/skills/` for compatibility (skills are free; hooks need translation).
 
-3. **Codex IDE `.agents/skills` path + `hooks.json`/`config.toml`?** **Confirmed
-   and current.** Codex reads `.agents/skills/*/SKILL.md` and hooks from
-   `.codex/hooks.json` (or `[[hooks.*]]` in `config.toml`); the **IDE extension
-   shares the CLI's discovery**. project-init's current Codex emission is correct.
+3. **Codex IDE `.agents/skills` path + `hooks.json`/`config.toml`?** **Skills
+   confirmed; hook enforcement unverified.** Codex reads `.agents/skills/*/SKILL.md`
+   and the **IDE extension shares the CLI's discovery**. project-init's Codex hook
+   emission (`.codex/hooks.json`, or `[[hooks.*]]` in `config.toml`) is
+   schema-correct and delivered, but the 2026-06-23 live test found codex 0.138.0
+   did **not** fire project- or global-scoped hooks without an enable step — so the
+   hook is **advisory** until that mechanism is confirmed (skills/MCP stay HIGH
+   confidence). git + CI remain the real boundary (ADR-007).
 
 4. **Antigravity v2.0 `hooks.json`?** **Partially confirmed (verify live).**
    Official docs are JS-rendered/un-fetchable; secondary sources indicate
@@ -77,7 +81,7 @@ and `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`.
 | Claude Code VS Code ext | hooks, skills, CLAUDE.md (same `.claude/`) | **shared project MCP**: emit a root `.mcp.json` (`mcpServers`) when MCPs are configured — `.claude/` alone does not carry shareable MCP (bare `claude mcp add` writes a private `~/.claude.json` entry) |
 | Copilot agent mode | CLAUDE.md, `.claude/skills`, hooks (matcher-blind), AGENTS.md | `.vscode/mcp.json` (`servers` map) if MCPs are configured; document that matchers are advisory here |
 | Cursor | `.claude/skills` (skills), AGENTS.md | `.cursor/hooks.json` (`PreToolUse(Bash)`→`beforeShellExecution`, deny via `{"permission":"deny","user_message"}`; PI-385); `.cursor/mcp.json` (≈copy of `mcpServers`) |
-| Codex (CLI/IDE) | `.codex/hooks.json` ✅, `.agents/skills` ✅, AGENTS.md ✅ | MCP → `.codex/config.toml` `[mcp_servers.*]` if MCPs are configured |
+| Codex (CLI/IDE) | `.codex/hooks.json` ⚠️ (schema-correct & delivered; **enforcement unverified** — codex 0.138.0 didn't fire project hooks in the 2026-06-23 live test without an enable step), `.agents/skills` ✅, AGENTS.md ✅ | MCP → `.codex/config.toml` `[mcp_servers.*]` if MCPs are configured |
 | Antigravity | `.agents/skills` ✅, `.agents/hooks.json` ✅, `.agents/mcp_config.json` ✅, AGENTS.md ✅ (PI-386) | hook blocking-contract still experimental — live-verify in #385 |
 | Amp | `.agents/skills` ✅, `.amp/settings.json` (`amp.mcpServers`) ✅, AGENTS.md ✅ (PI-397) | — (MCP-only surface; no hooks) |
 | JetBrains Junie | `.junie/skills` ✅, `.junie/mcp/mcp.json` (`mcpServers`) ✅, AGENTS.md ✅ (PI-397) | — (MCP-only surface; no hooks) |

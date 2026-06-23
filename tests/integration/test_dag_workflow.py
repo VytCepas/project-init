@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -50,6 +51,40 @@ def _denied(out: dict | None) -> bool:
 
 def _deny_reason(out: dict | None) -> str:
     return (out or {}).get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+
+
+def _project_with_hook(root: Path) -> Path:
+    """Install the guard hook into <root>/.claude/hooks/dag_workflow.py and
+    return its path. The hook anchors its wrapper-scripts dir on its own
+    location (#429), so running THIS copy makes <root>/.claude/scripts/ the
+    authoritative wrapper dir — independent of the process CWD."""
+    hooks = root / ".claude" / "hooks"
+    hooks.mkdir(parents=True, exist_ok=True)
+    dest = hooks / "dag_workflow.py"
+    dest.write_bytes(SOURCE_HOOK.read_bytes())
+    return dest
+
+
+def _run_guard_hook(
+    hook: Path, payload: dict, cwd: Path | None = None, env: dict | None = None
+) -> dict | None:
+    """Run a specific dag_workflow.py copy's guard via subprocess.
+
+    By default CLAUDE_PROJECT_DIR is stripped so the guard falls back to its
+    __file__-relative scripts dir (the codex/cursor/antigravity adapter path);
+    pass ``env`` to exercise the $CLAUDE_PROJECT_DIR plugin-mode branch."""
+    if env is None:
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"}
+    proc = subprocess.run(
+        [sys.executable, str(hook), "guard"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        cwd=cwd,
+        env=env,
+    )
+    assert proc.returncode == 0, f"guard exited {proc.returncode}: {proc.stderr}"
+    return json.loads(proc.stdout) if proc.stdout.strip() else None
 
 
 def test_root_monitor_pr_checks_merge_exit_code():
@@ -132,21 +167,21 @@ class TestGuardSteering:
         assert _denied(out)
 
     def test_blocks_gh_pr_merge(self, tmp_path: Path):
-        # No scripts dir in tmp_path → message references monitor_pr.sh which
-        # doesn't exist there, so the rule is suppressed. Create the script
-        # to make the redirect applicable.
-        scripts = tmp_path / ".claude" / "scripts"
-        scripts.mkdir(parents=True)
-        (scripts / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
-        out = _run_guard({"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path)
+        # The hook anchors its scripts dir on its own location, so install it
+        # into the tmp project and provide the wrapper it redirects to.
+        hook = _project_with_hook(tmp_path)
+        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
+        (tmp_path / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        out = _run_guard_hook(hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path)
         assert _denied(out)
         assert "monitor_pr.sh" in _deny_reason(out)
 
     def test_blocks_gh_api_merge(self, tmp_path: Path):
-        scripts = tmp_path / ".claude" / "scripts"
-        scripts.mkdir(parents=True)
-        (scripts / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
-        out = _run_guard(
+        hook = _project_with_hook(tmp_path)
+        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
+        (tmp_path / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        out = _run_guard_hook(
+            hook,
             {"tool_input": {"command": "gh api repos/foo/bar/pulls/42/merge -X PUT"}},
             cwd=tmp_path,
         )
@@ -154,16 +189,99 @@ class TestGuardSteering:
         assert "monitor_pr.sh" in _deny_reason(out)
 
     def test_blocks_raw_git_push_when_wrapper_exists(self, tmp_path: Path):
-        scripts = tmp_path / ".claude" / "scripts"
-        scripts.mkdir(parents=True)
-        (scripts / "push_branch.sh").write_text("#!/bin/sh\nexit 0\n")
-        out = _run_guard({"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path)
+        hook = _project_with_hook(tmp_path)
+        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
+        (tmp_path / ".claude" / "scripts" / "push_branch.sh").write_text("#!/bin/sh\nexit 0\n")
+        out = _run_guard_hook(
+            hook, {"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path
+        )
         assert _denied(out)
         assert "push_branch.sh" in _deny_reason(out)
 
     def test_no_redirect_when_wrapper_missing(self, tmp_path: Path):
-        # No .claude/scripts dir → suppress redirect for raw git push
-        out = _run_guard({"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path)
+        # Hook installed but no .claude/scripts dir → suppress redirect.
+        hook = _project_with_hook(tmp_path)
+        out = _run_guard_hook(
+            hook, {"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path
+        )
+        assert out is None
+
+    def test_redirect_applies_from_subdirectory(self, tmp_path: Path):
+        """#429: the script-redirect rules must fire regardless of the process
+        CWD. Run the guard from a deep subdirectory that has no .claude/ of its
+        own — the wrapper is found via the hook's own location, not the CWD."""
+        hook = _project_with_hook(tmp_path)
+        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
+        (tmp_path / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        subdir = tmp_path / "src" / "pkg"
+        subdir.mkdir(parents=True)
+        out = _run_guard_hook(
+            hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=subdir
+        )
+        assert _denied(out)
+        assert "monitor_pr.sh" in _deny_reason(out)
+
+    def test_redirect_resolves_via_project_dir_in_plugin_mode(self, tmp_path: Path):
+        """#447 review (P1): in the default plugin path the hook runs from the
+        plugin root (``${CLAUDE_PLUGIN_ROOT}/hooks/``), not the project's
+        ``.claude/hooks/``. It must resolve wrapper scripts via
+        $CLAUDE_PROJECT_DIR — anchoring on __file__ alone would point at the
+        plugin dir (no scripts/ there) and silently skip every redirect rule."""
+        # Hook installed at a plugin-style location with NO sibling scripts dir.
+        plugin_hooks = tmp_path / "plugin" / "hooks"
+        plugin_hooks.mkdir(parents=True)
+        hook = plugin_hooks / "dag_workflow.py"
+        hook.write_bytes(SOURCE_HOOK.read_bytes())
+        # The real project (with the wrapper) lives elsewhere.
+        project = tmp_path / "project"
+        (project / ".claude" / "scripts").mkdir(parents=True)
+        (project / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(project)}
+        out = _run_guard_hook(
+            hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path, env=env
+        )
+        assert _denied(out)
+        assert "monitor_pr.sh" in _deny_reason(out)
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "git push origin HEAD:main",
+            "git push -u origin HEAD:main",
+            "git push origin HEAD:refs/heads/main",
+            "git push origin refs/heads/main",
+            "git push origin :main",
+            "git push origin HEAD:master",
+            "git push --force -u origin main",
+            # Quoted refspecs (the shell strips the quotes, so these still push
+            # to main) must not slip past the raw-string match (#447 review).
+            "git push origin HEAD:'main'",
+            'git push origin HEAD:"main"',
+            "git push origin 'HEAD:main'",
+            "git push origin HEAD:'refs/heads/main'",
+        ],
+    )
+    def test_blocks_push_to_main_evasion_forms(self, cmd: str, tmp_path: Path):
+        """#438: the push-to-main hard block must catch refspec (HEAD:main,
+        :main, refs/heads/main) and multi-flag forms, not just a bare arg."""
+        out = _run_guard({"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert _denied(out)
+        assert "main/master" in _deny_reason(out)
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "git push origin feature-main",
+            "git push origin HEAD:main-thing",
+            "git push -u origin feat/PI-1-main-thing",
+        ],
+    )
+    def test_allows_push_to_benign_branches(self, cmd: str, tmp_path: Path):
+        """#438: branches that merely contain 'main' must not trip the block.
+        With no wrapper in the tmp project the generic git-push redirect is also
+        suppressed, so a benign push is allowed outright."""
+        hook = _project_with_hook(tmp_path)
+        out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
         assert out is None
 
     def test_innocuous_command_passes(self, tmp_path: Path):

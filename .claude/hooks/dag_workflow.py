@@ -240,7 +240,7 @@ def prereqs_satisfied(node: str, _seen: set[str] | None = None) -> tuple[bool, s
 # DAG validation; otherwise, prereqs of target_node are appended to the reason.
 COMMAND_RULES: list[tuple[re.Pattern[str], str | None, str]] = [
     (
-        re.compile(r"git\s+push\s+(?:\S+\s+)?(?:origin\s+)?(?:main|master)\b"),
+        re.compile(r"git\s+push\b[^|;&\n]*?[\s:]['\"]?(?:refs/heads/)?(?:main|master)(?![\w./-])"),
         None,
         "Direct pushes to main/master are blocked. Open a feature branch and PR.",
     ),
@@ -305,7 +305,19 @@ def _redirect_target_exists(reason: str) -> bool:
     m = re.search(r"\.claude/scripts/([\w.-]+)", reason)
     if not m:
         return True
-    return (Path(".claude/scripts") / m.group(1)).exists()
+    # Resolve the PROJECT's wrapper-scripts dir, never the process CWD (#429).
+    # Prefer $CLAUDE_PROJECT_DIR — Claude Code sets it on every hook invocation,
+    # including the default plugin mode where this file lives under the plugin
+    # root, not the project (#447 review). Otherwise — the codex/cursor/
+    # antigravity adapter path, which runs the project's own .claude/hooks/ copy
+    # and sets no such var — anchor on this file's location (.claude/hooks ->
+    # .claude/scripts). Mirrors prod_guard.py's project-root resolution.
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+    if project_dir:
+        scripts_dir = Path(project_dir) / ".claude" / "scripts"
+    else:
+        scripts_dir = Path(__file__).resolve().parent.parent / "scripts"
+    return (scripts_dir / m.group(1)).exists()
 
 
 def guard(payload: dict) -> dict | None:

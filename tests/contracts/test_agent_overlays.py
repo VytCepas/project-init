@@ -177,6 +177,25 @@ class TestSupportTierDocs:
         assert "Remote Control" in onboarding
         assert "repo-committed config" in onboarding
 
+    def test_codex_hook_described_as_advisory(self, tmp_path: Path):
+        """#430: codex 0.138.0 does not fire project-scoped hooks without an
+        enable step, so the rendered instructions must present the Codex hook as
+        advisory rather than as enforcing — git + CI are the real boundary."""
+        target = _scaffold_agents(tmp_path / "p", "codex")
+        agents_md = (target / "AGENTS.md").read_text()
+        onboarding = (
+            target / ".claude" / "docs" / "guides" / "developer-onboarding.md"
+        ).read_text()
+        # The Codex hook line must be qualified, not stated as plain enforcement.
+        assert "advisory" in agents_md.lower()
+        assert "advisory" in onboarding.lower()
+        # And it must not claim the guards unconditionally "run via" .codex/hooks.json.
+        assert "guards run via `.codex/hooks.json`" not in agents_md
+        # #447 review (P2): the prod_guard line must not also assert the guard
+        # "always blocks" on the non-Claude surfaces — that contradicts the
+        # advisory note for Codex in the same rendered file.
+        assert "always blocks" not in agents_md
+
 
 class TestAmpJunieOverlay:
     """PI-397: Amp and Junie ship a skills layer (MCP-file emission is covered in
