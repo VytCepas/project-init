@@ -59,10 +59,12 @@ class RunRecord:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RunRecord:
-        """Tolerant load — ignore unknown keys, default missing ones.
+        """Tolerant load — ignore unknown keys; fields with defaults fill in if absent.
 
         Keeps old result files readable as the schema grows (later issues add
-        fields); only the dataclass's known fields are consumed.
+        fields with defaults, so older records lacking them still load). Only the
+        dataclass's known fields are consumed; a record missing a *required*
+        capture field (no default) is malformed and raises ``TypeError``.
         """
         known = {f.name for f in fields(cls)}
         return cls(**{k: v for k, v in data.items() if k in known})

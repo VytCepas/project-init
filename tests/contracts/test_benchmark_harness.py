@@ -128,6 +128,17 @@ class TestBuildRecord:
         assert rec.wall_clock_s == 12.3 and rec.claude_version == "2.1.181"
         assert rec.cost_usd is None and rec.success is None  # later issues
 
+    def test_empty_model_falls_back_to_transcript(self, tmp_path: Path):
+        """record-from defaults --model to '' so the transcript's own model wins
+        instead of being overwritten by a CLI default (Codex review)."""
+        tx = tmp_path / "t.jsonl"
+        _write_transcript(tx)
+        rec = harness.build_record(
+            harness.RunContext(task="qa", target="bare", run_index=0, model=""),
+            tx,
+        )
+        assert rec.model == "claude-opus-4-8"  # from the transcript, not a default
+
 
 class TestTaskSpecs:
     @pytest.mark.parametrize("task_id", ["feat", "fix", "qa", "noop"])
@@ -161,6 +172,12 @@ class TestTargetSetup:
         target = harness.setup_bare_target(tmp_path / "bare")
         assert (target / "pyproject.toml").is_file()
         assert not (target / ".claude").exists()
+
+    def test_bare_target_has_pytest_for_checks(self, tmp_path: Path):
+        """The deterministic check runner must be available on the bare arm too,
+        so the comparison isolates the scaffold's contribution (Codex review)."""
+        target = harness.setup_bare_target(tmp_path / "bare")
+        assert "pytest" in (target / "pyproject.toml").read_text()
 
     def test_scaffolded_has_claude(self, tmp_path: Path):
         target = harness.setup_scaffolded_target(tmp_path / "scaf", "obsidian-only")

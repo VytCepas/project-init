@@ -81,19 +81,27 @@ def _git_init(target: Path) -> None:
     subprocess.run(["git", "-C", str(target), "init", "-q"], check=False, timeout=30)
 
 
+# pytest is the deterministic check runner (#273) and must be available in BOTH
+# arms so the comparison isolates what the scaffold actually adds (conventions,
+# skills, CLAUDE.md) — not whether the test runner happens to be installed. uv
+# includes the `dev` dependency-group by default, so `uv run pytest` resolves.
 _MINIMAL_PYPROJECT = """\
 [project]
 name = "benchmark-target"
 version = "0.0.0"
 requires-python = ">=3.11"
+
+[dependency-groups]
+dev = ["pytest"]
 """
 
 
 def setup_bare_target(target: Path) -> Path:
     """Create the baseline target — a temp project with NO ``.claude/``.
 
-    Carries a minimal pyproject + git so pytest-based tasks have a project to
-    run in.
+    Carries a minimal pyproject (with pytest in its dev group) + git so the
+    deterministic checks run on the bare arm too, isolating the scaffold's real
+    contribution rather than test-runner availability.
     """
     _git_init(target)
     (target / "pyproject.toml").write_text(_MINIMAL_PYPROJECT, encoding="utf-8")
@@ -340,7 +348,9 @@ def main(argv: list[str] | None = None) -> int:
     rec.add_argument("--task", required=True)
     rec.add_argument("--target", required=True, help="'bare' or a preset name")
     rec.add_argument("--transcript", required=True)
-    rec.add_argument("--model", default=_DEFAULT_MODEL)
+    # Default empty so the transcript's own model wins (build_record falls back
+    # to it); pass --model only to override. The `run` subcommand pins the model.
+    rec.add_argument("--model", default="", help="override; default = transcript's model")
     rec.add_argument("--run-index", type=int, default=0, dest="run_index")
     rec.add_argument("--out", help="output JSONL (default: tools/benchmark/results/records.jsonl)")
     rec.set_defaults(func=_cmd_record_from)
