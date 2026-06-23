@@ -143,10 +143,16 @@ fi
 # main and <branch>"), so a freshly-created branch cannot open the draft PR this
 # script promises until it has >=1 commit. Seed one when the branch is level
 # with the base; real work simply adds commits on top (#433).
+#
+# Build the seed from HEAD's own tree with commit-tree so it is empty by
+# construction and cannot capture the user's staged index — a plain
+# `git commit --allow-empty` still commits whatever is currently staged, which
+# would silently fold unrelated work into the generated seed commit (#446).
 BASE_BRANCH=$(base_branch)
 if [ -z "$(git rev-list "${BASE_BRANCH}..HEAD" 2>/dev/null || true)" ]; then
-  git commit --allow-empty -q \
-    -m "chore(${ISSUE_REF}): start #${ISSUE_NUMBER} — ${CLEAN_TITLE}"
+  SEED_COMMIT=$(git commit-tree "HEAD^{tree}" -p HEAD \
+    -m "chore(${ISSUE_REF}): start #${ISSUE_NUMBER} — ${CLEAN_TITLE}")
+  git reset --soft "$SEED_COMMIT"
 fi
 
 # --- Push and set upstream (retry + remote-SHA verification) ---

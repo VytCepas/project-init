@@ -203,12 +203,24 @@ class TestScaffoldObsidianOnly:
     def test_start_issue_sh_seeds_empty_commit_before_pr(self):
         """#433: a freshly-created branch has no commits, so `gh pr create`
         fails with 'No commits between main and <branch>'. The script must seed
-        a commit before opening the draft PR it promises."""
+        a commit before opening the draft PR it promises.
+
+        #446: the seed must be index-isolated (built via commit-tree from HEAD's
+        own tree), never a plain `git commit --allow-empty`, which would also
+        commit whatever the user happens to have staged."""
         content = (self.target / ".claude" / "scripts" / "start_issue.sh").read_text()
-        seed_idx = content.find("git commit --allow-empty")
+        seed_idx = content.find("git commit-tree")
         pr_idx = content.find("gh pr create")
-        assert seed_idx != -1, "empty-commit seed missing"
+        assert seed_idx != -1, "index-isolated commit-tree seed missing"
         assert seed_idx < pr_idx, "seed must precede gh pr create"
+        # A plain --allow-empty would capture staged work — it must not be
+        # invoked (a comment may still reference it to explain the choice).
+        command_lines = [
+            ln for ln in content.splitlines() if not ln.lstrip().startswith("#")
+        ]
+        assert not any("git commit --allow-empty" in ln for ln in command_lines), (
+            "seed must not use `git commit --allow-empty` (captures staged work)"
+        )
 
     def test_project_init_md_has_script_commands(self):
         content = (self.target / ".claude" / "project-init.md").read_text()
