@@ -1,0 +1,20 @@
+# Benchmark task: make a failing test pass without breaking others
+# (methodology "fix"). SWE-bench-style FAIL_TO_PASS / PASS_TO_PASS; isolates rework.
+id = "fix"
+description = "Make one failing test pass without breaking others"
+prompt = """
+The test `test_calc.py::test_divide_by_zero` is failing: `divide(a, b)` in
+`calc.py` raises `ZeroDivisionError` instead of returning `None` for a zero
+divisor. Fix `divide` so that test passes. Do not change any other behavior —
+the existing passing tests in `test_calc.py` must stay green.
+"""
+
+# Consumed by accuracy scoring (#273), ignored by the #271 collection harness.
+# The harness seeds calc.py + test_calc.py into the target before the run; #273
+# checks FAIL_TO_PASS flips green while PASS_TO_PASS stays green.
+[check]
+type = "pytest"
+command = "uv run pytest -q test_calc.py"
+expect_exit = 0
+fail_to_pass = ["test_calc.py::test_divide_by_zero"]
+pass_to_pass = ["test_calc.py::test_divide_basic"]

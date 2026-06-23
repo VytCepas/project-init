@@ -1,0 +1,10 @@
+# Benchmark probe: trivial prompt (methodology "noop").
+# Triggers context loading but no real work — measures the fixed, always-loaded
+# overhead a scaffold adds. task-dependent cost = total - noop.
+id = "noop"
+description = "Trivial probe — measures fixed always-loaded overhead"
+prompt = "Reply with the single word: ready"
+
+# No success check — this probe measures overhead, not correctness.
+[check]
+type = "none"

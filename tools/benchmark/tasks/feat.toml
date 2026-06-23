@@ -1,0 +1,17 @@
+# Benchmark task: small feature + test (methodology "feat").
+# Exercises the conventions/skills the scaffold injects.
+id = "feat"
+description = "Add a small function + a passing test"
+prompt = """
+Add a function `slugify(text: str) -> str` to a new module `slug.py` that
+lowercases the input and replaces every run of non-alphanumeric characters with
+a single hyphen, trimming leading/trailing hyphens. Add a pytest test in
+`test_slug.py` that covers a basic case and an edge case. Make the test pass.
+"""
+
+# Consumed by accuracy scoring (#273), ignored by the #271 collection harness.
+[check]
+type = "pytest"          # pytest | regex | none
+command = "uv run pytest -q test_slug.py"
+expect_exit = 0
+must_exist = ["slug.py", "test_slug.py"]
