@@ -147,6 +147,32 @@ class TestBuckets:
         )
         assert found == tx
 
+    def test_non_numeric_token_field_does_not_crash(self, tmp_path: Path):
+        """#436: a malformed (non-numeric) token field is coerced to 0 instead
+        of aborting the whole report; sibling good values still count."""
+        mod = _load_report(_scaffold(tmp_path / "p"))
+        tx = tmp_path / "bad.jsonl"
+        entry = {
+            "type": "assistant",
+            "message": {
+                "model": "claude-opus-4-8",
+                "usage": {
+                    "input_tokens": "not-a-number",
+                    "output_tokens": None,
+                    "cache_creation_input_tokens": 2000,
+                    "cache_read_input_tokens": 8000,
+                },
+                "content": [],
+            },
+        }
+        tx.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+        report = mod.analyze(
+            mod.parse_transcript(tx), {}, {"commits": None, "merge_commits": None}
+        )
+        model = report["cost"]["models"][0]
+        assert model["input"] == 0  # bad value coerced, not raised
+        assert model["cache_read"] == 8000  # good siblings still counted
+
     def test_missing_transcript_errors_clearly(self, tmp_path: Path):
         import pytest
 
@@ -172,6 +198,32 @@ class TestHtmlReport:
         assert _LEAK_PROMPT not in html
         assert _LEAK_COMMAND not in html
         assert _LEAK_FILE not in html
+
+    def test_full_dashboard_renders_not_truncated(self, tmp_path: Path):
+        """#427: the whole document renders. Previously render_html closed its
+        f-string mid-``<p>`` and returned early, so every section below the
+        Productivity card (and the closing tags) was unreachable dead code."""
+        target = _scaffold(tmp_path / "p")
+        mod = _load_report(target)
+        tx = tmp_path / "t.jsonl"
+        _write_transcript(tx)
+        report = mod.analyze(
+            mod.parse_transcript(tx), {}, {"commits": 7, "merge_commits": 0}
+        )
+        html = mod.render_html(report, tx)
+        # Document is complete, not cut off mid-tag.
+        assert html.rstrip().endswith("</html>")
+        # Every section at/after the historical truncation boundary is present.
+        for section in (
+            "<h2>Reliability</h2>",
+            "<h2>Adoption — Skills</h2>",
+            "<h2>Adoption — Hooks (self-log)</h2>",
+            "<h2>Cost by model</h2>",
+            "<h2>Reliability — errors by tool</h2>",
+        ):
+            assert section in html, f"missing section: {section}"
+        # The commits span sat exactly on the broken f-string boundary.
+        assert "7 commits" in html
 
 
 class TestInvariants:
