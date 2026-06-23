@@ -150,6 +150,16 @@ def _count_lines(text: object) -> int:
     return text.count("\n") + 1
 
 
+def _safe_int(value: object) -> int:
+    """Best-effort int cast — a malformed (non-numeric) token field yields 0.
+
+    Keeps a single bad transcript line from aborting the whole report."""
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def parse_transcript(path: Path) -> dict:
     """Single pass over the transcript → raw aggregates (names/counts/numbers).
 
@@ -179,10 +189,10 @@ def parse_transcript(path: Path) -> dict:
                     model,
                     {"input": 0, "output": 0, "cache_creation": 0, "cache_read": 0, "messages": 0},
                 )
-                acc["input"] += int(usage.get("input_tokens") or 0)
-                acc["output"] += int(usage.get("output_tokens") or 0)
-                acc["cache_creation"] += int(usage.get("cache_creation_input_tokens") or 0)
-                acc["cache_read"] += int(usage.get("cache_read_input_tokens") or 0)
+                acc["input"] += _safe_int(usage.get("input_tokens"))
+                acc["output"] += _safe_int(usage.get("output_tokens"))
+                acc["cache_creation"] += _safe_int(usage.get("cache_creation_input_tokens"))
+                acc["cache_read"] += _safe_int(usage.get("cache_read_input_tokens"))
                 acc["messages"] += 1
             for block in msg.get("content") or []:
                 if not isinstance(block, dict) or block.get("type") != "tool_use":
@@ -464,8 +474,7 @@ def render_html(report: dict, transcript: Path) -> str:
 <p class="muted">{c['total_tokens']:,} tokens · {c['cache_read_ratio']:.0%} cache-read</p></div>
 <div class="card"><h2>Productivity</h2>
 <p class="kpi">{p['loc_added_approx']:,} LoC</p>
-<p class="muted">{p['edits']} edits · {p['writes']} writes · """
-    f"""{p['commits'] if p['commits'] is not None else 'n/a'} commits</p></div>
+<p class="muted">{p['edits']} edits · {p['writes']} writes · {p['commits'] if p['commits'] is not None else 'n/a'} commits</p></div>
 <div class="card"><h2>Reliability</h2>
 <p class="kpi">{r['error_rate']:.0%} errors</p>
 <p class="muted">{r['tool_calls']} calls · {r['errors']} errors</p></div>
