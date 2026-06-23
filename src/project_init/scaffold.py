@@ -218,12 +218,14 @@ def overlay_layers(
     no_plugin: bool,
     multi_model: bool = False,
     governance: bool = False,
+    observability: bool = False,
 ) -> list[str]:
     """Extra template layers appended to a preset beyond its base definition.
 
     The per-agent overlays (PI-137), prefixed with the ``fallback`` layer when
-    plugins are off, plus the opt-in ``multi_model`` overlay (ADR-016, #351) and
-    the opt-in ``governance`` overlay (ADR-018, #410). One source for both the
+    plugins are off, plus the opt-in ``multi_model`` overlay (ADR-016, #351),
+    the opt-in ``governance`` overlay (ADR-018, #410), and the opt-in
+    ``observability`` overlay (ADR-019, #404). One source for both the
     scaffolder and the ``upgrade`` re-render, so they can never derive a
     different layer set (PI-189).
     """
@@ -235,6 +237,8 @@ def overlay_layers(
         extra = [*extra, "multi_model"]
     if governance:
         extra = [*extra, "governance"]
+    if observability:
+        extra = [*extra, "observability"]
     return extra
 
 

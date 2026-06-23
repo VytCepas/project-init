@@ -190,7 +190,7 @@ class TestInteractiveResolution:
             default_name="proj",
             no_plugin=False,
             profile="individual",
-            cli_overlays=(None, None, None, False, True),
+            cli_overlays=(None, None, None, False, True, False),
         )
         assert result.governance is True
 
@@ -201,7 +201,7 @@ class TestInteractiveResolution:
             default_name="proj",
             no_plugin=False,
             profile="individual",
-            cli_overlays=(None, None, None, False, False),
+            cli_overlays=(None, None, None, False, False, False),
         )
         assert result.governance is False
 
