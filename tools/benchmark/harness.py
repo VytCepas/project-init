@@ -31,6 +31,8 @@ from pathlib import Path
 
 from tools.benchmark.prices import apply_cost, load_prices
 from tools.benchmark.record import RunRecord, write_records
+from tools.benchmark.scoring import Score, rework_cycles
+from tools.benchmark.scoring import score as score_run
 from tools.benchmark.transcript import parse as parse_transcript
 
 _HERE = Path(__file__).resolve().parent
@@ -200,15 +202,24 @@ def run_task(
         cmd, cwd=str(target_dir), capture_output=True, text=True, env=env, timeout=1800
     )
     wall_clock_s = time.monotonic() - start
-    session_id, cost = "", None
+    session_id, cost, result_text = "", None, ""
     try:
         out = json.loads(proc.stdout)
         if isinstance(out, dict):
             session_id = out.get("session_id") or ""
             cost = out.get("total_cost_usd")
+            # Final agent text for the regex check; guard non-string payloads so
+            # re.search never gets a dict/list.
+            result_obj = out.get("result")
+            result_text = result_obj if isinstance(result_obj, str) else ""
     except (ValueError, TypeError):
         pass
-    return {"session_id": session_id, "wall_clock_s": wall_clock_s, "cost_estimate": cost}
+    return {
+        "session_id": session_id,
+        "wall_clock_s": wall_clock_s,
+        "cost_estimate": cost,
+        "result": result_text,
+    }
 
 
 # --- normalized record (pure — testable) ----------------------------------
@@ -253,6 +264,13 @@ def build_record(ctx: RunContext, transcript_path: Path) -> RunRecord:
 # --- CLI ------------------------------------------------------------------
 
 
+def _apply_score(record: RunRecord, result: Score) -> None:
+    """Copy a :class:`Score` onto the record's accuracy fields (#273)."""
+    record.success = result.success
+    record.first_try = result.first_try
+    record.rework_cycles = result.rework_cycles
+
+
 def _warn_if_unpriced(record: RunRecord) -> None:
     """Emit the documented warning when a record's model has no price row."""
     if record.cost_usd is None:
@@ -278,6 +296,9 @@ def _cmd_record_from(args: argparse.Namespace) -> int:
     )
     apply_cost(record, load_prices(Path(args.prices) if args.prices else None))
     _warn_if_unpriced(record)
+    # No target dir to check against here — record the rework proxy from the
+    # transcript; success/first_try stay null (use `run` for the full check).
+    record.rework_cycles = rework_cycles(transcript)
     out = Path(args.out) if args.out else _RESULTS_DIR / "records.jsonl"
     write_records([record], out)
     sys.stdout.write(json.dumps(record.to_dict(), indent=2) + "\n")
@@ -325,10 +346,20 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     )
                     apply_cost(record, prices)
                     _warn_if_unpriced(record)
+                    _apply_score(
+                        record,
+                        score_run(
+                            task,
+                            target_dir=tdir,
+                            transcript_path=transcript,
+                            agent_output=result.get("result", ""),
+                        ),
+                    )
                     records.append(record)
                     cost = f"${record.cost_usd:.4f}" if record.cost_usd is not None else "$?"
+                    ok = {True: "ok", False: "FAIL", None: "n/a"}[record.success]
                     sys.stdout.write(
-                        f"{target}/{task_id} run {run_index}: "
+                        f"{target}/{task_id} run {run_index}: {ok}, "
                         f"{record.total_tokens} tok, {cost}, {record.tool_calls} tool calls, "
                         f"{record.wall_clock_s:.1f}s\n"
                     )

@@ -27,6 +27,7 @@ class TranscriptAggregates:
     cache_read_tokens: int = 0
     cache_creation_tokens: int = 0
     tool_calls: int = 0
+    tool_errors: int = 0  # tool_result blocks flagged is_error (rework proxy, #273)
     turns: int = 0  # assistant messages
     models: list[str] = field(default_factory=list)
     claude_version: str = ""
@@ -89,6 +90,16 @@ def message_timestamps(path: Path) -> list[str]:
     return out
 
 
+def _fold_user_errors(agg: TranscriptAggregates, msg: dict) -> None:
+    """Count error tool_result blocks (the agent hit a failure it had to recover from)."""
+    content = msg.get("content")
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "tool_result" and block.get("is_error"):
+            agg.tool_errors += 1
+
+
 def parse(path: Path) -> TranscriptAggregates:
     """Fold a transcript into capture aggregates (tokens, tools, turns, span)."""
     agg = TranscriptAggregates()
@@ -104,7 +115,10 @@ def parse(path: Path) -> TranscriptAggregates:
             if isinstance(version, str):
                 agg.claude_version = version
         msg = obj.get("message")
-        if obj.get("type") == "assistant" and isinstance(msg, dict):
+        etype = obj.get("type")
+        if etype == "assistant" and isinstance(msg, dict):
             _fold_assistant(agg, msg, seen_models)
+        elif etype == "user" and isinstance(msg, dict):
+            _fold_user_errors(agg, msg)
     agg.models = seen_models
     return agg

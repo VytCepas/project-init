@@ -25,6 +25,7 @@ the `rich` report is #275.
 | `tasks/*.toml` | the task set: `feat`, `fix`, `qa`, `noop` (probe). `[check]` is for #273 |
 | `prices.py` | `cost_for` / `apply_cost` — $ from tokens × the static table (#272) |
 | `latency.py` | per-step latency + P50/P99 aggregation over repeats (#272) |
+| `scoring.py` | `score` — deterministic success + first_try + rework_cycles from the `[check]` specs (#273) |
 | `model_prices.json` | vendored, litellm-shaped price table for the $ axis (#272) |
 | `results/` | raw per-run JSONL (gitignored) |
 
@@ -77,6 +78,22 @@ code reads `RunRecord`, never raw transcripts.
   transcript timestamps (best-effort — unstable schema), and `latency.summarize()`
   aggregates a metric over repeats into `{n, p50, p99}`, reporting `n=1` honestly
   instead of faking a distribution. The #275 report consumes these.
+
+## Accuracy / success (#273)
+
+The **benefit** axis — cheap-but-wrong is not a win. Each `run` record gets a
+deterministic signal from the task's authored `[check]` spec:
+
+- **`success`** — `pytest` exits as expected and required files exist (`pytest`
+  checks like `feat`/`fix`); the agent's final text matches a pattern (`regex`,
+  e.g. `qa`); or `None` when no check applies (`none`, e.g. the `noop` probe).
+- **`rework_cycles`** — count of error `tool_result` blocks in the transcript: a
+  deterministic, artifact-reproducible *proxy* for correction rounds.
+- **`first_try`** — succeeded with zero rework.
+
+No LLM judge (ADR-001): test exit codes, file existence, a regex. `record-from`
+fills `rework_cycles` from the transcript but leaves `success`/`first_try` null
+(it has no target to check); use `run` for the full score.
 
 ## Caveats (from the methodology)
 
