@@ -80,6 +80,43 @@ class TestGovernanceOn:
         assert "NIST AI RMF" in text
 
 
+class TestUsageTrackDocs:
+    """#411: the policy layer scaffolds with its load-bearing content."""
+
+    _GOV = Path(".claude") / "governance"
+    _DOCS = (
+        "AI_USAGE_POLICY.md",
+        "approved-tools.md",
+        "data-handling.md",
+        "ai-code-provenance.md",
+        "NIST_RMF_CROSSWALK.md",
+    )
+
+    def test_all_docs_present(self, tmp_path: Path):
+        target = _scaffold(tmp_path / "p", governance=True)
+        for name in self._DOCS:
+            assert (target / self._GOV / name).is_file(), name
+
+    def test_approved_tools_is_deny_by_default_policy(self, tmp_path: Path):
+        target = _scaffold(tmp_path / "p", governance=True)
+        text = (target / self._GOV / "approved-tools.md").read_text(encoding="utf-8")
+        # It must read as an allow/deny *policy*, and disclaim being the inventory.
+        assert "deny" in text.lower()
+        assert "CAPABILITIES.md" in text
+
+    def test_data_handling_names_restricted_class_and_backstops(self, tmp_path: Path):
+        target = _scaffold(tmp_path / "p", governance=True)
+        text = (target / self._GOV / "data-handling.md").read_text(encoding="utf-8")
+        assert "Restricted" in text
+        assert "gitleaks" in text
+
+    def test_crosswalk_covers_four_nist_functions(self, tmp_path: Path):
+        target = _scaffold(tmp_path / "p", governance=True)
+        text = (target / self._GOV / "NIST_RMF_CROSSWALK.md").read_text(encoding="utf-8")
+        for fn in ("Govern", "Map", "Measure", "Manage"):
+            assert fn in text, fn
+
+
 class TestGovernanceOff:
     def test_no_layer_dir(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p", governance=False)
