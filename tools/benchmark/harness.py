@@ -100,6 +100,34 @@ def setup_bare_target(target: Path) -> Path:
     return target
 
 
+def seed_task(target: Path, task: dict) -> None:
+    """Materialize a task's ``[[seed_files]]`` into the target before the run.
+
+    Some tasks (e.g. ``fix``) need a pre-existing fixture — a failing + passing
+    test to repair — rather than starting from an empty project. Tasks without
+    seed files are a no-op.
+    """
+    for spec in task.get("seed_files", []):
+        dest = target / spec["path"]
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        # Strip the leading newline the TOML triple-quote literal carries.
+        dest.write_text(spec["content"].lstrip("\n"), encoding="utf-8")
+
+
+def prepare_target(target_dir: Path, target: str, task: dict, *, model: str) -> Path:
+    """Create a FRESH target for one run and seed the task fixture.
+
+    Recreated per ``(task, run_index)`` so each run measures an identical clean
+    baseline — a prior task's writes (or an earlier repeat) never leak in.
+    """
+    if target == "bare":
+        setup_bare_target(target_dir)
+    else:
+        setup_scaffolded_target(target_dir, target, model=model)
+    seed_task(target_dir, task)
+    return target_dir
+
+
 def setup_scaffolded_target(target: Path, preset: str, *, model: str = _DEFAULT_MODEL) -> Path:
     """The same temp project + project-init output for one preset."""
     from project_init.__main__ import main as project_init_main
@@ -155,11 +183,9 @@ def run_task(
         "--permission-mode",
         "bypassPermissions",
     ]
-    env = {
-        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-        "CLAUDE_CONFIG_DIR": str(config_dir),
-        "HOME": str(Path.home()),
-    }
+    # Inherit the caller's env (ANTHROPIC_API_KEY, proxy vars, …) and only
+    # override CLAUDE_CONFIG_DIR so the run is isolated from the user's history.
+    env = {**os.environ, "CLAUDE_CONFIG_DIR": str(config_dir)}
     start = time.monotonic()
     proc = subprocess.run(
         cmd, cwd=str(target_dir), capture_output=True, text=True, env=env, timeout=1800
@@ -253,13 +279,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
         tmp_root = Path(tmp)
         config_dir = tmp_root / "claude-config"
         for target in targets:
-            tdir = tmp_root / f"target-{target}"
-            if target == "bare":
-                setup_bare_target(tdir)
-            else:
-                setup_scaffolded_target(tdir, target, model=args.model)
             for task_id, task in tasks.items():
                 for run_index in range(args.repeats):
+                    # Fresh target per run — clean baseline, no cross-run leakage.
+                    tdir = tmp_root / f"target-{target}-{task_id}-{run_index}"
+                    prepare_target(tdir, target, task, model=args.model)
                     result = run_task(tdir, task, model=args.model, config_dir=config_dir)
                     transcript = transcript_path_for(config_dir, tdir, result["session_id"])
                     if not transcript.is_file():

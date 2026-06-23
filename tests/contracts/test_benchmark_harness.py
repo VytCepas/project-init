@@ -167,6 +167,34 @@ class TestTargetSetup:
         assert (target / ".claude").is_dir()
         assert (target / ".claude" / "config.yaml").is_file()
 
+    def test_fix_task_seeds_failing_fixture(self, tmp_path: Path):
+        """The fix task must arrive with a real failing+passing baseline, not an
+        empty project (Codex review P1)."""
+        target = harness.prepare_target(
+            tmp_path / "fix", "bare", harness.load_task("fix"), model="m"
+        )
+        calc = target / "calc.py"
+        test = target / "test_calc.py"
+        assert calc.is_file() and test.is_file()
+        # No stray leading blank line from the TOML triple-quote.
+        assert calc.read_text().startswith("def divide")
+        assert "test_divide_by_zero" in test.read_text()
+
+    def test_prepare_target_is_fresh_per_run(self, tmp_path: Path):
+        """A prior run's writes must not leak into the next (Codex review P1)."""
+        task = harness.load_task("feat")
+        first = harness.prepare_target(tmp_path / "r0", "bare", task, model="m")
+        (first / "leftover.py").write_text("# from a previous run\n")
+        # A different run dir is a clean baseline.
+        second = harness.prepare_target(tmp_path / "r1", "bare", task, model="m")
+        assert not (second / "leftover.py").exists()
+
+    def test_seed_task_noop_without_seed_files(self, tmp_path: Path):
+        target = tmp_path / "t"
+        target.mkdir()
+        harness.seed_task(target, harness.load_task("feat"))  # feat has no seeds
+        assert list(target.iterdir()) == []
+
 
 class TestRunTaskGuard:
     def test_run_task_requires_claude_cli(self, tmp_path: Path, monkeypatch):
