@@ -1,0 +1,9 @@
+# Activation marker for the observability overlay (ADR-019).
+#
+# The presence of this `.claude/observability/` directory flips the guarded
+# hook self-log ON (see the sibling self-log issue): the shipped-always-dormant
+# hooks write to `usage.jsonl` here only when this directory exists. Deleting
+# this directory disables the self-log without uninstalling anything.
+#
+# usage_report.py reads usage.jsonl (when present) for the hooks bucket and
+# writes dashboard.html alongside it.
