@@ -8,4 +8,11 @@
 
 set -euo pipefail
 
+# Self-log this firing (dormant unless the observability overlay is installed).
+# Reads no stdin (</dev/null), so the payload still reaches dag_workflow.py via
+# the exec below; runs before exec because exec replaces this process.
+# shellcheck source=/dev/null
+. "$(dirname "$0")/_usage_log.sh" 2>/dev/null && \
+  usage_log github_command_guard PreToolUse </dev/null || true
+
 exec "$(dirname "$0")/_py.sh" "$(dirname "$0")/dag_workflow.py" guard
