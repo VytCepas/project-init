@@ -500,6 +500,12 @@ def cmd_finish(pr_number: int | None, review_cycle: int | None) -> int:
         )
         return 1
     current = _current_branch()
+    if current is None:
+        sys.stderr.write(
+            f"finish: no current branch (detached HEAD or not a git repo) — check out "
+            f"PR #{pr_number}'s head '{head}' and re-run.\n"
+        )
+        return 1
     if current != head:
         sys.stderr.write(
             f"finish: checked-out branch '{current}' is not PR #{pr_number}'s head "

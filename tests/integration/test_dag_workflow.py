@@ -618,6 +618,21 @@ class TestFinishBranchGuard:
         assert rc == 1, "finish must refuse when checked-out branch != PR head"
         assert pushed == [], "finish must NOT push when the branch mismatches"
 
+    def test_finish_refuses_on_detached_head(self, monkeypatch):
+        mod = _load_module(SOURCE_HOOK)
+        monkeypatch.setattr(mod, "_current_branch", lambda: None)
+        monkeypatch.setattr(
+            mod, "_gh",
+            lambda args: (0, "feat/PI-99-x\n") if "headRefName" in args else (0, ""),
+        )
+        pushed: list = []
+        monkeypatch.setattr(mod, "cmd_push", lambda *a, **k: pushed.append(a) or 0)
+
+        rc = mod.cmd_finish(99, None)
+
+        assert rc == 1, "finish must refuse when there is no current branch"
+        assert pushed == []
+
     def test_finish_pushes_pr_head_branch_on_match(self, monkeypatch):
         mod = _load_module(SOURCE_HOOK)
         monkeypatch.setattr(mod, "_current_branch", lambda: "feat/PI-99-x")
