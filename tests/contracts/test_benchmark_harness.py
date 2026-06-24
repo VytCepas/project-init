@@ -234,3 +234,46 @@ class TestRunTaskGuard:
         monkeypatch.setattr(harness.shutil, "which", lambda _: None)
         with pytest.raises(RuntimeError, match="claude.*CLI"):
             harness.run_task(tmp_path, {"prompt": "x"}, model="m", config_dir=tmp_path)
+
+
+class TestAuth:
+    """Subscription-or-API-key auth for the manual `run` path (no agent driven)."""
+
+    def test_default_config_dir_honors_env(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cfg"))
+        assert harness.default_config_dir() == tmp_path / "cfg"
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+        assert harness.default_config_dir() == Path.home() / ".claude"
+
+    def test_seed_credentials_copies_subscription_token(self, tmp_path: Path):
+        source = tmp_path / "real"
+        source.mkdir()
+        (source / ".credentials.json").write_text('{"token": "x"}', encoding="utf-8")
+        config_dir = tmp_path / "iso"
+        assert harness.seed_credentials(config_dir, source=source) is True
+        dest = config_dir / ".credentials.json"
+        assert dest.read_text() == '{"token": "x"}'
+        assert dest.stat().st_mode & 0o777 == 0o600  # never widen token perms
+
+    def test_seed_credentials_absent_returns_false(self, tmp_path: Path):
+        assert harness.seed_credentials(tmp_path / "iso", source=tmp_path / "empty") is False
+
+    def test_auth_available_prefers_api_key(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+        assert harness.auth_available(tmp_path) is True  # no creds file needed
+
+    def test_auth_available_via_seeded_creds(self, tmp_path: Path, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        assert harness.auth_available(tmp_path) is False
+        (tmp_path / ".credentials.json").write_text("{}", encoding="utf-8")
+        assert harness.auth_available(tmp_path) is True
+
+    def test_run_aborts_clearly_when_unauthenticated(self, tmp_path: Path, monkeypatch, capsys):
+        """The silent per-task skip is replaced by an upfront precondition error."""
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr(harness.shutil, "which", lambda _: "/usr/bin/claude")
+        # Point cred discovery at an empty dir so no subscription token is found.
+        monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "empty"))
+        rc = harness.main(["run", "--task", "noop", "--repeats", "1"])
+        assert rc == 1
+        assert "not authenticated" in capsys.readouterr().err
