@@ -13,14 +13,14 @@ docs/
 
 ## How to use
 
-**Agents:** Read `adr/` before starting tasks. If you establish a new pattern or make a non-obvious decision, write a brief ADR.
+**Agents:** Read `.claude/docs/adr/` before starting tasks. If you establish a new pattern or make a non-obvious decision, write a brief ADR.
 
 **Humans:** When an exploratory note in `.claude/vault/` solidifies into a real decision, move it here as an ADR and commit it.
 
 ## One-way flow
 
 ```
-vault/knowledge/ (exploratory)  →  adr/ (permanent)
+.claude/vault/knowledge/ (exploratory)  →  .claude/docs/adr/ (permanent)
 ```
 
-Never duplicate content. If it's in `adr/`, don't repeat it in `vault/decisions/`.
+Never duplicate content. If it's in `.claude/docs/adr/`, don't repeat it in `.claude/vault/decisions/`.

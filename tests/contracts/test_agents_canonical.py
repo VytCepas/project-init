@@ -152,23 +152,46 @@ class TestPluginModeHookDocs:
 
 class TestAdrPathCanonical:
     """#462 F4: ADRs live in .claude/docs/adr/ (where the add_adr skill writes and
-    the scaffold creates them). No instruction file may point agents at a bare
-    docs/adr/ — that path does not exist in the scaffold and invites a stray
-    top-level docs/adr/ dir."""
+    the scaffold creates them). The invariant is that every markdown link to an
+    ADR path resolves: CLAUDE.md sits at repo root, while project-init.md lives in
+    .claude/, so its link *href* must be document-relative (`docs/adr/`) even
+    though the displayed path is the absolute `.claude/docs/adr/`. A naive
+    .claude/-prefixed href resolves to the non-existent .claude/.claude/docs/adr/."""
 
-    _CHECK = (
+    _FILES = (
         "CLAUDE.md",
         ".claude/project-init.md",
-        ".claude/docs/adr/adr-001-memory-stack.md",
+        ".claude/docs/README.md",
         ".claude/docs/guides/using-memory.md",
+        ".claude/docs/adr/adr-001-memory-stack.md",
     )
 
-    def test_no_bare_docs_adr_reference(self, target: Path):
-        bare = re.compile(r"(?<![\w./])docs/adr/")
-        for rel in self._CHECK:
-            text = (target / rel).read_text()
-            assert not bare.search(text), f"{rel}: bare docs/adr/ — use .claude/docs/adr/"
+    def test_canonical_adr_dir_exists(self, target: Path):
         assert (target / ".claude" / "docs" / "adr").is_dir(), "canonical ADR dir missing"
+
+    def test_no_doubled_claude_prefix(self, target: Path):
+        for rel in self._FILES:
+            assert ".claude/.claude/" not in (target / rel).read_text(), (
+                f"{rel}: doubled .claude/.claude/ path"
+            )
+
+    def test_adr_links_resolve(self, target: Path):
+        """Every markdown link whose href names an adr path must resolve relative
+        to the file that contains it — this catches a .claude/-prefixed href in a
+        file that already lives under .claude/."""
+        link = re.compile(r"\]\(([^)#]+)\)")
+        for rel in ("CLAUDE.md", ".claude/project-init.md"):
+            f = target / rel
+            for href in link.findall(f.read_text()):
+                if "adr" not in href:
+                    continue
+                assert (f.parent / href).exists(), (
+                    f"{rel}: broken adr link href {href!r} -> {f.parent / href}"
+                )
+
+    def test_root_claude_md_names_canonical_adr_path(self, target: Path):
+        # CLAUDE.md is at repo root; its plain-text ADR ref must be root-correct.
+        assert ".claude/docs/adr/" in (target / "CLAUDE.md").read_text()
 
 
 class TestGithubWorkflowProductionBoundary:
