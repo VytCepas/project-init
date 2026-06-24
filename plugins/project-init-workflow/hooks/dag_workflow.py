@@ -482,14 +482,39 @@ def cmd_promote(pr_number: int | None) -> int:
 
 def cmd_finish(pr_number: int | None, review_cycle: int | None) -> int:
     """Push, promote, then hand off to monitor_pr.sh for CI/review/merge."""
-    rc = cmd_push(None, 3)
-    if rc != 0:
-        return rc
+    # Resolve the PR BEFORE pushing so we push that PR's head branch, never
+    # whatever happens to be checked out. Pushing the current branch first let
+    # a concurrent branch switch make `finish` push an unrelated branch (PI-458).
     if pr_number is None:
         pr_number = _detect_pr_number()
     if pr_number is None:
         sys.stderr.write("finish: no PR found for current branch.\n")
         return 1
+    code, head = _gh(
+        ["pr", "view", str(pr_number), "--json", "headRefName", "-q", ".headRefName"]
+    )
+    head = head.strip()
+    if code != 0 or not head:
+        sys.stderr.write(
+            f"finish: cannot resolve head branch for PR #{pr_number} — refusing to push.\n"
+        )
+        return 1
+    current = _current_branch()
+    if current is None:
+        sys.stderr.write(
+            f"finish: no current branch (detached HEAD or not a git repo) — check out "
+            f"PR #{pr_number}'s head '{head}' and re-run.\n"
+        )
+        return 1
+    if current != head:
+        sys.stderr.write(
+            f"finish: checked-out branch '{current}' is not PR #{pr_number}'s head "
+            f"'{head}'. Check out '{head}' and re-run — refusing to push the wrong branch.\n"
+        )
+        return 1
+    rc = cmd_push(head, 3)
+    if rc != 0:
+        return rc
     rc = cmd_promote(pr_number)
     if rc != 0:
         return rc
