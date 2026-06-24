@@ -209,3 +209,59 @@ jobs:
           cd /tmp/macos-target
           out=$(/bin/bash .claude/hooks/_py.sh -c "print('resolver-ok')")
           test "$out" = "resolver-ok"
+
+  # PI-463: native Windows (non-WSL) runs hooks through Git Bash when Git for
+  # Windows is present (the documented prerequisite). This is the Git Bash
+  # oracle — it proves the scaffolded bash hooks fire on Windows, catching
+  # CRLF / exec-bit / _py.sh-resolution breakage the Linux/macOS jobs can't.
+  # Gated to shell/template changes like the macOS job.
+  windows-portability:
+    name: Windows Git Bash portability
+    needs: changes
+    if: needs.changes.outputs.shell == 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash  # GitHub's "bash" on Windows is Git Bash — the supported path
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+          python-version: "3.12"
+
+      - name: Confirm bash is Git Bash
+        run: bash --version | head -1
+
+      - name: Scaffold a project
+        run: |
+          uv run project-init ./win-target \
+            --non-interactive --preset obsidian-only --name win \
+            --description "windows portability" --language python --no-plugin --strict
+
+      - name: SessionStart bootstrap runs under Git Bash
+        run: |
+          cd ./win-target
+          bash .claude/hooks/session_setup.sh
+          test -f .claude/.session_setup_stamp
+
+      - name: Commit gate runs under Git Bash against a staged file
+        run: |
+          cd ./win-target
+          git init -q
+          git config user.email ci@example.com
+          git config user.name ci
+          printf 'x = 1\n' > sample.py
+          git add sample.py
+          # PreToolUse hook: reads tool JSON on stdin, must exit 0 for a clean file.
+          printf '%s' '{"tool_input":{"command":"git commit -m test"}}' \
+            | bash .claude/hooks/pre_commit_gate.sh
+          echo "pre_commit_gate.sh exit: $?"
+
+      - name: _py.sh resolves an interpreter on Windows
+        run: |
+          cd ./win-target
+          out=$(bash .claude/hooks/_py.sh -c "print('resolver-ok')")
+          test "$out" = "resolver-ok"

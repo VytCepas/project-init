@@ -208,6 +208,7 @@ git commit --allow-empty -m "test: verify hooks"
 | `uv: command not found` | Add `export PATH="$HOME/.local/bin:$PATH"` to shell profile |
 | `bunx: command not found` when adding MCPs | `curl -fsSL https://bun.sh/install \| bash` |
 | Hooks don't fire on commit | Check `python3 --version`; hooks need `python3` on PATH |
+| Hooks never fire on native Windows | Install [Git for Windows](https://gitforwindows.org/) and run from Git Bash. The hooks are bash; without Git Bash, Claude Code falls back to PowerShell, which can't run them. PowerShell-only is unsupported (no `.ps1` variants). WSL avoids this entirely. |
 | Unrendered `{{...}}` in output | Re-run with `--strict` to surface the missing variable |
 | `lint_memory.sh` reports errors | Each file in `memory/` needs a matching entry in `MEMORY.md` |
 | CRLF line ending errors on WSL | Edit and commit from inside WSL, not Git Bash on Windows |
