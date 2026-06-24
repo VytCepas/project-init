@@ -66,9 +66,16 @@ backend the first decomposed, self-explaining choice.
   there; rather than gate inconsistently, these ship in all backends and degrade
   gracefully (they use code-span instructions, not dangling markdown links). `core`'s
   guarantee is: no vault/memory **dirs**, no memory **config**, no dangling **links**.
-- **Backend-switching via `upgrade` is record-only.** Because `memory/`+`vault/` are
-  preserved dirs (excluded from the manifest), `upgrade` does not add/remove them when
-  `memory_stack` changes; switching backends is a re-scaffold operation.
+- **Backend-switching is a re-scaffold operation, and even then `config.yaml` is not
+  rewritten.** Because `memory/`+`vault/` are preserved dirs (excluded from the
+  manifest), `upgrade` does not add/remove them when `memory_stack` changes. And
+  `config.yaml` is a user-owned file (PI-179): once a scaffold record exists, re-running
+  with a different `--memory` updates the record block but leaves the visible config
+  **body** untouched — so an `obsidian-only → none` re-run still shows a stale `memory:`
+  block. The `core` "no memory config" guarantee therefore holds for **fresh** scaffolds,
+  not for in-place backend changes (Codex review, PR #473). Targeted config-body sync on
+  a changed backend is a general config-migration concern (not memory-specific) and is
+  out of scope for WS-A; the fresh-scaffold path is the supported one.
 
 ## Consequences
 
