@@ -76,6 +76,48 @@ def transcript_path_for(config_dir: Path, target_dir: Path, session_id: str) -> 
     return config_dir / "projects" / slug / f"{session_id}.jsonl"
 
 
+# --- auth (subscription or API key) ---------------------------------------
+
+
+def default_config_dir() -> Path:
+    """The user's real Claude config dir — where OAuth/subscription creds live.
+
+    Honors ``CLAUDE_CONFIG_DIR`` (matching Claude Code), else ``~/.claude``.
+    """
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    return Path(env) if env else Path.home() / ".claude"
+
+
+def seed_credentials(config_dir: Path, source: Path | None = None) -> bool:
+    """Copy Claude's ``.credentials.json`` into the isolated run config dir.
+
+    Lets ``run`` use a Pro/Max **subscription** (OAuth creds on disk) instead of
+    requiring ``ANTHROPIC_API_KEY``, while keeping the run otherwise isolated so
+    the fixed-overhead measurement stays clean. Returns True iff a credentials
+    file was found and copied. An API key / OAuth token in env (if set) still
+    wins in ``run_task`` since the env is inherited.
+    """
+    src = (source or default_config_dir()) / ".credentials.json"
+    if not src.is_file():
+        return False
+    config_dir.mkdir(parents=True, exist_ok=True)
+    dest = config_dir / ".credentials.json"
+    shutil.copyfile(src, dest)
+    # Match the source's mode but cap at 0o600 — never widen a stricter token.
+    dest.chmod(src.stat().st_mode & 0o600)
+    return True
+
+
+# Env vars Claude Code honors for non-interactive auth — both take precedence
+# over stored credentials, so either is sufficient (https://code.claude.com/docs/en/env-vars).
+_AUTH_ENV_VARS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")
+
+
+def auth_available(config_dir: Path) -> bool:
+    """True if the run can authenticate: an API key / OAuth token in env, or seeded creds."""
+    return any(os.environ.get(v) for v in _AUTH_ENV_VARS) or (config_dir / ".credentials.json").is_file()
+
+
 # --- target setup (testable — no agent) -----------------------------------
 
 
@@ -319,6 +361,18 @@ def _cmd_run(args: argparse.Namespace) -> int:
     with tempfile.TemporaryDirectory(prefix="pi-benchmark-") as tmp:
         tmp_root = Path(tmp)
         config_dir = tmp_root / "claude-config"
+        # Isolate the run from the user's history, but seed the subscription
+        # credentials so a Pro/Max login works without ANTHROPIC_API_KEY.
+        seeded = seed_credentials(config_dir)
+        if not auth_available(config_dir):
+            sys.stderr.write(
+                "benchmark: not authenticated — `claude -p` would fail. Set "
+                "ANTHROPIC_API_KEY, or log in once with `claude` so "
+                f"{default_config_dir() / '.credentials.json'} exists.\n"
+            )
+            return 1
+        if seeded and not os.environ.get("ANTHROPIC_API_KEY"):
+            sys.stdout.write("benchmark: using Claude subscription credentials (no API key set).\n")
         for target in targets:
             for task_id, task in tasks.items():
                 for run_index in range(args.repeats):
