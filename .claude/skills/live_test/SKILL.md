@@ -65,7 +65,9 @@ API. Each subagent asserts `command -v gh` resolves to the stub before running a
 
 **The stub command→response table is the source of truth — embed it, don't leave it to future
 diligence.** Enumerated from `create_issue.sh`, `start_issue.sh`, `push_branch.sh` /
-`promote_review.sh` (both shim to `dag_workflow.py`), and `monitor_pr.sh`:
+`promote_review.sh` (both shim to `dag_workflow.py`). The merge/monitor path (`monitor_pr.sh`,
+`gh pr checks` / `gh pr merge` / `gh api .../pulls/.../comments`) is **intentionally out of
+scope** (see Step 4 lifecycle), so its `gh` shapes are deliberately absent from this table:
 
 | `gh` invocation | Canned response (stdout) |
 |---|---|
@@ -76,13 +78,14 @@ diligence.** Enumerated from `create_issue.sh`, `start_issue.sh`, `push_branch.s
 | `gh label list --search <n> --json name -q '.[].name'` | empty (label absent → caller creates it) |
 | `gh label create <n> ...` | exit 0, no output |
 | `gh issue create ...` | `https://example.invalid/.../issues/101` |
-| `gh issue view <n> --json title -q '.title'` | `Stubbed issue <n>` |
+| `gh issue view <n> --json title -q '.title'` | `Stubbed issue` |
 | `gh api .../issues/<n> --jq '.node_id'` | `I_stubnode101` |
 | `gh api graphql -f query=...` | `{"data":{}}` (project-board mutations no-op) |
 | `gh pr create ...` | `https://example.invalid/.../pull/202` |
 | `gh pr view <n> --json isDraft -q .isDraft` | `true` |
 | `gh pr view <n> --json headRefName -q .headRefName` | the current branch name |
 | `gh pr view <n> --json url -q .url` | `https://example.invalid/.../pull/202` |
+| `gh pr view --json number,state` | `{"number":202,"state":"OPEN"}` (PR auto-detect, `check_pr_opened`) |
 | `gh pr view --json number,reviewDecision` | `{"number":202,"reviewDecision":""}` |
 | `gh pr ready <n>` | exit 0, no output |
 | anything else | log argv, exit 0, empty stdout |
@@ -90,6 +93,7 @@ diligence.** Enumerated from `create_issue.sh`, `start_issue.sh`, `push_branch.s
 A reference generator for the stub (the skill writes this file, then `chmod +x`):
 
 ```bash
+mkdir -p "$RUN/stub-bin"                          # the redirect below needs this dir to exist
 cat > "$RUN/stub-bin/gh" <<'STUB'
 #!/usr/bin/env bash
 echo "gh $*" >> "${GH_STUB_LOG:-/dev/null}"
@@ -108,6 +112,7 @@ case "$*" in
   "pr create"*)                     echo "https://example.invalid/livetest-owner/$proj/pull/202" ;;
   "pr view"*"isDraft"*)             echo "true" ;;
   "pr view"*"headRefName"*)         echo "$branch" ;;
+  "pr view"*"number,state"*)        echo '{"number":202,"state":"OPEN"}' ;;   # check_pr_opened / PR auto-detect
   "pr view"*"reviewDecision"*)      echo '{"number":202,"reviewDecision":""}' ;;
   "pr view"*"url"*)                 echo "https://example.invalid/livetest-owner/$proj/pull/202" ;;
   "pr ready"*)                      : ;;
