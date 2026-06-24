@@ -28,9 +28,9 @@ Exploratory notes, session logs, design sketches. Managed in Obsidian.
 
 When an exploratory vault note becomes a real decision:
 
-1. Create `docs/adr/adr-NNN-<topic>.md` (see existing ADRs for format)
-2. Update `docs/README.md` to link the new ADR
+1. Create `.claude/docs/adr/adr-NNN-<topic>.md` (see existing ADRs for format)
+2. Update `.claude/docs/README.md` to link the new ADR
 3. Commit and push
 4. Delete or summarise the vault note (avoid duplication)
 
-Agents read `docs/adr/` — not vault — for authoritative decisions.
+Agents read `.claude/docs/adr/` — not vault — for authoritative decisions.

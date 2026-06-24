@@ -20,7 +20,7 @@ docs/
 ## One-way flow
 
 ```
-vault/knowledge/ (exploratory)  →  docs/adr/ (permanent)
+vault/knowledge/ (exploratory)  →  adr/ (permanent)
 ```
 
-Never duplicate content. If it's in `docs/adr/`, don't repeat it in `vault/decisions/`.
+Never duplicate content. If it's in `adr/`, don't repeat it in `vault/decisions/`.

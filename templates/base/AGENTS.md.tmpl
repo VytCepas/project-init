@@ -26,7 +26,11 @@ below); everything else is reusable by any agent.
 Before any GitHub action (create issue, branch, push, PR, merge), check
 the available skills (plugin-provided in the default scaffold;{{#if no_plugin}} indexed in [`.claude/skills/INDEX.md`](.claude/skills/INDEX.md);{{/if no_plugin}} `/help` lists them) and load the relevant
 skill file. Skills are plain markdown (SKILL.md) — load only the one that
-matches what you are about to do.
+matches what you are about to do. Claude loads them directly; Codex and
+Antigravity read them from `.agents/skills/`. Surfaces with no skills directory
+(e.g. Cursor, VS Code Copilot) — and any surface in the default plugin scaffold,
+where the skill files live in the plugin rather than `.claude/skills/` — instead
+follow the inline quick-references in the rules below.
 
 > Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 
@@ -50,6 +54,8 @@ matches what you are about to do.
 This section applies only when the agent is Claude Code. Other agents get
 no automatic hooks — rely on the git/CI enforcement above.
 
-- Hooks in `.claude/settings.json` fire automatically: `pre_commit_gate` (lint gate on commit), `github_command_guard` (steers toward lifecycle scripts), `post_edit_lint`, `workflow_state_reminder`.
+{{#if no_plugin}}- Hooks wired in `.claude/settings.json` fire automatically: `pre_commit_gate` (lint gate on commit), `github_command_guard` (steers toward lifecycle scripts), `post_edit_lint`, `workflow_state_reminder`, `prod_guard`. The scripts live in `.claude/hooks/`.
+{{/if no_plugin}}{{#if plugin_mode}}- Hooks fire automatically via the `project-init-workflow` plugin (enabled in `.claude/settings.json` under `enabledPlugins`, not a local `hooks` block): `pre_commit_gate` (lint gate on commit), `github_command_guard` (steers toward lifecycle scripts), `post_edit_lint`, `workflow_state_reminder`, `prod_guard`. The wired scripts live under the plugin's `CLAUDE_PLUGIN_ROOT`/hooks; `.claude/hooks/` keeps only the libraries the lifecycle scripts call (`dag_workflow.py`, `prod_guard.py`, `_py.sh`). To see or change the wiring, edit the plugin, not `settings.json`.
+{{/if plugin_mode}}
 - Skills are auto-discovered and invocable as `/command`s.
 - Review plugins: `pr-review-toolkit@claude-plugins-official` is pre-enabled in `.claude/settings.json`; also consider `/plugin install code-review@claude-plugins-official` for full PR reviews.

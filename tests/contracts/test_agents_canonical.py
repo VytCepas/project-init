@@ -52,12 +52,16 @@ class TestClaudeOnlyIsolation:
         # Hook names and plugin wiring are Claude-only — they must not be
         # presented as universal capabilities.
         for claude_only in ("pre_commit_gate", "settings.json", "/plugin install"):
-            assert claude_only not in head, f"Claude-only reference outside marked section: {claude_only}"
+            assert claude_only not in head, (
+                f"Claude-only reference outside marked section: {claude_only}"
+            )
             assert claude_only in claude_section
 
     def test_agent_agnostic_enforcement_documented_for_all(self, target: Path):
         head = (target / "AGENTS.md").read_text().partition("## Claude Code specifics")[0]
-        assert "install_hooks.sh" in head, "git-level enforcement is universal — belongs before the Claude section"
+        assert "install_hooks.sh" in head, (
+            "git-level enforcement is universal — belongs before the Claude section"
+        )
         assert "gitleaks" in head
 
 
@@ -89,7 +93,10 @@ class TestPortableReferencesResolve:
         # sets `plugin_mode = "" if no_plugin`) so this is not an impossible mix.
         np = tmp_path / "np"
         preset = load_preset("obsidian-only")
-        preset = {**preset, "layers": list(preset["layers"]) + overlay_layers("claude", no_plugin=True)}
+        preset = {
+            **preset,
+            "layers": list(preset["layers"]) + overlay_layers("claude", no_plugin=True),
+        }
         scaffold(np, preset, make_variables(plugin_mode="", no_plugin="true"), strict=True)
         agents_np = (np / "AGENTS.md").read_text()
         assert "skills/INDEX.md" in agents_np
@@ -103,7 +110,9 @@ class TestPortableReferencesResolve:
 
 
 class TestSkillNeutrality:
-    _SKILLS = Path(__file__).resolve().parents[2] / "templates" / "fallback" / "dot_claude" / "skills"
+    _SKILLS = (
+        Path(__file__).resolve().parents[2] / "templates" / "fallback" / "dot_claude" / "skills"
+    )
 
     def test_claude_specific_skills_are_marked(self):
         """Skills that manage Claude Code config must say so explicitly."""
@@ -115,6 +124,51 @@ class TestSkillNeutrality:
         content = (self._SKILLS / "github_workflow" / "SKILL.md").read_text()
         frontmatter = content.split("---")[1]
         assert "Claude" not in frontmatter, "lifecycle skill must not be Claude-scoped"
+
+
+class TestPluginModeHookDocs:
+    """#462 F1: the hook docs must describe the actual wiring per mode. Plugin
+    mode (the default) sources hooks from the project-init-workflow plugin, not a
+    settings.json `hooks` block — so it must not tell agents the hooks are 'wired
+    in settings.json' (which would send a hook-debugger to the wrong file)."""
+
+    def test_plugin_mode_attributes_hooks_to_plugin(self, tmp_path: Path):
+        plug = tmp_path / "plug"
+        scaffold(plug, load_preset("obsidian-only"), make_variables())  # default = plugin
+        section = (plug / "AGENTS.md").read_text().partition("## Claude Code specifics")[2]
+        assert "`project-init-workflow` plugin" in section
+        assert "wired in `.claude/settings.json` fire automatically" not in section
+
+    def test_no_plugin_mode_attributes_hooks_to_settings(self, tmp_path: Path):
+        np = tmp_path / "np"
+        scaffold(
+            np,
+            load_preset("obsidian-only"),
+            make_variables(plugin_mode="", no_plugin="true"),
+        )
+        section = (np / "AGENTS.md").read_text().partition("## Claude Code specifics")[2]
+        assert "wired in `.claude/settings.json` fire automatically" in section
+
+
+class TestAdrPathCanonical:
+    """#462 F4: ADRs live in .claude/docs/adr/ (where the add_adr skill writes and
+    the scaffold creates them). No instruction file may point agents at a bare
+    docs/adr/ — that path does not exist in the scaffold and invites a stray
+    top-level docs/adr/ dir."""
+
+    _CHECK = (
+        "CLAUDE.md",
+        ".claude/project-init.md",
+        ".claude/docs/adr/adr-001-memory-stack.md",
+        ".claude/docs/guides/using-memory.md",
+    )
+
+    def test_no_bare_docs_adr_reference(self, target: Path):
+        bare = re.compile(r"(?<![\w./])docs/adr/")
+        for rel in self._CHECK:
+            text = (target / rel).read_text()
+            assert not bare.search(text), f"{rel}: bare docs/adr/ — use .claude/docs/adr/"
+        assert (target / ".claude" / "docs" / "adr").is_dir(), "canonical ADR dir missing"
 
 
 class TestGithubWorkflowProductionBoundary:
