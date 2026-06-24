@@ -10,6 +10,7 @@ Project-local Claude Code skills. Each skill is a directory `.claude/skills/<nam
 | `wiki` | Publish or update GitHub Wiki pages |
 | `add_hook` | When you need a new deterministic hook (safety, lint, logging) |
 | `add_command` | When you need a new slash command for a recurring workflow |
+| `live_test` | User-only `/live_test` — live E2E: build+install the wheel, scaffold real projects, and use them to surface bugs pytest can't |
 
 See `INDEX.md` for a trigger-based lookup table.
 

@@ -11,6 +11,7 @@ Load the relevant skill file when the trigger applies. Do not load all skills at
 | Summarize the session | `.claude/skills/session_summary/SKILL.md` |
 | Add a hook | `.claude/skills/add_hook/SKILL.md` |
 | Add a slash command | `.claude/skills/add_command/SKILL.md` |
+| Live E2E test the scaffolder (build+install wheel, scaffold real projects, use them) | `.claude/skills/live_test/SKILL.md` (user-only: `/live_test`) |
 
 ## Note for this repo
 
