@@ -66,8 +66,8 @@ Start with `obsidian-only` when in doubt. Upgrade later by re-running with `--pr
 
 ```
 your-project/
-├── CLAUDE.md                    # Agent entry point — read first
-├── AGENTS.md                    # Redirect for non-Claude agents
+├── AGENTS.md                    # Canonical agent instructions (most agents read this)
+├── CLAUDE.md                    # Claude Code entry point — redirects to AGENTS.md
 └── .claude/
     ├── project-init.md          # Workflow and conventions
     ├── config.yaml              # Record of wizard answers
