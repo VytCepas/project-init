@@ -44,8 +44,9 @@ Pick the event that matches when the hook should fire:
 - `UserPromptSubmit` — when the user submits a prompt
 - `UserPromptExpansion` — when slash commands expand
 
-**Agent/subagent events:**
+**Agent / task events:**
 - `SubagentStart` / `SubagentStop` — subagent lifecycle
+- `TaskCreated` / `TaskCompleted` — task lifecycle (via `TaskCreate` / completion)
 
 **File/config events:**
 - `FileChanged`, `CwdChanged`, `ConfigChange`
