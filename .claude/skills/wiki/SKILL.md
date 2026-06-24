@@ -2,7 +2,7 @@
 name: wiki
 description: Creates and manages GitHub Wiki pages via the wiki's git repo and the guard-allowlisted push_wiki.sh helper. Use when the user wants to publish documentation pages, architecture guides, or populate wiki content.
 when_to_use: Use when the user says "create a wiki page", "add documentation to wiki", "create an architecture page", "publish to the wiki", or "update the wiki".
-argument-hint: "<action> [page-name]"
+argument-hint: "<update|list> [owner/repo] [source-file.md]"
 allowed-tools: Bash(git *) Bash(.claude/scripts/*) Read Write
 effort: low
 ---
@@ -41,7 +41,8 @@ and pushes — all in one guard-allowlisted step. Use a template as the source:
 ### 2. List / read existing pages
 
 ```bash
-git clone "https://github.com/<owner>/<repo>.wiki.git" /tmp/wiki && ls /tmp/wiki/*.md
+WIKI=$(mktemp -d)
+git clone "https://github.com/<owner>/<repo>.wiki.git" "$WIKI" && ls "$WIKI"/*.md
 ```
 
 Each `*.md` file is a page; read them directly for current content.
