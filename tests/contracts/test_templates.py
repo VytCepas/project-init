@@ -251,14 +251,11 @@ class TestScaffoldGitHubFiles:
         # Review cycle protocol moved to github_workflow skill — file now points to it
         assert "github_workflow" in content
 
-    def test_gemini_md_created(self):
-        f = self.target / "GEMINI.md"
-        assert f.is_file()
-        content = f.read_text()
-        assert "AGENTS.md" in content
-        assert "source of truth" in content
-        assert "GitHub Projects" not in content
-        assert "[PROJECT-123][type] description" not in content
+    def test_gemini_md_not_created(self):
+        # PI-450: GEMINI.md was a pure redirect to AGENTS.md. Antigravity (the
+        # only remaining consumer after the PI-386 Gemini-CLI removal) reads
+        # AGENTS.md natively, so the redirect is no longer scaffolded.
+        assert not (self.target / "GEMINI.md").exists()
 
     def test_monitor_pr_can_merge_when_clean(self):
         script = self.target / ".claude" / "scripts" / "monitor_pr.sh"
@@ -361,14 +358,6 @@ class TestScaffoldGitHubFiles:
     def test_commit_msg_hook_is_executable(self):
         hook = self.target / ".github" / "hooks" / "commit-msg"
         assert hook.stat().st_mode & 0o111, "commit-msg hook must be executable"
-
-    def test_gemini_no_unrendered_placeholders(self):
-        import re
-
-        placeholder_re = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
-        text = (self.target / "GEMINI.md").read_text()
-        matches = placeholder_re.findall(text)
-        assert not matches, f"Unrendered placeholders in GEMINI.md: {matches}"
 
 
 def test_project_validate_pr_workflow_accepts_project_keys():

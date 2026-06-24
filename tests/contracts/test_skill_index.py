@@ -61,7 +61,7 @@ class TestSkillIndex:
 
 
 class TestAgentInstructionFiles:
-    """Verify AGENTS.md and GEMINI.md reference the skills index after scaffolding."""
+    """Verify AGENTS.md references the skills index after scaffolding."""
 
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_path: Path):
@@ -71,10 +71,6 @@ class TestAgentInstructionFiles:
 
     def test_agents_md_references_skills_index(self):
         content = (self.target / "AGENTS.md").read_text()
-        assert "INDEX.md" in content or "skills" in content.lower()
-
-    def test_gemini_md_references_skills_index(self):
-        content = (self.target / "GEMINI.md").read_text()
         assert "INDEX.md" in content or "skills" in content.lower()
 
 

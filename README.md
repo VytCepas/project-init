@@ -39,7 +39,7 @@ that is cheap, but it is not natively so — be explicit about what each agent g
 |---|---|---|
 | **Native** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring — read directly from `.claude/` | Claude Code (CLI + the Anthropic VS Code extension) |
 | **Generated per-surface config** | One canonical hook/MCP spec rendered to each surface's native files (ADR-017): Codex `.codex/`, Cursor `.cursor/`, Antigravity `.agents/` (experimental), VS Code `.vscode/mcp.json`, Amp `.amp/settings.json`, Junie `.junie/mcp/mcp.json`. Skills cross-read natively. Agent hooks (incl. the Codex CLI) are **best-effort/fail-open** | Codex (CLI+IDE), Cursor, Antigravity, VS Code Copilot, Amp, JetBrains Junie |
-| **Instructions + portable** | `AGENTS.md` is canonical; `CLAUDE.md`/`GEMINI.md` redirect to it; lifecycle scripts (plain bash), memory/vault (markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent; git hooks bind once `.claude/scripts/install_hooks.sh` has run (server-side actions need branch protection) | Everything, including Ollama-based agents |
+| **Instructions + portable** | `AGENTS.md` is canonical; `CLAUDE.md` redirects to it; lifecycle scripts (plain bash), memory/vault (markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent; git hooks bind once `.claude/scripts/install_hooks.sh` has run (server-side actions need branch protection) | Everything, including Ollama-based agents |
 
 ### Surface support matrix
 
@@ -52,7 +52,7 @@ Which scaffolded config each surface actually reads (full detail + sources:
 | VS Code Copilot | `CLAUDE.md`/`AGENTS.md` | `.claude/skills` | Claude hooks (matchers ignored) | `.vscode/mcp.json` (`servers`) | yes |
 | Cursor | `AGENTS.md` | `.claude/skills` | `.cursor/hooks.json` (best-effort) | `.cursor/mcp.json` | yes |
 | Codex (CLI + IDE) | `AGENTS.md` | `.agents/skills` | `.codex/hooks.json` (advisory) | `.codex/config.toml` | yes |
-| Antigravity (`agy`) | `AGENTS.md` / `GEMINI.md` | `.agents/skills` | `.agents/hooks.json` (experimental) | `.agents/mcp_config.json` | yes |
+| Antigravity (`agy`) | `AGENTS.md` | `.agents/skills` | `.agents/hooks.json` (experimental) | `.agents/mcp_config.json` | yes |
 | Amp | `AGENTS.md` | `.agents/skills` | — | `.amp/settings.json` (`amp.mcpServers`) | yes |
 | JetBrains Junie | `AGENTS.md` | `.junie/skills` | — | `.junie/mcp/mcp.json` | yes |
 | Ollama-based | `AGENTS.md` | — | — | — | yes |
@@ -344,7 +344,7 @@ adopters know what this tool owns and where it defers:
   ([anthropics/claude-code#34235](https://github.com/anthropics/claude-code/issues/34235)),
   while most other tools read the `AGENTS.md` standard — which is why this
   repo and scaffolded projects keep both: `AGENTS.md` is the canonical source of
-  truth and `CLAUDE.md` (and `GEMINI.md`) redirect to it — Claude Code still
+  truth and `CLAUDE.md` redirects to it — Claude Code still
   reads `CLAUDE.md` only because of the issue above (the #136 inversion shipped).
 
 ## Further reading

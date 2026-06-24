@@ -31,7 +31,6 @@ from tools.benchmark.record import RunRecord, read_records
 _OVERHEAD_CANDIDATES = (
     "CLAUDE.md",
     "AGENTS.md",
-    "GEMINI.md",
     ".claude/project-init.md",
     ".claude/memory/MEMORY.md",
 )
