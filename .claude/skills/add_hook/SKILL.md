@@ -9,11 +9,13 @@ allowed-tools: Read Write Bash
 ## Step 0 — Confirm the current schema (best-effort)
 
 The event names and output schema below are a snapshot and can lag Claude Code
-releases. Before relying on an event name or output field, confirm against the
-current docs — Context7 (resolve `claude code`, then the hooks reference) or
-WebFetch <https://docs.claude.com/en/docs/claude-code/hooks>. Best-effort only:
-if the lookup fails or you are offline, fall back to the embedded reference
-below and proceed — never block on this.
+releases. **If** a docs-lookup tool is available to you — the Context7 MCP, or
+WebFetch when it's permitted — confirm the event name / output field against the
+current reference (<https://docs.claude.com/en/docs/claude-code/hooks>) before
+relying on it. This skill's `allowed-tools` does not grant those tools, so skip
+this step cleanly whenever the tool is unavailable, unapproved, egress is
+disabled (`--no-egress` / air-gapped), or the lookup fails — fall back to the
+embedded reference below. Don't request extra permissions and never block on it.
 
 ## Step 1 — Choose an event
 

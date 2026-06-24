@@ -13,11 +13,13 @@ Slash commands in this project live in `.claude/skills/<name>/SKILL.md`. Each sk
 ## Step 0 — Confirm the current schema (best-effort)
 
 The frontmatter fields below are a snapshot and can lag Claude Code releases.
-Before relying on a field name or value, confirm against the current docs —
-Context7 (resolve `claude code`, then the slash-commands / skills reference) or
-WebFetch <https://docs.claude.com/en/docs/claude-code/slash-commands>.
-Best-effort only: if the lookup fails or you are offline, fall back to the
-embedded reference below and proceed — never block on this.
+**If** a docs-lookup tool is available to you — the Context7 MCP, or WebFetch
+when it's permitted — confirm the field name / value against the current
+reference (<https://docs.claude.com/en/docs/claude-code/slash-commands>) before
+relying on it. This skill's `allowed-tools` does not grant those tools, so skip
+this step cleanly whenever the tool is unavailable, unapproved, egress is
+disabled (`--no-egress` / air-gapped), or the lookup fails — fall back to the
+embedded reference below. Don't request extra permissions and never block on it.
 
 ## Step 1 — Create the file
 
