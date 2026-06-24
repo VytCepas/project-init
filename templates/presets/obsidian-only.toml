@@ -4,7 +4,9 @@
 name = "obsidian-only"
 description = "Obsidian vault only — human-authored docs, no AI index."
 
-layers = ["base", "obsidian"]
+# Memory layers (obsidian) are derived from memory_stack at scaffold/upgrade
+# time via overlay_layers(), not listed here, so --memory can override (#466).
+layers = ["base"]
 
 [vars]
 memory_stack = "obsidian-only"

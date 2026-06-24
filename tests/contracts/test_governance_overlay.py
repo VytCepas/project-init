@@ -126,8 +126,9 @@ class TestGovernanceOff:
 class TestGovernedPreset:
     def test_preset_merges_governance_var_onto_obsidian_base(self):
         preset = load_preset("governed")
-        # Inherits the Obsidian-only base (layers + memory stack) ...
-        assert preset["layers"] == ["base", "obsidian"]
+        # Inherits the Obsidian-only base. The obsidian layer is no longer listed
+        # in `layers`; it is derived from memory_stack at scaffold time (#466).
+        assert preset["layers"] == ["base"]
         assert preset["vars"]["memory_stack"] == "obsidian-only"
         # ... and adds the governance var that drives the overlay.
         assert preset["vars"]["governance"] is True
@@ -179,6 +180,7 @@ class TestInteractiveResolution:
         monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
         monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
         monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
+        monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
         # Every Confirm.ask (devcontainer/mise/vscode/multi-model/governance) → decline.
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
         return cli
@@ -215,8 +217,9 @@ class TestPresetPickerDefault:
         from project_init.scaffold import list_presets
 
         presets = list_presets()
-        # Sanity: governed really does sort first, so this guards a live risk.
-        assert presets[0]["name"] == "governed"
+        # Sanity: a non-obsidian preset (core, then governed) sorts before
+        # obsidian-only, so the default-index logic must actively pick it out.
+        assert presets[0]["name"] != "obsidian-only"
         default = presets[cli._default_preset_index(presets) - 1]
         assert default["name"] == "obsidian-only"
         assert not default.get("vars", {}).get("governance")

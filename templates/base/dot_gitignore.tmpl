@@ -3,9 +3,9 @@
 .claude/scheduled_tasks.lock
 .claude/.session_setup_stamp
 .claude/settings.local.json
-.claude/memory/.lightrag/  # legacy LightRAG work dir — keep ignored after migration (ADR-009)
+{{#if memory}}.claude/memory/.lightrag/  # legacy LightRAG work dir — keep ignored after migration (ADR-009)
 .claude/memory/.cache/
-.claude/logs/
+{{/if memory}}.claude/logs/
 .claude/.local/
 
 # Python
@@ -20,12 +20,12 @@ __pycache__/
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md
 
-{{/if graphify}}# Obsidian (vault workspace state only; keep notes tracked)
+{{/if graphify}}{{#if memory}}# Obsidian (vault workspace state only; keep notes tracked)
 .claude/vault/.obsidian/workspace*
 .claude/vault/.obsidian/cache
 .claude/vault/.trash/
 
-# OS / editor
+{{/if memory}}# OS / editor
 .DS_Store
 *.swp
 {{#if vscode}}# Scaffolded editor config (--vscode) is shared; the rest stays personal.

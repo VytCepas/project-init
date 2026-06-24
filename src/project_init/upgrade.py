@@ -481,8 +481,14 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
             key = raw.split(":", 1)[0].strip()
             fields[f"{section}.{key}"] = _scalar(raw)
 
-    stack = fields.get("memory.stack", "obsidian-only")
-    preset_name = stack  # memory stacks map 1:1 onto preset names
+    # No `memory:` section → a vault-free `core` project (#466): a pre-#466
+    # config ALWAYS wrote a memory block, so an absent stack uniquely identifies
+    # core. Defaulting to obsidian-only here would wrongly re-enable memory for a
+    # core project whose JSON record was deleted (Copilot review, PR #473).
+    stack = fields.get("memory.stack", "none")
+    # Memory stacks map 1:1 onto preset names EXCEPT the vault-free stack, whose
+    # preset is `core`, not `none` — load_preset("none") would fail.
+    preset_name = "core" if stack == "none" else stack
     language = fields.get("language", "none")
 
     try:
@@ -504,6 +510,7 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "test_command": fields.get("tooling.test_command", ""),
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
+        "memory": "" if stack == "none" else "true",
         "justfile": "true" if language != "none" else "",
         # Opt-in overlays + governance postdate pre-record configs — faithful as
         # off; shared with backfill (PI-190). A pre-record config also predates
@@ -536,6 +543,9 @@ def _backfill_variables(variables: dict) -> dict:
     derived: dict[str, str] = {
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
+        # Memory gate (#466): "" only for the vault-free `none` stack. The
+        # obsidian/graphify substring checks already yield "" for none.
+        "memory": "" if stack == "none" else "true",
         "justfile": "true" if language != "none" else "",
         "license_holder": v.get("project_owner") or v.get("project_name", ""),
         "created_year": v.get("created_date", "").split("-")[0],
@@ -628,6 +638,9 @@ def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Pa
     extra = overlay_layers(
         variables.get("agents", "claude"),
         no_plugin=bool(variables.get("no_plugin")),
+        # Derive memory overlays from the recorded stack (#466) so an obsidian
+        # project re-renders its vault overlay and a `none` project does not.
+        memory_stack=variables.get("memory_stack", "obsidian-only"),
         multi_model=bool(variables.get("multi_model")),
         governance=bool(variables.get("governance")),
         observability=bool(variables.get("observability")),

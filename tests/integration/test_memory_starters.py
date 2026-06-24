@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import make_variables, memory_preset
 
 
 class TestMemoryStarterFiles:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
+        preset = memory_preset("obsidian-only")
         variables = make_variables(memory_stack="obsidian-only")
         scaffold(tmp_target, preset, variables)
 
@@ -76,7 +76,7 @@ class TestVaultStarterContent:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
+        preset = memory_preset("obsidian-only")
         variables = make_variables(memory_stack="obsidian-only")
         scaffold(tmp_target, preset, variables)
 
@@ -123,7 +123,7 @@ class TestObsidianConfig:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
+        preset = memory_preset("obsidian-only")
         variables = make_variables(memory_stack="obsidian-only")
         scaffold(tmp_target, preset, variables)
 
@@ -166,7 +166,7 @@ class TestLintMemoryScript:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
-        preset = load_preset("obsidian-only")
+        preset = memory_preset("obsidian-only")
         variables = make_variables(memory_stack="obsidian-only")
         scaffold(tmp_target, preset, variables)
 

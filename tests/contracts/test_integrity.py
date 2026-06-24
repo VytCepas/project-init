@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from tests.helpers import make_variables, memory_preset
 
 
 class TestScaffoldIntegrity:
@@ -121,7 +121,8 @@ class TestStrictMode:
     def test_strict_preserves_user_memory_files_on_rerun(self, tmp_path: Path):
         """Strict mode should honor the same memory/vault idempotency as default mode."""
         target = tmp_path / "p"
-        preset = load_preset("obsidian-only")
+        # memory_preset: vault/memory live in the obsidian overlay now (#466).
+        preset = memory_preset("obsidian-only")
         scaffold(target, preset, make_variables(), strict=True)
 
         memory_file = target / ".claude" / "memory" / "project_context.md"

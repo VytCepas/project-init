@@ -13,14 +13,14 @@ import json
 import re
 from pathlib import Path
 
-from project_init.scaffold import load_preset, scaffold
+from project_init.scaffold import scaffold
 from project_init.upgrade import (
     _addition_groups,
     _classify_addition,
     run_upgrade,
     write_scaffold_record,
 )
-from tests.helpers import make_variables
+from tests.helpers import make_variables, memory_preset
 
 
 def _declined(target: Path) -> dict:
@@ -33,7 +33,7 @@ def _declined(target: Path) -> dict:
 def _scaffolded(tmp_path: Path) -> Path:
     target = tmp_path / "p"
     v = make_variables()
-    created = scaffold(target, load_preset("obsidian-only"), v, strict=True)
+    created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
     write_scaffold_record(target, "obsidian-only", v, created)
     return target
 
@@ -44,7 +44,7 @@ def _genuinely_new_docs(tmp_path: Path) -> tuple[Path, Path]:
     as new (not a restoration of a manifested file)."""
     target = tmp_path / "p"
     v = make_variables()
-    created = scaffold(target, load_preset("obsidian-only"), v, strict=True)
+    created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
     rel = sorted(p.relative_to(target) for p in (target / "docs").rglob("*.md"))[0]
     write_scaffold_record(target, "obsidian-only", v, [c for c in created if c != rel])
     (target / rel).unlink()

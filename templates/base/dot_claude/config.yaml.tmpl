@@ -19,12 +19,12 @@ delivery: {{delivery}}            # library | service | prototype — how this s
 deploy: {{deploy_target}}            # none | cloud-run | fly | k8s | registry | custom — service deploy overlay (ADR-015)
 iac: {{iac}}            # none | opentofu — infrastructure-as-code overlay (ADR-015)
 
-memory:
+{{#if memory}}memory:
   stack: {{memory_stack}}         # obsidian-only | obsidian-graphify
   vault_path: .claude/vault
   memory_path: .claude/memory
 
-mcps:
+{{/if memory}}mcps:
   installed: {{installed_mcps_yaml}}
 
 safety:
@@ -40,8 +40,8 @@ tooling:
 
 # Extra files never overwritten or reported as drift on `upgrade` (and on
 # `project-init` re-runs) (#243): a single-line JSON array of globs.
-# memory/ and vault/ are always preserved.
-# preserve: ["ci.yml", "justfile", "docs/*.md"]
+{{#if memory}}# memory/ and vault/ are always preserved.
+{{/if memory}}# preserve: ["ci.yml", "justfile", "docs/*.md"]
 
 updates:
   # Addition-group consent state (#249): IDs the owner has declined are stored

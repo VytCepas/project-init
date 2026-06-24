@@ -7,15 +7,15 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | | |
 |---|---|
 | Language | {{language}} |
-| Memory stack | {{memory_stack}} |
-| MCPs | {{installed_mcps}} |
+{{#if memory}}| Memory stack | {{memory_stack}} |
+{{/if memory}}| MCPs | {{installed_mcps}} |
 
 ## Workflow
 
-1. **Start of session** — read [`memory/MEMORY.md`](memory/MEMORY.md), then check [`.claude/docs/adr/`](docs/adr/) for relevant decisions.
-2. **During work** — permanent decisions → [`.claude/docs/adr/`](docs/adr/); exploratory notes → [`vault/`](vault/); reusable facts → [`memory/`](memory/).
-3. **End of session** — run `/session_summary` to write a session log to [`vault/sessions/`](vault/sessions/).
-
+1. **Start of session** — {{#if memory}}read [`memory/MEMORY.md`](memory/MEMORY.md), then {{/if memory}}check [`.claude/docs/adr/`](docs/adr/) for relevant decisions.
+2. **During work** — permanent decisions → [`.claude/docs/adr/`](docs/adr/){{#if memory}}; exploratory notes → [`vault/`](vault/); reusable facts → [`memory/`](memory/){{/if memory}}.
+{{#if memory}}3. **End of session** — run `/session_summary` to write a session log to [`vault/sessions/`](vault/sessions/).
+{{/if memory}}
 ## Tools
 
 | Type | Name | Purpose |

@@ -212,27 +212,52 @@ def generate_preset(name: str, *, extends: str, description: str = "", version: 
 _AGENT_LAYERS = ("codex", "antigravity", "amp", "junie")
 
 
-def overlay_layers(
+def memory_layers(memory_stack: str) -> list[str]:
+    """Template layers contributed by the memory backend (#466).
+
+    ``obsidian-only`` → ``["obsidian"]``; ``obsidian-graphify`` →
+    ``["obsidian", "graphify"]`` (graphify always implies the obsidian vault it
+    exports from); ``none`` → ``[]``. The memory backend used to be hard-coded
+    in each preset's ``layers``; it is now derived from the recorded
+    ``memory_stack`` so memory can be declined (``none``) and so scaffold +
+    upgrade derive the same layers (PI-189).
+    """
+    if memory_stack == "obsidian-only":
+        return ["obsidian"]
+    if memory_stack == "obsidian-graphify":
+        return ["obsidian", "graphify"]
+    return []
+
+
+def overlay_layers(  # noqa: PLR0913 — one parameter per independent overlay selector
     agents: str | list[str],
     *,
     no_plugin: bool,
+    memory_stack: str = "none",
     multi_model: bool = False,
     governance: bool = False,
     observability: bool = False,
 ) -> list[str]:
     """Extra template layers appended to a preset beyond its base definition.
 
-    The per-agent overlays (PI-137), prefixed with the ``fallback`` layer when
-    plugins are off, plus the opt-in ``multi_model`` overlay (ADR-016, #351),
-    the opt-in ``governance`` overlay (ADR-018, #410), and the opt-in
-    ``observability`` overlay (ADR-019, #404). One source for both the
+    The memory overlays derived from ``memory_stack`` (#466) come first — right
+    after ``base`` — preserving the historical layer order from when presets
+    listed obsidian/graphify in ``layers``. Then the per-agent overlays
+    (PI-137), prefixed with the ``fallback`` layer when plugins are off, plus
+    the opt-in ``multi_model`` (ADR-016, #351), ``governance`` (ADR-018, #410),
+    and ``observability`` (ADR-019, #404) overlays. One source for both the
     scaffolder and the ``upgrade`` re-render, so they can never derive a
     different layer set (PI-189).
+
+    ``memory_stack`` defaults to ``"none"`` so memory-agnostic callers (e.g.
+    ``agent_layers()``) are unaffected; full scaffold/upgrade pass the resolved
+    stack explicitly.
     """
     chosen = {a.strip() for a in (agents.split(",") if isinstance(agents, str) else agents)}
-    extra = [a for a in _AGENT_LAYERS if a in chosen]
+    extra = memory_layers(memory_stack)
     if no_plugin:
-        extra = ["fallback", *extra]
+        extra = [*extra, "fallback"]
+    extra = [*extra, *(a for a in _AGENT_LAYERS if a in chosen)]
     if multi_model:
         extra = [*extra, "multi_model"]
     if governance:

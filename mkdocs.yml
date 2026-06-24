@@ -43,6 +43,7 @@ nav:
     - Per-surface config generator: adr/adr-017-per-surface-config-generator.md
     - AI-governance overlay: adr/adr-018-ai-governance-overlay.md
     - Local observability overlay: adr/adr-019-local-observability-overlay.md
+    - Memory backend decomposition: adr/adr-020-memory-backend-decomposition.md
   - Development:
     - Template system: development/template-system.md
     - Non-CLI surface matrix: development/non-cli-surface-matrix.md

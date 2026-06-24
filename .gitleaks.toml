@@ -1,0 +1,15 @@
+# gitleaks config — extends the built-in default ruleset and adds narrow
+# allowlists for known false positives in this repo's own sources.
+# Used by the CI "Secret scan (gitleaks)" job (gitleaks-action@v3).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Repo-specific false positives (not secrets)."
+paths = [
+  # Byte-identity baseline manifests (#466): JSON maps of scaffold relpath →
+  # sha256 file hash. The high-entropy hash next to a "secrets.md" path key
+  # trips the generic-api-key rule, but these are content hashes, not secrets.
+  '''tests/fixtures/memory_baseline/.*\.json''',
+]

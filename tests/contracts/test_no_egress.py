@@ -14,14 +14,14 @@ from pathlib import Path
 import pytest
 
 from project_init.__main__ import _build_parser
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import make_variables, memory_preset
 
 
 def _settings(tmp_path: Path, **overrides: str) -> dict:
     target = tmp_path / "p"
     scaffold(
-        target, load_preset("obsidian-only"), make_variables(**overrides), strict=True
+        target, memory_preset("obsidian-only"), make_variables(**overrides), strict=True
     )
     return json.loads((target / ".claude" / "settings.json").read_text())
 
@@ -83,7 +83,7 @@ class TestNoEgressUpgradeBackfill:
 
         target = tmp_path / "p"
         v = make_variables()
-        created = scaffold(target, load_preset("obsidian-only"), v, strict=True)
+        created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         legacy = {k: val for k, val in v.items() if k not in ("egress_ok", "no_egress")}
         write_scaffold_record(target, "obsidian-only", legacy, created)
 

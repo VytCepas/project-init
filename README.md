@@ -25,7 +25,7 @@ Inside any target project:
 
 Principles:
 - **One folder, `.claude/`**, for everything agentic. Project root stays clean.
-- **Obsidian vault for humans, Graphify (optional) for agents** — separated on disk.
+- **Memory is à-la-carte** — an Obsidian vault for humans + optional Graphify for agents, or **none at all** (`--memory none` / the vault-free `core` preset). When present, the vault and the agent index are separated on disk.
 - **Deterministic-first** — hooks and scripts are bash/python. LLM calls only where generative.
 - **Claude-first, portable core** — built and tested for Claude Code; other agents get instructions, not enforcement. See [Agent support tiers](#agent-support-tiers).
 - **`bun` and `uv` only** — no `npm`/`npx`/`pip`/`venv` anywhere in scaffolded projects.
@@ -169,7 +169,7 @@ The wizard asks (interactive mode only):
 - Multi-model switching (`--multi-model`) — opt-in overlay (ADR-016) that scaffolds a [claude-code-router](https://github.com/musistudio/claude-code-router) config + a `setup_models.sh` installer, so you can run DeepSeek/Kimi/Ollama **through the Claude Code harness** with live `/model` switching and background **cost-routing** — your hooks, CI gates, and standards stay identical (they run below the model). OpenAI/Codex is better in its native `--agents` harness. CCR is **pinned**, machine-level, and the scaffolder never runs it (ADR-001). Clean by default.
 - AI governance (`--governance`) — opt-in overlay (ADR-018) that ships **governance-as-code** for projects that build or operate an AI system: a **policy layer** (AI usage policy, approved-tools / data-handling / code-provenance docs, NIST RMF crosswalk), a **system card** template carrying a flat-scalar governance manifest, a two-file **AIBOM** (generated MCP + detected-CCR-route inventory, plus a user-owned declarations file), and a **presence-triggered CI gate** that validates every real system card (required fields, allowed values, the `prohibited`+`allowed:true` illegal combo, declarations completeness, `last_reviewed` staleness) — failing the build, not producing a PDF. Adopts NIST AI RMF / ISO 42001 / EU AI Act / OWASP conventions (referenced, not re-authored). A freshly scaffolded project ships only an example/template, so the gate passes until a team deliberately writes a card. Most projects are not AI products — strictly opt-in, off by default. The `governed` preset enables it.
 - Observability (`--observability`) — opt-in overlay (ADR-019) that scaffolds a **file-based usage report**: a stdlib analyzer over the Claude Code transcript JSONL plus a guarded, stdin-safe hook self-log, rendered to an HTML report with one command. **No Docker, no OTEL, no egress** — everything stays on disk. Lets you see what your agents actually do (tokens, tool calls, activity) without a telemetry backend. Strictly opt-in, off by default.
-- Memory stack — Obsidian-only or Obsidian + Graphify (recommended for code-heavy projects)
+- Memory backend (`--memory none|obsidian|obsidian-graphify`) — **none** (vault-free; the `core` preset), **Obsidian-only** (markdown vault + agent-memory files), or **Obsidian + Graphify** (recommended for code-heavy projects). The flag overrides the preset's default; the wizard explains each backend before asking (#466).
 - Core MCPs (Context7)
 - Database MCP — none / Postgres / SQLite
 - Browser automation — Playwright (yes/no)
@@ -325,7 +325,7 @@ The hooks need `python3` on `PATH` (replaces the previous `jq` dependency). They
 Edit and commit from inside WSL (`wsl` then `cd ~/projects/...`). Editing WSL files from Git Bash on Windows mangles executable bits and line endings.
 
 **`Unknown preset 'foo'`**
-Run `project-init --help` and pick from `obsidian-only` or `obsidian-graphify` (ADR-009). Custom presets go in `templates/presets/<name>.toml`.
+Run `project-init --help` and pick from `core` (vault-free), `obsidian-only`, `obsidian-graphify` (ADR-009), or `governed`. Custom presets go in `templates/presets/<name>.toml`.
 
 ## Positioning in the ecosystem
 
@@ -373,9 +373,9 @@ project-init/
 ├── install.sh                # bootstrap one-liner
 ├── src/project_init/         # wizard CLI + scaffold engine
 ├── templates/
-│   ├── base/                 # always copied
-│   ├── obsidian/             # Obsidian vault overlay (both presets)
-│   ├── graphify/             # Graphify memory overlay
+│   ├── base/                 # always copied (no memory backend of its own)
+│   ├── obsidian/             # vault + agent-memory overlay; derived from memory_stack (#466)
+│   ├── graphify/             # Graphify memory overlay (implies obsidian)
 │   └── presets/              # toml preset definitions
 └── tests/                    # focused pytest modules by behavior area
 ```

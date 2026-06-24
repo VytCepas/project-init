@@ -47,6 +47,11 @@ class ScaffoldInputs:
     no_plugin: bool
     profile: str
     no_egress: bool = False
+    # Memory backend (#466): the resolved memory_stack — "obsidian-only",
+    # "obsidian-graphify", or "none" (vault-free). Drives the obsidian/graphify
+    # overlays via overlay_layers() and the memory/obsidian/graphify gate vars.
+    # Resolved with precedence flag > interactive > preset var > "obsidian-only".
+    memory: str = "obsidian-only"
     # Delivery model (epic #316, ADR-015): how the project ships — drives the
     # env/CI/release bundle. "prototype" is the safe minimal default.
     delivery: str = "prototype"
@@ -156,6 +161,17 @@ def _build_parser() -> argparse.ArgumentParser:
             "usage report. Parses Claude Code transcript JSONL plus a guarded "
             "hook self-log into a stdlib HTML report — no Docker, no OTEL, no "
             "egress. Off by default."
+        ),
+    )
+    p.add_argument(
+        "--memory",
+        choices=["none", "obsidian", "obsidian-only", "obsidian-graphify"],
+        default=None,
+        help=(
+            "Memory backend (#466): none (no vault — the vault-free `core` preset), "
+            "obsidian (human-authored markdown vault; alias for obsidian-only), or "
+            "obsidian-graphify (vault + a derived knowledge graph for agents). "
+            "Overrides the preset's default."
         ),
     )
     p.add_argument(
@@ -546,6 +562,51 @@ def _choose_observability_interactive() -> bool:
     return Confirm.ask("Set up the observability overlay?", default=False)
 
 
+_MEMORY_STACKS = ("none", "obsidian-only", "obsidian-graphify")
+
+
+def _normalize_memory(value: str | None) -> str | None:
+    """Normalize a --memory value to a canonical memory_stack, or None if unset.
+
+    Accepts the friendly ``obsidian`` alias for ``obsidian-only`` (#466).
+    """
+    if not value:
+        return None
+    return "obsidian-only" if value == "obsidian" else value
+
+
+def _choose_memory_interactive(default: str = "obsidian-only") -> str:
+    """Explain the memory backends, then ask which to scaffold (#466).
+
+    States what each backend ships and what it brings, so the user makes an
+    informed choice or declines memory entirely (``none`` → the vault-free
+    project). Passing --memory pre-selects and skips this. The default follows
+    the chosen preset's memory stack.
+    """
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import IntPrompt
+
+    console = Console()
+    body = (
+        "A [bold]memory backend[/bold] gives your agents a place to persist "
+        "decisions, conventions, and session notes [bold]across conversations[/bold] "
+        "— so context survives beyond a single chat. Everything stays on disk.\n\n"
+        "[bold]1. none[/bold]      [dim]no vault/memory — leanest; bring your own docs[/dim]\n"
+        "[bold]2. obsidian[/bold]  [dim].claude/vault (markdown notes) + .claude/memory[/dim]\n"
+        "            [dim](agent facts); browsable in Obsidian[/dim]\n"
+        "[bold]3. obsidian-graphify[/bold]  [dim]obsidian PLUS a derived knowledge[/dim]\n"
+        "            [dim]graph agents can query (Graphify)[/dim]\n\n"
+        "[cyan]Helps:[/cyan] agents recall why a decision was made weeks later.\n"
+        "Clean by default — pick [bold]none[/bold] and no vault/memory is added."
+    )
+    console.print(Panel(body, title="Memory backend", border_style="cyan"))
+    default_idx = _MEMORY_STACKS.index(default) + 1 if default in _MEMORY_STACKS else 2
+    choice = IntPrompt.ask("Choose a memory backend", default=default_idx)
+    idx = choice - 1 if 1 <= choice <= len(_MEMORY_STACKS) else default_idx - 1
+    return _MEMORY_STACKS[idx]
+
+
 def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
     """Warn that user-owned files were kept; renders landed as .new siblings."""
     from rich.console import Console
@@ -668,7 +729,7 @@ def _resolve_overlays_interactive(
     return resolved_delivery, resolved_deploy, resolved_iac
 
 
-def _gather_inputs_interactive(
+def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map to prompts
     default_name: str,
     *,
     no_plugin: bool,
@@ -682,6 +743,8 @@ def _gather_inputs_interactive(
         False,
         False,
     ),
+    memory_flag: str | None = None,
+    preset_memory: str = "obsidian-only",
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -736,6 +799,9 @@ def _gather_inputs_interactive(
     # Observability overlay (ADR-019, #404). The flag pre-accepts it; otherwise
     # the wizard explains what it ships, then asks (strictly opt-in).
     resolved_observability = observability_flag or _choose_observability_interactive()
+    # Memory backend (#466). The --memory flag wins; otherwise the wizard explains
+    # the backends and asks, defaulting to the chosen preset's memory stack.
+    resolved_memory = memory_flag or _choose_memory_interactive(default=preset_memory)
     while True:
         agents_raw = _prompt(
             "Agents/surfaces (claude always; add codex/ollama/cursor/antigravity/vscode, comma-separated)",
@@ -768,6 +834,7 @@ def _gather_inputs_interactive(
         multi_model=resolved_multi_model,
         governance=resolved_governance,
         observability=resolved_observability,
+        memory=resolved_memory,
     )
 
 
@@ -1119,8 +1186,15 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
     vscode = inputs.vscode
     agents = inputs.agents
     no_plugin = inputs.no_plugin
-    is_graphify = "graphify" in preset.get("name", "")
-    has_obsidian = "obsidian" in preset.get("layers", [])
+    # Memory backend variable contract (#466) — derived from the resolved
+    # memory_stack, NOT the preset name/layers (which no longer carry obsidian/
+    # graphify). none → all empty; obsidian-only → obsidian; obsidian-graphify →
+    # obsidian + graphify. _backfill_variables and _migrate_semantic_config emit
+    # the same table so scaffold + upgrade never diverge.
+    memory_stack = inputs.memory
+    has_obsidian = memory_stack in ("obsidian-only", "obsidian-graphify")
+    is_graphify = memory_stack == "obsidian-graphify"
+    has_memory = memory_stack != "none"
     lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(language, ("", "", ""))
     return {
         "project_name": project_name,
@@ -1158,7 +1232,8 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         # Cloud-OIDC integration seam (#326): set whenever a deploy or IaC workflow
         # authenticates to a cloud via OIDC, so the contract doc ships for them.
         "cloud_oidc": ("true" if (inputs.deploy in _DEPLOY_OIDC or inputs.iac != "none") else ""),
-        "memory_stack": preset.get("vars", {}).get("memory_stack", "obsidian-only"),
+        "memory_stack": memory_stack,
+        "memory": "true" if has_memory else "",
         "installed_mcps": format_installed_mcps(selected_mcps),
         "installed_mcps_yaml": format_installed_mcps_yaml(selected_mcps),
         "lint_command": lint_command,
@@ -1244,11 +1319,16 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
     }
 
 
-def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
+def _resolve_inputs(
+    args, parser, target: Path, preset_memory: str = "obsidian-only"
+) -> ScaffoldInputs | None:
     """Resolve all scaffold inputs from flags; None means prompt instead.
 
     Validation errors call ``parser.error`` (exits) BEFORE the target dir is
     created (PI-20), so a typo'd flag never leaves an empty dir behind.
+
+    ``preset_memory`` is the chosen preset's memory_stack — the fallback when
+    --memory is not given (#466); the flag wins.
     """
     if not args.non_interactive:
         return None
@@ -1286,6 +1366,7 @@ def _resolve_inputs(args, parser, target: Path) -> ScaffoldInputs | None:
         multi_model=args.multi_model,
         governance=args.governance,
         observability=args.observability,
+        memory=_normalize_memory(args.memory) or preset_memory,
     )
 
 
@@ -1344,11 +1425,14 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write("error: no presets found in templates/presets/\n")
         return 1
     preset = _select_preset(args, parser, presets)
+    # Memory backend fallback when --memory is absent (#466): the preset's stack
+    # (obsidian-only/obsidian-graphify/core's "none"), default obsidian-only.
+    preset_memory = preset.get("vars", {}).get("memory_stack", "obsidian-only")
 
     # Validate non-interactive args / gather interactive input BEFORE creating
     # the target directory (PI-20, PI-199: a bad flag OR a Ctrl-C at an
     # interactive prompt must not leave an empty dir behind).
-    inputs = _resolve_inputs(args, parser, target)
+    inputs = _resolve_inputs(args, parser, target, preset_memory)
     if inputs is None:
         inputs = _gather_inputs_interactive(
             default_name=target.name,
@@ -1368,6 +1452,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.governance or bool(preset.get("vars", {}).get("governance")),
                 args.observability,
             ),
+            memory_flag=_normalize_memory(args.memory),
+            preset_memory=preset_memory,
         )
     target.mkdir(parents=True, exist_ok=True)
 
@@ -1383,6 +1469,7 @@ def main(argv: list[str] | None = None) -> int:
     extra_layers = overlay_layers(
         inputs.agents,
         no_plugin=inputs.no_plugin,
+        memory_stack=inputs.memory,
         multi_model=inputs.multi_model,
         governance=governance_on,
         observability=inputs.observability,
