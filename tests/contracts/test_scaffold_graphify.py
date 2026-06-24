@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import make_variables, memory_preset
 
 
 class TestScaffoldGraphify:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_path: Path):
         self.target = tmp_path / "p"
-        preset = load_preset("obsidian-graphify")
+        preset = memory_preset("obsidian-graphify")
         variables = make_variables(
             memory_stack="obsidian-graphify",
             graphify="true",

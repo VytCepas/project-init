@@ -14,13 +14,15 @@ from pathlib import Path
 import pytest
 
 from project_init.scaffold import load_preset, overlay_layers, scaffold
-from tests.helpers import make_variables
+from tests.helpers import make_variables, memory_preset
 
 
 @pytest.fixture()
 def target(tmp_path: Path) -> Path:
     t = tmp_path / "proj"
-    scaffold(t, load_preset("obsidian-only"), make_variables())
+    # memory_preset: the obsidian overlay is derived from memory_stack (#466),
+    # so the vault/memory paths AGENTS.md links actually exist in the scaffold.
+    scaffold(t, memory_preset("obsidian-only"), make_variables())
     return t
 
 

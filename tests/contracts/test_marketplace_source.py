@@ -12,8 +12,8 @@ import json
 from pathlib import Path
 
 from project_init import __plugin_version__
-from project_init.scaffold import load_preset, marketplace_source_vars, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import marketplace_source_vars, scaffold
+from tests.helpers import make_variables, memory_preset
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -46,7 +46,7 @@ class TestMarketplaceSourceVars:
 class TestSettingsRendersHostAwareSource:
     def test_github_emits_github_source(self, tmp_path: Path):
         target = tmp_path / "g"
-        scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
+        scaffold(target, memory_preset("obsidian-only"), make_variables(), strict=True)
         data = json.loads((target / ".claude" / "settings.json").read_text())
         src = data["extraKnownMarketplaces"]["project-init"]["source"]
         assert src == {"source": "github", "repo": "example/project-init"}
@@ -58,7 +58,7 @@ class TestSettingsRendersHostAwareSource:
             project_init_enterprise="true",
             project_init_repo_url="https://ghes.example.com/org/repo.git",
         )
-        scaffold(target, load_preset("obsidian-only"), v, strict=True)
+        scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         data = json.loads((target / ".claude" / "settings.json").read_text())
         src = data["extraKnownMarketplaces"]["project-init"]["source"]
         assert src == {"source": "git", "url": "https://ghes.example.com/org/repo.git"}
@@ -88,7 +88,7 @@ class TestVersionSpanOnUpgrade:
 
         target = tmp_path / "p"
         v = make_variables(project_init_version="0.0.1")
-        created = scaffold(target, load_preset("obsidian-only"), v, strict=True)
+        created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
         assert run_upgrade(target, apply=True) == 0
         _, recorded, _, _ = read_scaffold_record(target)

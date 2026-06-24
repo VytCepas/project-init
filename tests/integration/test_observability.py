@@ -8,9 +8,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from project_init.scaffold import load_preset, marketplace_source_vars, scaffold
+from project_init.scaffold import marketplace_source_vars, scaffold
 from project_init.upgrade import run_upgrade, write_scaffold_record
-from tests.helpers import make_variables
+from tests.helpers import make_variables, memory_preset
 
 _MARKER = "# --- scaffold record"
 
@@ -32,7 +32,7 @@ class TestMarketplaceVarsIncludeHost:
 class TestFreshScaffoldRecordsObservability:
     def test_visible_fields_present(self, tmp_path: Path):
         target = tmp_path / "p"
-        scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
+        scaffold(target, memory_preset("obsidian-only"), make_variables(), strict=True)
         config_text = (target / ".claude" / "config.yaml").read_text()
         human = _human_section(config_text)
         assert "profile:" in human
@@ -46,7 +46,7 @@ class TestUpgradeInjectsObservability:
     def test_pre_259_config_gets_fields_on_apply(self, tmp_path: Path):
         target = tmp_path / "p"
         v = make_variables()
-        created = scaffold(target, load_preset("obsidian-only"), v, strict=True)
+        created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
         cfg = target / ".claude" / "config.yaml"
 
@@ -72,7 +72,7 @@ class TestUpgradeInjectsObservability:
     def test_injection_is_idempotent(self, tmp_path: Path):
         target = tmp_path / "p"
         v = make_variables()
-        created = scaffold(target, load_preset("obsidian-only"), v, strict=True)
+        created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
         assert run_upgrade(target, apply=True) == 0
         human = _human_section((target / ".claude" / "config.yaml").read_text())
@@ -83,7 +83,7 @@ class TestUpgradeInjectsObservability:
     def test_pre_259_config_gains_updates_placeholder(self, tmp_path: Path):
         target = tmp_path / "p"
         v = make_variables()
-        created = scaffold(target, load_preset("obsidian-only"), v, strict=True)
+        created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
         cfg = target / ".claude" / "config.yaml"
         # Simulate a config predating the updates section (strip the whole block).

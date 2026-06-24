@@ -1,0 +1,18 @@
+# Preset: Core — no memory backend (#466)
+# The first vault-free preset. Ships the base agentic-dev layer (hooks, skills,
+# GitHub lifecycle, toolchain) WITHOUT an Obsidian vault or agent-memory files.
+# Pick this if you don't want a docs/knowledge layer or bring your own.
+# Note: "no memory backend", NOT "minimal" — it still ships the full lifecycle
+# and toolchain (those become à-la-carte in later #470 workstreams).
+
+name = "core"
+description = "No memory backend — base agentic-dev layer without an Obsidian vault."
+
+layers = ["base"]
+
+[vars]
+memory_stack = "none"
+
+[scaffolded_project_dependencies.python]
+core = []
+dev = ["ruff"]

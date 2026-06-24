@@ -6,7 +6,9 @@
 name = "obsidian-graphify"
 description = "Obsidian vault for humans, Graphify code knowledge graph for agents."
 
-layers = ["base", "obsidian", "graphify"]
+# Memory layers (obsidian + graphify) are derived from memory_stack at
+# scaffold/upgrade time via overlay_layers(), not listed here (#466).
+layers = ["base"]
 
 [vars]
 memory_stack = "obsidian-graphify"

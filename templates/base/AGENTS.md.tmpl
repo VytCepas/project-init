@@ -17,10 +17,10 @@ Code's own hook configuration is Claude-specific (see "Claude Code specifics"
 below); everything else is reusable by any agent.
 
 - [`.claude/project-init.md`](.claude/project-init.md) — workflow, conventions, task tracking
-- [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) — memory index (read first for context)
-- [`.claude/docs/`](.claude/docs/) — system of record: ADRs and development guides
-- [`.claude/vault/`](.claude/vault/) — human workspace (Obsidian vault)
-
+{{#if memory}}- [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) — memory index (read first for context)
+{{/if memory}}- [`.claude/docs/`](.claude/docs/) — system of record: ADRs and development guides
+{{#if memory}}- [`.claude/vault/`](.claude/vault/) — human workspace (Obsidian vault)
+{{/if memory}}
 ## Skills (load on demand)
 
 Before any GitHub action (create issue, branch, push, PR, merge), check

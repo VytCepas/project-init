@@ -102,6 +102,15 @@ def make_variables(**overrides: str) -> dict[str, str]:
         defaults["want_devcontainer"] = (
             "true" if (defaults.get("devcontainer") or defaults.get("delivery") == "service") else ""
         )
+    # Mirror the memory variable contract (#466): obsidian/graphify/memory are
+    # derived from memory_stack unless a test overrides them explicitly.
+    stack = defaults["memory_stack"]
+    if "obsidian" not in overrides:
+        defaults["obsidian"] = "true" if stack in ("obsidian-only", "obsidian-graphify") else ""
+    if "graphify" not in overrides:
+        defaults["graphify"] = "true" if stack == "obsidian-graphify" else ""
+    if "memory" not in overrides:
+        defaults["memory"] = "" if stack == "none" else "true"
     return defaults
 
 
@@ -110,9 +119,33 @@ def fallback_variables(**overrides: str) -> dict[str, str]:
     return make_variables(plugin_mode="", no_plugin="true", **overrides)
 
 
-def fallback_preset(name: str = "obsidian-only") -> dict:
-    """Preset dict with the fallback layer appended, as --no-plugin does."""
-    from project_init.scaffold import load_preset
+def memory_preset(name: str = "obsidian-only") -> dict:
+    """Preset with its memory overlays (obsidian/graphify) derived, as a
+    plugin-mode scaffold does (#466).
+
+    The memory backend is no longer hard-coded in preset `layers`; it is derived
+    from `memory_stack` via overlay_layers() at the scaffold call site. Tests
+    that scaffold a preset directly must mirror that, or the vault/memory content
+    (now in the obsidian overlay) is missing.
+    """
+    from project_init.scaffold import load_preset, overlay_layers
 
     preset = load_preset(name)
-    return {**preset, "layers": [*preset["layers"], "fallback"]}
+    stack = preset.get("vars", {}).get("memory_stack", "obsidian-only")
+    extra = overlay_layers([], no_plugin=False, memory_stack=stack)
+    return {**preset, "layers": [*preset["layers"], *extra]}
+
+
+def fallback_preset(name: str = "obsidian-only") -> dict:
+    """Preset dict with memory + fallback layers appended, as --no-plugin does.
+
+    Mirrors the scaffold call site: memory overlays (obsidian/graphify) are
+    derived from the preset's memory_stack via overlay_layers(), not listed in
+    the preset's `layers` (#466).
+    """
+    from project_init.scaffold import load_preset, overlay_layers
+
+    preset = load_preset(name)
+    stack = preset.get("vars", {}).get("memory_stack", "obsidian-only")
+    extra = overlay_layers([], no_plugin=True, memory_stack=stack)
+    return {**preset, "layers": [*preset["layers"], *extra]}
