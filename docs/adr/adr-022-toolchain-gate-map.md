@@ -1,0 +1,85 @@
+# ADR-022: Toolchain decomposition — keep the existing `{{#if}}` conditionals, don't add overlays
+
+- Status: Accepted (spike — file→gate map + recommendation; no production code)
+- Date: 2026-06-25
+- Implements: epic #470 (decompose project-init into à-la-carte overlays), WS-C spike — #471
+- Relates to: ADR-002 (dot_ + .tmpl convention — the whole-file skip mechanism),
+  ADR-015 (env/deploy model — `--delivery`/`--deploy`/`--iac` gating), ADR-020 (memory
+  decomposition — the overlay pattern this spike *declines* to extend to the toolchain)
+
+## Context
+
+`base` ships ~13 toolchain files (linters, container, devcontainer, docs, IaC,
+Renovate). The WS-C mandate was explicit: **evaluate extending the existing whole-file
+`{{#if}}` conditional mechanism BEFORE proposing new overlay layers**, and justify new
+overlays only if the conditionals are insufficient.
+
+The whole-file skip mechanism (ADR-002): a `.tmpl` whose rendered output is empty or
+whitespace-only is **not created**. Wrapping a file's entire body in `{{#if x}}…{{/if x}}`
+makes the file conditional on `x`.
+
+## Finding: the toolchain is already à-la-carte
+
+Every language/container/docs toolchain file is **already** whole-file-gated:
+
+| File | Current gate | Axis | Verdict |
+|---|---|---|---|
+| `ruff.toml.tmpl` | `{{#if python}}` | language (py) | ✅ keep |
+| `eslint.config.mjs.tmpl` | `{{#if node}}` | language (node) | ✅ keep |
+| `dot_golangci.yml.tmpl` | `{{#if go}}` | language (go) | ✅ keep |
+| `typedoc.json.tmpl` | `{{#if node}}` | language (node) — API docs | ⚠️ keep, but also honor the docs axis |
+| `mkdocs.yml.tmpl` | `{{#if python}}` | **mis-gated** — a docs *site* on raw language | ⚠️ refine → docs axis |
+| `Dockerfile.tmpl` | `{{#if delivery_service}}` | delivery (ADR-015) | ✅ keep |
+| `compose.yaml.tmpl` | `{{#if delivery_service}}` | delivery | ✅ keep |
+| `dot_dockerignore.tmpl` | `{{#if delivery_service}}` | delivery | ✅ keep |
+| `dot_devcontainer/*.tmpl` | `{{#if want_devcontainer}}` | flag/delivery | ✅ keep |
+| `deploy/**`, `infra/**` | `--deploy` / `--iac` (ADR-015) | delivery | ✅ keep (separate) |
+| `mise.toml.tmpl` | `{{#if mise}}` | flag (`--mise`) | ✅ keep |
+| `justfile.tmpl` | always (conditional *sections*) | core command surface | ✅ keep always-on |
+| `renovate.json` | **always** (static `.json`, never gated) | — | ⚠️ refine → opt-out |
+| `.gitignore`, `.gitattributes`, `ruff`/lang configs core bits | always | core | ✅ keep |
+
+**Conclusion: extend the existing conditional mechanism. Do NOT introduce new overlay
+layers.** Overlays (the memory/governance pattern) earn their keep when a concern is a
+*cohesive bundle of many files toggled together* (a vault, a governance kit). The
+toolchain is the opposite: a set of **independent single files**, each already cleanly
+gated on the axis that determines it (language detection, `--delivery`, `--mise`,
+`--devcontainer`). Wrapping them in an overlay layer would **duplicate a working
+mechanism** and add a registry/derivation indirection for zero benefit.
+
+## Recommended refinements (the C-impl scope — small, additive)
+
+These are gate *adjustments*, not new machinery:
+
+1. **Introduce a docs axis** (`--docs` / `want_docs`), resolving the `mkdocs`↔`python`
+   and `typedoc`↔`node` conflation (the per-file conflict #471 called out):
+   - `mkdocs.yml` (a published docs **site** + the `docs.yml` workflow it references)
+     should gate on `want_docs`, not raw `python` — a python project that doesn't want
+     a published site shouldn't get one, and a node/go project should be able to.
+   - `typedoc.json` is node **toolchain** (stays `{{#if node}}`) but should additionally
+     respect `want_docs` so it isn't forced on every node project.
+   - **Backward-compat:** `want_docs` must default to preserve today's output (on for
+     python/node) so existing scaffolds re-render byte-identically (PI-189); the new
+     behavior is the *opt-out* and the cross-language opt-in.
+2. **Gate `renovate.json`** behind a flag (e.g. `--renovate`, default on to preserve
+   today) or convert it to `.tmpl` wrapped in `{{#if renovate}}` — a project not using
+   Renovate currently gets a stray always-on config.
+3. **No change** to the language/delivery/mise/devcontainer gates — they are correct.
+
+## Consequences
+
+- WS-C needs **no new overlay layer, no `overlay_layers()` change, no registry**. It is
+  a handful of `{{#if}}` gate edits + two new resolved vars (`want_docs`, `renovate`),
+  threaded through the same 11-touchpoint wizard/CLI/variable pattern as any flag, and
+  guarded by the PI-189 round-trip contract (defaults preserve current output).
+- This is the smallest WS-C that satisfies the epic goal ("adopt only what you need"):
+  the toolchain was *already* mostly decomposed; the spike's value is confirming the
+  existing mechanism is right and pinning down the two real gaps (docs axis, Renovate).
+
+## Out of scope
+
+- Implementation (a follow-up **C-impl** issue: the docs axis + Renovate gate).
+- Per-tool opt-outs *within* a language (e.g. python-without-ruff) — niche; ruff is the
+  scaffolder's chosen python linter (ADR-001), not an à-la-carte slot.
+- A non-GitHub docs publish target (the `docs.yml` workflow is GitHub Pages; a GitLab
+  Pages analogue is the forge-overlay concern from ADR-021, not this spike).
