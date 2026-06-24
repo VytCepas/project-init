@@ -6,6 +6,17 @@ argument-hint: "<hook-name> <event> <description>"
 allowed-tools: Read Write Bash
 ---
 
+## Step 0 — Confirm the current schema (best-effort)
+
+The event names and output schema below are a snapshot and can lag Claude Code
+releases. **If** a docs-lookup tool is available to you — the Context7 MCP, or
+WebFetch when it's permitted — confirm the event name / output field against the
+current reference (<https://docs.claude.com/en/docs/claude-code/hooks>) before
+relying on it. This skill's `allowed-tools` does not grant those tools, so skip
+this step cleanly whenever the tool is unavailable, unapproved, egress is
+disabled (`--no-egress` / air-gapped), or the lookup fails — fall back to the
+embedded reference below. Don't request extra permissions and never block on it.
+
 ## Step 1 — Choose an event
 
 Pick the event that matches when the hook should fire:
@@ -42,7 +53,8 @@ Create `.claude/hooks/<name>.sh`:
 INPUT=$(cat)
 
 # exit 0 = allow (or no-op for non-blocking events)
-# stdout JSON with {"decision":"block","reason":"..."} = block (PreToolUse)
+# PreToolUse block: stdout JSON {"hookSpecificOutput":{"hookEventName":
+#   "PreToolUse","permissionDecision":"deny","permissionDecisionReason":"..."}}
 # stdout JSON with {"additionalContext":"..."} = inject context
 # Always exit 0 — exit 1 means hook error, not a block
 
@@ -59,7 +71,7 @@ print((data.get('tool_input', {}) or {}).get('command', '') or '')
 [ -z "$CMD" ] && exit 0
 
 if echo "$CMD" | grep -qE 'git push.*(main|master)'; then
-  python3 -c "import json,sys; print(json.dumps({'decision':'block','reason':sys.argv[1]}))" \
+  python3 -c "import json,sys; print(json.dumps({'hookSpecificOutput':{'hookEventName':'PreToolUse','permissionDecision':'deny','permissionDecisionReason':sys.argv[1]}}))" \
     "Direct push to main is not allowed. Use a branch and PR."
   exit 0
 fi

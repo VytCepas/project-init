@@ -14,6 +14,17 @@ allowed-tools: Write
 
 Slash commands in this project live in `.claude/skills/<name>/SKILL.md`. Each skill is a markdown file with YAML frontmatter.
 
+## Step 0 — Confirm the current schema (best-effort)
+
+The frontmatter fields below are a snapshot and can lag Claude Code releases.
+**If** a docs-lookup tool is available to you — the Context7 MCP, or WebFetch
+when it's permitted — confirm the field name / value against the current
+reference (<https://docs.claude.com/en/docs/claude-code/slash-commands>) before
+relying on it. This skill's `allowed-tools` does not grant those tools, so skip
+this step cleanly whenever the tool is unavailable, unapproved, egress is
+disabled (`--no-egress` / air-gapped), or the lookup fails — fall back to the
+embedded reference below. Don't request extra permissions and never block on it.
+
 ## Step 1 — Create the file
 
 Create `.claude/skills/<name>/SKILL.md` where `<name>` is the command name (lowercase, hyphen-separated).
