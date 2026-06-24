@@ -156,6 +156,9 @@ jobs:
               - '**/*.sh.tmpl'
               - 'templates/**/hooks/**'
               - 'templates/**/scripts/**'
+              - 'templates/**/settings.json.tmpl'
+              - 'plugins/**/hooks/**'
+              - '.github/workflows/ci.yml'
 
   # PI-363 Layer 3: the real bash-3.2 oracle. macos-latest ships bash 3.2 as
   # /bin/bash and BSD coreutils — the genuine stock-Mac environment — so it
