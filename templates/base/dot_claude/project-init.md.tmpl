@@ -12,8 +12,8 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 
 ## Workflow
 
-1. **Start of session** — read [`memory/MEMORY.md`](memory/MEMORY.md), then check [`docs/adr/`](docs/adr/) for relevant decisions.
-2. **During work** — permanent decisions → [`docs/adr/`](docs/adr/); exploratory notes → [`vault/`](vault/); reusable facts → [`memory/`](memory/).
+1. **Start of session** — read [`memory/MEMORY.md`](memory/MEMORY.md), then check [`.claude/docs/adr/`](docs/adr/) for relevant decisions.
+2. **During work** — permanent decisions → [`.claude/docs/adr/`](docs/adr/); exploratory notes → [`vault/`](vault/); reusable facts → [`memory/`](memory/).
 3. **End of session** — run `/session_summary` to write a session log to [`vault/sessions/`](vault/sessions/).
 
 ## Tools
@@ -38,7 +38,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Agent | `reviewer` | code review specialist |
 | Agent | `researcher` | codebase explorer |
 
-Hooks run automatically via `settings.json`: `github_command_guard`, `workflow_state_reminder`, `pre_commit_gate`, `post_edit_lint`. Secret scanning and lifecycle gating are enforced agent-agnostically by git hooks (gitleaks pre-commit, commit-msg, pre-push — installed via `.claude/scripts/install_hooks.sh`) and mirrored in CI; the `security-guidance` plugin provides Claude-side guidance.
+Hooks run automatically: `github_command_guard`, `workflow_state_reminder`, `pre_commit_gate`, `post_edit_lint`, `prod_guard` — {{#if no_plugin}}wired in `.claude/settings.json`, scripts in `.claude/hooks/`{{/if no_plugin}}{{#if plugin_mode}}supplied by the `project-init-workflow` plugin (enabled in `.claude/settings.json` under `enabledPlugins`, not a local `hooks` block); the scripts live under the plugin's `CLAUDE_PLUGIN_ROOT`/hooks, so edit the plugin to change them{{/if plugin_mode}}. Secret scanning and lifecycle gating are enforced agent-agnostically by git hooks (gitleaks pre-commit, commit-msg, pre-push — installed via `.claude/scripts/install_hooks.sh`) and mirrored in CI; the `security-guidance` plugin provides Claude-side guidance.
 
 **Rules** (`.claude/rules/`): per-filetype conventions loaded automatically by Claude Code when you open a matching file.
 
@@ -175,4 +175,4 @@ When compacting, preserve:
 - Files modified this session
 - Test results (pass/fail count, failing test names)
 - Unresolved errors or lint failures
-- Decisions not yet committed to `docs/adr/`
+- Decisions not yet committed to `.claude/docs/adr/`
