@@ -258,12 +258,30 @@ class TestAuth:
     def test_seed_credentials_absent_returns_false(self, tmp_path: Path):
         assert harness.seed_credentials(tmp_path / "iso", source=tmp_path / "empty") is False
 
+    def test_seed_credentials_does_not_widen_restrictive_mode(self, tmp_path: Path):
+        """A 0o400 source token must not be widened to 0o600 (Copilot review)."""
+        source = tmp_path / "real"
+        source.mkdir()
+        src = source / ".credentials.json"
+        src.write_text("{}", encoding="utf-8")
+        src.chmod(0o400)
+        config_dir = tmp_path / "iso"
+        assert harness.seed_credentials(config_dir, source=source) is True
+        assert (config_dir / ".credentials.json").stat().st_mode & 0o777 == 0o400
+
     def test_auth_available_prefers_api_key(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
         assert harness.auth_available(tmp_path) is True  # no creds file needed
 
+    def test_auth_available_honors_oauth_token(self, tmp_path: Path, monkeypatch):
+        """CLAUDE_CODE_OAUTH_TOKEN is valid non-interactive auth (Codex review)."""
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
+        assert harness.auth_available(tmp_path) is True  # no API key / creds needed
+
     def test_auth_available_via_seeded_creds(self, tmp_path: Path, monkeypatch):
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
         assert harness.auth_available(tmp_path) is False
         (tmp_path / ".credentials.json").write_text("{}", encoding="utf-8")
         assert harness.auth_available(tmp_path) is True
@@ -271,6 +289,7 @@ class TestAuth:
     def test_run_aborts_clearly_when_unauthenticated(self, tmp_path: Path, monkeypatch, capsys):
         """The silent per-task skip is replaced by an upfront precondition error."""
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
         monkeypatch.setattr(harness.shutil, "which", lambda _: "/usr/bin/claude")
         # Point cred discovery at an empty dir so no subscription token is found.
         monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "empty"))

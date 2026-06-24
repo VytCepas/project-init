@@ -94,8 +94,8 @@ def seed_credentials(config_dir: Path, source: Path | None = None) -> bool:
     Lets ``run`` use a Pro/Max **subscription** (OAuth creds on disk) instead of
     requiring ``ANTHROPIC_API_KEY``, while keeping the run otherwise isolated so
     the fixed-overhead measurement stays clean. Returns True iff a credentials
-    file was found and copied. ``ANTHROPIC_API_KEY`` (if set) still wins in
-    ``run_task`` since the env is inherited.
+    file was found and copied. An API key / OAuth token in env (if set) still
+    wins in ``run_task`` since the env is inherited.
     """
     src = (source or default_config_dir()) / ".credentials.json"
     if not src.is_file():
@@ -103,13 +103,19 @@ def seed_credentials(config_dir: Path, source: Path | None = None) -> bool:
     config_dir.mkdir(parents=True, exist_ok=True)
     dest = config_dir / ".credentials.json"
     shutil.copyfile(src, dest)
-    dest.chmod(0o600)  # the source is 0600; never widen the token's perms.
+    # Match the source's mode but cap at 0o600 — never widen a stricter token.
+    dest.chmod(src.stat().st_mode & 0o600)
     return True
 
 
+# Env vars Claude Code honors for non-interactive auth — both take precedence
+# over stored credentials, so either is sufficient (https://code.claude.com/docs/en/env-vars).
+_AUTH_ENV_VARS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")
+
+
 def auth_available(config_dir: Path) -> bool:
-    """True if the run can authenticate: an API key in env or seeded creds."""
-    return bool(os.environ.get("ANTHROPIC_API_KEY")) or (config_dir / ".credentials.json").is_file()
+    """True if the run can authenticate: an API key / OAuth token in env, or seeded creds."""
+    return any(os.environ.get(v) for v in _AUTH_ENV_VARS) or (config_dir / ".credentials.json").is_file()
 
 
 # --- target setup (testable — no agent) -----------------------------------
