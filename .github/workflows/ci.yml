@@ -216,8 +216,9 @@ jobs:
   # PI-463: native Windows (non-WSL) runs hooks through Git Bash when Git for
   # Windows is present (the documented prerequisite). This is the Git Bash
   # oracle — it proves the scaffolded bash hooks fire on Windows, catching
-  # CRLF / exec-bit / _py.sh-resolution breakage the Linux/macOS jobs can't.
-  # Gated to shell/template changes like the macOS job.
+  # CRLF and _py.sh interpreter-resolution breakage the Linux/macOS jobs can't.
+  # (Hooks run via `bash <script>`, so exec bits aren't exercised here — that
+  # is covered on Linux by test_packaging.) Gated to shell/template changes.
   windows-portability:
     name: Windows Git Bash portability
     needs: changes
@@ -238,21 +239,28 @@ jobs:
       - name: Confirm bash is Git Bash
         run: bash --version | head -1
 
-      - name: Scaffold a project
+      # Scaffold OUTSIDE the repo checkout: session_setup.sh resolves its root as
+      # ${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}, so a target inside
+      # the project-init checkout would climb to the parent repo. RUNNER_TEMP is a
+      # sibling of the workspace; cygpath -u makes it a bash-clean path.
+      - name: Scaffold a project (outside the repo tree)
         run: |
-          uv run project-init ./win-target \
+          target="$(cygpath -u "$RUNNER_TEMP")/win-target"
+          echo "WIN_TARGET=$target" >> "$GITHUB_ENV"
+          uv run project-init "$target" \
             --non-interactive --preset obsidian-only --name win \
             --description "windows portability" --language python --no-plugin --strict
 
       - name: SessionStart bootstrap runs under Git Bash
         run: |
-          cd ./win-target
-          bash .claude/hooks/session_setup.sh
+          cd "$WIN_TARGET"
+          # CLAUDE_PROJECT_DIR is what Claude Code itself sets on every hook fire.
+          CLAUDE_PROJECT_DIR="$WIN_TARGET" bash .claude/hooks/session_setup.sh
           test -f .claude/.session_setup_stamp
 
       - name: Commit gate runs under Git Bash against a staged file
         run: |
-          cd ./win-target
+          cd "$WIN_TARGET"
           git init -q
           git config user.email ci@example.com
           git config user.name ci
@@ -260,11 +268,11 @@ jobs:
           git add sample.py
           # PreToolUse hook: reads tool JSON on stdin, must exit 0 for a clean file.
           printf '%s' '{"tool_input":{"command":"git commit -m test"}}' \
-            | bash .claude/hooks/pre_commit_gate.sh
+            | CLAUDE_PROJECT_DIR="$WIN_TARGET" bash .claude/hooks/pre_commit_gate.sh
           echo "pre_commit_gate.sh exit: $?"
 
       - name: _py.sh resolves an interpreter on Windows
         run: |
-          cd ./win-target
+          cd "$WIN_TARGET"
           out=$(bash .claude/hooks/_py.sh -c "print('resolver-ok')")
           test "$out" = "resolver-ok"
