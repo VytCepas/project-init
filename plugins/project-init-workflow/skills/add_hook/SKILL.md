@@ -29,10 +29,14 @@ Pick the event that matches when the hook should fire:
 - `PreToolUse` — before a tool runs; output block JSON to block it
 - `PostToolUse` — after a tool runs; cannot block, can log or validate
 - `PostToolBatch` — after a batch of parallel tool calls completes
+- `PostToolUseFailure` — after a tool fails
 - `PermissionRequest` — when Claude asks for permission; can auto-approve
+- `PermissionDenied` — when permission is denied; can request a retry
 
 **Session lifecycle:**
 - `SessionStart` — when a session begins
+- `SessionEnd` — when a session closes
+- `PreCompact` — before context compaction (can block)
 - `Stop` — when Claude stops generating (end of turn)
 - `StopFailure` — when a turn fails
 
@@ -40,9 +44,9 @@ Pick the event that matches when the hook should fire:
 - `UserPromptSubmit` — when the user submits a prompt
 - `UserPromptExpansion` — when slash commands expand
 
-**Agent/task events:**
+**Agent / task events:**
 - `SubagentStart` / `SubagentStop` — subagent lifecycle
-- `TaskCreated` / `TaskCompleted` — task tracking events
+- `TaskCreated` / `TaskCompleted` — task lifecycle (via `TaskCreate` / completion)
 
 **File/config events:**
 - `FileChanged`, `CwdChanged`, `ConfigChange`

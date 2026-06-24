@@ -46,15 +46,23 @@ class TestWikiSkillStructure:
         assert "Bash" in content, "Skill should allow Bash tool"
         assert "Read" in content or "Write" in content, "Skill should allow file tools"
 
-    def test_skill_documents_cli_actions(self, skill_file: Path):
-        """Verify skill documents gh CLI actions."""
+    def test_skill_documents_real_actions(self, skill_file: Path):
+        """Verify skill documents the real git-based wiki mechanism, not a
+        fabricated ``gh wiki`` subcommand (which does not exist)."""
         content = skill_file.read_text()
-        cli_actions = [
-            "gh wiki create",
-            "gh wiki list",
+        required = [
+            "push_wiki.sh",  # guard-allowlisted write path
+            ".wiki.git",  # the wiki is a plain git repo
         ]
-        for action in cli_actions:
+        for action in required:
             assert action in content, f"Skill should document {action}"
+        # Regression guard: gh has no `wiki` subcommand. The only acceptable
+        # mentions are the negative instructions telling authors not to use it.
+        for line in content.splitlines():
+            if "gh wiki" in line:
+                assert ("no `gh wiki`" in line) or ("never use `gh wiki" in line), (
+                    f"Skill must not instruct using the nonexistent gh wiki CLI: {line!r}"
+                )
 
     def test_skill_documents_templates(self, skill_file: Path):
         """Verify skill mentions template directory."""

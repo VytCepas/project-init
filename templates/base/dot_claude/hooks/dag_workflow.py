@@ -362,7 +362,7 @@ def cmd_check(node: str) -> int:
         own_ok, own_reason = CHECKS[node]()
         marker = "OK" if own_ok else "REACHABLE (state not yet satisfied)"
         sys.stdout.write(f"{marker}: {node} — {own_reason}\n")
-        return 0 if own_ok else 0  # prereqs satisfied = transition allowed
+        return 0  # prereqs satisfied = transition allowed (own check is advisory)
     sys.stdout.write(f"BLOCKED: cannot reach {node}: {reason}\n")
     return 2
 

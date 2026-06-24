@@ -77,5 +77,5 @@ context = (
     f"{state_block}"
 )
 
-print(json.dumps({"additionalContext": context}))
+print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": context}}))
 '

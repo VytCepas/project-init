@@ -2,7 +2,7 @@
 name: status
 description: Show project status — git state, recent commits, open tasks, and memory summary
 when_to_use: Use when you want a quick snapshot of the project — current branch, uncommitted changes, recent work, active memory, and open TODOs.
-allowed-tools: Bash Read Grep Glob
+allowed-tools: Bash(git *) Read Grep Glob
 ---
 
 Give me a concise project status report:

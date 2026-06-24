@@ -85,5 +85,5 @@ blindly apply a suggestion — post reasoning even when rejecting.
 ## Issue titles vs PR titles
 
 - **Issue titles**: plain description only — type is carried by the label.
-- **PR titles**: must include `[type]` — PR titles become merge commit messages in `git log`.
+- **PR titles**: use `type(PROJECT-123): description` (Conventional Commits, ADR-006); drop the scope for no-issue PRs (`type: description`). PR titles become merge commit messages in `git log`.
 - **nojira**: for minor fixes without a tracking issue; no `Closes #N` needed.

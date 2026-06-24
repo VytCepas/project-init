@@ -60,7 +60,8 @@ if [ -n "$ERRORS" ]; then
     "$PY" -c "
 import json, sys
 file, errors = sys.argv[1], sys.argv[2]
-print(json.dumps({'additionalContext': f'Lint errors in {file} (after auto-fix attempt) — please fix before continuing:\n{errors}'}))
+ctx = f'Lint errors in {file} (after auto-fix attempt) — please fix before continuing:\n{errors}'
+print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': ctx}}))
 " "$FILE" "$ERRORS"
 fi
 
