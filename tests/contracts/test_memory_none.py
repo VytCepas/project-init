@@ -93,6 +93,18 @@ class TestVariableContract:
         # The vault-free stack maps to the `core` preset, NOT load_preset("none").
         assert preset_name == ("core" if stack == "none" else stack)
 
+    def test_migrate_no_memory_section_is_core_not_obsidian(self):
+        # A core project renders config.yaml with NO `memory:` block. With the
+        # JSON record stripped, the semantic fallback must default to `none`/core
+        # — defaulting to obsidian-only would re-enable memory (Copilot, PR #473).
+        preset_name, variables, _manifest = _migrate_semantic_config(["language: python"])
+        assert preset_name == "core"
+        assert (variables["memory_stack"], variables["memory"], variables["obsidian"]) == (
+            "none",
+            "",
+            "",
+        )
+
 
 class TestDefaultPresetIndex:
     def test_core_does_not_become_the_enter_default(self):

@@ -481,9 +481,13 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
             key = raw.split(":", 1)[0].strip()
             fields[f"{section}.{key}"] = _scalar(raw)
 
-    stack = fields.get("memory.stack", "obsidian-only")
+    # No `memory:` section → a vault-free `core` project (#466): a pre-#466
+    # config ALWAYS wrote a memory block, so an absent stack uniquely identifies
+    # core. Defaulting to obsidian-only here would wrongly re-enable memory for a
+    # core project whose JSON record was deleted (Copilot review, PR #473).
+    stack = fields.get("memory.stack", "none")
     # Memory stacks map 1:1 onto preset names EXCEPT the vault-free stack, whose
-    # preset is `core`, not `none` — load_preset("none") would fail (#466).
+    # preset is `core`, not `none` — load_preset("none") would fail.
     preset_name = "core" if stack == "none" else stack
     language = fields.get("language", "none")
 
