@@ -119,6 +119,18 @@ uv tool install git+https://github.com/VytCepas/project-init@v0.3.0
 
 Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
 
+### Platform requirements
+
+macOS, Linux, and WSL work out of the box. The scaffolded hooks and lifecycle
+scripts are bash (a single bash-3.2 portability floor, epic #359) — so on **native Windows
+(non-WSL)** you need **[Git for Windows](https://gitforwindows.org/)** (it ships
+`bash`/`sh` + coreutils), and you should run from a **Git Bash** shell. Claude
+Code then runs hooks through Git Bash automatically; the wired hooks also pin
+`"shell": "bash"` to make that explicit. Without Git for Windows, Claude Code
+falls back to PowerShell, which can't run a bash hook — so the enforcement
+hooks won't fire. PowerShell-only is not a supported target; there are no
+`.ps1` equivalents by design. (WSL remains the smoothest Windows path.)
+
 ## Use
 
 ### Option 1: Inside a Claude Code session (interactive)

@@ -8,9 +8,13 @@ templates and the derived plugin payload (kept in sync by tools/sync_plugin.py).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
+
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -32,9 +36,7 @@ def _hook_files(name: str) -> list[Path]:
 
 def _code_lines(text: str) -> str:
     """Strip comment-only lines so a builtin named in a comment doesn't trip."""
-    return "\n".join(
-        line for line in text.splitlines() if not line.lstrip().startswith("#")
-    )
+    return "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
 
 
 @pytest.mark.parametrize("name", _ALWAYS_ON)
@@ -64,3 +66,43 @@ def test_commit_gate_builds_arrays_portably():
         code = _code_lines(path.read_text())
         assert "while IFS= read -r" in code, f"{path}: expected portable read loop"
         assert "STAGED_PY+=(" in code and "STAGED_JS+=(" in code
+
+
+def _command_hooks(hooks_block: dict) -> list[dict]:
+    """Flatten every command-type hook object across all events."""
+    out: list[dict] = []
+    for event_entries in hooks_block.values():
+        for entry in event_entries:
+            for hook in entry.get("hooks", []):
+                if hook.get("type") == "command":
+                    out.append(hook)
+    return out
+
+
+def test_plugin_hooks_pin_bash_shell():
+    """PI-463: every command hook pins shell:bash so native Windows uses Git
+    Bash (and never silently falls back to PowerShell, which can't run a bash
+    shebang or expand POSIX $CLAUDE_PLUGIN_ROOT)."""
+    config = json.loads(
+        (_REPO_ROOT / "plugins" / "project-init-workflow" / "hooks" / "hooks.json").read_text()
+    )
+    cmds = _command_hooks(config["hooks"])
+    assert cmds, "plugin hooks.json must define at least one command hook"
+    for hook in cmds:
+        assert hook.get("shell") == "bash", (
+            f'plugin hook {hook.get("command")!r} must set "shell": "bash"'
+        )
+
+
+def test_scaffolded_settings_hooks_pin_bash_shell(tmp_path: Path):
+    """The --no-plugin scaffold wires hooks in settings.json; each must pin
+    shell:bash for the same native-Windows reason (PI-463)."""
+    target = tmp_path / "proj"
+    scaffold(target, fallback_preset(), fallback_variables())
+    settings = json.loads((target / ".claude" / "settings.json").read_text())
+    cmds = _command_hooks(settings.get("hooks", {}))
+    assert cmds, "no-plugin settings.json must wire command hooks"
+    for hook in cmds:
+        assert hook.get("shell") == "bash", (
+            f'settings.json hook {hook.get("command")!r} must set "shell": "bash"'
+        )

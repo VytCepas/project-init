@@ -156,6 +156,9 @@ jobs:
               - '**/*.sh.tmpl'
               - 'templates/**/hooks/**'
               - 'templates/**/scripts/**'
+              - 'templates/**/settings.json.tmpl'
+              - 'plugins/**/hooks/**'
+              - '.github/workflows/ci.yml'
 
   # PI-363 Layer 3: the real bash-3.2 oracle. macos-latest ships bash 3.2 as
   # /bin/bash and BSD coreutils — the genuine stock-Mac environment — so it
@@ -208,4 +211,68 @@ jobs:
         run: |
           cd /tmp/macos-target
           out=$(/bin/bash .claude/hooks/_py.sh -c "print('resolver-ok')")
+          test "$out" = "resolver-ok"
+
+  # PI-463: native Windows (non-WSL) runs hooks through Git Bash when Git for
+  # Windows is present (the documented prerequisite). This is the Git Bash
+  # oracle — it proves the scaffolded bash hooks fire on Windows, catching
+  # CRLF and _py.sh interpreter-resolution breakage the Linux/macOS jobs can't.
+  # (Hooks run via `bash <script>`, so exec bits aren't exercised here — that
+  # is covered on Linux by test_packaging.) Gated to shell/template changes.
+  windows-portability:
+    name: Windows Git Bash portability
+    needs: changes
+    if: needs.changes.outputs.shell == 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash  # GitHub's "bash" on Windows is Git Bash — the supported path
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+          python-version: "3.12"
+
+      - name: Confirm bash is Git Bash
+        run: bash --version | head -1
+
+      # Scaffold OUTSIDE the repo checkout: session_setup.sh resolves its root as
+      # ${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}, so a target inside
+      # the project-init checkout would climb to the parent repo. RUNNER_TEMP is a
+      # sibling of the workspace; cygpath -u makes it a bash-clean path.
+      - name: Scaffold a project (outside the repo tree)
+        run: |
+          target="$(cygpath -u "$RUNNER_TEMP")/win-target"
+          echo "WIN_TARGET=$target" >> "$GITHUB_ENV"
+          uv run project-init "$target" \
+            --non-interactive --preset obsidian-only --name win \
+            --description "windows portability" --language python --no-plugin --strict
+
+      - name: SessionStart bootstrap runs under Git Bash
+        run: |
+          cd "$WIN_TARGET"
+          # CLAUDE_PROJECT_DIR is what Claude Code itself sets on every hook fire.
+          CLAUDE_PROJECT_DIR="$WIN_TARGET" bash .claude/hooks/session_setup.sh
+          test -f .claude/.session_setup_stamp
+
+      - name: Commit gate runs under Git Bash against a staged file
+        run: |
+          cd "$WIN_TARGET"
+          git init -q
+          git config user.email ci@example.com
+          git config user.name ci
+          printf 'x = 1\n' > sample.py
+          git add sample.py
+          # PreToolUse hook: reads tool JSON on stdin, must exit 0 for a clean file.
+          printf '%s' '{"tool_input":{"command":"git commit -m test"}}' \
+            | CLAUDE_PROJECT_DIR="$WIN_TARGET" bash .claude/hooks/pre_commit_gate.sh
+          echo "pre_commit_gate.sh exit: $?"
+
+      - name: _py.sh resolves an interpreter on Windows
+        run: |
+          cd "$WIN_TARGET"
+          out=$(bash .claude/hooks/_py.sh -c "print('resolver-ok')")
           test "$out" = "resolver-ok"

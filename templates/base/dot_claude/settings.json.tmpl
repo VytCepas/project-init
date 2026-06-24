@@ -27,6 +27,7 @@
         "hooks": [
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session_setup.sh",
             "timeout": 300
           }
@@ -39,16 +40,19 @@
         "hooks": [
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre_commit_gate.sh",
             "timeout": 60
           },
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/github_command_guard.sh",
             "timeout": 10
           },
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/prod_guard.py",
             "timeout": 10
           }
@@ -61,6 +65,7 @@
         "hooks": [
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post_edit_lint.sh",
             "timeout": 30
           }
@@ -72,6 +77,7 @@
         "hooks": [
           {
             "type": "command",
+            "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/workflow_state_reminder.sh",
             "timeout": 10
           }
