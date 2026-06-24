@@ -38,10 +38,10 @@ class TestCanonicality:
         assert "Key rules for agents" not in content
         assert len(content.splitlines()) < 30
 
-    def test_gemini_md_redirects_to_agents(self, target: Path):
-        content = (target / "GEMINI.md").read_text()
-        assert "AGENTS.md" in content
-        assert "CLAUDE.md" not in content, "no two-hop indirection for Gemini"
+    def test_gemini_md_not_scaffolded(self, target: Path):
+        # PI-450: GEMINI.md was a pure redirect. Antigravity reads AGENTS.md
+        # natively (Gemini CLI removed in PI-386), so it is no longer emitted.
+        assert not (target / "GEMINI.md").exists()
 
 
 class TestClaudeOnlyIsolation:
@@ -72,16 +72,17 @@ class TestPortableReferencesResolve:
         for rel in referenced:
             assert (target / rel).exists(), f"AGENTS.md references missing path: {rel}"
 
-    def test_gemini_skills_index_link_gated_by_plugin_mode(self, tmp_path: Path):
-        """#437: GEMINI.md must not dangle a `.claude/skills/INDEX.md` link in
-        the default plugin scaffold — INDEX.md ships only via the fallback layer
-        (--no-plugin). In plugin mode the link must be absent; in --no-plugin
-        mode it must be present and resolve."""
+    def test_agents_skills_index_link_gated_by_plugin_mode(self, tmp_path: Path):
+        """#437 (repointed to AGENTS.md in PI-450): the instruction file must not
+        dangle a `.claude/skills/INDEX.md` link in the default plugin scaffold —
+        INDEX.md ships only via the fallback layer (--no-plugin). In plugin mode
+        the link must be absent; in --no-plugin mode it must be present and
+        resolve."""
         # Plugin mode (default): no INDEX.md link, and no such file.
         plug = tmp_path / "plug"
         scaffold(plug, load_preset("obsidian-only"), make_variables())
-        gemini_plug = (plug / "GEMINI.md").read_text()
-        assert "skills/INDEX.md" not in gemini_plug
+        agents_plug = (plug / "AGENTS.md").read_text()
+        assert "skills/INDEX.md" not in agents_plug
         assert not (plug / ".claude" / "skills" / "INDEX.md").exists()
         # --no-plugin mode: INDEX.md is linked and present. Clear plugin_mode as
         # the real CLI does (plugin_mode and no_plugin are coupled: __main__.py
@@ -90,13 +91,13 @@ class TestPortableReferencesResolve:
         preset = load_preset("obsidian-only")
         preset = {**preset, "layers": list(preset["layers"]) + overlay_layers("claude", no_plugin=True)}
         scaffold(np, preset, make_variables(plugin_mode="", no_plugin="true"), strict=True)
-        gemini_np = (np / "GEMINI.md").read_text()
-        assert "skills/INDEX.md" in gemini_np
+        agents_np = (np / "AGENTS.md").read_text()
+        assert "skills/INDEX.md" in agents_np
         assert (np / ".claude" / "skills" / "INDEX.md").exists()
 
     def test_no_unrendered_placeholders_in_instruction_files(self, target: Path):
         placeholder = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
-        for name in ("AGENTS.md", "CLAUDE.md", "GEMINI.md"):
+        for name in ("AGENTS.md", "CLAUDE.md"):
             text = (target / name).read_text()
             assert not placeholder.search(text), f"unrendered placeholder in {name}"
 

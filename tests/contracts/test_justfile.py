@@ -144,14 +144,14 @@ class TestRecipesAreTheSingleCallsite:
 
     def test_instruction_files_reference_just_list(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")
-        # CLAUDE.md is a redirect (PI-136); the canonical and Gemini entry
-        # points carry the command-discovery pointer.
-        for name in ("AGENTS.md", "GEMINI.md"):
+        # CLAUDE.md is a redirect (PI-136); the canonical AGENTS.md carries
+        # the command-discovery pointer.
+        for name in ("AGENTS.md",):
             assert "just --list" in (target / name).read_text(), f"{name} missing just --list"
 
     def test_no_just_reference_for_language_none(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "none")
-        for name in ("CLAUDE.md", "AGENTS.md", "GEMINI.md"):
+        for name in ("CLAUDE.md", "AGENTS.md"):
             assert "just --list" not in (target / name).read_text(), name
 
 

@@ -89,9 +89,10 @@ def test_readme_documents_env_model_flags():
 
 
 def test_readme_states_agents_md_canonical():
-    """#434: #136 shipped — AGENTS.md is canonical and CLAUDE.md/GEMINI.md
-    redirect to it. The README must not still describe the inverse (CLAUDE.md
-    canonical / AGENTS.md a redirect), which contradicts the generated output."""
+    """#434: #136 shipped — AGENTS.md is canonical and CLAUDE.md redirects to
+    it. The README must not still describe the inverse (CLAUDE.md canonical /
+    AGENTS.md a redirect), which contradicts the generated output. PI-450:
+    GEMINI.md is no longer scaffolded."""
     readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
     # Stale inverse fragments must be gone.
     assert "thin redirect to CLAUDE.md" not in readme
@@ -100,4 +101,4 @@ def test_readme_states_agents_md_canonical():
     assert "planned in #136" not in readme  # the inversion shipped
     # Canonical-AGENTS statements must be present.
     assert "AGENTS.md` is the portability backbone" in readme
-    assert "`CLAUDE.md`/`GEMINI.md` redirect to it" in readme
+    assert "`CLAUDE.md` redirects to it" in readme

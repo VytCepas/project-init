@@ -17,7 +17,7 @@ project-init can decide what to emit beyond `.claude/` (epic #359, workstream B)
 | **VS Code Copilot agent mode** | **Partial** — CLAUDE.md (`chat.useClaudeMdFile`), `.claude/skills/`, `.claude/rules`, Claude-format hooks | `.github/skills/`, `.claude/skills/`, `.agents/skills/` | reads Claude hooks but **matcher ignored**, ~8 PascalCase events | **separate** — `.vscode/mcp.json`, top-level `servers` | AGENTS.md, CLAUDE.md | MED–HIGH |
 | **Cursor** (≥1.7 / 2.4) | **Skills only** | `.claude/skills/`, `.codex/skills/`, `.cursor/skills/`, `.agents/skills/` | `.cursor/hooks.json`, **own camelCase vocab**, NOT interchangeable | `.cursor/mcp.json`, `mcpServers` (portable) | AGENTS.md, `.cursor/rules/*.mdc` | HIGH |
 | **Codex** (CLI **and** IDE ext — shared config) | n/a (uses `.codex/` + `.agents/`) | `.agents/skills/` ✅ (our current target) | `.codex/hooks.json` or `config.toml`, PascalCase subset, `type:command` only | `.codex/config.toml` `[mcp_servers.*]` (**TOML**, not JSON) | AGENTS.md (primary consumer) | HIGH |
-| **Antigravity** (v2.0) | No (reads `.agents/` + `~/.gemini/`) | `.agents/skills/` (format-compatible; **not** `.claude/skills`) | `.agents/hooks.json` (`safety-gate`/`PreToolUse`) | `~/.gemini/config/mcp_config.json`, `mcpServers` | AGENTS.md ✅, CLAUDE.md ✗, GEMINI.md native | MED **(verify live)** |
+| **Antigravity** (v2.0) | No (reads `.agents/` + `~/.gemini/`) | `.agents/skills/` (format-compatible; **not** `.claude/skills`) | `.agents/hooks.json` (`safety-gate`/`PreToolUse`) | `~/.gemini/config/mcp_config.json`, `mcpServers` | AGENTS.md ✅, CLAUDE.md ✗ | MED **(verify live)** |
 
 ## Validation of the #365 medium-confidence claims
 
@@ -74,7 +74,7 @@ project-init can decide what to emit beyond `.claude/` (epic #359, workstream B)
 Current emission (verified by scaffolding `obsidian-only` + `--agents claude,codex,antigravity`):
 `.claude/` (Claude CLI), `.codex/hooks.json` + `.agents/skills/` (Codex),
 `.agents/skills/` + `.agents/hooks.json` + `.agents/mcp_config.json` (Antigravity),
-and `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`.
+and `AGENTS.md`/`CLAUDE.md`.
 
 | Surface | Already covered by current output | Gap to close (feeds #366) |
 |---|---|---|
