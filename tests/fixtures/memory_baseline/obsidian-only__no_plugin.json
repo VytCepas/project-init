@@ -16,8 +16,6 @@
   ".claude/docs/guides/secrets.md": "3971a9dd0568aaa1ec65e13a6e83b07b0b96f795cb2b10ec6e894111d72a9cce",
   ".claude/docs/guides/using-memory.md": "433598cd17ee0a7d98f2987100cae5426947ee8edb8e0b2dfa7c7786a7b94e1e",
   ".claude/hooks/README.md": "9a6533d1f8ad8cc667683ba58bbda5e524c230931f65c77cb2d477c72c080061",
-  ".claude/hooks/__pycache__/dag_workflow.cpython-312.pyc": "91bf5aa748dce5a64d4678624429ded8fb4b7e5e27adc463ac0ffd419e85af39",
-  ".claude/hooks/__pycache__/prod_guard.cpython-312.pyc": "8fd7c59e2887d5cf9c19706f901dc3265ffef88b06b2f52067ef84f562184f43",
   ".claude/hooks/_py.sh": "41c28f08f42df48131b052aa6a74f0b49b2baa17624e4c17e2f6ca4c289ad100",
   ".claude/hooks/_usage_log.sh": "9684c3821fd3ac2cbac334a3f2ccb6de6c5792062b1bc30702001c02d19da5de",
   ".claude/hooks/dag_workflow.py": "b143f12e5f94ecd7b78ed7c9b0e99e5db16b541c1e7edf0870ac86ea38fa863d",

@@ -34,11 +34,18 @@ COMBOS = [
 
 
 def _manifest(target: Path) -> dict[str, str]:
-    return {
-        p.relative_to(target).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-        for p in sorted(target.rglob("*"))
-        if p.is_file()
-    }
+    out: dict[str, str] = {}
+    for p in sorted(target.rglob("*")):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(target)
+        # Skip Python bytecode caches: a developer's local templates/ tree may
+        # carry __pycache__ that scaffold() copies, but a clean checkout (CI)
+        # does not — including them would be spurious drift.
+        if "__pycache__" in rel.parts or rel.suffix == ".pyc":
+            continue
+        out[rel.as_posix()] = hashlib.sha256(p.read_bytes()).hexdigest()
+    return out
 
 
 @pytest.mark.parametrize("preset_name,no_plugin", COMBOS)
