@@ -28,7 +28,7 @@ Every language/container/docs toolchain file is **already** whole-file-gated:
 | `eslint.config.mjs.tmpl` | `{{#if node}}` | language (node) | ✅ keep |
 | `dot_golangci.yml.tmpl` | `{{#if go}}` | language (go) | ✅ keep |
 | `typedoc.json.tmpl` | `{{#if node}}` | language (node) — API docs | ⚠️ keep, but also honor the docs axis |
-| `mkdocs.yml.tmpl` | `{{#if python}}` | **mis-gated** — a docs *site* on raw language | ⚠️ refine → docs axis |
+| `mkdocs.yml.tmpl` | `{{#if python}}` | **mis-gated** — local docs config on raw language (no published site; PI-343) | ⚠️ refine → docs axis |
 | `Dockerfile.tmpl` | `{{#if delivery_service}}` | delivery (ADR-015) | ✅ keep |
 | `compose.yaml.tmpl` | `{{#if delivery_service}}` | delivery | ✅ keep |
 | `dot_dockerignore.tmpl` | `{{#if delivery_service}}` | delivery | ✅ keep |
@@ -52,15 +52,22 @@ mechanism** and add a registry/derivation indirection for zero benefit.
 These are gate *adjustments*, not new machinery:
 
 1. **Introduce a docs axis** (`--docs` / `want_docs`), resolving the `mkdocs`↔`python`
-   and `typedoc`↔`node` conflation (the per-file conflict #471 called out):
-   - `mkdocs.yml` (a published docs **site** + the `docs.yml` workflow it references)
-     should gate on `want_docs`, not raw `python` — a python project that doesn't want
-     a published site shouldn't get one, and a node/go project should be able to.
+   and `typedoc`↔`node` conflation (the per-file conflict #471 called out). Note these
+   are **local doc-tooling configs only** — there is no published-site workflow
+   (PI-343/ADR-004 retired the GitHub Pages `docs.yml`; `test_quality_toolchain.py`
+   asserts its absence). `mkdocs.yml` exists for `mkdocs serve` preview; `typedoc.json`
+   for a local `typedoc` build:
+   - `mkdocs.yml` should gate on `want_docs`, not raw `python` — a python project that
+     doesn't want MkDocs config shouldn't get one, and a node/go project should be able
+     to opt in.
    - `typedoc.json` is node **toolchain** (stays `{{#if node}}`) but should additionally
      respect `want_docs` so it isn't forced on every node project.
    - **Backward-compat:** `want_docs` must default to preserve today's output (on for
      python/node) so existing scaffolds re-render byte-identically (PI-189); the new
      behavior is the *opt-out* and the cross-language opt-in.
+   - **Cleanup:** `mkdocs.yml.tmpl:3` still claims it is "Published to GitHub Pages by
+     `.github/workflows/docs.yml`" — a stale reference to the retired workflow (Codex
+     review). C-impl should fix this comment to describe local preview only.
 2. **Gate `renovate.json`** behind a flag (e.g. `--renovate`, default on to preserve
    today) or convert it to `.tmpl` wrapped in `{{#if renovate}}` — a project not using
    Renovate currently gets a stray always-on config.
