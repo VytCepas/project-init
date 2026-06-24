@@ -1,84 +1,68 @@
 ---
 name: wiki
-description: Creates and manages GitHub Wiki pages using gh CLI. Use when the user wants to create documentation pages, architecture guides, or populate wiki content.
-when_to_use: Use when the user says "create a wiki page", "add documentation to wiki", "create an architecture page", or "update the wiki".
+description: Creates and manages GitHub Wiki pages via the wiki's git repo and the guard-allowlisted push_wiki.sh helper. Use when the user wants to publish documentation pages, architecture guides, or populate wiki content.
+when_to_use: Use when the user says "create a wiki page", "add documentation to wiki", "create an architecture page", "publish to the wiki", or "update the wiki".
 argument-hint: "<action> [page-name]"
-allowed-tools: Bash Read Write
+allowed-tools: Bash(git *) Bash(.claude/scripts/*) Read Write
 effort: low
 ---
 
-Manage GitHub Wiki pages using `gh` CLI commands. Keep operations simple and deterministic.
+Manage the GitHub Wiki. A wiki is a **plain git repository** at
+`https://github.com/<owner>/<repo>.wiki.git` — there is **no `gh wiki`
+subcommand**. Each page is a markdown file named after its title with spaces
+replaced by hyphens (e.g. "Getting Started" → `Getting-Started.md`); `Home.md`
+is the landing page. Pushes go through `push_wiki.sh`, which the command guard
+allowlists (a raw `git push` to the wiki is otherwise blocked).
+
+> The wiki must be enabled and initialized once in the repo's GitHub UI
+> (create any first page) before `<repo>.wiki.git` exists to clone or push.
 
 ## Actions
 
-### 1. Create a new wiki page
+### 1. Update the Home page (supported write path)
 
 ```bash
-gh wiki create --title "<Page Title>" --body "$(cat <<'EOF'
-# Page Title
-
-## Overview
-
-Add your content here.
-
-## Section
-
-More details.
-EOF
-)"
+.claude/scripts/push_wiki.sh <owner>/<repo> <source-file.md> [--prune <stale-page.md> ...]
 ```
 
-Or using the template system:
+Writes `<source-file.md>` as `Home.md`, optionally removes stale pages, commits,
+and pushes — all in one guard-allowlisted step. Use a template as the source:
 
 ```bash
-gh wiki create --title "Architecture" --body "$(cat .claude/skills/wiki/templates/architecture.md)"
+.claude/scripts/push_wiki.sh <owner>/<repo> .claude/skills/wiki/templates/architecture.md
 ```
 
-**Available templates:**
+**Available templates** (`.claude/skills/wiki/templates/`):
 - `architecture.md` — System architecture and design
 - `scaffolder-logic.md` — Scaffolder workflow and implementation
 - `preset-guide.md` — Preset configuration guide
 - `implementation-guide.md` — Implementation guidance
 
-### 2. List wiki pages
+### 2. List / read existing pages
 
 ```bash
-gh wiki list
+git clone "https://github.com/<owner>/<repo>.wiki.git" /tmp/wiki && ls /tmp/wiki/*.md
 ```
 
-Shows all pages with their last update time.
+Each `*.md` file is a page; read them directly for current content.
 
-### 3. Update an existing page
+### 3. Create or edit additional named pages
 
-```bash
-# Edit locally first
-vim ~/tmp/wiki-page.md
-
-# Push the updated version
-gh wiki edit "<Page Title>" --body "$(cat ~/tmp/wiki-page.md)"
-```
-
-### 4. Clone the wiki for local editing
-
-```bash
-gh repo clone <repo>.wiki.git
-cd <repo>.wiki
-# Edit pages as markdown files
-git add .
-git commit -m "Update wiki"
-git push
-```
+`push_wiki.sh` manages `Home.md` only. To publish other pages, add the named
+markdown file(s) to the source flow — extend `push_wiki.sh` (it already clones,
+commits, and pushes the wiki repo) rather than running a raw `git push`, which
+the guard blocks. Name each file `<Page-Title>.md` with spaces as hyphens.
 
 ## Rules
 
-- Page titles are descriptive and match the markdown H1 heading
-- Templates are stored in `.claude/skills/wiki/templates/`
-- All wiki operations use `gh` CLI — no direct git operations in the skill
-- Test that wiki configuration exists before attempting operations
+- The wiki is a git repo, not a `gh` resource — never use `gh wiki ...` (it does not exist).
+- All wiki pushes go through `push_wiki.sh` so the command guard allows them.
+- Page file names mirror the title with spaces → hyphens; `Home.md` is the landing page.
+- Confirm the wiki is initialized before cloning/pushing.
 
 ## Testing
 
 The test suite validates:
-- `gh` CLI is available and authenticated
-- Wiki is enabled for the repository
-- Standard wiki operations work (create, list, clone)
+- The wiki git repo (`<repo>.wiki.git`) is reachable / wiki is enabled.
+- `push_wiki.sh` writes `Home.md` and pushes successfully.
+- Cloning and listing pages works for read operations.

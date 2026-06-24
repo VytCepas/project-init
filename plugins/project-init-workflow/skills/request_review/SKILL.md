@@ -1,9 +1,9 @@
 ---
 name: request_review
-description: Mark the current draft PR ready for review
-when_to_use: Use when a draft PR is ready to move from Draft to In Review status. Marks the PR ready and triggers board automation.
+description: Marks a draft PR ready for review, moving it Draft → In Review and triggering board automation. Use when a draft PR is finished and ready for reviewers.
+when_to_use: Use when the user says "request review", "mark the PR ready", "this PR is ready", or a draft PR is ready to move from Draft to In Review.
 argument-hint: "[pr-number]"
-allowed-tools: Bash Read
+allowed-tools: Bash(.claude/scripts/*) Read
 ---
 
 Mark PR $ARGUMENTS (or current branch's PR if omitted) ready for review.

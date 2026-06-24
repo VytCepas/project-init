@@ -6,6 +6,7 @@ argument-hint: "[--fix]"
 allowed-tools: Bash(git *) Bash(gh *) Bash(stat *) Bash(file *) Bash(head *) Read Write Edit Glob Grep
 effort: high
 context: fork
+agent: general-purpose
 ---
 
 Run a comprehensive project health audit. Create a GitHub issue with all findings. If `$ARGUMENTS` contains `--fix`, also fix the issues and open a PR.

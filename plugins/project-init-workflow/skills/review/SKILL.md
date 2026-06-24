@@ -3,7 +3,7 @@ name: review
 description: Review staged or recent changes for bugs, style issues, and missed edge cases
 when_to_use: Use when you want a code review of work — staged changes, a specific commit, or a commit range.
 argument-hint: "[commit-range or file]"
-allowed-tools: Bash Read Grep Glob
+allowed-tools: Bash(git *) Read Grep Glob
 ---
 
 Review the code changes specified by: $ARGUMENTS

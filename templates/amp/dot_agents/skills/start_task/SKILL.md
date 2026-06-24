@@ -34,7 +34,7 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
    ```bash
    .claude/scripts/start_issue.sh <issue-number> <type>
    ```
-   This derives the branch name (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) from the issue title, pushes it, and opens a draft PR with the correct `[PROJECT-123][type]` title and `Closes #n` body.
+   This derives the branch name (`<issue_type>/<project_abbr>-<issue_number>-<slug>`) from the issue title, pushes it, and opens a draft PR with the correct `type(PROJECT-123): description` title (Conventional Commits, ADR-006) and `Closes #n` body.
 
 5. **Proceed** — only begin implementation after the scripts have run successfully.
 

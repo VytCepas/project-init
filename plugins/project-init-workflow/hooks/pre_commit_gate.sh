@@ -89,7 +89,7 @@ if [ -n "$ERRORS" ]; then
 import json, sys
 errors = sys.argv[1].replace('\\\\n', '\n')
 msg = 'Pre-commit lint check failed. Fix these errors before committing:\n\n' + errors
-print(json.dumps({'decision': 'block', 'reason': msg}))
+print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny', 'permissionDecisionReason': msg}}))
 " "$ERRORS"
 fi
 

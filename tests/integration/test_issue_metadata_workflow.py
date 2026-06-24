@@ -453,7 +453,10 @@ exit 2
             cwd=self.target,
         )
         out = json.loads(result.stdout)
-        assert "additionalContext" in out
+        # Canonical UserPromptSubmit shape: context nested under hookSpecificOutput.
+        hso = out.get("hookSpecificOutput", {})
+        assert hso.get("hookEventName") == "UserPromptSubmit"
+        assert "additionalContext" in hso
 
 
 class TestCommitMsgHookFormats:
