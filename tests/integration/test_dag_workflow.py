@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -593,3 +594,45 @@ class TestPushForceWithLease:
             cwd=work, capture_output=True, text=True,
         )
         assert proc.returncode == 0, proc.stderr
+
+
+class TestFinishBranchGuard:
+    """PI-458: `finish` must push the PR's head branch, never whatever is
+    checked out — a concurrent branch switch once made it push an unrelated
+    branch."""
+
+    def test_finish_refuses_when_current_branch_mismatches_pr_head(self, monkeypatch):
+        mod = _load_module(SOURCE_HOOK)
+        # PR #99's head is feat/PI-99-x, but a different branch is checked out.
+        monkeypatch.setattr(mod, "_current_branch", lambda: "chore/PI-50-other")
+        monkeypatch.setattr(
+            mod, "_gh",
+            lambda args: (0, "feat/PI-99-x\n") if "headRefName" in args else (0, ""),
+        )
+        pushed: list = []
+        monkeypatch.setattr(mod, "cmd_push", lambda *a, **k: pushed.append(a) or 0)
+        monkeypatch.setattr(mod, "cmd_promote", lambda *a, **k: 0)
+
+        rc = mod.cmd_finish(99, None)
+
+        assert rc == 1, "finish must refuse when checked-out branch != PR head"
+        assert pushed == [], "finish must NOT push when the branch mismatches"
+
+    def test_finish_pushes_pr_head_branch_on_match(self, monkeypatch):
+        mod = _load_module(SOURCE_HOOK)
+        monkeypatch.setattr(mod, "_current_branch", lambda: "feat/PI-99-x")
+        monkeypatch.setattr(
+            mod, "_gh",
+            lambda args: (0, "feat/PI-99-x\n") if "headRefName" in args else (0, ""),
+        )
+        pushed: list = []
+        monkeypatch.setattr(mod, "cmd_push", lambda branch, *a, **k: pushed.append(branch) or 0)
+        monkeypatch.setattr(mod, "cmd_promote", lambda *a, **k: 0)
+        monkeypatch.setattr(
+            mod.subprocess, "run", lambda *a, **k: types.SimpleNamespace(returncode=0)
+        )
+
+        rc = mod.cmd_finish(99, None)
+
+        assert rc == 0
+        assert pushed == ["feat/PI-99-x"], "finish must push the PR's head branch by name"
