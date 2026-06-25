@@ -80,10 +80,14 @@ def test_combination_renders_strict_clean(
     assert has_lifecycle == (lifecycle == "github"), "lifecycle gating wrong for this combo"
 
     # The two-plugin split (#476): the lifecycle plugin is enabled iff lifecycle
-    # is on AND we are in plugin mode (absent from enabledPlugins otherwise).
-    lifecycle_plugin_on = settings["enabledPlugins"].get("project-init-lifecycle@project-init")
-    expected_lifecycle_plugin = (lifecycle == "github") and not no_plugin
-    assert (lifecycle_plugin_on is True) == expected_lifecycle_plugin
+    # is on AND we are in plugin mode — enabled as `True`, and entirely ABSENT
+    # (not present-as-false) otherwise, since the key is conditionally rendered.
+    enabled = settings["enabledPlugins"]
+    key = "project-init-lifecycle@project-init"
+    if (lifecycle == "github") and not no_plugin:
+        assert enabled.get(key) is True, "lifecycle plugin should be enabled for this combo"
+    else:
+        assert key not in enabled, "lifecycle plugin must be absent for this combo"
 
     # docs config follows language (python→mkdocs, node→typedoc) with want_docs on.
     assert (target / "mkdocs.yml").exists() == (language == "python")
