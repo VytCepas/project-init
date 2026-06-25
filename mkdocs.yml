@@ -46,6 +46,7 @@ nav:
     - Memory backend decomposition: adr/adr-020-memory-backend-decomposition.md
     - Quality vs lifecycle tier boundary: adr/adr-021-quality-vs-lifecycle-tier-boundary.md
     - Toolchain gate map: adr/adr-022-toolchain-gate-map.md
+    - Wizard explanation standard: adr/adr-023-wizard-explanation-standard.md
   - Development:
     - Template system: development/template-system.md
     - Non-CLI surface matrix: development/non-cli-surface-matrix.md
