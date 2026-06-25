@@ -4,10 +4,6 @@
 .github
 .claude
 .devcontainer
-.venv
-__pycache__
-*.pyc
-node_modules
 dist
 build
 target
@@ -16,9 +12,13 @@ target
 !.env.example
 *.log
 .DS_Store
+coverage
+.coverage
+{{#if python}}.venv
+__pycache__
+*.pyc
 .pytest_cache
 .ruff_cache
 .mypy_cache
-coverage
-.coverage
-{{/if delivery_service}}
+{{/if python}}{{#if node}}node_modules
+{{/if node}}{{/if delivery_service}}
