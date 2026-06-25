@@ -62,6 +62,7 @@ def _explainer_calls() -> dict:
         "vscode": cli._choose_vscode_interactive,
         "docs": lambda: cli._choose_docs_interactive("python"),
         "renovate": cli._choose_renovate_interactive,
+        "browser": cli._choose_browser_interactive,
     }
 
 

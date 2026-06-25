@@ -23,8 +23,8 @@ so the next selectable concern can't ship as a bare yes/no prompt.
 forms satisfy the standard:
 
 1. **Panel form** (opt-in / opt-out concerns: memory, lifecycle, governance,
-   observability, multi-model, devcontainer, mise, vscode, docs, renovate). A
-   `rich.Panel` whose body states, in order:
+   observability, multi-model, devcontainer, mise, vscode, docs, renovate, the
+   Playwright/browser add-on). A `rich.Panel` whose body states, in order:
    - **what it ships** — the concrete files/behavior;
    - a **`Helps:` line** — the value, in the user's terms ("why you'd want it");
    - the **honest cost / caveat** — build time, a setting to enable, a tradeoff;

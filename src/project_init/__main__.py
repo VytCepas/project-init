@@ -414,9 +414,19 @@ def _choose_mcps_interactive(catalog: list[dict]) -> list[dict]:
 
 
 def _choose_browser_interactive() -> bool:
-    from rich.prompt import Confirm
-
-    return Confirm.ask("\nAdd Playwright (browser automation)?", default=False)
+    # A genuine selectable add-on, so it explains its value too (#472/ADR-023,
+    # Codex review) — not a bare yes/no. _explain_and_confirm is defined below;
+    # this runs at wizard time, after the module is fully loaded.
+    return _explain_and_confirm(
+        "Browser automation (Playwright MCP)",
+        "Adds the [bold]Playwright MCP[/bold] so the agent can drive a real "
+        "browser — navigate, click, fill forms, and screenshot.\n\n"
+        "[cyan]Helps:[/cyan] end-to-end web testing, scraping, and visual checks "
+        "from the agent.\n"
+        "[dim]Cost: installs Playwright + a browser engine. Off by default.[/dim]",
+        "Add Playwright (browser automation)?",
+        default=False,
+    )
 
 
 def _choose_profile_interactive() -> str:
@@ -818,6 +828,7 @@ WIZARD_CONCERN_FLAGS: dict[str, str] = {
     "vscode": "vscode",
     "docs": "no_docs",
     "renovate": "no_renovate",
+    "browser": "browser",
 }
 
 # Flags that are mechanical inputs (basic identity / distribution mechanics /
@@ -836,7 +847,6 @@ WIZARD_MECHANICAL_FLAGS: frozenset[str] = frozenset(
         "license",
         "agents",
         "mcps",
-        "browser",
         "no_plugin",
         "no_egress",
         "non_interactive",
