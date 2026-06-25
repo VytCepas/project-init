@@ -6,7 +6,7 @@
   },
 {{/if go}}  "postCreateCommand": "bash .devcontainer/post-create.sh",
   "remoteEnv": {
-    "PATH": "${containerEnv:HOME}/.local/bin:${containerEnv:HOME}/.bun/bin:${containerEnv:PATH}"
+    "PATH": "${containerEnv:HOME}/.local/bin:{{#if node}}${containerEnv:HOME}/.bun/bin:{{/if node}}${containerEnv:PATH}"
   },
   "customizations": {
     "vscode": {

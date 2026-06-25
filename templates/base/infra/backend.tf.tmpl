@@ -1,14 +1,24 @@
 {{#if iac_enabled}}# Remote state backend — UNCOMMENT and configure once, then `tofu init`.
 # Left commented because the backend is account-specific and has a bootstrap
 # chicken-and-egg (the bucket/table must exist before init). Never commit
-# credentials; supply them via the environment / OIDC.
+# credentials; supply them via the environment / OIDC. Pick the block for your
+# cloud (delete the other).
 #
+# AWS — S3:
 # terraform {
 #   backend "s3" {
 #     bucket       = "your-tf-state-bucket"
 #     key          = "{{project_name}}/terraform.tfstate"
 #     region       = "your-region"
 #     use_lockfile = true   # native S3 state locking (TF 1.10+/OpenTofu)
+#   }
+# }
+#
+# GCP — GCS:
+# terraform {
+#   backend "gcs" {
+#     bucket = "your-tf-state-bucket"
+#     prefix = "{{project_name}}/state"
 #   }
 # }
 {{/if iac_enabled}}

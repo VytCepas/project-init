@@ -4,9 +4,8 @@
 #
 # Loading order (first match wins):
 #   1. variables already exported in your shell
-#   2. .env, loaded by the tool itself — `uv run --env-file .env`, bun
-#      auto-loads .env, or direnv if your team uses it
-# Nothing here is loaded implicitly by the scaffold; tools opt in.
+#   2. .env, loaded explicitly by your tooling or direnv — nothing here is
+#      loaded implicitly by the scaffold.{{#if python}} For Python: `uv run --env-file .env`.{{/if python}}{{#if node}} For Node: bun auto-loads `.env`.{{/if node}}{{#if go}} For Go: use a loader like `godotenv` (parse the file; don't `source` it).{{/if go}}
 #
 # Never commit .env: the pre-commit gitleaks scan and CI both enforce this.
 # For team secrets, see .claude/docs/guides/secrets.md (escalation paths).
