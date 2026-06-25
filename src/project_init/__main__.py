@@ -840,6 +840,8 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     preset_memory: str = "obsidian-only",
     lifecycle_flag: str | None = None,
     preset_lifecycle: str = "github",
+    no_docs: bool = False,
+    no_renovate: bool = False,
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -885,18 +887,23 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     )
     mise = Confirm.ask("Pin toolchain versions with mise (mise.toml)?", default=False)
     vscode = Confirm.ask("Add shared VS Code config (extensions + format-on-save)?", default=False)
-    # Docs tooling axis (#477, ADR-022). Default ON; only meaningful for the
-    # languages whose docs config ships (mkdocs→python, typedoc→node), so the
-    # question is skipped for other languages (the gate yields no docs file there).
-    want_docs = True
-    if language in ("python", "node"):
+    # Docs tooling axis (#477, ADR-022). The --no-docs flag wins (skip the
+    # prompt); otherwise default ON and only ask for the languages whose docs
+    # config ships (mkdocs→python, typedoc→node) — other languages get no docs
+    # file from the gate, so the question is skipped there.
+    if no_docs:
+        want_docs = False
+    elif language in ("python", "node"):
         _tool = "mkdocs.yml" if language == "python" else "typedoc.json"
         want_docs = Confirm.ask(
             f"Include the local docs-preview config ({_tool})?", default=True
         )
-    # Renovate dependency-update config (#477, ADR-022). Default ON.
-    want_renovate = Confirm.ask(
-        "Include renovate.json (Renovate dependency-update bot)?", default=True
+    else:
+        want_docs = True
+    # Renovate dependency-update config (#477, ADR-022). --no-renovate wins.
+    want_renovate = (
+        False if no_renovate
+        else Confirm.ask("Include renovate.json (Renovate dependency-update bot)?", default=True)
     )
     # Multi-model switching overlay (ADR-016, #351/#352). The flag pre-accepts it;
     # otherwise the wizard explains what it does + the alternatives, then asks.
@@ -1594,6 +1601,8 @@ def main(argv: list[str] | None = None) -> int:
             preset_memory=preset_memory,
             lifecycle_flag=_normalize_lifecycle(args.lifecycle),
             preset_lifecycle=preset_lifecycle,
+            no_docs=args.no_docs,
+            no_renovate=args.no_renovate,
         )
     target.mkdir(parents=True, exist_ok=True)
 

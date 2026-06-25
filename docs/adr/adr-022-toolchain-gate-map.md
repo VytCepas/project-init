@@ -51,7 +51,8 @@ mechanism** and add a registry/derivation indirection for zero benefit.
 
 These are gate *adjustments*, not new machinery:
 
-1. **Introduce a docs axis** (`--docs` / `want_docs`), resolving the `mkdocs`↔`python`
+1. **Introduce a docs axis** (`want_docs`; shipped as the opt-out flag `--no-docs`,
+   default ON — see the implementation outcome below), resolving the `mkdocs`↔`python`
    and `typedoc`↔`node` conflation (the per-file conflict #471 called out). Note these
    are **local doc-tooling configs only** — there is no published-site workflow
    (PI-343/ADR-004 retired the GitHub Pages `docs.yml`; `test_quality_toolchain.py`
@@ -68,9 +69,10 @@ These are gate *adjustments*, not new machinery:
    - **Cleanup:** `mkdocs.yml.tmpl:3` still claims it is "Published to GitHub Pages by
      `.github/workflows/docs.yml`" — a stale reference to the retired workflow (Codex
      review). C-impl should fix this comment to describe local preview only.
-2. **Gate `renovate.json`** behind a flag (e.g. `--renovate`, default on to preserve
-   today) or convert it to `.tmpl` wrapped in `{{#if renovate}}` — a project not using
-   Renovate currently gets a stray always-on config.
+2. **Gate `renovate.json`** behind a flag (shipped as the opt-out `--no-renovate`,
+   default on to preserve today) by converting it to `.tmpl` wrapped in
+   `{{#if renovate}}` — a project not using Renovate currently gets a stray
+   always-on config.
 3. **No change** to the language/delivery/mise/devcontainer gates — they are correct.
 
 ## Consequences

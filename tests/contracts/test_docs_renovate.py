@@ -153,3 +153,48 @@ class TestUpgradeRoundTrip:
         _preset, variables, _manifest, _migrated = read_scaffold_record(target)
         assert variables["want_docs"] == ""
         assert variables["renovate"] == ""
+
+
+class TestInteractiveFlags:
+    """--no-docs / --no-renovate must be honored in the wizard too, not only in
+    --non-interactive (Codex review #483)."""
+
+    @staticmethod
+    def _mock_leaves(monkeypatch):
+        import project_init.__main__ as cli
+
+        answers = iter(["proj", "desc", "python", "@owner", "none", "claude"])
+        monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
+        monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
+        monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
+        monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
+        monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
+        monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "none")
+        monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
+        # Confirm.ask → True: docs/renovate would land ON if the flags were ignored.
+        monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: True)
+        return cli
+
+    def test_flags_honored_despite_prompt_default(self, monkeypatch):
+        cli = self._mock_leaves(monkeypatch)
+        result = cli._gather_inputs_interactive(
+            default_name="proj",
+            no_plugin=False,
+            profile="individual",
+            cli_overlays=(None, None, None, False, False, False),
+            no_docs=True,
+            no_renovate=True,
+        )
+        assert result.want_docs is False
+        assert result.renovate is False
+
+    def test_no_flags_respects_prompt(self, monkeypatch):
+        cli = self._mock_leaves(monkeypatch)
+        result = cli._gather_inputs_interactive(
+            default_name="proj",
+            no_plugin=False,
+            profile="individual",
+            cli_overlays=(None, None, None, False, False, False),
+        )
+        assert result.want_docs is True
+        assert result.renovate is True
