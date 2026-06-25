@@ -19,7 +19,7 @@
   ".claude/hooks/README.md": "9a6533d1f8ad8cc667683ba58bbda5e524c230931f65c77cb2d477c72c080061",
   ".claude/hooks/_py.sh": "41c28f08f42df48131b052aa6a74f0b49b2baa17624e4c17e2f6ca4c289ad100",
   ".claude/hooks/dag_workflow.py": "b143f12e5f94ecd7b78ed7c9b0e99e5db16b541c1e7edf0870ac86ea38fa863d",
-  ".claude/hooks/prod_guard.py": "686b3a0dc1949890ccfa4b49643d13e65ed5d01e0ce4433e410a3749f0b41c93",
+  ".claude/hooks/prod_guard.py": "387e3f0c886f47cceb61d25df651e9d149f0b5f179adc9fa9da15c0587416993",
   ".claude/memory/MEMORY.md": "544dac81979cbe795cc55a020360c2569036381b62f879d10ce8dffdc0de0791",
   ".claude/memory/README.md": "ff7e14d842d875f537d7d3a6cbe18df47e754088949804f94f348e300bbcbc5e",
   ".claude/memory/SCHEMA.md": "5c7191cb5946a603a9e1f715837f2783fe4bf736d87334cf45b853892fab9102",

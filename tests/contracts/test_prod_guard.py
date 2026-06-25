@@ -19,6 +19,9 @@ DESTRUCTIVE = [
     # OpenTofu parity (PI-488): the `tofu` fork must be guarded like terraform.
     "tofu destroy -auto-approve",
     "tofu apply -destroy",
+    # Global options before the verb must not slip past the guard (Codex P2).
+    "tofu -chdir=infra destroy -auto-approve",
+    "terraform -chdir=./infra apply -destroy",
     "kubectl delete namespace prod",
     "helm uninstall api --namespace prod",
     "aws ec2 terminate-instances --instance-ids i-123",
@@ -43,6 +46,10 @@ SAFE = [
     # Parity: routine OpenTofu reads/applies are not destructive (PI-488).
     "tofu plan",
     "tofu apply -auto-approve",
+    # `plan -destroy` only PREVIEWS a destroy — read-only, must stay unflagged
+    # even though the flag-skip tolerates global options (Codex P2 review).
+    "tofu plan -destroy",
+    "tofu -chdir=infra apply -auto-approve",
     "kubectl get pods -n prod",
     "aws s3 ls",
     "git status",

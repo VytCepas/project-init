@@ -37,10 +37,13 @@ from pathlib import Path
 _SEG = r"[^|;&]*?"
 DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     # OpenTofu (`tofu`) is a CLI-identical Terraform fork — guard both the same
-    # way (PI-488). Routine non-interactive `apply -auto-approve` is intentionally
-    # not flagged; only destroy / apply-with-destroy is.
-    (re.compile(r"\b(?:terraform|tofu)\s+(destroy|apply\s+.*-destroy)\b"),
-     "terraform/tofu destroy"),
+    # way (PI-488). `(?:-\S+\s+)*` tolerates global options before the verb
+    # (e.g. `tofu -chdir=infra destroy`) like _SEG does for the other rules, but
+    # stays flag-specific (only skips leading `-tokens`) so a read-only
+    # `plan -destroy` is NOT flagged. Routine `apply -auto-approve` is
+    # intentionally not flagged; only destroy / apply-with-destroy is.
+    (re.compile(r"\b(?:terraform|tofu)\s+(?:-\S+\s+)*(destroy|apply\s+.*-destroy)\b"),
+     "terraform/tofu destroy/apply -destroy"),
     (re.compile(rf"\bkubectl\b{_SEG}\bdelete\b"), "kubectl delete"),
     (re.compile(rf"\bhelm\b{_SEG}\b(uninstall|delete)\b"), "helm uninstall"),
     (re.compile(rf"\baws\b{_SEG}\b(delete|terminate|remove)\S*\b"), "aws delete/terminate"),
