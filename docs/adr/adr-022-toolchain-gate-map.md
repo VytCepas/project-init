@@ -51,7 +51,8 @@ mechanism** and add a registry/derivation indirection for zero benefit.
 
 These are gate *adjustments*, not new machinery:
 
-1. **Introduce a docs axis** (`--docs` / `want_docs`), resolving the `mkdocs`↔`python`
+1. **Introduce a docs axis** (`want_docs`; shipped as the opt-out flag `--no-docs`,
+   default ON — see the implementation outcome below), resolving the `mkdocs`↔`python`
    and `typedoc`↔`node` conflation (the per-file conflict #471 called out). Note these
    are **local doc-tooling configs only** — there is no published-site workflow
    (PI-343/ADR-004 retired the GitHub Pages `docs.yml`; `test_quality_toolchain.py`
@@ -68,9 +69,10 @@ These are gate *adjustments*, not new machinery:
    - **Cleanup:** `mkdocs.yml.tmpl:3` still claims it is "Published to GitHub Pages by
      `.github/workflows/docs.yml`" — a stale reference to the retired workflow (Codex
      review). C-impl should fix this comment to describe local preview only.
-2. **Gate `renovate.json`** behind a flag (e.g. `--renovate`, default on to preserve
-   today) or convert it to `.tmpl` wrapped in `{{#if renovate}}` — a project not using
-   Renovate currently gets a stray always-on config.
+2. **Gate `renovate.json`** behind a flag (shipped as the opt-out `--no-renovate`,
+   default on to preserve today) by converting it to `.tmpl` wrapped in
+   `{{#if renovate}}` — a project not using Renovate currently gets a stray
+   always-on config.
 3. **No change** to the language/delivery/mise/devcontainer gates — they are correct.
 
 ## Consequences
@@ -90,3 +92,25 @@ These are gate *adjustments*, not new machinery:
   scaffolder's chosen python linter (ADR-001), not an à-la-carte slot.
 - A non-GitHub docs publish target (the `docs.yml` workflow is GitHub Pages; a GitLab
   Pages analogue is the forge-overlay concern from ADR-021, not this spike).
+
+## Implementation outcome (C-impl, #477)
+
+Implemented as gate edits + two opt-out vars, no new overlay (as recommended):
+
+- **`want_docs` axis** (`--no-docs`, default ON): `mkdocs.yml` now gates on
+  `{{#if python}}{{#if want_docs}}` and `typedoc.json` on `{{#if node}}{{#if want_docs}}`
+  — so a python/node project can decline its docs-preview config. Both stay
+  byte-identical with the default on (PI-189).
+- **`renovate` gate** (`--no-renovate`, default ON): `renovate.json` → `renovate.json.tmpl`
+  wrapped in `{{#if renovate}}`.
+- **Stale-comment fix**: `mkdocs.yml` and `typedoc.json` no longer claim a
+  GitHub-Pages publish workflow (the `docs.yml` retired by PI-343/ADR-004); they
+  now state they are local-preview only. This is the one intentional byte change
+  (the committed byte-identity fixtures' `mkdocs.yml` hash was updated to match).
+- **Deferred — cross-language mkdocs opt-in.** The spike floated letting a
+  node/go project opt INTO mkdocs. That needs a separate per-tool selector (a
+  single `want_docs` binary with a python default can't also serve node's
+  typedoc-but-not-mkdocs without breaking byte-identity), so it is left out as a
+  niche follow-up; `want_docs` here only *narrows* (declines), it never forces
+  docs on a new language. The primary gap the spike identified — "you can't
+  decline mkdocs" — is fixed.

@@ -517,6 +517,10 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "lifecycle_tier": "github",
         "lifecycle": "true",
         "lifecycle_off": "",
+        # Docs axis + Renovate gate (#477): pre-record configs always shipped
+        # them, so reconstruct ON.
+        "want_docs": "true",
+        "renovate": "true",
         "justfile": "true" if language != "none" else "",
         # Opt-in overlays + governance postdate pre-record configs — faithful as
         # off; shared with backfill (PI-190). A pre-record config also predates
@@ -561,6 +565,11 @@ def _backfill_variables(variables: dict) -> dict:
         "lifecycle_tier": ltier,
         "lifecycle": "" if ltier == "none" else "true",
         "lifecycle_off": "true" if ltier == "none" else "",
+        # Docs axis + Renovate gate (#477): opt-outs, default ON. A pre-#477
+        # record predates them (always shipped), so backfill ON; a post-#477
+        # record carries explicit values that setdefault below preserves.
+        "want_docs": "true",
+        "renovate": "true",
         "justfile": "true" if language != "none" else "",
         "license_holder": v.get("project_owner") or v.get("project_name", ""),
         "created_year": v.get("created_date", "").split("-")[0],

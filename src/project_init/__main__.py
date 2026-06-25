@@ -80,6 +80,14 @@ class ScaffoldInputs:
     # file-based usage-report layer (transcript parser + guarded self-log +
     # stdlib HTML report). Off by default; no Docker/OTEL.
     observability: bool = False
+    # Docs tooling axis (#477, ADR-022): gates the local docs-preview configs
+    # (mkdocs for python, typedoc for node) so a project can decline them. Opt-OUT
+    # — default ON; the per-tool language gate still applies (mkdocs→python,
+    # typedoc→node), so this only narrows, it never forces docs on a new language.
+    want_docs: bool = True
+    # Renovate config (#477, ADR-022): gates renovate.json (dependency-update bot).
+    # Opt-OUT — default ON to preserve today's always-shipped config.
+    renovate: bool = True
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -256,6 +264,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Render .devcontainer/ (base image + toolchain bootstrap) for "
             "Codespaces, fresh clones, and remote agent sessions"
+        ),
+    )
+    p.add_argument(
+        "--no-docs",
+        action="store_true",
+        help=(
+            "Skip the local docs-preview tooling config (#477, ADR-022): mkdocs.yml "
+            "for a python project, typedoc.json for a node project. On by default; "
+            "the per-language gate still applies (no docs config for go/none)"
+        ),
+    )
+    p.add_argument(
+        "--no-renovate",
+        action="store_true",
+        help=(
+            "Skip renovate.json (#477, ADR-022): the Renovate dependency-update "
+            "bot config. On by default — decline it if you use a different "
+            "update mechanism or none"
         ),
     )
     p.add_argument(
@@ -814,6 +840,8 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     preset_memory: str = "obsidian-only",
     lifecycle_flag: str | None = None,
     preset_lifecycle: str = "github",
+    no_docs: bool = False,
+    no_renovate: bool = False,
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -859,6 +887,24 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     )
     mise = Confirm.ask("Pin toolchain versions with mise (mise.toml)?", default=False)
     vscode = Confirm.ask("Add shared VS Code config (extensions + format-on-save)?", default=False)
+    # Docs tooling axis (#477, ADR-022). The --no-docs flag wins (skip the
+    # prompt); otherwise default ON and only ask for the languages whose docs
+    # config ships (mkdocs→python, typedoc→node) — other languages get no docs
+    # file from the gate, so the question is skipped there.
+    if no_docs:
+        want_docs = False
+    elif language in ("python", "node"):
+        _tool = "mkdocs.yml" if language == "python" else "typedoc.json"
+        want_docs = Confirm.ask(
+            f"Include the local docs-preview config ({_tool})?", default=True
+        )
+    else:
+        want_docs = True
+    # Renovate dependency-update config (#477, ADR-022). --no-renovate wins.
+    want_renovate = (
+        False if no_renovate
+        else Confirm.ask("Include renovate.json (Renovate dependency-update bot)?", default=True)
+    )
     # Multi-model switching overlay (ADR-016, #351/#352). The flag pre-accepts it;
     # otherwise the wizard explains what it does + the alternatives, then asks.
     resolved_multi_model = multi_model_flag or _choose_multi_model_interactive()
@@ -908,6 +954,8 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         observability=resolved_observability,
         memory=resolved_memory,
         lifecycle=resolved_lifecycle,
+        want_docs=want_docs,
+        renovate=want_renovate,
     )
 
 
@@ -1324,6 +1372,11 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "lint_command": lint_command,
         "format_command": format_command,
         "test_command": test_command,
+        # Docs tooling axis + Renovate gate (#477, ADR-022). Default-ON opt-outs;
+        # recorded so `upgrade` re-derives the same set (PI-189). The mkdocs/typedoc
+        # gates AND want_docs; renovate.json gates on renovate alone.
+        "want_docs": "true" if inputs.want_docs else "",
+        "renovate": "true" if inputs.renovate else "",
         # Governance (PI-145). license_holder falls back to the project name
         # so a LICENSE rendered without --owner still has a copyright line.
         # The leading "@" is required for CODEOWNERS (project_owner) but is a
@@ -1454,6 +1507,8 @@ def _resolve_inputs(
         observability=args.observability,
         memory=_normalize_memory(args.memory) or preset_memory,
         lifecycle=_normalize_lifecycle(args.lifecycle) or preset_lifecycle,
+        want_docs=not args.no_docs,
+        renovate=not args.no_renovate,
     )
 
 
@@ -1546,6 +1601,8 @@ def main(argv: list[str] | None = None) -> int:
             preset_memory=preset_memory,
             lifecycle_flag=_normalize_lifecycle(args.lifecycle),
             preset_lifecycle=preset_lifecycle,
+            no_docs=args.no_docs,
+            no_renovate=args.no_renovate,
         )
     target.mkdir(parents=True, exist_ok=True)
 

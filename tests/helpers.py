@@ -57,6 +57,8 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "lifecycle_tier": "github",
         "lifecycle": "true",
         "lifecycle_off": "",
+        "want_docs": "true",
+        "renovate": "true",
         "installed_mcps": "none",
         "installed_mcps_yaml": "[]",
         "lint_command": "uv run ruff check .",

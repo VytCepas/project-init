@@ -1,7 +1,7 @@
-{{#if node}}{
-  // typedoc.json — API documentation (scaffolded by project-init).
+{{#if node}}{{#if want_docs}}{
+  // typedoc.json — local API-documentation preview config (scaffolded by project-init).
   // TypeDoc accepts JSONC. Local build:  bunx typedoc
-  // Published to GitHub Pages by .github/workflows/docs.yml on push to main.
+  // Local-only: no publish workflow ships (the GitHub Pages docs.yml was retired — PI-343/ADR-004).
   "entryPoints": ["src/index.ts"],
   "out": "_site",
   "excludePrivate": true,
@@ -11,4 +11,4 @@
     "notDocumented": true
   }
 }
-{{/if node}}
+{{/if want_docs}}{{/if node}}
