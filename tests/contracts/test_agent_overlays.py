@@ -17,20 +17,28 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _TEMPLATE_SKILLS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills"
 # Lifecycle skills moved to the lifecycle_fallback overlay (#476); agent surfaces
 # carry the FULL set (core + lifecycle), synced together.
-_LIFECYCLE_FALLBACK_SKILLS = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills"
+_LIFECYCLE_FALLBACK_SKILLS = (
+    _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills"
+)
 _CODEX_SKILLS = _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
 _ANTIGRAVITY_SKILLS = _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills"
 _AMP_SKILLS = _REPO_ROOT / "templates" / "amp" / "dot_agents" / "skills"
 _JUNIE_SKILLS = _REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
 
 
+_BASE_PLAN = _REPO_ROOT / "templates" / "base" / "dot_claude" / "skills" / "plan" / "SKILL.md.tmpl"
+
+
 def _canonical_skill_map() -> dict[str, Path]:
     """The full skill set the agent surfaces carry: core (fallback) + lifecycle
-    (lifecycle_fallback), synced together by `just sync-plugin` (#476)."""
+    (lifecycle_fallback), synced together by `just sync-plugin` (#476), plus the
+    base `plan` skill (PI-491). `plan` is a no-variable SKILL.md.tmpl, so its
+    template bytes equal the rendered SKILL.md the surfaces ship."""
     out: dict[str, Path] = {}
     for root in (_TEMPLATE_SKILLS, _LIFECYCLE_FALLBACK_SKILLS):
         for p in root.glob("*/SKILL.md"):
             out[p.parent.name] = p
+    out["plan"] = _BASE_PLAN
     return out
 
 
@@ -69,9 +77,7 @@ class TestAgentSelection:
         fall back to claude-only (PR #167 review)."""
         import project_init.__main__ as cli
 
-        answers = iter(
-            ["proj", "desc", "python", "@owner", "none", "codex,windsurf", "codex"]
-        )
+        answers = iter(["proj", "desc", "python", "@owner", "none", "codex,windsurf", "codex"])
         monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
         monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
         monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
@@ -254,6 +260,28 @@ class TestSyncedCopiesInRepo:
                 f"antigravity skill {name} drifted — run `just sync-plugin`"
             )
 
+    def test_base_plan_shipped_to_every_surface(self):
+        """PI-491: the base `plan` skill (the one project-local skill on the
+        Claude path) is bundled to every non-Claude surface so the per-surface
+        set matches the CAPABILITIES inventory. It is shipped verbatim as a
+        rendered SKILL.md, which is only sound while plan carries no variables —
+        guard that invariant here so a future `{{var}}` fails loudly."""
+        assert "{{" not in _BASE_PLAN.read_text(encoding="utf-8"), (
+            "plan gained a variable — it can no longer ship verbatim to surfaces; "
+            "render it per-project or drop it from _ship_base_plan"
+        )
+        for label, skills_dir in (
+            ("codex", _CODEX_SKILLS),
+            ("antigravity", _ANTIGRAVITY_SKILLS),
+            ("amp", _AMP_SKILLS),
+            ("junie", _JUNIE_SKILLS),
+        ):
+            plan = skills_dir / "plan" / "SKILL.md"
+            assert plan.is_file(), f"{label} missing the plan skill — run `just sync-plugin`"
+            assert plan.read_bytes() == _BASE_PLAN.read_bytes(), (
+                f"{label} plan skill drifted — run `just sync-plugin`"
+            )
+
     def test_amp_and_junie_skill_sources_in_sync(self):
         """PI-397: Amp (.agents/skills) and Junie (.junie/skills) carry the same
         canonical SKILL.md set, synced via `just sync-plugin`."""
@@ -279,9 +307,7 @@ class TestAgentGuardAdapter:
             "cursor": {"command": command},  # beforeShellExecution: top-level
             "antigravity": {"toolCall": {"args": {"CommandLine": command}}},
         }
-        payload = json.dumps(
-            surface_payloads.get(dialect, {"tool_input": {"command": command}})
-        )
+        payload = json.dumps(surface_payloads.get(dialect, {"tool_input": {"command": command}}))
         proc = subprocess.run(
             [sys.executable, str(adapter), dialect],
             input=payload,
