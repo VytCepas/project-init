@@ -198,7 +198,7 @@ jobs:
           gh run view --log-failed
           \`\`\`
 
-          Fix the issues, then run \`.claude/scripts/push_branch.sh\` to re-trigger CI."
+          Fix the issues, then {{#if lifecycle}}run \`.claude/scripts/push_branch.sh\`{{/if lifecycle}}{{#if lifecycle_off}}push your branch{{/if lifecycle_off}} to re-trigger CI."
 
 {{#if python}}
   # Optimization #2: Split heavyweight tests into separate job

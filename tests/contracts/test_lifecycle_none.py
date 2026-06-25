@@ -220,6 +220,39 @@ class TestLifecycleNoneScaffold:
                 offenders.append(p.relative_to(self.target).as_posix())
         assert not offenders, f"dangling lifecycle links in: {offenders}"
 
+    def test_no_dangling_lifecycle_references_in_prose(self):
+        """Generated docs/indexes must not point at lifecycle files that the
+        lifecycle-free scaffold didn't ship (Codex review, #482). Catches inline
+        `code` references, not just markdown links."""
+        names = [
+            "create_issue.sh", "start_issue.sh", "create_nojira_pr.sh", "promote_review.sh",
+            "monitor_pr.sh", "finish_pr.sh", "push_branch.sh", "setup_github.sh", "push_wiki.sh",
+            "dag_workflow.py", "board-automation", "issue-validation", "review-status",
+            "validate-pr", "project-init-upgrade",
+            "skills/create_issue", "skills/start_task", "skills/github_workflow",
+            "skills/request_review", "skills/audit",
+        ]
+        pat = re.compile("|".join(re.escape(n) for n in names))
+        # The guard hooks and gh_host carry internal design comments that mention
+        # dag_workflow.py / start_issue.sh as examples — not user-facing paths and
+        # not present as wired hooks in a lifecycle-off scaffold. Allowed.
+        allowed = {".claude/hooks/_usage_log.sh", ".claude/scripts/gh_host.sh"}
+        offenders = {}
+        for p in self.target.rglob("*"):
+            if not p.is_file():
+                continue
+            rel = p.relative_to(self.target).as_posix()
+            if rel in allowed:
+                continue
+            try:
+                text = p.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            hits = sorted(set(pat.findall(text)))
+            if hits:
+                offenders[rel] = hits
+        assert not offenders, f"dangling lifecycle references in lifecycle-free scaffold: {offenders}"
+
     def test_base_layer_intact(self):
         assert (self.target / "AGENTS.md").is_file()
         assert (self.target / ".claude" / "settings.json").is_file()

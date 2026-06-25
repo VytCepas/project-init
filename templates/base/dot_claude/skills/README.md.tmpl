@@ -8,8 +8,8 @@ Each skill is a directory `.claude/skills/<name>/SKILL.md`. See [`INDEX.md`](IND
 |---|---|
 | `plan` | Plan a non-trivial change before implementing |
 | `session_summary` | End of session — summarize work and save to vault |
-| `start_task` | Before any non-trivial task — create a GitHub Issue |
-| `add_hook` | When you need a new deterministic hook (safety, lint, logging) |
+{{#if lifecycle}}| `start_task` | Before any non-trivial task — create a GitHub Issue |
+{{/if lifecycle}}| `add_hook` | When you need a new deterministic hook (safety, lint, logging) |
 | `add_command` | When you need a new slash command for a recurring workflow |
 {{/if no_plugin}}{{#if plugin_mode}}
 Most skills are provided by the `project-init-workflow` plugin (run `/help` to list them) — they are **not** files under this directory. The only project-local skill here is `plan/`. (Scaffold with `--no-plugin` to copy every skill in as `.claude/skills/<name>/SKILL.md`, indexed in `INDEX.md`.)

@@ -15,7 +15,7 @@ just setup
 ```
 {{/if justfile}}
 Install the repo git hooks once per clone — they enforce commit-message
-format, secret scanning, and branch naming locally:
+format{{#if lifecycle}}, secret scanning, and branch naming{{/if lifecycle}}{{#if lifecycle_off}} and secret scanning{{/if lifecycle_off}} locally:
 
 ```bash
 .claude/scripts/install_hooks.sh
@@ -27,7 +27,7 @@ The justfile is the canonical command surface — `just --list` shows every
 recipe. CI runs the same recipes, so if `just lint` and `just test` pass
 locally, CI agrees.
 {{/if justfile}}
-## Branches, commits, and PRs
+{{#if lifecycle}}## Branches, commits, and PRs
 
 | What | Pattern | Example |
 |---|---|---|
@@ -47,7 +47,11 @@ from an issue — use `.claude/scripts/create_issue.sh` (or the
 2. Mark ready when CI is green. Respond to every review comment —
    including bot reviews — either by fixing or by explaining why not.
 3. Merges go through `.claude/scripts/monitor_pr.sh <n> --merge` so CI
-   and review gates are honored.
+   and review gates are honored.{{/if lifecycle}}{{#if lifecycle_off}}## Commits and PRs
+
+Use Conventional Commit messages (`feat:`/`fix:`/`chore:`/`docs:`/`test:`).
+Open a pull request, keep CI green, and respond to every review comment —
+including bot reviews — either by fixing or by explaining why not.{{/if lifecycle_off}}
 
 ## Security
 
