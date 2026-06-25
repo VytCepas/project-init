@@ -353,10 +353,25 @@ def _default_preset_index(presets: list[dict]) -> int:
 
 def _choose_preset_interactive(presets: list[dict]) -> dict:
     from rich.console import Console
+    from rich.panel import Panel
     from rich.prompt import IntPrompt
 
     console = Console()
-    console.print("\n[bold]Available presets:[/bold]")
+    # Value framing (#472, ADR-023): say what a preset *is* and that it's only a
+    # starting point, so the choice is informed rather than blind.
+    console.print(
+        Panel(
+            "A [bold]preset[/bold] is your starting bundle — it sets the default "
+            "overlays (memory, lifecycle, toolchain).\n\n"
+            "[cyan]Helps:[/cyan] pick the closest fit, then the prompts below let "
+            "you still decline or add individual pieces.\n"
+            "[dim]Default: the recommended Obsidian-only preset. `core` is the "
+            "leanest (no memory backend).[/dim]",
+            title="Preset",
+            border_style="cyan",
+        )
+    )
+    console.print("[bold]Available presets:[/bold]")
     for i, p in enumerate(presets, 1):
         console.print(f"  [cyan]{i}[/cyan]. {p['name']} — {p['description']}")
     console.print()
@@ -700,6 +715,137 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
     return _LIFECYCLE_TIERS[idx]
 
 
+# Wizard-explanation standard (#472, ADR-023): every selectable concern explains
+# its value before asking — what it ships · a "Helps:" line · the honest cost ·
+# the safe default. Heavyweight concerns (memory, lifecycle, overlays) render a
+# full rich.Panel; lightweight toolchain toggles use this shared helper so the
+# wizard stays scannable while still explaining each one. The coverage test in
+# test_wizard_explanations.py enumerates the concerns against the CLI flags so a
+# new concern can't ship without an explanation.
+def _explain_and_confirm(title: str, body: str, question: str, *, default: bool) -> bool:
+    """Render a concise explanation Panel for a toolchain toggle, then ask."""
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import Confirm
+
+    Console().print(Panel(body, title=title, border_style="cyan"))
+    return Confirm.ask(question, default=default)
+
+
+def _choose_devcontainer_interactive() -> bool:
+    return _explain_and_confirm(
+        "Devcontainer",
+        "A [bold].devcontainer/[/bold] (base image + toolchain bootstrap) gives "
+        "Codespaces, fresh clones, and remote agent sessions an identical, "
+        "ready-to-run environment.\n\n"
+        "[cyan]Helps:[/cyan] zero-setup onboarding; agents run in a known image.\n"
+        "[dim]Cost: a container build on first open. Off by default.[/dim]",
+        "Add a devcontainer (Codespaces / remote agent sessions)?",
+        default=False,
+    )
+
+
+def _choose_mise_interactive() -> bool:
+    return _explain_and_confirm(
+        "Toolchain pinning (mise)",
+        "A [bold]mise.toml[/bold] pins runtime/tool versions so every machine and "
+        "CI run uses the same toolchain.\n\n"
+        "[cyan]Helps:[/cyan] reproducible builds; no \"works on my machine\".\n"
+        "[dim]Ownership: mise owns versions only (uv/bun own deps, just owns "
+        "commands). Off by default.[/dim]",
+        "Pin toolchain versions with mise (mise.toml)?",
+        default=False,
+    )
+
+
+def _choose_vscode_interactive() -> bool:
+    return _explain_and_confirm(
+        "VS Code config",
+        "Shared [bold].vscode/[/bold] config: recommended extensions + a minimal "
+        "settings.json (format-on-save wired to the preset formatter).\n\n"
+        "[cyan]Helps:[/cyan] consistent editor behavior across the team.\n"
+        "[dim]Nothing personal is committed — only these two files. Off by default.[/dim]",
+        "Add shared VS Code config (extensions + format-on-save)?",
+        default=False,
+    )
+
+
+def _choose_docs_interactive(language: str) -> bool:
+    tool = "mkdocs.yml" if language == "python" else "typedoc.json"
+    return _explain_and_confirm(
+        "Docs-preview config",
+        f"A [bold]{tool}[/bold] config for a local documentation preview "
+        f"({'mkdocs serve' if language == 'python' else 'typedoc'}).\n\n"
+        "[cyan]Helps:[/cyan] browsable docs from your markdown/docstrings.\n"
+        "[dim]Local-only — no publish workflow ships (PI-343). On by default; "
+        "decline with --no-docs.[/dim]",
+        f"Include the local docs-preview config ({tool})?",
+        default=True,
+    )
+
+
+def _choose_renovate_interactive() -> bool:
+    return _explain_and_confirm(
+        "Renovate",
+        "A [bold]renovate.json[/bold] config for the Renovate bot — automated, "
+        "grouped, scheduled dependency-update PRs (digests pinned).\n\n"
+        "[cyan]Helps:[/cyan] dependencies stay current without manual bumps.\n"
+        "[dim]Cost: needs the Renovate app/GitHub action enabled. On by default; "
+        "decline with --no-renovate.[/dim]",
+        "Include renovate.json (Renovate dependency-update bot)?",
+        default=True,
+    )
+
+
+# (#472, ADR-023) The selectable concerns the wizard must explain before asking,
+# mapped to the CLI flag `dest` that toggles each (docs/renovate are the opt-out
+# flags --no-docs/--no-renovate). The coverage test cross-checks this against the
+# argparse parser so a new concern can't ship without an explanation, and renders
+# each concern's chooser to assert it actually states its value.
+WIZARD_CONCERN_FLAGS: dict[str, str] = {
+    "preset": "preset",
+    "profile": "profile",
+    "memory": "memory",
+    "lifecycle": "lifecycle",
+    "delivery": "delivery",
+    "deploy": "deploy",
+    "iac": "iac",
+    "multi_model": "multi_model",
+    "governance": "governance",
+    "observability": "observability",
+    "devcontainer": "devcontainer",
+    "mise": "mise",
+    "vscode": "vscode",
+    "docs": "no_docs",
+    "renovate": "no_renovate",
+}
+
+# Flags that are mechanical inputs (basic identity / distribution mechanics /
+# catalog selections that self-describe in their own annotated lists), not
+# value-laden concerns needing a "why you'd want it" panel. The coverage test
+# asserts every parser flag is either a concern above or listed here, so adding a
+# flag forces an explicit classification — the enumeration can't go stale.
+WIZARD_MECHANICAL_FLAGS: frozenset[str] = frozenset(
+    {
+        "help",
+        "target",
+        "name",
+        "description",
+        "language",
+        "owner",
+        "license",
+        "agents",
+        "mcps",
+        "browser",
+        "no_plugin",
+        "no_egress",
+        "non_interactive",
+        "strict",
+        "version",
+    }
+)
+
+
 def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
     """Warn that user-owned files were kept; renders landed as .new siblings."""
     from rich.console import Console
@@ -880,13 +1026,10 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     if license_choice not in {"mit", "apache-2.0", "proprietary", "none"}:
         license_choice = "none"
 
-    from rich.prompt import Confirm
-
-    devcontainer = Confirm.ask(
-        "Add a devcontainer (Codespaces / remote agent sessions)?", default=False
-    )
-    mise = Confirm.ask("Pin toolchain versions with mise (mise.toml)?", default=False)
-    vscode = Confirm.ask("Add shared VS Code config (extensions + format-on-save)?", default=False)
+    # Toolchain toggles — each explains its value before asking (#472, ADR-023).
+    devcontainer = _choose_devcontainer_interactive()
+    mise = _choose_mise_interactive()
+    vscode = _choose_vscode_interactive()
     # Docs tooling axis (#477, ADR-022). The --no-docs flag wins (skip the
     # prompt); otherwise default ON and only ask for the languages whose docs
     # config ships (mkdocs→python, typedoc→node) — other languages get no docs
@@ -894,17 +1037,11 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     if no_docs:
         want_docs = False
     elif language in ("python", "node"):
-        _tool = "mkdocs.yml" if language == "python" else "typedoc.json"
-        want_docs = Confirm.ask(
-            f"Include the local docs-preview config ({_tool})?", default=True
-        )
+        want_docs = _choose_docs_interactive(language)
     else:
         want_docs = True
     # Renovate dependency-update config (#477, ADR-022). --no-renovate wins.
-    want_renovate = (
-        False if no_renovate
-        else Confirm.ask("Include renovate.json (Renovate dependency-update bot)?", default=True)
-    )
+    want_renovate = False if no_renovate else _choose_renovate_interactive()
     # Multi-model switching overlay (ADR-016, #351/#352). The flag pre-accepts it;
     # otherwise the wizard explains what it does + the alternatives, then asks.
     resolved_multi_model = multi_model_flag or _choose_multi_model_interactive()

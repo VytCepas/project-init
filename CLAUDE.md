@@ -35,6 +35,7 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 - **ruff only** — no black / isort / mypy.
 - **justfile is the command surface** — `just --list` shows the canonical recipes (`setup`, `lint`, `format`, `test`, `docs`, `ci`); prefer `just <recipe>` over raw tool invocations. Recipes stay thin wrappers — no logic in the justfile.
 - **Templates are tested by scaffolding into a temp dir** — any change to `templates/` should have a corresponding test in the focused `tests/test_*.py` module for that behavior. Create a new focused file if no existing module fits.
+- **Self-explaining wizard (ADR-023)** — every *selectable concern* the wizard offers must explain its value before asking (a `rich.Panel` with what·`Helps:`·cost·default, or an annotated `name — description` option list). When you add an optional concern, add its chooser, a `WIZARD_CONCERN_FLAGS` entry, and `--help`/README copy — `test_wizard_explanations.py` partitions every CLI flag into concern-with-explainer or mechanical and fails if a new flag is unclassified.
 
 ## Settings
 
