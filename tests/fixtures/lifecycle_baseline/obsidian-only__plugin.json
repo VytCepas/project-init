@@ -92,7 +92,7 @@
   "docs/reference/index.md": "63e744c0a28aea03d8876f5414901fe1c279c4d698a2f8fedc0d702aedca0b45",
   "docs/tutorials/index.md": "73f92133163e3f7facbe5bcf309ae34d934ad528e00f1ab2f879eacace69d420",
   "justfile": "ac22cee081414e7e2760735b3985ba9fc4c3086b677b831bc422c6377be88958",
-  "mkdocs.yml": "b74a7fc34dcb362748a78eefa3e7d79a63f3139716dd2f20dda9deb8c0cc62dd",
+  "mkdocs.yml": "f498f08f86a70f5c1467771a0044d98bcacbc826c39be00b8217dccdc1228c1d",
   "renovate.json": "78b75a146a1d7a1d0b5077cc2c4cbf3bd207398099b0e3a2d1887ad08c47ba4b",
   "ruff.toml": "e25eb25d16ee919839b10b14afd218d25a86d60c376bb3da34e57711b4249700"
 }

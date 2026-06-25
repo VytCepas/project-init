@@ -90,3 +90,25 @@ These are gate *adjustments*, not new machinery:
   scaffolder's chosen python linter (ADR-001), not an à-la-carte slot.
 - A non-GitHub docs publish target (the `docs.yml` workflow is GitHub Pages; a GitLab
   Pages analogue is the forge-overlay concern from ADR-021, not this spike).
+
+## Implementation outcome (C-impl, #477)
+
+Implemented as gate edits + two opt-out vars, no new overlay (as recommended):
+
+- **`want_docs` axis** (`--no-docs`, default ON): `mkdocs.yml` now gates on
+  `{{#if python}}{{#if want_docs}}` and `typedoc.json` on `{{#if node}}{{#if want_docs}}`
+  — so a python/node project can decline its docs-preview config. Both stay
+  byte-identical with the default on (PI-189).
+- **`renovate` gate** (`--no-renovate`, default ON): `renovate.json` → `renovate.json.tmpl`
+  wrapped in `{{#if renovate}}`.
+- **Stale-comment fix**: `mkdocs.yml` and `typedoc.json` no longer claim a
+  GitHub-Pages publish workflow (the `docs.yml` retired by PI-343/ADR-004); they
+  now state they are local-preview only. This is the one intentional byte change
+  (the committed byte-identity fixtures' `mkdocs.yml` hash was updated to match).
+- **Deferred — cross-language mkdocs opt-in.** The spike floated letting a
+  node/go project opt INTO mkdocs. That needs a separate per-tool selector (a
+  single `want_docs` binary with a python default can't also serve node's
+  typedoc-but-not-mkdocs without breaking byte-identity), so it is left out as a
+  niche follow-up; `want_docs` here only *narrows* (declines), it never forces
+  docs on a new language. The primary gap the spike identified — "you can't
+  decline mkdocs" — is fixed.

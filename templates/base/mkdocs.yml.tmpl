@@ -1,6 +1,6 @@
-{{#if python}}# mkdocs.yml — project documentation site (scaffolded by project-init).
+{{#if python}}{{#if want_docs}}# mkdocs.yml — local documentation preview config (scaffolded by project-init).
 # Local preview:  uv run --with mkdocs-material --with "mkdocstrings[python]" mkdocs serve
-# Published to GitHub Pages by .github/workflows/docs.yml on every push to main.
+# Local-only: no publish workflow ships (the GitHub Pages docs.yml was retired — PI-343/ADR-004).
 #
 # NOTE: mkdocs-material entered maintenance mode early 2026. Zensical is the
 # drop-in successor and reads this mkdocs.yml natively — migrate when ready:
@@ -29,4 +29,4 @@ nav:
   - How-to guides: how-to/index.md
   - Reference: reference/index.md
   - Explanation: explanation/index.md
-{{/if python}}
+{{/if want_docs}}{{/if python}}
