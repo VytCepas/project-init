@@ -8,7 +8,12 @@
     {
       "name": "project-init-workflow",
       "source": "./plugins/project-init-workflow",
-      "description": "GitHub lifecycle skills and deterministic guard hooks for projects scaffolded by project-init — the default (plugin-first) payload; --no-plugin scaffolds copy the same files locally instead (ADR-010)."
+      "description": "Forge-agnostic quality + safety hooks and general skills for projects scaffolded by project-init — the always-on core payload (commit gate, lint-on-edit, prod-safety, session bootstrap). --no-plugin scaffolds copy the same files locally instead (ADR-010)."
+    },
+    {
+      "name": "project-init-lifecycle",
+      "source": "./plugins/project-init-lifecycle",
+      "description": "GitHub lifecycle automation (#476, ADR-021): the issue->branch->PR->review->merge DAG guard + workflow-state hooks and the lifecycle skills. Enabled only when the lifecycle tier is on; declined by a --lifecycle none scaffold."
     }
   ]
 }

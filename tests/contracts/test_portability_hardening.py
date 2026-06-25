@@ -88,7 +88,9 @@ def test_gh_callers_have_presence_guard(scaffolded: Path):
 
 def test_audit_stat_guidance_is_portable():
     for mirror in (
-        _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills" / "audit" / "SKILL.md",
+        # audit moved to the lifecycle_fallback overlay (#476); agent-surface
+        # copies (codex/antigravity) still carry it via the sync.
+        _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills" / "audit" / "SKILL.md",
         _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills" / "audit" / "SKILL.md",
         _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills" / "audit" / "SKILL.md",
     ):

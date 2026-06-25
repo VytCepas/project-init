@@ -127,3 +127,39 @@ way — existing records backfill `lifecycle=true` and re-render unchanged.
   `overlay_layers()` derivation → `{{#if lifecycle}}` gate, round-trip-safe).
 - Authoring a GitLab/Gitea CI/lifecycle overlay (this spike only *assesses* feasibility).
 - Re-tiering the `--deploy`/`--iac`/`--delivery` workflows (already gated, ADR-015).
+
+## Implementation outcome (B-impl, #476)
+
+The implementation followed this boundary; the resolutions to the open questions
+above and the refinements discovered during the work:
+
+- **Two new template layers, not one.** `lifecycle` carries the project-scaffolded
+  files present in BOTH plugin and no-plugin modes (the DAG library, lifecycle
+  scripts, board/wiki/validation workflows, issue/PR templates, copilot-instructions).
+  `lifecycle_fallback` carries the no-plugin-only guard hooks + lifecycle skills.
+  `overlay_layers(..., lifecycle: bool)` appends `lifecycle` when on and
+  `lifecycle_fallback` additionally when `no_plugin AND lifecycle`.
+- **The plugin split is confirmed (key finding #1).** A new `project-init-lifecycle`
+  plugin holds the lifecycle hooks (`github_command_guard`, `workflow_state_reminder`,
+  `dag_workflow.py` + the `_py.sh`/`_usage_log.sh` they source) and the five lifecycle
+  skills; the slimmed `project-init-workflow` keeps the quality/safety hooks + general
+  skills. Both ship from the same marketplace; the scaffolded `settings.json` enables
+  `project-init-lifecycle@project-init` only under `{{#if lifecycle}}` in plugin mode.
+- **`gh_host.sh` stays in `base`, NOT the lifecycle tier (a correction to the table
+  above).** It is a shared host/`base_branch()` resolver sourced by the deploy scripts
+  (`whats_deployed`, `setup_env_protection` — gated by `--deploy`, ADR-015) as well as
+  the lifecycle scripts; moving it would orphan a `--deploy --lifecycle none` scaffold.
+  It is dormant (a sourced library) when nothing uses it.
+- **An inverse `lifecycle_off` var** (mirroring `vscode_off`/`egress_ok`) backs the
+  engine's else-less blocks — the `pre-push` main/master remediation reads differently
+  once the lifecycle scripts are absent. `pre-push` became `pre-push.tmpl`: the
+  main/master push block stays (quality), the branch-type-prefix rule is gated.
+- **Agent-surface static skill copies degrade gracefully** (codex/antigravity/amp/junie
+  `.agents|.junie/skills`): they keep the full skill set; the five lifecycle skills
+  no-op when their scripts are absent — the same ADR-020 precedent that declined to gate
+  the memory-mentioning skills, accepted because per-surface gating would need four more
+  layers for a narrow `extra-agents + --lifecycle none` combo. Documented, not silent.
+- **`lifecycle` is recorded as a string tier** (`github`/`none`) for forge
+  extensibility, with the `lifecycle` gate flag derived from it; `_backfill_variables`
+  defaults a pre-#476 record to `github` (opt-out), so existing projects re-render
+  unchanged (PI-189, verified by a committed pre-move byte-identity fixture).

@@ -9,14 +9,15 @@ from tests.helpers import fallback_preset, fallback_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SKILLS_DIR = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills"
-_INDEX_PATH = _SKILLS_DIR / "INDEX.md"
+# INDEX.md became a template (#476) so its lifecycle skill rows can be gated.
+_INDEX_PATH = _SKILLS_DIR / "INDEX.md.tmpl"
 
 
 class TestSkillIndex:
     """Verify INDEX.md exists and covers every skill directory."""
 
     def test_index_file_exists(self):
-        assert _INDEX_PATH.exists(), "templates/fallback/dot_claude/skills/INDEX.md missing"
+        assert _INDEX_PATH.exists(), "templates/fallback/dot_claude/skills/INDEX.md.tmpl missing"
 
     def test_every_skill_dir_mentioned_in_index(self):
         index_text = _INDEX_PATH.read_text()
@@ -128,5 +129,7 @@ class TestSkillFrontmatter:
 
     def test_audit_runs_in_forked_context(self):
         """Heavyweight scan isolates its context; findings land in a GitHub issue."""
-        fm = self._frontmatter(_SKILLS_DIR / "audit" / "SKILL.md")
+        # audit moved to the lifecycle_fallback overlay (#476).
+        audit = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills" / "audit"
+        fm = self._frontmatter(audit / "SKILL.md")
         assert fm.get("context") == "fork"

@@ -511,6 +511,12 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "memory": "" if stack == "none" else "true",
+        # Lifecycle (#476): a pre-record config ALWAYS shipped the GitHub
+        # lifecycle (it was force-bundled in base), so reconstruct it as ON —
+        # it is an opt-OUT, NOT one of the opt-in overlays defaulted off below.
+        "lifecycle_tier": "github",
+        "lifecycle": "true",
+        "lifecycle_off": "",
         "justfile": "true" if language != "none" else "",
         # Opt-in overlays + governance postdate pre-record configs — faithful as
         # off; shared with backfill (PI-190). A pre-record config also predates
@@ -538,6 +544,12 @@ def _backfill_variables(variables: dict) -> dict:
     v = dict(variables)
     language = v.get("language", "none")
     stack = v.get("memory_stack", "obsidian-only")
+    # Lifecycle gate (#476): an existing record written before #476 has no
+    # lifecycle field — it pre-dates the decomposition, when the GitHub
+    # lifecycle was force-bundled — so it backfills ON (lifecycle is opt-OUT).
+    # A post-#476 record carries lifecycle_tier; setdefault below preserves an
+    # explicit `none`, and re-deriving the gate from the tier keeps them aligned.
+    ltier = v.get("lifecycle_tier", "github")
     url = v.get("project_init_url", _MIGRATION_DEFAULTS["project_init_url"])
 
     derived: dict[str, str] = {
@@ -546,6 +558,9 @@ def _backfill_variables(variables: dict) -> dict:
         # Memory gate (#466): "" only for the vault-free `none` stack. The
         # obsidian/graphify substring checks already yield "" for none.
         "memory": "" if stack == "none" else "true",
+        "lifecycle_tier": ltier,
+        "lifecycle": "" if ltier == "none" else "true",
+        "lifecycle_off": "true" if ltier == "none" else "",
         "justfile": "true" if language != "none" else "",
         "license_holder": v.get("project_owner") or v.get("project_name", ""),
         "created_year": v.get("created_date", "").split("-")[0],
@@ -641,6 +656,9 @@ def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Pa
         # Derive memory overlays from the recorded stack (#466) so an obsidian
         # project re-renders its vault overlay and a `none` project does not.
         memory_stack=variables.get("memory_stack", "obsidian-only"),
+        # Lifecycle overlay (#476): backfill guarantees the gate var (ON for
+        # pre-#476 records), so re-render ships the lifecycle layer iff recorded.
+        lifecycle=bool(variables.get("lifecycle")),
         multi_model=bool(variables.get("multi_model")),
         governance=bool(variables.get("governance")),
         observability=bool(variables.get("observability")),

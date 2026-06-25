@@ -234,6 +234,7 @@ def overlay_layers(  # noqa: PLR0913 — one parameter per independent overlay s
     *,
     no_plugin: bool,
     memory_stack: str = "none",
+    lifecycle: bool = False,
     multi_model: bool = False,
     governance: bool = False,
     observability: bool = False,
@@ -242,21 +243,32 @@ def overlay_layers(  # noqa: PLR0913 — one parameter per independent overlay s
 
     The memory overlays derived from ``memory_stack`` (#466) come first — right
     after ``base`` — preserving the historical layer order from when presets
-    listed obsidian/graphify in ``layers``. Then the per-agent overlays
-    (PI-137), prefixed with the ``fallback`` layer when plugins are off, plus
-    the opt-in ``multi_model`` (ADR-016, #351), ``governance`` (ADR-018, #410),
-    and ``observability`` (ADR-019, #404) overlays. One source for both the
-    scaffolder and the ``upgrade`` re-render, so they can never derive a
+    listed obsidian/graphify in ``layers``. Then the ``fallback`` layer when
+    plugins are off, then the GitHub-lifecycle overlay (#476/ADR-021): the
+    ``lifecycle`` layer (scripts, the DAG library, board/wiki/validation
+    workflows, issue/PR templates — scaffolded in both plugin and no-plugin
+    modes) plus ``lifecycle_fallback`` (the lifecycle guard hooks + skills,
+    copied only with --no-plugin; in plugin mode they ship as the separate
+    ``project-init-lifecycle`` plugin). Then the per-agent overlays (PI-137)
+    and the opt-in ``multi_model`` (ADR-016, #351), ``governance`` (ADR-018,
+    #410), and ``observability`` (ADR-019, #404) overlays. One source for both
+    the scaffolder and the ``upgrade`` re-render, so they can never derive a
     different layer set (PI-189).
 
-    ``memory_stack`` defaults to ``"none"`` so memory-agnostic callers (e.g.
-    ``agent_layers()``) are unaffected; full scaffold/upgrade pass the resolved
-    stack explicitly.
+    ``memory_stack`` defaults to ``"none"`` and ``lifecycle`` to ``False`` so
+    overlay-agnostic callers (e.g. ``agent_layers()``) are unaffected; full
+    scaffold/upgrade pass the resolved values explicitly. Note ``lifecycle`` is
+    an opt-OUT in the CLI (default ON) — it is the resolved boolean here, so a
+    declined lifecycle (``--lifecycle none``) passes ``False``.
     """
     chosen = {a.strip() for a in (agents.split(",") if isinstance(agents, str) else agents)}
     extra = memory_layers(memory_stack)
     if no_plugin:
         extra = [*extra, "fallback"]
+    if lifecycle:
+        extra = [*extra, "lifecycle"]
+        if no_plugin:
+            extra = [*extra, "lifecycle_fallback"]
     extra = [*extra, *(a for a in _AGENT_LAYERS if a in chosen)]
     if multi_model:
         extra = [*extra, "multi_model"]

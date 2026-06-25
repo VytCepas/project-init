@@ -11,7 +11,7 @@ project:
   enforcement: {{enforcement}}      # advisory | hard — see ADR-013 / #251
   project_init_host: {{project_init_host}}  # upstream GitHub host (github.com | *.ghe.com | GHES) — #255/#259
   project_key: ""          # e.g. "PI" → branches use feat/PI-42-slug, PR titles use feat(PI-42):
-  github_project_number: 1 # numeric GitHub Project V2 board number (used by board-automation.yml and create_issue.sh)
+  github_project_number: 1 # numeric GitHub Project V2 board number{{#if lifecycle}} (used by board-automation.yml and create_issue.sh){{/if lifecycle}}
 
 language: {{language}}            # python | node | go | none
 

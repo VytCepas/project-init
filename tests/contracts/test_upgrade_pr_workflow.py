@@ -7,15 +7,17 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from project_init.scaffold import load_preset, marketplace_source_vars, scaffold
-from tests.helpers import make_variables
+from project_init.scaffold import marketplace_source_vars, scaffold
+from tests.helpers import make_variables, memory_preset
 
 _WORKFLOW_REL = Path(".github/workflows/project-init-upgrade.yml")
 _PLACEHOLDER_RE = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
 
 
 def _render(target: Path, **overrides: str) -> str:
-    scaffold(target, load_preset("obsidian-only"), make_variables(**overrides))
+    # The upgrade workflow moved to the lifecycle overlay (#476); memory_preset
+    # appends the lifecycle layer for a full default scaffold.
+    scaffold(target, memory_preset("obsidian-only"), make_variables(**overrides))
     return (target / _WORKFLOW_REL).read_text()
 
 

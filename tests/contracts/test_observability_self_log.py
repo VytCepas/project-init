@@ -19,8 +19,21 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _FALLBACK_HOOKS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "hooks"
 _PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-workflow" / "hooks"
+# The lifecycle guard hooks moved to the lifecycle_fallback overlay + the
+# project-init-lifecycle plugin (#476).
+_LIFECYCLE_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "hooks"
+_LIFECYCLE_PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-lifecycle" / "hooks"
+_LIFECYCLE_HOOK_NAMES = {"github_command_guard.sh", "workflow_state_reminder.sh"}
 _HELPER = _FALLBACK_HOOKS / "_usage_log.sh"
 _PROD_GUARD = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "prod_guard.py"
+
+
+def _source_dir(hook: str) -> Path:
+    return _LIFECYCLE_FALLBACK_HOOKS if hook in _LIFECYCLE_HOOK_NAMES else _FALLBACK_HOOKS
+
+
+def _plugin_dir(hook: str) -> Path:
+    return _LIFECYCLE_PLUGIN_HOOKS if hook in _LIFECYCLE_HOOK_NAMES else _PLUGIN_HOOKS
 
 # The five always-on shell hooks that must self-log, with the (hook, event) each
 # should record.
@@ -134,15 +147,18 @@ class TestHelperGating:
 class TestHookWiring:
     @pytest.mark.parametrize("hook,expected", _WIRED_HOOKS.items())
     def test_fallback_hook_sources_and_calls(self, hook: str, expected: tuple[str, str]):
-        text = (_FALLBACK_HOOKS / hook).read_text(encoding="utf-8")
+        text = (_source_dir(hook) / hook).read_text(encoding="utf-8")
         assert "_usage_log.sh" in text, f"{hook} does not source the helper"
         name, event = expected
         assert f"usage_log {name} {event}" in text, f"{hook} missing usage_log call"
 
     @pytest.mark.parametrize("hook", _WIRED_HOOKS)
     def test_plugin_copy_in_sync(self, hook: str):
-        """Plugin-mode hooks self-log too — the synced copy must carry the call."""
-        plugin = _PLUGIN_HOOKS / hook
+        """Plugin-mode hooks self-log too — the synced copy must carry the call.
+
+        The lifecycle guard hooks ship in the project-init-lifecycle plugin; the
+        rest in project-init-workflow (#476)."""
+        plugin = _plugin_dir(hook) / hook
         assert plugin.is_file(), f"{hook} missing from plugin (run just sync-plugin)"
         assert "_usage_log.sh" in plugin.read_text(encoding="utf-8")
 

@@ -10,21 +10,37 @@ from pathlib import Path
 import pytest
 
 from project_init.__main__ import agent_layers, resolve_agents
-from project_init.scaffold import load_preset, scaffold
+from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _TEMPLATE_SKILLS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills"
+# Lifecycle skills moved to the lifecycle_fallback overlay (#476); agent surfaces
+# carry the FULL set (core + lifecycle), synced together.
+_LIFECYCLE_FALLBACK_SKILLS = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills"
 _CODEX_SKILLS = _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
 _ANTIGRAVITY_SKILLS = _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills"
 _AMP_SKILLS = _REPO_ROOT / "templates" / "amp" / "dot_agents" / "skills"
 _JUNIE_SKILLS = _REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
 
 
+def _canonical_skill_map() -> dict[str, Path]:
+    """The full skill set the agent surfaces carry: core (fallback) + lifecycle
+    (lifecycle_fallback), synced together by `just sync-plugin` (#476)."""
+    out: dict[str, Path] = {}
+    for root in (_TEMPLATE_SKILLS, _LIFECYCLE_FALLBACK_SKILLS):
+        for p in root.glob("*/SKILL.md"):
+            out[p.parent.name] = p
+    return out
+
+
 def _scaffold_agents(target: Path, *agent_names: str) -> Path:
     agents = ["claude", *agent_names]
     preset = load_preset("obsidian-only")
-    preset = {**preset, "layers": list(preset["layers"]) + agent_layers(agents)}
+    # lifecycle=True so the DAG guard library (dag_workflow.py) is scaffolded —
+    # the agent_guard_adapter execs it for the main/master push block (#476).
+    extra = overlay_layers(agents, no_plugin=False, lifecycle=True)
+    preset = {**preset, "layers": list(preset["layers"]) + extra}
     overrides = {
         "agents": ",".join(agents),
         "codex": "true" if "codex" in agents else "",
@@ -62,6 +78,7 @@ class TestAgentSelection:
         monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
         monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
         monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
+        monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 
         result = cli._gather_inputs_interactive(
@@ -116,9 +133,9 @@ class TestCodexOverlay:
         target = _scaffold_agents(tmp_path / "p", "codex")
         rendered = sorted((target / ".agents" / "skills").glob("*/SKILL.md"))
         assert rendered, "codex overlay must ship skills"
+        canonical = _canonical_skill_map()
         for skill in rendered:
-            source = _TEMPLATE_SKILLS / skill.parent.name / "SKILL.md"
-            assert skill.read_bytes() == source.read_bytes()
+            assert skill.read_bytes() == canonical[skill.parent.name].read_bytes()
 
     def test_hooks_json_wires_adapter(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "codex")
@@ -137,9 +154,9 @@ class TestAntigravityOverlay:
         target = _scaffold_agents(tmp_path / "p", "antigravity")
         skills = sorted((target / ".agents" / "skills").glob("*/SKILL.md"))
         assert skills, "antigravity overlay must ship .agents/skills"
+        canonical = _canonical_skill_map()
         for skill in skills:
-            source = _TEMPLATE_SKILLS / skill.parent.name / "SKILL.md"
-            assert skill.read_bytes() == source.read_bytes()
+            assert skill.read_bytes() == canonical[skill.parent.name].read_bytes()
 
     def test_emits_hooks(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "antigravity")
@@ -220,9 +237,7 @@ class TestSyncedCopiesInRepo:
     aligned with templates/base/dot_claude/skills."""
 
     def test_codex_skill_sources_in_sync(self):
-        template = {
-            p.parent.name: p for p in _TEMPLATE_SKILLS.glob("*/SKILL.md")
-        }
+        template = _canonical_skill_map()
         codex = {p.parent.name: p for p in _CODEX_SKILLS.glob("*/SKILL.md")}
         assert set(template) == set(codex)
         for name, path in template.items():
@@ -231,7 +246,7 @@ class TestSyncedCopiesInRepo:
             )
 
     def test_antigravity_skill_sources_in_sync(self):
-        template = {p.parent.name: p for p in _TEMPLATE_SKILLS.glob("*/SKILL.md")}
+        template = _canonical_skill_map()
         antigravity = {p.parent.name: p for p in _ANTIGRAVITY_SKILLS.glob("*/SKILL.md")}
         assert set(template) == set(antigravity)
         for name, path in template.items():
@@ -242,7 +257,7 @@ class TestSyncedCopiesInRepo:
     def test_amp_and_junie_skill_sources_in_sync(self):
         """PI-397: Amp (.agents/skills) and Junie (.junie/skills) carry the same
         canonical SKILL.md set, synced via `just sync-plugin`."""
-        template = {p.parent.name: p for p in _TEMPLATE_SKILLS.glob("*/SKILL.md")}
+        template = _canonical_skill_map()
         for label, skills_dir in (("amp", _AMP_SKILLS), ("junie", _JUNIE_SKILLS)):
             mirror = {p.parent.name: p for p in skills_dir.glob("*/SKILL.md")}
             assert set(template) == set(mirror), f"{label} skill set drifted"

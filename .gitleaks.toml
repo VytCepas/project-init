@@ -8,8 +8,9 @@ useDefault = true
 [allowlist]
 description = "Repo-specific false positives (not secrets)."
 paths = [
-  # Byte-identity baseline manifests (#466): JSON maps of scaffold relpath →
-  # sha256 file hash. The high-entropy hash next to a "secrets.md" path key
+  # Byte-identity baseline manifests (#466, #476): JSON maps of scaffold relpath
+  # → sha256 file hash. The high-entropy hash next to a "secrets.md" path key
   # trips the generic-api-key rule, but these are content hashes, not secrets.
   '''tests/fixtures/memory_baseline/.*\.json''',
+  '''tests/fixtures/lifecycle_baseline/.*\.json''',
 ]

@@ -19,7 +19,8 @@
   "enabledPlugins": {
     {{#if egress_ok}}"security-guidance@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true{{#if plugin_mode}},
-    {{/if plugin_mode}}{{/if egress_ok}}{{#if plugin_mode}}"project-init-workflow@project-init": true{{/if plugin_mode}}
+    {{/if plugin_mode}}{{/if egress_ok}}{{#if plugin_mode}}"project-init-workflow@project-init": true{{#if lifecycle}},
+    "project-init-lifecycle@project-init": true{{/if lifecycle}}{{/if plugin_mode}}
   }{{#if no_plugin}},
   "hooks": {
     "SessionStart": [
@@ -44,13 +45,13 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre_commit_gate.sh",
             "timeout": 60
           },
-          {
+{{#if lifecycle}}          {
             "type": "command",
             "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/github_command_guard.sh",
             "timeout": 10
           },
-          {
+{{/if lifecycle}}          {
             "type": "command",
             "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/prod_guard.py",
@@ -71,7 +72,7 @@
           }
         ]
       }
-    ],
+    ]{{#if lifecycle}},
     "UserPromptSubmit": [
       {
         "hooks": [
@@ -83,6 +84,6 @@
           }
         ]
       }
-    ]
+    ]{{/if lifecycle}}
   }{{/if no_plugin}}
 }

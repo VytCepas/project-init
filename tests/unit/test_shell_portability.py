@@ -37,13 +37,18 @@ def _shell_templates() -> list[Path]:
     out: set[Path] = set()
     for pattern in ("*.sh", "*.sh.tmpl"):
         out.update(_TEMPLATES.rglob(pattern))
-    # Extensionless git hooks (pre-push, commit-msg, pre-commit) are bash too,
-    # so the denylist catches them in `uv run pytest`, not only the CI jobs.
+    # Extensionless git hooks (commit-msg, pre-commit) are bash too — as is the
+    # templated pre-push.tmpl (#476: a hook whose rendered name has no extension)
+    # — so the denylist catches them in `uv run pytest`, not only the CI jobs.
     for p in _TEMPLATES.rglob("*"):
-        if p.is_file() and p.suffix == "" and "hooks" in p.parts:
-            first = _IF_GUARD.sub("", p.read_text().splitlines()[0])
-            if first.startswith("#!"):
-                out.add(p)
+        if not (p.is_file() and "hooks" in p.parts):
+            continue
+        rendered_name = p.name[: -len(".tmpl")] if p.name.endswith(".tmpl") else p.name
+        if "." in rendered_name:
+            continue  # e.g. _py.sh / .json — handled by the *.sh patterns above
+        first = _IF_GUARD.sub("", p.read_text().splitlines()[0])
+        if first.startswith("#!"):
+            out.add(p)
     return sorted(out)
 
 
@@ -68,7 +73,9 @@ def test_templates_discovered():
     """Guard against a wrong glob silently parametrizing zero cases."""
     names = {p.name for p in _SHELL_TEMPLATES}
     assert _SHELL_TEMPLATES, "no shell templates found — wrong path?"
-    assert {"pre_commit_gate.sh", "_py.sh", "pre-push"} <= names
+    # pre-push became pre-push.tmpl (#476): main/master block always renders,
+    # the lifecycle branch-prefix rule is gated.
+    assert {"pre_commit_gate.sh", "_py.sh", "pre-push.tmpl"} <= names
 
 
 @pytest.mark.parametrize("tmpl", _SHELL_TEMPLATES, ids=_id)
