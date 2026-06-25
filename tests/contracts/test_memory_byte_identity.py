@@ -10,6 +10,12 @@ thing that does.
 The baseline fixtures in tests/fixtures/memory_baseline/ were captured BEFORE
 the move (tools/scratch gen_baseline.py). If this test fails, the move/gating
 changed rendered bytes — fix the template, do NOT regenerate the baseline.
+
+Exception (#496): the code-map feature intentionally ADDS
+`.claude/scripts/gen_code_map.py` and edits AGENTS.md (the read-the-map pointer)
+and the justfile (the `code-map` recipe). Only those three keys were re-pinned,
+after verifying every OTHER file still matched the baseline — the move invariant
+is intact for everything else.
 """
 
 from __future__ import annotations

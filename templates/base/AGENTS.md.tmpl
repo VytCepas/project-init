@@ -19,7 +19,8 @@ below); everything else is reusable by any agent.
 - [`.claude/project-init.md`](.claude/project-init.md) — workflow, conventions, task tracking
 {{#if memory}}- [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) — memory index (read first for context)
 {{/if memory}}- [`.claude/docs/`](.claude/docs/) — system of record: ADRs and development guides
-{{#if memory}}- [`.claude/vault/`](.claude/vault/) — human workspace (Obsidian vault)
+{{#if python}}- `.claude/docs/CODE_MAP.md` — generated map of what each module does; **read before grepping** (generate/refresh with `just code-map`)
+{{/if python}}{{#if memory}}- [`.claude/vault/`](.claude/vault/) — human workspace (Obsidian vault)
 {{/if memory}}
 ## Skills (load on demand)
 

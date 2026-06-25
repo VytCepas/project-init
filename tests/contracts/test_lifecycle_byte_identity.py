@@ -13,6 +13,11 @@ snapshot against a committed pre-move baseline is the direct guard on the move.
 The baseline fixtures in tests/fixtures/lifecycle_baseline/ were captured BEFORE
 the move. If this test fails, the move/gating changed rendered bytes — fix the
 template, do NOT regenerate the baseline.
+
+Exception (#496): the code-map feature intentionally ADDS
+`.claude/scripts/gen_code_map.py` and edits AGENTS.md + the justfile. Only those
+three keys were re-pinned, after verifying every other file still matched the
+baseline — the move invariant is intact for everything else.
 """
 
 from __future__ import annotations
