@@ -72,6 +72,37 @@ class TestMemoryPrecedence:
         assert (target / ".claude" / "governance").is_dir()  # governance preserved
         assert not _has_vault(target)  # memory removed
 
+    def test_flag_auto_gives_memory_without_vault(self, tmp_path: Path):
+        """Tier-0 `auto` (#497): memory facts, no vault — a strict subset of obsidian."""
+        target = tmp_path / "p"
+        _scaffold(target, "--preset", "core", "--memory", "auto")
+        assert (target / ".claude" / "memory").is_dir()
+        assert not _has_vault(target)
+        config = (target / ".claude" / "config.yaml").read_text()
+        assert "stack: auto" in config
+        assert "vault_path" not in config  # vault_path is obsidian-gated
+        assert "memory_path: .claude/memory" in config
+
+
+class TestAutoUpgradeRoundTrip:
+    def test_auto_scaffold_upgrades_without_drift(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target, "--preset", "auto")
+        capsys.readouterr()
+        assert main(["upgrade", str(target)]) == 0
+        assert "No drift" in capsys.readouterr().out
+
+    def test_auto_record_round_trips(self, tmp_path: Path):
+        from project_init.upgrade import read_scaffold_record
+
+        target = tmp_path / "p"
+        _scaffold(target, "--preset", "auto")
+        preset, variables, _manifest, _migrated = read_scaffold_record(target)
+        assert preset == "auto"
+        assert variables["memory_stack"] == "auto"
+        assert variables["memory"] == "true"
+        assert variables["obsidian"] == ""
+
 
 class TestCoreUpgradeRoundTrip:
     def test_core_scaffold_upgrades_without_drift(self, tmp_path: Path, capsys):

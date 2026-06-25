@@ -10,6 +10,11 @@ thing that does.
 The baseline fixtures in tests/fixtures/memory_baseline/ were captured BEFORE
 the move (tools/scratch gen_baseline.py). If this test fails, the move/gating
 changed rendered bytes — fix the template, do NOT regenerate the baseline.
+
+Exception (#497): the `auto`/`obsidian` tier split kept every file byte-identical
+EXCEPT `lint_memory.sh`, which gained deterministic staleness checks (a deliberate
+feature, not move-drift). Only that one hash was re-pinned in the baselines; all
+other files still guard the move invariant unchanged.
 """
 
 from __future__ import annotations

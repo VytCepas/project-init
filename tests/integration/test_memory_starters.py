@@ -221,3 +221,77 @@ class TestLintMemoryScript:
         )
         assert result.returncode == 1
         assert "user_role.md" in result.stderr
+
+    def test_lint_warns_on_dangling_path_reference(self):
+        """A fact naming a `path/like.ext` that doesn't exist warns but does NOT
+        fail (#497, ADR-024 staleness): deterministic, advisory."""
+        subprocess.run(["git", "init", str(self.target)], capture_output=True, check=True)
+        mem = self.target / ".claude" / "memory"
+        (mem / "probe.md").write_text(
+            "---\nname: probe\ndescription: p\ntype: reference\n---\n"
+            "See `src/gone.py` for details. `SCHEMA.md` and prose are not flagged.\n",
+            encoding="utf-8",
+        )
+        index = mem / "MEMORY.md"
+        index.write_text(index.read_text() + "- [probe](probe.md) — p\n", encoding="utf-8")
+
+        script = self.target / ".claude" / "scripts" / "lint_memory.sh"
+        result = subprocess.run(
+            ["bash", str(script)], cwd=str(self.target), capture_output=True, text=True
+        )
+        assert result.returncode == 0  # advisory, not a failure
+        assert "src/gone.py" in result.stderr
+        # bare names / prose words must not trip the path heuristic
+        assert "prose" not in result.stderr
+
+    def test_lint_warns_on_stale_files_when_configured(self):
+        """LINT_MEMORY_STALE_DAYS flags committed facts older than the cutoff —
+        deterministic git-age staleness (#497). A future cutoff flags everything."""
+        subprocess.run(["git", "init", str(self.target)], capture_output=True, check=True)
+        subprocess.run(
+            ["git", "-C", str(self.target), "add", "-A"], capture_output=True, check=True
+        )
+        subprocess.run(
+            ["git", "-C", str(self.target), "-c", "user.email=t@t", "-c", "user.name=t",
+             "commit", "-qm", "seed"],
+            capture_output=True, check=True,
+        )
+        script = self.target / ".claude" / "scripts" / "lint_memory.sh"
+        result = subprocess.run(
+            ["bash", str(script)],
+            cwd=str(self.target),
+            capture_output=True,
+            text=True,
+            env={**__import__("os").environ, "LINT_MEMORY_STALE_DAYS": "-1"},
+        )
+        assert result.returncode == 0
+        assert "review for staleness" in result.stderr
+
+
+class TestAutoTierStarters:
+    """Tier-0 `auto` (#497): flat agent-memory files, NO Obsidian vault."""
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = tmp_target
+        preset = memory_preset("auto")
+        variables = make_variables(memory_stack="auto")
+        scaffold(tmp_target, preset, variables)
+
+    def test_memory_dir_present(self):
+        assert (self.target / ".claude" / "memory" / "SCHEMA.md").is_file()
+        assert (self.target / ".claude" / "memory" / "MEMORY.md").is_file()
+
+    def test_no_vault(self):
+        assert not (self.target / ".claude" / "vault").exists()
+
+    def test_lint_script_present(self):
+        assert (self.target / ".claude" / "scripts" / "lint_memory.sh").is_file()
+
+    def test_lint_passes_clean(self):
+        subprocess.run(["git", "init", str(self.target)], capture_output=True, check=True)
+        script = self.target / ".claude" / "scripts" / "lint_memory.sh"
+        result = subprocess.run(
+            ["bash", str(script)], cwd=str(self.target), capture_output=True, text=True
+        )
+        assert result.returncode == 0, f"lint failed: {result.stderr}"

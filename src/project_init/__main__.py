@@ -182,13 +182,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--memory",
-        choices=["none", "obsidian", "obsidian-only", "obsidian-graphify"],
+        choices=["none", "auto", "obsidian", "obsidian-only", "obsidian-graphify"],
         default=None,
         help=(
-            "Memory backend (#466): none (no vault — the vault-free `core` preset), "
-            "obsidian (human-authored markdown vault; alias for obsidian-only), or "
-            "obsidian-graphify (vault + a derived knowledge graph for agents). "
-            "Overrides the preset's default."
+            "Memory backend (#466, #497) — a superset ladder: none (no memory — the "
+            "vault-free `core` preset), auto (flat agent-fact files in .claude/memory/, "
+            "no vault — pure files, installs nothing), obsidian (auto PLUS a human "
+            "Obsidian vault; alias for obsidian-only), or obsidian-graphify (obsidian "
+            "PLUS a derived code knowledge graph for agents). Overrides the preset's default."
         ),
     )
     p.add_argument(
@@ -482,7 +483,22 @@ def _resolve_mcps_non_interactive(
     return selected
 
 
-def _print_summary(target: Path, created: list[Path], preset_name: str) -> None:
+# Per-tier "you run later" next-step for the chosen memory backend (#497). Only
+# obsidian-graphify needs a one-time install; the rest are pure files.
+_MEMORY_NEXT_STEPS = {
+    "none": "",
+    "auto": "Memory: flat agent facts in .claude/memory/ — nothing to install.",
+    "obsidian-only": "Memory: .claude/memory/ + Obsidian vault — open .claude/vault/ in Obsidian (optional).",
+    "obsidian-graphify": (
+        "Memory: build the code graph — run "
+        "[bold]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/bold]"
+    ),
+}
+
+
+def _print_summary(
+    target: Path, created: list[Path], preset_name: str, memory_stack: str = "none"
+) -> None:
     from rich.console import Console
     from rich.panel import Panel
 
@@ -499,6 +515,10 @@ def _print_summary(target: Path, created: list[Path], preset_name: str) -> None:
         body += f"  {d}/\n"
     if len(dirs) > 15:
         body += f"  ... and {len(dirs) - 15} more\n"
+
+    next_step = _MEMORY_NEXT_STEPS.get(memory_stack, "")
+    if next_step:
+        body += f"\n[bold]Next:[/bold] {next_step}\n"
 
     console.print()
     console.print(Panel(body.rstrip(), title="project-init", border_style="green"))
@@ -636,7 +656,7 @@ def _choose_observability_interactive() -> bool:
     return Confirm.ask("Set up the observability overlay?", default=False)
 
 
-_MEMORY_STACKS = ("none", "obsidian-only", "obsidian-graphify")
+_MEMORY_STACKS = ("none", "auto", "obsidian-only", "obsidian-graphify")
 
 
 def _normalize_memory(value: str | None) -> str | None:
@@ -665,17 +685,24 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
     body = (
         "A [bold]memory backend[/bold] gives your agents a place to persist "
         "decisions, conventions, and session notes [bold]across conversations[/bold] "
-        "— so context survives beyond a single chat. Everything stays on disk.\n\n"
-        "[bold]1. none[/bold]      [dim]no vault/memory — leanest; bring your own docs[/dim]\n"
-        "[bold]2. obsidian[/bold]  [dim].claude/vault (markdown notes) + .claude/memory[/dim]\n"
-        "            [dim](agent facts); browsable in Obsidian[/dim]\n"
-        "[bold]3. obsidian-graphify[/bold]  [dim]obsidian PLUS a derived knowledge[/dim]\n"
-        "            [dim]graph agents can query (Graphify)[/dim]\n\n"
+        "— so context survives beyond a single chat. Everything stays on disk. "
+        "Each rung is a [bold]superset[/bold] of the one above (ADR-024).\n\n"
+        "[bold]1. none[/bold]      [dim]no memory — leanest; bring your own docs[/dim]\n"
+        "            [dim]Installs now: nothing · You run later: nothing[/dim]\n"
+        "[bold]2. auto[/bold]      [dim].claude/memory (flat agent facts) — no vault[/dim]\n"
+        "            [dim]Installs now: files only · You run later: nothing[/dim]\n"
+        "[bold]3. obsidian[/bold]  [dim]auto PLUS .claude/vault (markdown notes,[/dim]\n"
+        "            [dim]browsable in Obsidian)[/dim]\n"
+        "            [dim]Installs now: files only · You run later: nothing[/dim]\n"
+        "[bold]4. obsidian-graphify[/bold]  [dim]obsidian PLUS a derived knowledge[/dim]\n"
+        "            [dim]graph agents can query (Graphify)[/dim]\n"
+        "            [dim]Installs now: files only · You run later:[/dim]\n"
+        "            [dim]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/dim]\n\n"
         "[cyan]Helps:[/cyan] agents recall why a decision was made weeks later.\n"
-        "Clean by default — pick [bold]none[/bold] and no vault/memory is added."
+        "Clean by default — pick [bold]none[/bold] and no memory is added."
     )
     console.print(Panel(body, title="Memory backend", border_style="cyan"))
-    default_idx = _MEMORY_STACKS.index(default) + 1 if default in _MEMORY_STACKS else 2
+    default_idx = _MEMORY_STACKS.index(default) + 1 if default in _MEMORY_STACKS else 3
     choice = IntPrompt.ask("Choose a memory backend", default=default_idx)
     idx = choice - 1 if 1 <= choice <= len(_MEMORY_STACKS) else default_idx - 1
     return _MEMORY_STACKS[idx]
@@ -1792,7 +1819,7 @@ def main(argv: list[str] | None = None) -> int:
     from project_init.upgrade import write_scaffold_record
 
     write_scaffold_record(target, preset["name"], variables, created)
-    _print_summary(target, created, preset["name"])
+    _print_summary(target, created, preset["name"], variables.get("memory_stack", "none"))
     if conflicts:
         _print_conflicts(conflicts)
     _print_mcp_commands(inputs.selected_mcps)

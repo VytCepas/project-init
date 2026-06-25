@@ -213,19 +213,23 @@ _AGENT_LAYERS = ("codex", "antigravity", "amp", "junie")
 
 
 def memory_layers(memory_stack: str) -> list[str]:
-    """Template layers contributed by the memory backend (#466).
+    """Template layers contributed by the memory backend (#466, #497).
 
-    ``obsidian-only`` → ``["obsidian"]``; ``obsidian-graphify`` →
-    ``["obsidian", "graphify"]`` (graphify always implies the obsidian vault it
-    exports from); ``none`` → ``[]``. The memory backend used to be hard-coded
-    in each preset's ``layers``; it is now derived from the recorded
-    ``memory_stack`` so memory can be declined (``none``) and so scaffold +
-    upgrade derive the same layers (PI-189).
+    The ladder is a strict superset chain (ADR-024): ``auto`` → ``["auto"]``
+    (flat agent facts in ``.claude/memory/`` — no vault); ``obsidian-only`` →
+    ``["auto", "obsidian"]`` (adds the human Obsidian vault on top of the memory
+    facts); ``obsidian-graphify`` → ``["auto", "obsidian", "graphify"]`` (adds
+    the derived code knowledge graph); ``none`` → ``[]``. The memory backend
+    used to be hard-coded in each preset's ``layers``; it is now derived from
+    the recorded ``memory_stack`` so memory can be declined (``none``) and so
+    scaffold + upgrade derive the same layers (PI-189).
     """
+    if memory_stack == "auto":
+        return ["auto"]
     if memory_stack == "obsidian-only":
-        return ["obsidian"]
+        return ["auto", "obsidian"]
     if memory_stack == "obsidian-graphify":
-        return ["obsidian", "graphify"]
+        return ["auto", "obsidian", "graphify"]
     return []
 
 

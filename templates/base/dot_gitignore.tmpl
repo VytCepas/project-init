@@ -20,12 +20,12 @@ __pycache__/
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md
 
-{{/if graphify}}{{#if memory}}# Obsidian (vault workspace state only; keep notes tracked)
+{{/if graphify}}{{#if obsidian}}# Obsidian (vault workspace state only; keep notes tracked)
 .claude/vault/.obsidian/workspace*
 .claude/vault/.obsidian/cache
 .claude/vault/.trash/
 
-{{/if memory}}# OS / editor
+{{/if obsidian}}# OS / editor
 .DS_Store
 *.swp
 {{#if vscode}}# Scaffolded editor config (--vscode) is shared; the rest stays personal.
