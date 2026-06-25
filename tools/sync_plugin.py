@@ -125,13 +125,32 @@ def _sync_hooks(scripts: list[Path], plugin_root: Path, synced: list[str]) -> No
         synced.append(f"{plugin_root.name}/hooks/{script.name}")
 
 
+def _ship_base_plan(dest: Path) -> None:
+    """Copy the base `plan` skill into a surface layer as a rendered SKILL.md.
+
+    Renames SKILL.md.tmpl -> SKILL.md (PI-491). `plan` is the one project-local
+    skill (templates/base/.../skills) and is a
+    template only by convention — it carries no ``{{variables}}``, so its
+    rendered bytes equal the template bytes and it is sound to ship verbatim.
+    That invariant is guarded by test_agent_overlays; a future variable in plan
+    would render per-project and must NOT be shipped this way.
+    """
+    src = TEMPLATE_CLAUDE / "skills" / "plan"
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in sorted(src.iterdir()):
+        if f.is_file():
+            name = f.name[:-5] if f.name.endswith(".tmpl") else f.name
+            shutil.copy2(f, dest / name)
+
+
 def _sync_agent_skills() -> list[str]:
     """Byte-identical SKILL.md trees per surface (Codex/Antigravity/Amp/Junie).
 
     Codex/Antigravity/Amp use `.agents/skills`; Junie uses `.junie/skills`. Each
     layer ships its own copy of the FULL skill set so the surface works
     standalone — all discover `<dir>/<name>/SKILL.md` natively, no command
-    pointers (PI-386, PI-397).
+    pointers (PI-386, PI-397). The full set is the core + lifecycle skills plus
+    the base `plan` skill (PI-491), so it matches the CAPABILITIES inventory.
     """
     synced = []
     for label, dest in (
@@ -145,6 +164,8 @@ def _sync_agent_skills() -> list[str]:
         for skill_dir in all_skill_dirs():
             shutil.copytree(skill_dir, dest / skill_dir.name)
             synced.append(f"{label}:skills/{skill_dir.name}")
+        _ship_base_plan(dest / "plan")
+        synced.append(f"{label}:skills/plan")
     return synced
 
 
