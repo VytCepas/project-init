@@ -526,7 +526,14 @@ def _validate_no_placeholders(rendered_files: list[tuple[Path, str]]) -> None:
 
 
 def _iter_layer_files(layers: list[str]):
-    """Yield (src, layer_dir) for every file across the preset's template layers."""
+    """Yield (src, layer_dir) for every file across the preset's template layers.
+
+    Python bytecode caches are skipped: a developer's local templates/ tree
+    accumulates ``__pycache__/*.pyc`` next to the hook/script sources (after the
+    test suite or any import compiles them), and copying those into scaffolds
+    pollutes the project with stale bytecode that also trips ``upgrade``'s drift
+    report. Never a real template file, on any host (#470 e2e).
+    """
     for layer_name in layers:
         layer_dir = _TEMPLATES_DIR / layer_name
         if not layer_dir.exists():
@@ -534,6 +541,8 @@ def _iter_layer_files(layers: list[str]):
             raise FileNotFoundError(msg)
         for src in sorted(layer_dir.rglob("*")):
             if src.is_dir():
+                continue
+            if "__pycache__" in src.parts or src.suffix in (".pyc", ".pyo"):
                 continue
             yield src, layer_dir
 
