@@ -123,7 +123,13 @@ class TestSkillNeutrality:
             assert "Claude Code specific" in content, f"{name} missing scope marker"
 
     def test_github_workflow_skill_is_agent_neutral(self):
-        content = (self._SKILLS / "github_workflow" / "SKILL.md").read_text()
+        # github_workflow moved to the lifecycle_fallback overlay (#476).
+        gw = (
+            Path(__file__).resolve().parents[2]
+            / "templates" / "lifecycle_fallback" / "dot_claude" / "skills"
+            / "github_workflow" / "SKILL.md"
+        )
+        content = gw.read_text()
         frontmatter = content.split("---")[1]
         assert "Claude" not in frontmatter, "lifecycle skill must not be Claude-scoped"
 
@@ -201,11 +207,13 @@ class TestGithubWorkflowProductionBoundary:
     production-ref boundary explicit, and all copies must stay in sync."""
 
     _REPO = Path(__file__).resolve().parents[2]
+    # github_workflow moved to the lifecycle_fallback overlay + the
+    # project-init-lifecycle plugin (#476); the agent-surface copies stay.
     _SKILLS = [
-        _REPO / "templates/fallback/dot_claude/skills/github_workflow/SKILL.md",
+        _REPO / "templates/lifecycle_fallback/dot_claude/skills/github_workflow/SKILL.md",
         _REPO / "templates/codex/dot_agents/skills/github_workflow/SKILL.md",
         _REPO / "templates/antigravity/dot_agents/skills/github_workflow/SKILL.md",
-        _REPO / "plugins/project-init-workflow/skills/github_workflow/SKILL.md",
+        _REPO / "plugins/project-init-lifecycle/skills/github_workflow/SKILL.md",
     ]
 
     def test_skill_documents_production_boundary(self):

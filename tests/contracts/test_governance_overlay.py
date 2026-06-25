@@ -181,6 +181,7 @@ class TestInteractiveResolution:
         monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
         monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
         monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
+        monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
         # Every Confirm.ask (devcontainer/mise/vscode/multi-model/governance) → decline.
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
         return cli

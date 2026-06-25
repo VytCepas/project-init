@@ -23,7 +23,7 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Command | `/status` | git state, recent commits, open TODOs |
 | Command | `/review` | code review of staged changes or a file |
 | Command | `/plan <task>` | acceptance tests first, then implementation plan |
-| Command | `/request_review` | mark PR ready for review, optional agent review |
+{{#if lifecycle}}| Command | `/request_review` | mark PR ready for review, optional agent review |
 | Script | `create_issue.sh <type> "desc"` | create typed issue, prints issue number |
 | Script | `create_nojira_pr.sh <type> "desc"` | branch + push + draft PR without an issue |
 | Script | `setup_github.sh [branch] [--protect]` | provision board fields and review settings; `--protect` applies baseline branch protection |
@@ -31,14 +31,14 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Script | `promote_review.sh` | mark PR ready (board card moves automatically) |
 | Script | `monitor_pr.sh <n> [--merge]` | wait for CI; --merge squash-merges when clean |
 | Script | `finish_pr.sh [n] [--review-cycle N]` | push branch, mark ready, monitor checks/review, and merge |
-| Skill | `session_summary` | summarise session and save to vault |
+{{/if lifecycle}}| Skill | `session_summary` | summarise session and save to vault |
 | Skill | `add_hook` | add a new deterministic hook |
 | Skill | `add_command` | add a new slash command |
-| Skill | `audit` | full project health scan, creates issue with findings |
-| Agent | `reviewer` | code review specialist |
+{{#if lifecycle}}| Skill | `audit` | full project health scan, creates issue with findings |
+{{/if lifecycle}}| Agent | `reviewer` | code review specialist |
 | Agent | `researcher` | codebase explorer |
 
-Hooks run automatically: `github_command_guard`, `workflow_state_reminder`, `pre_commit_gate`, `post_edit_lint`, `prod_guard` — {{#if no_plugin}}wired in `.claude/settings.json`, scripts in `.claude/hooks/`{{/if no_plugin}}{{#if plugin_mode}}supplied by the `project-init-workflow` plugin (enabled in `.claude/settings.json` under `enabledPlugins`, not a local `hooks` block); the scripts live under the plugin's `CLAUDE_PLUGIN_ROOT`/hooks, so edit the plugin to change them{{/if plugin_mode}}. Secret scanning and lifecycle gating are enforced agent-agnostically by git hooks (gitleaks pre-commit, commit-msg, pre-push — installed via `.claude/scripts/install_hooks.sh`) and mirrored in CI; the `security-guidance` plugin provides Claude-side guidance.
+Hooks run automatically: {{#if lifecycle}}`github_command_guard`, `workflow_state_reminder`, {{/if lifecycle}}`pre_commit_gate`, `post_edit_lint`, `prod_guard` — {{#if no_plugin}}wired in `.claude/settings.json`, scripts in `.claude/hooks/`{{/if no_plugin}}{{#if plugin_mode}}supplied by the `project-init-workflow` plugin (enabled in `.claude/settings.json` under `enabledPlugins`, not a local `hooks` block); the scripts live under the plugin's `CLAUDE_PLUGIN_ROOT`/hooks, so edit the plugin to change them{{/if plugin_mode}}. Secret scanning and lifecycle gating are enforced agent-agnostically by git hooks (gitleaks pre-commit, commit-msg, pre-push — installed via `.claude/scripts/install_hooks.sh`) and mirrored in CI; the `security-guidance` plugin provides Claude-side guidance.
 
 **Rules** (`.claude/rules/`): per-filetype conventions loaded automatically by Claude Code when you open a matching file.
 
@@ -64,7 +64,7 @@ Write failing tests before implementation. Tests define the contract.
 Test conventions: one assertion per test, name as `test_<unit>_<scenario>`, run with `uv run pytest`. Real DB/API instances — no mocks.
 {{/if}}
 
-## GitHub Projects tracking
+{{#if lifecycle}}## GitHub Projects tracking
 
 Work items are GitHub Issues; the project board is GitHub Projects (kanban with To Do / In Progress / In Review / Done columns). Board cards move automatically via `board-automation.yml` — **no manual board moves needed**.
 
@@ -162,7 +162,7 @@ gh issue list                                         # open issues
 gh pr list                                            # open PRs
 ```
 
-## Conventions
+{{/if lifecycle}}## Conventions
 
 - Hooks and scripts prefer bash/python. LLM calls only for generative steps.
 - `AGENTS.md` is the canonical root instruction file (the standard most agents read natively). `CLAUDE.md` redirects to it.

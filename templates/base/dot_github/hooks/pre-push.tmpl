@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Pre-push hook: lifecycle gate (ADR-007).
+# Pre-push hook: {{#if lifecycle}}lifecycle gate (ADR-007).
 #   1. Prevent direct pushes to main/master.
 #   2. Enforce a branch type prefix — (feat|fix|chore|docs|test)/<slug> —
 #      the same rule as dag_workflow.py's _BRANCH_RE. Full issue-key
 #      validation (<type>/<KEY>-<n>-<slug>) runs in CI via validate-pr.yml,
-#      where the linked issue can actually be checked.
+#      where the linked issue can actually be checked.{{/if lifecycle}}{{#if lifecycle_off}}quality gate.
+#   Prevent direct pushes to main/master — universal git hygiene. (The branch
+#   naming + issue-key rules are part of the GitHub lifecycle, declined here.){{/if lifecycle_off}}
 # Install: .claude/scripts/install_hooks.sh
 
 set -e
@@ -29,14 +31,16 @@ while read -r _ local_sha remote_ref _; do
     echo "❌ ERROR: Direct push to main/master is not allowed"
     echo ""
     echo "To contribute:"
-    echo "  1. Create a new branch with the project key: git checkout -b <issue_type>/<project_abbr>-<issue_number>-<slug>"
+{{#if lifecycle}}    echo "  1. Create a new branch with the project key: git checkout -b <issue_type>/<project_abbr>-<issue_number>-<slug>"
     echo "  2. Make your changes and push: .claude/scripts/push_branch.sh"
     echo "  3. Open a PR on GitHub"
     echo ""
     echo "For more details, see .claude/project-init.md"
-    exit 1
+{{/if lifecycle}}{{#if lifecycle_off}}    echo "  1. Create a feature branch: git checkout -b my-change"
+    echo "  2. Make your changes, then push and open a pull request"
+{{/if lifecycle_off}}    exit 1
   fi
-
+{{#if lifecycle}}
   if ! echo "$branch_name" | grep -qE '^(feat|fix|chore|docs|test)/[A-Za-z0-9._/-]+$'; then
     echo "❌ ERROR: branch '$branch_name' does not follow the lifecycle naming convention"
     echo ""
@@ -48,6 +52,6 @@ while read -r _ local_sha remote_ref _; do
     echo "Use .claude/scripts/start_issue.sh or create_nojira_pr.sh to create branches."
     exit 1
   fi
-done
+{{/if lifecycle}}done
 
 exit 0

@@ -16,9 +16,12 @@ from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS = _REPO_ROOT / "templates/base/dot_claude/scripts"
+# Lifecycle scripts moved to the lifecycle overlay (#476); gh_host.sh stays in
+# base (shared host resolver also sourced by the deploy scripts).
+_LIFECYCLE_SCRIPTS = _REPO_ROOT / "templates/lifecycle/dot_claude/scripts"
 _GH_HOST = _SCRIPTS / "gh_host.sh"
-_SETUP_GITHUB = _SCRIPTS / "setup_github.sh"
-_PUSH_WIKI = _SCRIPTS / "push_wiki.sh"
+_SETUP_GITHUB = _LIFECYCLE_SCRIPTS / "setup_github.sh"
+_PUSH_WIKI = _LIFECYCLE_SCRIPTS / "push_wiki.sh"
 _INSTALL = _REPO_ROOT / "install.sh"
 
 

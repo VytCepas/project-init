@@ -1,15 +1,18 @@
-"""Byte-identity contract for the memory decomposition (#466, PI-189).
+"""Byte-identity contract for the lifecycle decomposition (#476, PI-189).
 
-Moving memory/vault content base→obsidian overlay and gating it behind
-`{{#if memory}}` must render the existing obsidian-only / obsidian-graphify
-backends BYTE-IDENTICALLY. `memory/` and `vault/` are excluded from the upgrade
-manifest (`_PRESERVE_DIRS`), so the upgrade round-trip does NOT cover the move —
-this fresh-scaffold snapshot against a committed pre-move baseline is the only
-thing that does.
+Moving the GitHub lifecycle (DAG library, scripts, board/wiki/validation
+workflows, issue/PR templates, guard hooks, lifecycle skills) out of base into
+the ``lifecycle`` / ``lifecycle_fallback`` overlays and gating the mixed files
+(settings hooks, pre-push, AGENTS/project-init prose) behind ``{{#if lifecycle}}``
+must render the default lifecycle-ON scaffold BYTE-IDENTICALLY.
 
-The baseline fixtures in tests/fixtures/memory_baseline/ were captured BEFORE
-the move (tools/scratch gen_baseline.py). If this test fails, the move/gating
-changed rendered bytes — fix the template, do NOT regenerate the baseline.
+Unlike memory, the lifecycle files are NOT in ``_PRESERVE_DIRS``, so the upgrade
+round-trip covers them — but only via the recorded layer set. This fresh-scaffold
+snapshot against a committed pre-move baseline is the direct guard on the move.
+
+The baseline fixtures in tests/fixtures/lifecycle_baseline/ were captured BEFORE
+the move. If this test fails, the move/gating changed rendered bytes — fix the
+template, do NOT regenerate the baseline.
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ import pytest
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables
 
-FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "memory_baseline"
+FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "lifecycle_baseline"
 
 COMBOS = [
     ("obsidian-only", False),
@@ -33,11 +36,11 @@ COMBOS = [
 ]
 
 
-# Generated/lifecycle-touched files excluded from the memory-move comparison
-# (#476): CAPABILITIES.md is a regenerated inventory that gained a "GitHub
-# lifecycle" row + the lifecycle skills now sourced from lifecycle_fallback;
-# plugin-mode settings.json gained the project-init-lifecycle plugin enablement.
-# Neither is part of the memory move this contract guards.
+# Generated inventories regenerated every scaffold/upgrade — NOT part of the
+# static template move this contract guards, and they legitimately gain a
+# "GitHub lifecycle: on/off" row + the lifecycle skills now sourced from the
+# lifecycle_fallback overlay (#476). Their correctness is covered by
+# test_lifecycle_none.py, not byte-identity.
 _GENERATED = {".claude/CAPABILITIES.md"}
 
 
@@ -47,21 +50,18 @@ def _manifest(target: Path) -> dict[str, str]:
         if not p.is_file():
             continue
         rel = p.relative_to(target)
-        # Skip Python bytecode caches: a developer's local templates/ tree may
-        # carry __pycache__ that scaffold() copies, but a clean checkout (CI)
-        # does not — including them would be spurious drift.
         if "__pycache__" in rel.parts or rel.suffix == ".pyc":
+            continue
+        if rel.as_posix() in _GENERATED:
             continue
         out[rel.as_posix()] = hashlib.sha256(p.read_bytes()).hexdigest()
     return out
 
 
 @pytest.mark.parametrize("preset_name,no_plugin", COMBOS)
-def test_memory_move_byte_identical(preset_name: str, no_plugin: bool, tmp_path: Path):
+def test_lifecycle_move_byte_identical(preset_name: str, no_plugin: bool, tmp_path: Path):
     preset = load_preset(preset_name)
     stack = preset.get("vars", {}).get("memory_stack", "obsidian-only")
-    # lifecycle=True: the baseline was captured when the lifecycle files lived in
-    # base, so a full (lifecycle-on) scaffold is what reproduces it (#476).
     extra = overlay_layers([], no_plugin=no_plugin, memory_stack=stack, lifecycle=True)
     preset = {**preset, "layers": [*preset["layers"], *extra]}
     variables = make_variables(
@@ -73,6 +73,10 @@ def test_memory_move_byte_identical(preset_name: str, no_plugin: bool, tmp_path:
     scaffold(target, preset, variables)
     got = _manifest(target)
 
+    # Plugin-mode settings.json legitimately gains the project-init-lifecycle
+    # plugin enablement (#476 plugin split) — an intended edit, not move drift.
+    # The no-plugin hook gating IS designed byte-identical-when-ON, so it stays
+    # in the comparison. The plugin-mode change is covered by test_lifecycle_none.
     drop = set(_GENERATED)
     if not no_plugin:
         drop.add(".claude/settings.json")
@@ -80,6 +84,8 @@ def test_memory_move_byte_identical(preset_name: str, no_plugin: bool, tmp_path:
 
     mode = "no_plugin" if no_plugin else "plugin"
     expected = json.loads((FIXTURES / f"{preset_name}__{mode}.json").read_text())
+    # The pre-move baseline still carries the generated inventories; drop the
+    # same keys so the comparison matches the move-focused manifest above.
     expected = {k: v for k, v in expected.items() if k not in drop}
 
     added = sorted(set(got) - set(expected))

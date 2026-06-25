@@ -52,6 +52,15 @@ class ScaffoldInputs:
     # overlays via overlay_layers() and the memory/obsidian/graphify gate vars.
     # Resolved with precedence flag > interactive > preset var > "obsidian-only".
     memory: str = "obsidian-only"
+    # GitHub lifecycle tier (#476, ADR-021): "github" ships the issue→branch→PR
+    # →review→merge automation (DAG hooks/scripts, board/wiki/validation
+    # workflows, issue/PR templates, lifecycle skills); "none" declines it for a
+    # forge-agnostic / minimalist scaffold. Opt-OUT — default ON. Drives the
+    # lifecycle/lifecycle_fallback overlays + the `lifecycle` gate var. Resolved
+    # with precedence flag > interactive > preset var > "github". Forge-portable
+    # quality hooks (commit-msg, gitleaks, lint/format gate, prod-safety) are
+    # core and stay regardless.
+    lifecycle: str = "github"
     # Delivery model (epic #316, ADR-015): how the project ships — drives the
     # env/CI/release bundle. "prototype" is the safe minimal default.
     delivery: str = "prototype"
@@ -172,6 +181,20 @@ def _build_parser() -> argparse.ArgumentParser:
             "obsidian (human-authored markdown vault; alias for obsidian-only), or "
             "obsidian-graphify (vault + a derived knowledge graph for agents). "
             "Overrides the preset's default."
+        ),
+    )
+    p.add_argument(
+        "--lifecycle",
+        choices=["github", "none"],
+        default=None,
+        help=(
+            "GitHub lifecycle tier (#476, ADR-021): github (default — ship the "
+            "issue→branch→PR→review→merge automation: DAG guard hooks, lifecycle "
+            "scripts, board/wiki/validation workflows, issue/PR templates, "
+            "lifecycle skills) or none (decline it for a forge-agnostic or "
+            "minimalist scaffold). Forge-portable quality hooks (commit-msg, "
+            "gitleaks, lint/format gate, prod-safety) stay either way. Overrides "
+            "the preset's default."
         ),
     )
     p.add_argument(
@@ -607,6 +630,50 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
     return _MEMORY_STACKS[idx]
 
 
+_LIFECYCLE_TIERS = ("github", "none")
+
+
+def _normalize_lifecycle(value: str | None) -> str | None:
+    """Normalize a --lifecycle value to a canonical tier, or None if unset (#476)."""
+    return value or None
+
+
+def _choose_lifecycle_interactive(default: str = "github") -> str:
+    """Explain the GitHub lifecycle tier, then ask whether to ship it (#476).
+
+    States what the lifecycle automation ships and what it brings, so the user
+    keeps it or declines for a forge-agnostic / minimalist scaffold. Passing
+    --lifecycle pre-selects and skips this. The default follows the chosen
+    preset's lifecycle tier.
+    """
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import IntPrompt
+
+    console = Console()
+    body = (
+        "The [bold]GitHub lifecycle[/bold] tier ships project-init's flagship "
+        "workflow — [bold]issue → branch → PR → review → merge[/bold], enforced "
+        "by deterministic guard hooks so the steps can't be skipped or "
+        "mis-ordered.\n\n"
+        "[bold]1. github[/bold]  [dim]DAG guard hooks, lifecycle scripts "
+        "(start_issue/finish_pr/…),[/dim]\n"
+        "          [dim]board+wiki+PR-validation workflows, issue/PR templates,[/dim]\n"
+        "          [dim]and the create_issue/start_task/github_workflow skills[/dim]\n"
+        "[bold]2. none[/bold]    [dim]decline it — forge-agnostic / minimalist; "
+        "bring your own flow[/dim]\n\n"
+        "[cyan]Helps:[/cyan] every change is traceable to an issue and a "
+        "reviewed PR; no accidental pushes to main.\n"
+        "[dim]Forge-portable quality hooks (commit-msg, gitleaks secret scan, "
+        "lint/format gate, prod-safety) stay either way.[/dim]"
+    )
+    console.print(Panel(body, title="GitHub lifecycle (issue → PR → merge)", border_style="cyan"))
+    default_idx = _LIFECYCLE_TIERS.index(default) + 1 if default in _LIFECYCLE_TIERS else 1
+    choice = IntPrompt.ask("Ship the GitHub lifecycle?", default=default_idx)
+    idx = choice - 1 if 1 <= choice <= len(_LIFECYCLE_TIERS) else default_idx - 1
+    return _LIFECYCLE_TIERS[idx]
+
+
 def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
     """Warn that user-owned files were kept; renders landed as .new siblings."""
     from rich.console import Console
@@ -745,6 +812,8 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     ),
     memory_flag: str | None = None,
     preset_memory: str = "obsidian-only",
+    lifecycle_flag: str | None = None,
+    preset_lifecycle: str = "github",
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -802,6 +871,9 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     # Memory backend (#466). The --memory flag wins; otherwise the wizard explains
     # the backends and asks, defaulting to the chosen preset's memory stack.
     resolved_memory = memory_flag or _choose_memory_interactive(default=preset_memory)
+    # GitHub lifecycle tier (#476). The --lifecycle flag wins; otherwise the
+    # wizard explains it and asks, defaulting to the chosen preset's tier.
+    resolved_lifecycle = lifecycle_flag or _choose_lifecycle_interactive(default=preset_lifecycle)
     while True:
         agents_raw = _prompt(
             "Agents/surfaces (claude always; add codex/ollama/cursor/antigravity/vscode, comma-separated)",
@@ -835,6 +907,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         governance=resolved_governance,
         observability=resolved_observability,
         memory=resolved_memory,
+        lifecycle=resolved_lifecycle,
     )
 
 
@@ -1195,6 +1268,11 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
     has_obsidian = memory_stack in ("obsidian-only", "obsidian-graphify")
     is_graphify = memory_stack == "obsidian-graphify"
     has_memory = memory_stack != "none"
+    # GitHub lifecycle gate (#476, ADR-021): drives the lifecycle/lifecycle_fallback
+    # overlays + every {{#if lifecycle}} block (settings hooks, pre-push branch
+    # rule, AGENTS/project-init prose). Recorded so `upgrade` re-derives the same
+    # set (PI-189); _backfill_variables / _migrate_semantic_config emit it too.
+    has_lifecycle = inputs.lifecycle != "none"
     lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(language, ("", "", ""))
     return {
         "project_name": project_name,
@@ -1234,6 +1312,13 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "cloud_oidc": ("true" if (inputs.deploy in _DEPLOY_OIDC or inputs.iac != "none") else ""),
         "memory_stack": memory_stack,
         "memory": "true" if has_memory else "",
+        # GitHub lifecycle tier (#476): the recorded value + the gate flag, plus
+        # the inverse flag for the engine's else-less {{#if}} blocks (e.g. the
+        # pre-push main/master remediation reads differently with the lifecycle
+        # scripts absent), mirroring vscode_off / egress_ok.
+        "lifecycle_tier": inputs.lifecycle,
+        "lifecycle": "true" if has_lifecycle else "",
+        "lifecycle_off": "" if has_lifecycle else "true",
         "installed_mcps": format_installed_mcps(selected_mcps),
         "installed_mcps_yaml": format_installed_mcps_yaml(selected_mcps),
         "lint_command": lint_command,
@@ -1320,15 +1405,16 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
 
 
 def _resolve_inputs(
-    args, parser, target: Path, preset_memory: str = "obsidian-only"
+    args, parser, target: Path, preset_memory: str = "obsidian-only", preset_lifecycle: str = "github"
 ) -> ScaffoldInputs | None:
     """Resolve all scaffold inputs from flags; None means prompt instead.
 
     Validation errors call ``parser.error`` (exits) BEFORE the target dir is
     created (PI-20), so a typo'd flag never leaves an empty dir behind.
 
-    ``preset_memory`` is the chosen preset's memory_stack — the fallback when
-    --memory is not given (#466); the flag wins.
+    ``preset_memory`` is the chosen preset's memory_stack and ``preset_lifecycle``
+    its lifecycle tier — the fallbacks when --memory / --lifecycle are not given
+    (#466, #476); the flags win.
     """
     if not args.non_interactive:
         return None
@@ -1367,6 +1453,7 @@ def _resolve_inputs(
         governance=args.governance,
         observability=args.observability,
         memory=_normalize_memory(args.memory) or preset_memory,
+        lifecycle=_normalize_lifecycle(args.lifecycle) or preset_lifecycle,
     )
 
 
@@ -1428,11 +1515,14 @@ def main(argv: list[str] | None = None) -> int:
     # Memory backend fallback when --memory is absent (#466): the preset's stack
     # (obsidian-only/obsidian-graphify/core's "none"), default obsidian-only.
     preset_memory = preset.get("vars", {}).get("memory_stack", "obsidian-only")
+    # Lifecycle-tier fallback when --lifecycle is absent (#476): the preset's
+    # tier (a preset may set lifecycle = "none" to be minimal), default "github".
+    preset_lifecycle = preset.get("vars", {}).get("lifecycle", "github")
 
     # Validate non-interactive args / gather interactive input BEFORE creating
     # the target directory (PI-20, PI-199: a bad flag OR a Ctrl-C at an
     # interactive prompt must not leave an empty dir behind).
-    inputs = _resolve_inputs(args, parser, target, preset_memory)
+    inputs = _resolve_inputs(args, parser, target, preset_memory, preset_lifecycle)
     if inputs is None:
         inputs = _gather_inputs_interactive(
             default_name=target.name,
@@ -1454,6 +1544,8 @@ def main(argv: list[str] | None = None) -> int:
             ),
             memory_flag=_normalize_memory(args.memory),
             preset_memory=preset_memory,
+            lifecycle_flag=_normalize_lifecycle(args.lifecycle),
+            preset_lifecycle=preset_lifecycle,
         )
     target.mkdir(parents=True, exist_ok=True)
 
@@ -1470,6 +1562,7 @@ def main(argv: list[str] | None = None) -> int:
         inputs.agents,
         no_plugin=inputs.no_plugin,
         memory_stack=inputs.memory,
+        lifecycle=inputs.lifecycle != "none",
         multi_model=inputs.multi_model,
         governance=governance_on,
         observability=inputs.observability,

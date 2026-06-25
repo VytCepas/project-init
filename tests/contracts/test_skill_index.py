@@ -128,5 +128,7 @@ class TestSkillFrontmatter:
 
     def test_audit_runs_in_forked_context(self):
         """Heavyweight scan isolates its context; findings land in a GitHub issue."""
-        fm = self._frontmatter(_SKILLS_DIR / "audit" / "SKILL.md")
+        # audit moved to the lifecycle_fallback overlay (#476).
+        audit = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills" / "audit"
+        fm = self._frontmatter(audit / "SKILL.md")
         assert fm.get("context") == "fork"

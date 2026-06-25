@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from project_init.scaffold import load_preset, scaffold
-from tests.helpers import fallback_preset, fallback_variables, make_variables
+from project_init.scaffold import scaffold
+from tests.helpers import fallback_preset, fallback_variables, make_variables, memory_preset
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -27,6 +27,11 @@ _FALLBACK_HOOKS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "hooks"
 _PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-workflow" / "hooks"
 _BASE_HOOKS = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks"
 _BASE_SCRIPTS = _REPO_ROOT / "templates" / "base" / "dot_claude" / "scripts"
+# GitHub-lifecycle overlay dirs (#476): the lifecycle scripts + guard hooks moved
+# out of base/fallback; their second home is the project-init-lifecycle plugin.
+_LIFECYCLE_SCRIPTS = _REPO_ROOT / "templates" / "lifecycle" / "dot_claude" / "scripts"
+_LIFECYCLE_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "hooks"
+_LIFECYCLE_PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-lifecycle" / "hooks"
 _MULTI_MODEL = (
     _REPO_ROOT / "templates" / "multi_model" / "dot_claude" / "scripts" / "setup_models.sh"
 )
@@ -35,7 +40,14 @@ _MULTI_MODEL = (
 # resolver itself (which legitimately names python3/python/uv).
 def _shell_scripts() -> list[Path]:
     scripts: list[Path] = []
-    for d in (_FALLBACK_HOOKS, _PLUGIN_HOOKS, _BASE_SCRIPTS):
+    for d in (
+        _FALLBACK_HOOKS,
+        _PLUGIN_HOOKS,
+        _BASE_SCRIPTS,
+        _LIFECYCLE_SCRIPTS,
+        _LIFECYCLE_FALLBACK_HOOKS,
+        _LIFECYCLE_PLUGIN_HOOKS,
+    ):
         scripts += [p for p in d.glob("*.sh") if p.name != "_py.sh"]
     scripts.append(_MULTI_MODEL)
     return scripts
@@ -82,8 +94,9 @@ def test_resolver_exists_and_is_executable():
     ("preset", "variables"),
     [
         # True plugin mode (no fallback layer) — the case Codex flagged: the
-        # base lifecycle scripts reference ../hooks/_py.sh, which must exist.
-        (load_preset("obsidian-only"), make_variables(plugin_mode="true", no_plugin="")),
+        # lifecycle scripts reference ../hooks/_py.sh, which must exist. The
+        # lifecycle overlay (#476) is what ships those scripts now.
+        (memory_preset("obsidian-only"), make_variables(plugin_mode="true", no_plugin="")),
         # --no-plugin mode (fallback layer present).
         (fallback_preset(), fallback_variables()),
     ],
@@ -118,7 +131,9 @@ def test_json_hook_configs_use_resolver():
 
 
 def test_dag_workflow_invokes_monitor_via_bash_absolute_path():
-    src = (_REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "dag_workflow.py").read_text()
+    src = (
+        _REPO_ROOT / "templates" / "lifecycle" / "dot_claude" / "hooks" / "dag_workflow.py"
+    ).read_text()
     # Explicit bash on an absolute path — not exec'ing the .sh by relative path.
     assert '"bash", str(script)' in src
     assert 'Path(__file__).resolve().parent.parent / "scripts" / "monitor_pr.sh"' in src

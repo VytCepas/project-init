@@ -34,19 +34,26 @@ def _skill_meta(skill_md: Path) -> tuple[str, str]:
     )
 
 
-def canonical_skills() -> list[tuple[str, str]]:
+def canonical_skills(variables: dict[str, str] | None = None) -> list[tuple[str, str]]:
     """Return (name, description) for every skill the scaffold ships.
 
     Both the always-rendered base skills (e.g. ``plan``, as ``SKILL.md.tmpl``)
     and the shared fallback/plugin skill set — the canonical skill source.
-    Deduped by name, sorted.
+    The GitHub-lifecycle skills (#476) live in the ``lifecycle_fallback``
+    overlay and ship only when the lifecycle tier is on; ``variables=None`` (the
+    canonical full set, used by tests/tooling) includes them. Deduped by name,
+    sorted.
     """
-    dirs = (
+    dirs = [
         _TEMPLATES_DIR / "base" / "dot_claude" / "skills",
         _TEMPLATES_DIR / "fallback" / "dot_claude" / "skills",
-    )
+    ]
+    if variables is None or variables.get("lifecycle"):
+        dirs.append(_TEMPLATES_DIR / "lifecycle_fallback" / "dot_claude" / "skills")
     seen: dict[str, tuple[str, str]] = {}
     for skills_dir in dirs:
+        if not skills_dir.exists():
+            continue
         # SKILL.md and SKILL.md.tmpl (base 'plan' is templated; frontmatter is
         # static so the name/description read fine).
         for p in sorted(skills_dir.glob("*/SKILL.md*")):
@@ -134,6 +141,7 @@ def _chosen_options(variables: dict[str, str]) -> list[tuple[str, str]]:
         ("Delivery", g("delivery", "prototype") or "prototype"),
         ("Deploy", g("deploy_target", "none") or "none"),
         ("IaC", g("iac", "none") or "none"),
+        ("GitHub lifecycle", "on" if g("lifecycle") else "off"),
         ("Multi-model (CCR)", "on" if g("multi_model") else "off"),
         ("AI governance", "on" if g("governance") else "off"),
         ("Observability", "on" if g("observability") else "off"),
@@ -153,7 +161,7 @@ def _table(headers: tuple[str, str], rows: list[tuple[str, str]]) -> list[str]:
 
 def render(variables: dict[str, str]) -> str:
     """The CAPABILITIES.md content for a scaffold described by *variables*."""
-    skills = canonical_skills()
+    skills = canonical_skills(variables)
     hooks = canonical_hooks(variables)
     servers = servers_for_ids(_mcp_ids(variables))
 

@@ -54,6 +54,9 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "cloud_oidc": "",
         "want_devcontainer": "",
         "memory_stack": "obsidian-only",
+        "lifecycle_tier": "github",
+        "lifecycle": "true",
+        "lifecycle_off": "",
         "installed_mcps": "none",
         "installed_mcps_yaml": "[]",
         "lint_command": "uv run ruff check .",
@@ -111,6 +114,12 @@ def make_variables(**overrides: str) -> dict[str, str]:
         defaults["graphify"] = "true" if stack == "obsidian-graphify" else ""
     if "memory" not in overrides:
         defaults["memory"] = "" if stack == "none" else "true"
+    # Mirror the lifecycle variable contract (#476): the `lifecycle` gate
+    # derives from lifecycle_tier unless a test overrides it explicitly.
+    if "lifecycle" not in overrides:
+        defaults["lifecycle"] = "" if defaults["lifecycle_tier"] == "none" else "true"
+    if "lifecycle_off" not in overrides:
+        defaults["lifecycle_off"] = "true" if defaults["lifecycle_tier"] == "none" else ""
     return defaults
 
 
@@ -132,7 +141,10 @@ def memory_preset(name: str = "obsidian-only") -> dict:
 
     preset = load_preset(name)
     stack = preset.get("vars", {}).get("memory_stack", "obsidian-only")
-    extra = overlay_layers([], no_plugin=False, memory_stack=stack)
+    # Default to a full (lifecycle-ON) scaffold (#476) so tests using this
+    # helper still find the lifecycle scripts/hooks/workflows, which now live in
+    # the lifecycle overlay rather than base.
+    extra = overlay_layers([], no_plugin=False, memory_stack=stack, lifecycle=True)
     return {**preset, "layers": [*preset["layers"], *extra]}
 
 
@@ -147,5 +159,7 @@ def fallback_preset(name: str = "obsidian-only") -> dict:
 
     preset = load_preset(name)
     stack = preset.get("vars", {}).get("memory_stack", "obsidian-only")
-    extra = overlay_layers([], no_plugin=True, memory_stack=stack)
+    # Full (lifecycle-ON) --no-plugin scaffold (#476): include the lifecycle +
+    # lifecycle_fallback overlays so the copied lifecycle hooks/skills are present.
+    extra = overlay_layers([], no_plugin=True, memory_stack=stack, lifecycle=True)
     return {**preset, "layers": [*preset["layers"], *extra]}

@@ -16,7 +16,7 @@ from tests.helpers import fallback_preset, fallback_variables
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_HOOK = REPO_ROOT / ".claude" / "hooks" / "dag_workflow.py"
-TEMPLATE_HOOK = REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "dag_workflow.py"
+TEMPLATE_HOOK = REPO_ROOT / "templates" / "lifecycle" / "dot_claude" / "hooks" / "dag_workflow.py"
 
 
 def _load_module(path: Path):
@@ -502,7 +502,7 @@ class TestScriptShims:
 
     @pytest.mark.parametrize("name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"])
     def test_template_script_is_shim(self, name: str):
-        path = REPO_ROOT / "templates" / "base" / "dot_claude" / "scripts" / name
+        path = REPO_ROOT / "templates" / "lifecycle" / "dot_claude" / "scripts" / name
         assert path.is_file()
         text = path.read_text()
         assert "dag_workflow.py" in text

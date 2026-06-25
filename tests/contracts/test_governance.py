@@ -12,7 +12,7 @@ from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SETUP_GITHUB = (
-    _REPO_ROOT / "templates/base/dot_claude/scripts/setup_github.sh"
+    _REPO_ROOT / "templates/lifecycle/dot_claude/scripts/setup_github.sh"
 )
 
 

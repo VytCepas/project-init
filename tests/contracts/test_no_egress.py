@@ -62,7 +62,12 @@ class TestSettingsEgress:
 
     def test_no_egress_plugin_mode_keeps_project_init_plugin(self, tmp_path: Path):
         data = _settings(tmp_path, egress_ok="", no_egress="true", plugin_mode="true")
-        assert data["enabledPlugins"] == {"project-init-workflow@project-init": True}
+        # The fork marketplace's plugins survive no-egress; with the default
+        # lifecycle tier on, that is BOTH the core and the lifecycle plugin (#476).
+        assert data["enabledPlugins"] == {
+            "project-init-workflow@project-init": True,
+            "project-init-lifecycle@project-init": True,
+        }
 
     def test_no_egress_no_plugin_empties_enabled_plugins(self, tmp_path: Path):
         data = _settings(

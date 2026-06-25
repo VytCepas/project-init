@@ -25,12 +25,6 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/github_command_guard.sh",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "shell": "bash",
             "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/_py.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/prod_guard.py",
             "timeout": 10
           }
@@ -46,18 +40,6 @@
             "shell": "bash",
             "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/post_edit_lint.sh",
             "timeout": 30
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/workflow_state_reminder.sh",
-            "timeout": 10
           }
         ]
       }
