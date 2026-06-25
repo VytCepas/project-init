@@ -23,7 +23,7 @@
   ".claude/hooks/github_command_guard.sh": "14bcf3da720916a0fdaec22febb33401c60d79717cc0035880c7c84b2cd428f1",
   ".claude/hooks/post_edit_lint.sh": "5e346c9796d9189bfc11fcbccdf24432980f4cde436cc3d374ea7623d995c1c8",
   ".claude/hooks/pre_commit_gate.sh": "527c1c3ee56013d3db24f8fff33c2d5b1606d736d234b37691221c9853f8aeb9",
-  ".claude/hooks/prod_guard.py": "86cb63f991e76a581866e68077fbfd4827ee039e9515512c68384e6c2132669b",
+  ".claude/hooks/prod_guard.py": "686b3a0dc1949890ccfa4b49643d13e65ed5d01e0ce4433e410a3749f0b41c93",
   ".claude/hooks/session_setup.sh": "7eda14864cf1d4c179cdcfe949beefef5c61f0f139567e38e02ef336dd0c0929",
   ".claude/hooks/workflow_state_reminder.sh": "b2316d64d01c72ce50693a272877516339cd8655b4e6a6bff74071306fd717d0",
   ".claude/memory/MEMORY.md": "544dac81979cbe795cc55a020360c2569036381b62f879d10ce8dffdc0de0791",

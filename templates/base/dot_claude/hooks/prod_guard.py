@@ -36,7 +36,11 @@ from pathlib import Path
 # names, which the ask/allowlist paths absorb cheaply.
 _SEG = r"[^|;&]*?"
 DENY_RULES: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\bterraform\s+(destroy|apply\s+.*-destroy)\b"), "terraform destroy"),
+    # OpenTofu (`tofu`) is a CLI-identical Terraform fork — guard both the same
+    # way (PI-488). Routine non-interactive `apply -auto-approve` is intentionally
+    # not flagged; only destroy / apply-with-destroy is.
+    (re.compile(r"\b(?:terraform|tofu)\s+(destroy|apply\s+.*-destroy)\b"),
+     "terraform/tofu destroy"),
     (re.compile(rf"\bkubectl\b{_SEG}\bdelete\b"), "kubectl delete"),
     (re.compile(rf"\bhelm\b{_SEG}\b(uninstall|delete)\b"), "helm uninstall"),
     (re.compile(rf"\baws\b{_SEG}\b(delete|terminate|remove)\S*\b"), "aws delete/terminate"),
