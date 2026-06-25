@@ -86,6 +86,7 @@ scope** (see Step 4 lifecycle), so its `gh` shapes are deliberately absent from 
 | `gh pr view <n> --json headRefName -q .headRefName` | the current branch name |
 | `gh pr view <n> --json url -q .url` | `https://example.invalid/.../pull/202` |
 | `gh pr view --json number,state` | `{"number":202,"state":"OPEN"}` (PR auto-detect, `check_pr_opened`) |
+| `gh pr view --json number -q .number` | `202` (bare PR-number auto-detect, e.g. `promote_review.sh`) |
 | `gh pr view --json number,reviewDecision` | `{"number":202,"reviewDecision":""}` |
 | `gh pr ready <n>` | exit 0, no output |
 | anything else | log argv, exit 0, empty stdout |
@@ -115,6 +116,7 @@ case "$*" in
   "pr view"*"number,state"*)        echo '{"number":202,"state":"OPEN"}' ;;   # check_pr_opened / PR auto-detect
   "pr view"*"reviewDecision"*)      echo '{"number":202,"reviewDecision":""}' ;;
   "pr view"*"url"*)                 echo "https://example.invalid/livetest-owner/$proj/pull/202" ;;
+  "pr view"*"number"*)              echo "202" ;;                 # bare --json number -q .number (promote_review auto-detect); after the number,state/reviewDecision cases so they win first
   "pr ready"*)                      : ;;
   *)                                : ;;
 esac
