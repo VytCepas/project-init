@@ -485,6 +485,7 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "test_command": fields.get("tooling.test_command", ""),
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
+        "rag": "true" if "rag" in stack else "",
         "memory": "" if stack == "none" else "true",
         "memory_tier": memory_tier(stack),
         # Lifecycle (#476): a pre-record config ALWAYS shipped the GitHub
@@ -535,6 +536,7 @@ def _backfill_variables(variables: dict) -> dict:
     derived: dict[str, str] = {
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
+        "rag": "true" if "rag" in stack else "",
         # Memory gate (#466): "" only for the vault-free `none` stack. The
         # obsidian/graphify substring checks already yield "" for none.
         "memory": "" if stack == "none" else "true",

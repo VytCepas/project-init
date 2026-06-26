@@ -17,10 +17,20 @@ from project_init.scaffold import memory_tier
 
 
 def _scaffold(target: Path, preset: str) -> None:
-    rc = main([
-        str(target), "--non-interactive", "--name", "fx", "--description", "d",
-        "--language", "python", "--preset", preset,
-    ])
+    rc = main(
+        [
+            str(target),
+            "--non-interactive",
+            "--name",
+            "fx",
+            "--description",
+            "d",
+            "--language",
+            "python",
+            "--preset",
+            preset,
+        ]
+    )
     assert rc == 0
 
 
@@ -35,6 +45,7 @@ class TestMemoryTierDerivation:
         assert memory_tier("auto") == "0"
         assert memory_tier("obsidian-only") == "1"
         assert memory_tier("obsidian-graphify") == "2"
+        assert memory_tier("obsidian-graphify-rag") == "3"
         assert memory_tier("none") == ""  # no descriptor
 
 
