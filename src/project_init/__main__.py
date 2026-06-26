@@ -20,6 +20,7 @@ from project_init.scaffold import (
     list_presets,
     load_preset,
     marketplace_source_vars,
+    memory_tier,
     overlay_layers,
     scaffold,
 )
@@ -1533,6 +1534,7 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         # authenticates to a cloud via OIDC, so the contract doc ships for them.
         "cloud_oidc": ("true" if (inputs.deploy in _DEPLOY_OIDC or inputs.iac != "none") else ""),
         "memory_stack": memory_stack,
+        "memory_tier": memory_tier(memory_stack),
         "memory": "true" if has_memory else "",
         # GitHub lifecycle tier (#476): the recorded value + the gate flag, plus
         # the inverse flag for the engine's else-less {{#if}} blocks (e.g. the

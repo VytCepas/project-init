@@ -18,6 +18,10 @@ Exception (#496): the code-map feature intentionally ADDS
 `.claude/scripts/gen_code_map.py` and edits AGENTS.md + the justfile. Only those
 three keys were re-pinned, after verifying every other file still matched the
 baseline — the move invariant is intact for everything else.
+
+Exception (#497/#498): later features re-pinned `lint_memory.sh` (staleness) and
+`.claude/config.yaml` (memory descriptor) the same way — only the intentionally
+changed key, after verifying no other drift.
 """
 
 from __future__ import annotations

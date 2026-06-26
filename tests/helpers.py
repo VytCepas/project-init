@@ -116,6 +116,10 @@ def make_variables(**overrides: str) -> dict[str, str]:
         defaults["graphify"] = "true" if stack == "obsidian-graphify" else ""
     if "memory" not in overrides:
         defaults["memory"] = "" if stack == "none" else "true"
+    if "memory_tier" not in overrides:
+        from project_init.scaffold import memory_tier
+
+        defaults["memory_tier"] = memory_tier(stack)
     # Mirror the lifecycle variable contract (#476): the `lifecycle` gate
     # derives from lifecycle_tier unless a test overrides it explicitly.
     if "lifecycle" not in overrides:

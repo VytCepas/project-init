@@ -49,6 +49,7 @@ from project_init.scaffold import (
     _new_sibling,
     load_preset,
     marketplace_source_vars,
+    memory_tier,
     overlay_layers,
     read_preserve_globs,
     scaffold,
@@ -511,6 +512,7 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "memory": "" if stack == "none" else "true",
+        "memory_tier": memory_tier(stack),
         # Lifecycle (#476): a pre-record config ALWAYS shipped the GitHub
         # lifecycle (it was force-bundled in base), so reconstruct it as ON —
         # it is an opt-OUT, NOT one of the opt-in overlays defaulted off below.
@@ -562,6 +564,7 @@ def _backfill_variables(variables: dict) -> dict:
         # Memory gate (#466): "" only for the vault-free `none` stack. The
         # obsidian/graphify substring checks already yield "" for none.
         "memory": "" if stack == "none" else "true",
+        "memory_tier": memory_tier(stack),
         "lifecycle_tier": ltier,
         "lifecycle": "" if ltier == "none" else "true",
         "lifecycle_off": "true" if ltier == "none" else "",
