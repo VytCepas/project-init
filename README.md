@@ -344,8 +344,7 @@ adopters know what this tool owns and where it defers:
   community plugin or scaffolder covers these.
 - **Knowledge-graph memory**: the community has consolidated around
   [Graphify](https://github.com/safishamsi/graphify) for codebase knowledge
-  graphs. The `obsidian-graphify` preset wires it in (ADR-009); the
-  hand-rolled LightRAG overlay was removed once Graphify landed (PI-172).
+  graphs. The `obsidian-graphify` preset wires it in (ADR-009).
 - **Distributing `.claude/` components**: the official
   [Claude Code plugin marketplace](https://code.claude.com/docs/en/discover-plugins)
   is the standard channel for hooks/skills/agents. This repo doubles as a

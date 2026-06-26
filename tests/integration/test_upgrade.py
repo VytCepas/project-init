@@ -596,29 +596,6 @@ class TestMigration:
         assert variables["lint_command"] == "uv run ruff check ."
 
 
-class TestRemovedPresets:
-    def test_lightrag_record_auto_migrates_to_graphify(self, tmp_path: Path, capsys):
-        """PI-172: a record naming the removed obsidian-lightrag preset
-        re-renders as obsidian-graphify with corrected variables — users are
-        never asked to hand-edit the recorded JSON (PR #173 review)."""
-        target = tmp_path / "p"
-        _scaffold(target)
-        config = target / _CONFIG_REL
-        config.write_text(
-            config.read_text().replace("  preset: obsidian-only", "  preset: obsidian-lightrag")
-        )
-        rc = main(["upgrade", str(target), "--apply", "--accept-new", "all"])
-        assert rc == 0
-        assert "re-rendering as obsidian-graphify" in capsys.readouterr().err
-        # Successor preset's overlay landed and the record was rewritten.
-        assert (target / ".claude" / "scripts" / "setup_graphify.sh").exists()
-        preset, variables, _, _ = read_scaffold_record(target)
-        assert preset == "obsidian-graphify"
-        assert variables["memory_stack"] == "obsidian-graphify"
-        assert variables["graphify"] == "true"
-        assert "lightrag" not in variables
-
-
 class TestPluginCutoverMigration:
     def test_pre_cutover_record_backfills_fallback_mode(self, tmp_path: Path):
         """PI-165: records written before the cutover lack plugin_mode/

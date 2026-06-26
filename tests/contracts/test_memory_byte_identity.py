@@ -20,6 +20,9 @@ Exception (#496): the code-map feature intentionally ADDS
 and the justfile (the `code-map` recipe). Only those keys were re-pinned, after
 verifying every OTHER file still matched the baseline — the move invariant is
 intact for everything else.
+
+Exception (LightRAG cleanup): removing the dead `.claude/memory/.lightrag/`
+gitignore line (ADR-024) re-pinned `.gitignore` only.
 """
 
 from __future__ import annotations
