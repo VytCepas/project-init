@@ -230,11 +230,11 @@ _MEMORY_TIERS = {
 def memory_tier(memory_stack: str) -> str:
     """Descriptor tier number for *memory_stack* (#498, ADR-024).
 
-    The rung on the recall ladder a root orchestrator (#479) reads to feature-
+    The rung on the recall ladder a root orchestrator (ADR-025) reads to feature-
     detect a child's retrieval surfaces: ``auto``→0, ``obsidian-only``→1,
-    ``obsidian-graphify``→2. ``none`` returns ``""`` (no descriptor — the config
-    memory block is gated out). Single source for the scaffold + the two upgrade
-    emit paths so they never diverge (PI-189).
+    ``obsidian-graphify``→2, ``obsidian-graphify-rag``→3. ``none`` returns ``""``
+    (no descriptor — the config memory block is gated out). Single source for the
+    scaffold + the two upgrade emit paths so they never diverge (PI-189).
     """
     return _MEMORY_TIERS.get(memory_stack, "")
 

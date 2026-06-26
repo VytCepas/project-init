@@ -24,8 +24,8 @@ iac: {{iac}}            # none | opentofu — infrastructure-as-code overlay (AD
   # Stable descriptor (#498): tier + resolved paths a root orchestrator reads to
   # introspect this project. Anchors (memory_path, MEMORY.md) are invariant across
   # tiers; higher tiers only ADD retrieval surfaces (vault, graph).
-  tier: {{memory_tier}}             # 0 auto | 1 obsidian-only | 2 obsidian-graphify
-  stack: {{memory_stack}}{{#if obsidian}}         # obsidian-only | obsidian-graphify{{/if obsidian}}
+  tier: {{memory_tier}}             # 0 auto | 1 obsidian-only | 2 obsidian-graphify | 3 obsidian-graphify-rag
+  stack: {{memory_stack}}{{#if obsidian}}         # obsidian-only | obsidian-graphify | obsidian-graphify-rag{{/if obsidian}}
   memory_path: .claude/memory
 {{#if obsidian}}  vault_path: .claude/vault
 {{/if obsidian}}{{#if graphify}}  graph_path: graphify-out/graph.json
