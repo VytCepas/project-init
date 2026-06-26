@@ -96,6 +96,12 @@ The orchestrator reads, per project, the **memory descriptor** standardized in
 - **Anchor (invariant across tiers):** `.claude/config.yaml` `memory:` block with
   `tier`, `stack`, `memory_path`, and (tier-gated) `vault_path`, `graph_path`,
   `rag_endpoint`; plus `.claude/CAPABILITIES.md` as the human-readable mirror.
+  *Field availability:* tiers 0–2 (`tier`/`stack`/`memory_path`/`vault_path`/
+  `graph_path`) ship today via #498; the tier-3 `rag_endpoint` field is added by
+  the seam PR (#505/#506) and is only present on `obsidian-graphify-rag` scaffolds
+  — a tier-0–2 child simply omits it, which the degrade-by-tier read already
+  handles. This ADR documents the *target* contract; it does not assume every
+  child exposes `rag_endpoint` before its scaffold opts into tier 3.
 - **Degrade-by-tier:** a cross-project skill reads `memory.tier` and picks its
   retrieval path — `tier ≥ 3` → query the RAG endpoint; `≥ 2` → query the graph;
   `≥ 0` → grep `memory_path`. The anchors never move between tiers; higher tiers

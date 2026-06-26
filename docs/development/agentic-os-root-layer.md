@@ -25,6 +25,9 @@ this note is the buildable picture for when it is greenlit. **Not built yet.**
                         │ project_init scaffolds each (one-way: produce → consume)
 ```
 
+*(In the diagram `CAPS.md` is the generated `.claude/CAPABILITIES.md`, abbreviated
+to fit the box; `config.yaml(memory)` is its `memory:` descriptor block.)*
+
 `project_init` only *produces* the descriptor; `agentic-os` only *consumes* it.
 The arrow never reverses — no callback/registration hook back into a child repo.
 
