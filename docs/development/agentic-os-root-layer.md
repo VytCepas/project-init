@@ -80,13 +80,17 @@ exactly which strategy to apply per project.
 | **0 auto** | `.claude/memory/MEMORY.md` (flat facts) | **direct-merge** — read + union each `MEMORY.md`; may cross-link facts between projects | cheapest | deterministic, no LLM |
 | **1 obsidian** | `.claude/vault/` (human prose) | **grep** for cheap recall, **or agent-synthesis** to summarize the "why" across projects | grep cheap / synthesis costly | LLM only for synthesis |
 | **2 graphify** | `graphify-out/graph.json` | **federate** — read each project's `graph_path`, union the code graphs | moderate | graphify CLI (per-repo) |
-| **3 rag** | `rag_endpoint` (or none) | **federated** (query each project's engine, merge) **or central** (one OS index over all corpora) | highest | a RAG tool (#495) |
+| **3 rag** | `rag_endpoint` (present at tier 3; may be empty until a tool is wired) | **federated** (query each project's engine, merge) **or central** (one OS index over all corpora) | highest | a RAG tool (#495) |
 
-**Mixed-tier fleet.** Projects sit at different tiers; the orchestrator retrieves
-each project at *its own* tier (the highest its descriptor supports) and unions
-the results. Tier 1 is **high-value but high-cost** (the vault holds the *why*,
-but synthesizing prose needs an LLM) — not "least useful"; fall back to grep when
-you don't want to pay for synthesis. Build order follows cost: **deterministic
+**Mixed-tier fleet.** Projects sit at different tiers, and the strategies are
+**additive, not exclusive** — exactly like the per-project ladder where higher
+tiers only *add* surfaces. Every project with memory contributes its **tier-0
+`MEMORY.md` merge** (the universal baseline); a tier-≥2 project *also* contributes
+its graph, and a tier-3 project *also* its RAG surface. The fleet view is the
+union of all those layers across all projects, not "highest tier only." Tier 1 is
+**high-value but high-cost** (the vault holds the *why*, but synthesizing prose
+needs an LLM) — not "least useful"; fall back to grep when you don't want to pay
+for synthesis. Build order follows cost: **deterministic
 first** (L0 direct-merge, L2 graph federation), then the LLM-assisted layers
 (L1 synthesis, L3 RAG).
 
@@ -131,8 +135,21 @@ follow-up unblocked is **finishing #498** (the `rag_endpoint` field shipped with
 #505; plus a short "contract a root project reads" doc). The (a) infrastructure-OS
 surface (scheduling/isolation/runtime) is explicitly out of scope.
 
+## Tier-3 default topology + engine (provisional — #495 research)
+
+A 2026 deep-research pass (logged on #495) provisionally resolves two of the
+below: **default tier-3 topology = central** (one OS-level index over all repos,
+project-filtered — better-supported and more maintainable than federated for a
+solo dev; federated stays the fallback for a project that wired its own engine via
+`rag_endpoint`). Provisional engine = **`codebase-memory-mcp`** (on-device,
+no-key, MCP-native, dual AST-graph + vectors), with **LEANN** as the uv-native
+fallback. Because that engine is dual, the **A-vs-B** question leans **B** (one
+tool could replace the Graphify rung, collapsing tiers 2+3) — but that supersedes
+ADR-009 and rests on first-party quality claims, so it is gated on a hands-on
+bake-off (incl. comparing its AST-graph depth against Graphify) before any build.
+
 ## Open questions for the build decision (not now)
 
 - Registry format: a hand-maintained `~/.claude/projects.toml` vs. discovery-only glob.
 - Does the orchestrator ship as a CLI, an MCP server, or both?
-- RAG A-vs-B (#495): distinct vector rung vs. one tool replacing Graphify.
+- RAG A-vs-B (#495): provisionally **B** (one tool replaces Graphify) — confirm on the bake-off.
