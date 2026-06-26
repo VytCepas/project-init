@@ -40,6 +40,24 @@ class TestListPresets:
         out = capsys.readouterr().out
         assert "core" in out and "memory:" in out
 
+    def test_inherited_memory_stack_resolved(self, capsys):
+        # `governed` extends `obsidian-only` and omits memory_stack; the payload
+        # must report the INHERITED stack, not the raw-TOML "none" (#511 review).
+        assert main(["--list-presets", "--json"]) == 0
+        by_name = {p["name"]: p for p in json.loads(capsys.readouterr().out)}
+        assert by_name["governed"]["memory_stack"] == "obsidian-only"
+
+
+class TestJsonRequiresNonInteractive:
+    def test_scaffold_json_without_non_interactive_errors(self, tmp_path):
+        # --json promises clean stdout; an interactive run would pollute it, so
+        # scaffold --json must require --non-interactive (#511 review).
+        import pytest
+
+        with pytest.raises(SystemExit) as exc:
+            main([str(tmp_path / "p"), "--preset", "core", "--json"])
+        assert exc.value.code == 2  # argparse usage error
+
 
 class TestScaffoldResult:
     def test_clean_json_only_stdout(self, tmp_path, capsys):

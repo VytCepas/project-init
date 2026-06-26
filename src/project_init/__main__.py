@@ -533,15 +533,25 @@ def _presets_payload(presets: list[dict]) -> list[dict]:
 
     Name, description, and the default memory stack each preset scaffolds — enough
     for a root layer to choose a preset before driving a non-interactive scaffold.
+    Each preset is re-resolved through ``load_preset`` so ``extends`` inheritance
+    is applied (e.g. ``governed`` inherits ``obsidian-only``'s ``memory_stack``);
+    reading the raw TOML would otherwise advertise the wrong stack (#511 review).
     """
-    return [
-        {
-            "name": p.get("name", ""),
-            "description": p.get("description", ""),
-            "memory_stack": p.get("vars", {}).get("memory_stack", "none"),
-        }
-        for p in presets
-    ]
+    payload = []
+    for p in presets:
+        name = p.get("name", "")
+        try:
+            resolved = load_preset(name) if name else p
+        except ValueError:
+            resolved = p
+        payload.append(
+            {
+                "name": name,
+                "description": resolved.get("description", p.get("description", "")),
+                "memory_stack": resolved.get("vars", {}).get("memory_stack", "none"),
+            }
+        )
+    return payload
 
 
 def _scaffold_result_payload(
@@ -1880,6 +1890,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.list_presets:
         _emit_preset_list(presets, as_json=args.json)
         return 0
+
+    # --json promises a single clean JSON stdout line; interactive prompts/panels
+    # would pollute it, so a scaffold --json run must be non-interactive (#511).
+    if args.json and not args.non_interactive:
+        parser.error("--json requires --non-interactive (interactive prompts would corrupt JSON stdout)")
 
     if args.non_interactive:
         _require_non_interactive_args(args, parser)
