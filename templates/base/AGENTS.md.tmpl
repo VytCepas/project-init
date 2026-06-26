@@ -20,8 +20,8 @@ below); everything else is reusable by any agent.
 {{#if memory}}- [`.claude/memory/MEMORY.md`](.claude/memory/MEMORY.md) — memory index (read first for context)
 {{/if memory}}- [`.claude/docs/`](.claude/docs/) — system of record: ADRs and development guides
 {{#if python}}- `.claude/docs/CODE_MAP.md` — generated map of what each module does; **read before grepping** (generate/refresh with `just code-map`)
-{{/if python}}{{#if memory}}- [`.claude/vault/`](.claude/vault/) — human workspace (Obsidian vault)
-{{/if memory}}
+{{/if python}}{{#if obsidian}}- [`.claude/vault/`](.claude/vault/) — human workspace (Obsidian vault)
+{{/if obsidian}}
 ## Skills (load on demand)
 
 Before any GitHub action (create issue, branch, push, PR, merge), check

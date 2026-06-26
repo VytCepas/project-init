@@ -82,6 +82,50 @@ else
   done < <(sed -n 's/.*\[[^]]*\](\([^)]*\)).*/\1/p' "$INDEX" 2>/dev/null || true)
 fi
 
+# --- Dangling path references (warnings only) ---
+# A fact that names a `path/like/this.ext` which no longer exists is the most
+# common mechanically-detectable staleness (ADR-024). Deterministic, no LLM:
+# only flags backtick tokens that look like repo-relative paths (a slash plus a
+# file extension), so prose, commands, and bare names don't trip it. Semantic
+# contradiction detection is intentionally out of scope here — that needs a
+# model, so it belongs to a consolidate-memory agent pass, not this gate.
+
+for file in "$MEMORY_DIR"/*.md; do
+  [ -f "$file" ] || continue
+  name="$(basename "$file")"
+  is_skipped "$name" && continue
+
+  # word-splitting is safe: the charclass excludes whitespace, so no path has spaces.
+  for ref in $(grep -oE '`[A-Za-z0-9_./-]+`' "$file" 2>/dev/null | tr -d '`'); do
+    case "$ref" in
+      http*|/*|*'*'*) continue ;;  # URLs, absolute system paths, globs
+      */*.*) ;;                     # looks like a repo-relative path with an extension
+      *) continue ;;
+    esac
+    [ -e "$ROOT/$ref" ] || warn "$name: references \`$ref\` which does not exist (stale?)"
+  done
+done
+
+# --- Stale memory facts (warnings only) ---
+# Flag facts not touched in over STALE_DAYS days — a deterministic nudge to
+# review/refresh them (ADR-024). Only meaningful inside a git repo with history;
+# uncommitted files (a fresh scaffold) and non-git checkouts are skipped.
+
+STALE_DAYS="${LINT_MEMORY_STALE_DAYS:-180}"
+if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  cutoff=$(( $(date +%s) - STALE_DAYS * 86400 ))
+  for file in "$MEMORY_DIR"/*.md; do
+    [ -f "$file" ] || continue
+    name="$(basename "$file")"
+    is_skipped "$name" && continue
+    ts="$(git -C "$ROOT" log -1 --format=%ct -- "$file" 2>/dev/null || true)"
+    [ -n "$ts" ] || continue  # uncommitted / no history → not stale
+    if [ "$ts" -lt "$cutoff" ]; then
+      warn "$name: not updated in over $STALE_DAYS days (review for staleness)"
+    fi
+  done
+fi
+
 # --- Report orphaned vault notes (warnings only) ---
 
 VAULT_DIR="$ROOT/.claude/vault"

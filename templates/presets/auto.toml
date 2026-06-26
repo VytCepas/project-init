@@ -1,0 +1,20 @@
+# Preset: Auto — flat agent-memory files, no Obsidian vault (#497, ADR-024)
+# Tier 0 of the memory ladder: ships .claude/memory/ (flat facts agents read
+# every session) and lint_memory.sh, WITHOUT the human Obsidian vault. Pure
+# files — installs nothing. Pick this when you want durable agent recall but no
+# vault to curate. `obsidian-only` is this PLUS the vault; `obsidian-graphify`
+# adds a code knowledge graph on top.
+
+name = "auto"
+description = "Flat agent-memory files (.claude/memory/) with no Obsidian vault."
+
+# The `auto` memory layer is derived from memory_stack at scaffold/upgrade time
+# via overlay_layers(), not listed here, so --memory can override (#466).
+layers = ["base"]
+
+[vars]
+memory_stack = "auto"
+
+[scaffolded_project_dependencies.python]
+core = []
+dev = ["ruff"]

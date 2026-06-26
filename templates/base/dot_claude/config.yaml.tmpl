@@ -20,9 +20,9 @@ deploy: {{deploy_target}}            # none | cloud-run | fly | k8s | registry |
 iac: {{iac}}            # none | opentofu — infrastructure-as-code overlay (ADR-015)
 
 {{#if memory}}memory:
-  stack: {{memory_stack}}         # obsidian-only | obsidian-graphify
-  vault_path: .claude/vault
-  memory_path: .claude/memory
+  stack: {{memory_stack}}{{#if obsidian}}         # obsidian-only | obsidian-graphify{{/if obsidian}}
+{{#if obsidian}}  vault_path: .claude/vault
+{{/if obsidian}}  memory_path: .claude/memory
 
 {{/if memory}}mcps:
   installed: {{installed_mcps_yaml}}
@@ -40,7 +40,7 @@ tooling:
 
 # Extra files never overwritten or reported as drift on `upgrade` (and on
 # `project-init` re-runs) (#243): a single-line JSON array of globs.
-{{#if memory}}# memory/ and vault/ are always preserved.
+{{#if memory}}# memory/{{#if obsidian}} and vault/{{/if obsidian}} are always preserved.
 {{/if memory}}# preserve: ["ci.yml", "justfile", "docs/*.md"]
 
 updates:

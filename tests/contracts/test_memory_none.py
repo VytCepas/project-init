@@ -38,8 +38,10 @@ def _inputs(memory: str) -> ScaffoldInputs:
 
 
 # (memory_stack, memory, obsidian, graphify) — the rendered-variable contract.
+# `auto` (#497) is memory-on but vault-off: memory="true", obsidian="".
 CONTRACT = [
     ("none", "", "", ""),
+    ("auto", "true", "", ""),
     ("obsidian-only", "true", "true", ""),
     ("obsidian-graphify", "true", "true", "true"),
 ]
@@ -47,10 +49,13 @@ CONTRACT = [
 
 class TestMemoryLayerDerivation:
     def test_memory_layers_mapping(self):
+        # Superset ladder (#497, ADR-024): each rung includes the one above it.
         assert memory_layers("none") == []
-        assert memory_layers("obsidian-only") == ["obsidian"]
+        assert memory_layers("auto") == ["auto"]
+        # obsidian-only is auto (memory facts) PLUS the human vault.
+        assert memory_layers("obsidian-only") == ["auto", "obsidian"]
         # graphify always implies the obsidian vault it exports from.
-        assert memory_layers("obsidian-graphify") == ["obsidian", "graphify"]
+        assert memory_layers("obsidian-graphify") == ["auto", "obsidian", "graphify"]
 
     def test_default_is_none_for_memory_agnostic_callers(self):
         # agent_layers() and many existing tests rely on the default NOT pulling
@@ -59,10 +64,10 @@ class TestMemoryLayerDerivation:
         assert overlay_layers("claude,codex", no_plugin=False) == ["codex"]
 
     def test_memory_layers_precede_fallback_and_agents(self):
-        # Historical order: base → obsidian → graphify → fallback → agents.
+        # Historical order: base → auto → obsidian → graphify → fallback → agents.
         assert overlay_layers(
             "claude,codex", no_plugin=True, memory_stack="obsidian-graphify"
-        ) == ["obsidian", "graphify", "fallback", "codex"]
+        ) == ["auto", "obsidian", "graphify", "fallback", "codex"]
 
 
 class TestVariableContract:
