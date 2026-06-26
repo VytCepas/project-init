@@ -169,6 +169,10 @@ def _memory_descriptor(variables: dict[str, str]) -> list[tuple[str, str]]:
         rows.append(("vault_path", ".claude/vault"))
     if variables.get("graphify"):
         rows.append(("graph_path", "graphify-out/graph.json"))
+    if variables.get("rag"):
+        # Tier 3 (ADR-024 §4): the seam is scaffolded; the endpoint is empty
+        # until the user wires an engine via setup_rag.sh (#495 — not bundled).
+        rows.append(("rag_endpoint", "(unset — run .claude/scripts/setup_rag.sh)"))
     return rows
 
 

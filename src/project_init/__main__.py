@@ -183,14 +183,24 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--memory",
-        choices=["none", "auto", "obsidian", "obsidian-only", "obsidian-graphify"],
+        choices=[
+            "none",
+            "auto",
+            "obsidian",
+            "obsidian-only",
+            "obsidian-graphify",
+            "obsidian-graphify-rag",
+        ],
         default=None,
         help=(
-            "Memory backend (#466, #497) — a superset ladder: none (no memory — the "
-            "vault-free `core` preset), auto (flat agent-fact files in .claude/memory/, "
+            "Memory backend (#466, #497, ADR-024) — a superset ladder: none (no memory — "
+            "the vault-free `core` preset), auto (flat agent-fact files in .claude/memory/, "
             "no vault — pure files, installs nothing), obsidian (auto PLUS a human "
-            "Obsidian vault; alias for obsidian-only), or obsidian-graphify (obsidian "
-            "PLUS a derived code knowledge graph for agents). Overrides the preset's default."
+            "Obsidian vault; alias for obsidian-only), obsidian-graphify (obsidian "
+            "PLUS a derived code knowledge graph for agents), or obsidian-graphify-rag "
+            "(tier 3 — graphify PLUS a RAG *seam*: docs + a user-run setup stub + the "
+            "rag_endpoint descriptor, engine NOT bundled (#495); worth it only at "
+            "multi-project / monorepo scale). Overrides the preset's default."
         ),
     )
     p.add_argument(
@@ -494,6 +504,12 @@ _MEMORY_NEXT_STEPS = {
         "Memory: build the code graph — run "
         "[bold]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/bold]"
     ),
+    "obsidian-graphify-rag": (
+        "Memory: code graph + a RAG seam — run "
+        "[bold]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/bold], "
+        "then read [bold].claude/scripts/setup_rag.sh[/bold] to pick & wire a RAG tool "
+        "(engine not bundled — see .claude/docs/guides/using-rag.md)"
+    ),
 }
 
 
@@ -657,7 +673,13 @@ def _choose_observability_interactive() -> bool:
     return Confirm.ask("Set up the observability overlay?", default=False)
 
 
-_MEMORY_STACKS = ("none", "auto", "obsidian-only", "obsidian-graphify")
+_MEMORY_STACKS = (
+    "none",
+    "auto",
+    "obsidian-only",
+    "obsidian-graphify",
+    "obsidian-graphify-rag",
+)
 
 
 def _normalize_memory(value: str | None) -> str | None:
@@ -698,8 +720,16 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
         "[bold]4. obsidian-graphify[/bold]  [dim]obsidian PLUS a derived knowledge[/dim]\n"
         "            [dim]graph agents can query (Graphify)[/dim]\n"
         "            [dim]Installs now: files only · You run later:[/dim]\n"
-        "            [dim]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/dim]\n\n"
-        "[cyan]Helps:[/cyan] agents recall why a decision was made weeks later.\n"
+        "            [dim]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/dim]\n"
+        "[bold]5. obsidian-graphify-rag[/bold]  [dim]graphify PLUS a semantic /[/dim]\n"
+        "            [dim]vector recall surface over the whole corpus (RAG seam)[/dim]\n"
+        "            [dim]Installs now: docs + a user-run setup stub only ·[/dim]\n"
+        "            [dim]You run later: pick & wire an upstream tool (engine[/dim]\n"
+        "            [dim]NOT bundled) — an external index + a tool install[/dim]\n\n"
+        "[cyan]Helps:[/cyan] agents recall why a decision was made weeks later;\n"
+        "the RAG rung (option 5, tier 3) adds cross-corpus semantic search worth\n"
+        "it only at [bold]multi-project / monorepo[/bold] scale — for one small/medium\n"
+        "repo, vault + the graph + grep already win, so [bold]skip it[/bold] (default off).\n"
         "Clean by default — pick [bold]none[/bold] and no memory is added."
     )
     console.print(Panel(body, title="Memory backend", border_style="cyan"))
@@ -788,7 +818,7 @@ def _choose_mise_interactive() -> bool:
         "Toolchain pinning (mise)",
         "A [bold]mise.toml[/bold] pins runtime/tool versions so every machine and "
         "CI run uses the same toolchain.\n\n"
-        "[cyan]Helps:[/cyan] reproducible builds; no \"works on my machine\".\n"
+        '[cyan]Helps:[/cyan] reproducible builds; no "works on my machine".\n'
         "[dim]Ownership: mise owns versions only (uv/bun own deps, just owns "
         "commands). Off by default.[/dim]",
         "Pin toolchain versions with mise (mise.toml)?",
@@ -1488,8 +1518,11 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
     # obsidian + graphify. _backfill_variables and _migrate_semantic_config emit
     # the same table so scaffold + upgrade never diverge.
     memory_stack = inputs.memory
-    has_obsidian = memory_stack in ("obsidian-only", "obsidian-graphify")
-    is_graphify = memory_stack == "obsidian-graphify"
+    # Tier 3 (obsidian-graphify-rag, ADR-024 §4) is a strict superset of tier 2,
+    # so it lights up obsidian + graphify too, then adds the rag seam on top.
+    is_rag = memory_stack == "obsidian-graphify-rag"
+    has_obsidian = memory_stack in ("obsidian-only", "obsidian-graphify", "obsidian-graphify-rag")
+    is_graphify = memory_stack in ("obsidian-graphify", "obsidian-graphify-rag")
     has_memory = memory_stack != "none"
     # GitHub lifecycle gate (#476, ADR-021): drives the lifecycle/lifecycle_fallback
     # overlays + every {{#if lifecycle}} block (settings hooks, pre-push branch
@@ -1627,6 +1660,7 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "vscode_off": "" if vscode else "true",
         "graphify": "true" if is_graphify else "",
         "obsidian": "true" if has_obsidian else "",
+        "rag": "true" if is_rag else "",
         "license_mit": "true" if license_choice == "mit" else "",
         "license_apache": "true" if license_choice == "apache-2.0" else "",
         "license_proprietary": "true" if license_choice == "proprietary" else "",
@@ -1634,7 +1668,11 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
 
 
 def _resolve_inputs(
-    args, parser, target: Path, preset_memory: str = "obsidian-only", preset_lifecycle: str = "github"
+    args,
+    parser,
+    target: Path,
+    preset_memory: str = "obsidian-only",
+    preset_lifecycle: str = "github",
 ) -> ScaffoldInputs | None:
     """Resolve all scaffold inputs from flags; None means prompt instead.
 

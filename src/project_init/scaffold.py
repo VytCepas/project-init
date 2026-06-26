@@ -212,7 +212,12 @@ def generate_preset(name: str, *, extends: str, description: str = "", version: 
 _AGENT_LAYERS = ("codex", "antigravity", "amp", "junie")
 
 
-_MEMORY_TIERS = {"auto": "0", "obsidian-only": "1", "obsidian-graphify": "2"}
+_MEMORY_TIERS = {
+    "auto": "0",
+    "obsidian-only": "1",
+    "obsidian-graphify": "2",
+    "obsidian-graphify-rag": "3",
+}
 
 
 def memory_tier(memory_stack: str) -> str:
@@ -234,7 +239,11 @@ def memory_layers(memory_stack: str) -> list[str]:
     (flat agent facts in ``.claude/memory/`` — no vault); ``obsidian-only`` →
     ``["auto", "obsidian"]`` (adds the human Obsidian vault on top of the memory
     facts); ``obsidian-graphify`` → ``["auto", "obsidian", "graphify"]`` (adds
-    the derived code knowledge graph); ``none`` → ``[]``. The memory backend
+    the derived code knowledge graph); ``obsidian-graphify-rag`` → ``["auto",
+    "obsidian", "graphify", "rag"]`` (tier 3, ADR-024 §4 — adds the RAG *seam*:
+    docs + a user-run setup stub + the ``rag_endpoint`` descriptor, no engine
+    and no dependency; the tool pick stays parked in #495); ``none`` → ``[]``.
+    The memory backend
     used to be hard-coded in each preset's ``layers``; it is now derived from
     the recorded ``memory_stack`` so memory can be declined (``none``) and so
     scaffold + upgrade derive the same layers (PI-189).
@@ -245,6 +254,8 @@ def memory_layers(memory_stack: str) -> list[str]:
         return ["auto", "obsidian"]
     if memory_stack == "obsidian-graphify":
         return ["auto", "obsidian", "graphify"]
+    if memory_stack == "obsidian-graphify-rag":
+        return ["auto", "obsidian", "graphify", "rag"]
     return []
 
 
