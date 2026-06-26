@@ -34,7 +34,7 @@ of the one below.
 | 3 | `…-rag` | + semantic / vector retrieval over a corpus | `uv tool install 'cocoindex-code[full]'` → run `setup_rag.sh` (keyless, on-device; see §4, ADR-026) | **Multi-project / multi-repo / monorepo** scale, where cross-corpus semantic recall beats per-repo grep. Opt-in only. |
 
 Tiers 0–1 are the split of today's `obsidian` overlay (#497); tier 2 is unchanged from
-ADR-009; tier 3 is parked (§4).
+ADR-009; tier 3 is now built on cocoindex-code (§4, ADR-026).
 
 ### 2. Composition rule (resolves the overlap between layers)
 
@@ -54,11 +54,12 @@ exist today: docstrings are enforced (ruff `D`) but never surfaced, and there is
 gate. It is specified and tracked separately as a low-token "what does what" code-map (#496),
 the deterministic counterpart to tier-3 RAG.
 
-### 4. RAG (tier 3) — accepted as a *seam*, build deferred (#495)
+### 4. RAG (tier 3) — accepted as a *seam*, now built on cocoindex-code (#495, ADR-026)
 
 RAG is the place to be disciplined: ADR-009 deleted LightRAG precisely because it pinned a
 fast-moving dep, needed Anthropic+OpenAI keys, and put every upstream change on us. Any tier-3
-overlay must therefore meet hard constraints, and the build is deferred:
+overlay must therefore meet hard constraints. It was first shipped as a seam (#505), then the
+engine was wired (ADR-026); the constraints that gated it:
 
 - **Positioning (owner):** tier-3 RAG is **not worth it for small/medium single projects** —
   vault + the code graph + grep cover recall there. Its payoff is **multi-project /

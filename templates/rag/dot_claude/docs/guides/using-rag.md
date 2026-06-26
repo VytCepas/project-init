@@ -55,9 +55,9 @@ but the default is the recommended choice — keep it keyless (never the cloud
 > should be wired in as a new `RAG_EMBED_MODEL` option.
 
 After setup, record the surface so a root orchestrator (#498/ADR-025) can
-discover it — set `memory.rag_endpoint` in `.claude/config.yaml` — and keep the
-index out of git (`setup_rag.sh` adds `.cocoindex_code/` to `.gitignore`
-automatically; it is a derived cache).
+discover it — set `memory.rag_endpoint` in `.claude/config.yaml`. The index stays
+out of git: the scaffolded `.gitignore` already ignores `.cocoindex_code/` (and
+`ccc init` also ensures the entry); it is a derived cache.
 
 ## Daily flow
 

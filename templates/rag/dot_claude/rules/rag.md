@@ -1,6 +1,6 @@
 ---
 description: RAG memory (tier 3) — a semantic recall surface, authoritative for nothing
-globs: [".cocoindex_code/**", ".claude/scripts/setup_rag.sh", ".claude/config.yaml"]
+globs: [".claude/scripts/setup_rag.sh", ".claude/config.yaml"]
 alwaysApply: false
 ---
 

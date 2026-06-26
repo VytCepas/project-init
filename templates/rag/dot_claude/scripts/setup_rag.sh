@@ -21,6 +21,11 @@
 
 set -euo pipefail
 
+# Always operate from the project root, wherever the script is invoked from — so
+# the .cocoindex_code/ index lands in the repo (this script lives at .claude/scripts/).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}/../.." || exit 1
+
 # --- config -----------------------------------------------------------------
 # Pin the tool (alpha, ~weekly releases — upgrade deliberately, not floating).
 RAG_TOOL_SPEC="${RAG_TOOL_SPEC:-cocoindex-code[full]==0.2.37}"
@@ -42,14 +47,21 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v ccc >/dev/null 2>&1; then
-  echo "Installing cocoindex-code CLI (uv tool install '${RAG_TOOL_SPEC}')..."
-  # The [full] extra is REQUIRED: it pulls sentence-transformers so embeddings
-  # run locally. Without it cocoindex-code falls back to a cloud provider that
-  # needs an API key — exactly the LightRAG trap ADR-009 forbids.
-  uv tool install "${RAG_TOOL_SPEC}"
+# Enforce the exact pin even if a different ccc is already installed (alpha tool,
+# ~weekly releases — a stale version would diverge from the scaffolded docs/tests).
+PINNED_VER="${RAG_TOOL_SPEC##*==}"   # single source of truth for the version
+installed_ver=""
+command -v ccc >/dev/null 2>&1 && \
+  installed_ver="$(uv tool list 2>/dev/null | awk '/^cocoindex-code /{sub(/^v/,"",$2); print $2}')"
+if [ "${installed_ver}" != "${PINNED_VER}" ]; then
+  echo "Installing cocoindex-code ${PINNED_VER} (uv tool install --force '${RAG_TOOL_SPEC}')..."
+  # The [full] extra is REQUIRED: it pulls sentence-transformers so embeddings run
+  # locally. Without it cocoindex-code falls back to a cloud provider that needs an
+  # API key — exactly the LightRAG trap ADR-009 forbids. --force pins the exact
+  # version (cached, so no large re-download when already present).
+  uv tool install --force "${RAG_TOOL_SPEC}"
 else
-  echo "cocoindex-code (ccc) already installed — skipping install"
+  echo "cocoindex-code ${PINNED_VER} already installed — skipping install"
 fi
 
 # Pin the keyless local model BEFORE init. There is no CLI flag for a local
@@ -57,13 +69,20 @@ fi
 # `provider:` line is mandatory — omitting it silently resolves to a cloud
 # (key-required) provider.
 GLOBAL_CFG="${COCOINDEX_CODE_DIR:-$HOME/.cocoindex_code}/global_settings.yml"
+SENTINEL="# Written by .claude/scripts/setup_rag.sh"
 mkdir -p "$(dirname "$GLOBAL_CFG")"
+# This is cocoindex-code's GLOBAL (cross-project) config. Don't silently clobber
+# one we didn't write — back it up first so another project's setup is recoverable.
+if [ -f "$GLOBAL_CFG" ] && ! head -n1 "$GLOBAL_CFG" | grep -qF "$SENTINEL"; then
+  cp "$GLOBAL_CFG" "${GLOBAL_CFG}.bak.$$"
+  echo "WARNING: backed up your existing ${GLOBAL_CFG} to ${GLOBAL_CFG}.bak.$$ before overwriting." >&2
+fi
 cat > "$GLOBAL_CFG" <<EOF
-# Written by .claude/scripts/setup_rag.sh — keyless, on-device embeddings.
+${SENTINEL} — keyless, on-device embeddings.
 embedding:
   provider: sentence-transformers
-  model: ${RAG_EMBED_MODEL}
-  device: ${RAG_EMBED_DEVICE}
+  model: "${RAG_EMBED_MODEL}"
+  device: "${RAG_EMBED_DEVICE}"
 EOF
 echo "Pinned local embedding model: ${RAG_EMBED_MODEL} (device: ${RAG_EMBED_DEVICE})"
 
