@@ -66,7 +66,10 @@ EOF
 echo "Pinned local embedding model: ${RAG_EMBED_MODEL} (device: ${RAG_EMBED_DEVICE})"
 
 echo "Initialising the project index config (.cocoindex_code/, auto-gitignored)..."
-ccc init --non-interactive 2>/dev/null || ccc init || true
+# `ccc init` reads the keyless model from the global config written above, so it
+# never prompts; -f skips the parent-dir warning and is idempotent (re-runs print
+# "Project already initialized" and exit 0).
+ccc init -f
 
 echo "Building the semantic index (first run downloads the local model)..."
 ccc index
