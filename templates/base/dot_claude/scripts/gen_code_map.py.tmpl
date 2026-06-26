@@ -21,8 +21,8 @@ import sys
 from pathlib import Path
 
 SKIP_DIRS = {
-    ".venv", "venv", "env", "__pycache__", ".git", "node_modules", "build",
-    "dist", "site", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".eggs",
+    ".venv", "venv", "env", "__pycache__", ".git", ".claude", "node_modules",
+    "build", "dist", "site", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", ".eggs",
 }
 OUTPUT = Path(".claude/docs/CODE_MAP.md")
 
@@ -75,8 +75,16 @@ def iter_py_files(root: Path):
 
 
 def main(argv: list[str]) -> int:
-    """Write the code map for ``argv[1]`` (or cwd) and report the module count."""
-    root = Path(argv[1]).resolve() if len(argv) > 1 else Path.cwd()
+    """Write the code map and report the module count.
+
+    Scan root precedence: an explicit ``argv[1]``; else ``src/`` when it exists
+    (the common package layout — keeps the map to real source); else cwd.
+    """
+    if len(argv) > 1:
+        root = Path(argv[1]).resolve()
+    else:
+        src = Path("src")
+        root = src.resolve() if src.is_dir() else Path.cwd()
     sections = [s for s in (summarize_file(p, root) for p in iter_py_files(root)) if s]
 
     body = [

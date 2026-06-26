@@ -107,6 +107,26 @@ class TestGeneratorOutput:
             f"map not low-token enough: {map_bytes} vs {source_bytes}"
         )
 
+    def test_default_root_prefers_src_over_cwd(self, tmp_path: Path):
+        """With no explicit root, scan `src/` when present so the map stays to
+        real source instead of traversing tests/.claude/etc. (review on #502)."""
+        target = tmp_path / "p"
+        _scaffold(target, "python")
+        (target / "src").mkdir()
+        (target / "src" / "app.py").write_text('"""The app."""\n', encoding="utf-8")
+        (target / "noise.py").write_text('"""Top-level noise."""\n', encoding="utf-8")
+        script = target / _SCRIPT_REL
+        subprocess.run(
+            [sys.executable, str(script)],  # no root arg → should pick src/
+            cwd=str(target),
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+        text = (target / ".claude" / "docs" / "CODE_MAP.md").read_text()
+        assert "The app." in text
+        assert "Top-level noise." not in text  # cwd not scanned when src/ exists
+
     def test_syntax_error_file_is_skipped_not_fatal(self, tmp_path: Path):
         target = tmp_path / "p"
         _scaffold(target, "python")
