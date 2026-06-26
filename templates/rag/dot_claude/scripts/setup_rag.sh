@@ -1,54 +1,107 @@
 #!/usr/bin/env bash
-# Tier-3 RAG memory — setup STUB (scaffolded by project-init; ADR-024 §4).
+# Tier-3 RAG memory — setup (scaffolded by project-init; ADR-024 §4, ADR-026).
+# Run this yourself — the scaffolder never installs tools.
+# Idempotent: safe to re-run after cocoindex-code updates.
 #
-# This is a SEAM, not an engine. project-init deliberately ships docs + this
-# stub + agent rules + the `rag_endpoint` descriptor — and installs NOTHING.
-# The tool/engine pick is parked upstream (#495) so the repo never repeats the
-# LightRAG trap (a pinned fast-moving dep + mandatory API keys; ADR-009).
+# What it does (no container, no server, no API key):
+#   1. installs the cocoindex-code CLI as a uv tool (`ccc`), with local
+#      embeddings (the `[full]` extra → sentence-transformers, runs in-process)
+#   2. pins a keyless local embedding model (no OpenAI/Voyage key on this path)
+#   3. builds the semantic index into a gitignored .cocoindex_code/ cache
+#   4. prints how to query it and how to expose it to agents over MCP
 #
-# Running this script does not change your system. It prints the decision you
-# need to make and the vetted starting point, then stops. Wire your chosen tool
-# yourself, set `memory.rag_endpoint` in .claude/config.yaml, and you are done.
+# Why cocoindex-code (the A-vs-B call, ADR-026): it sits ALONGSIDE Graphify
+# (option A), not replacing it — Graphify answers "who calls this / how does the
+# code fit together" (structural), RAG answers "where did we touch X" (fuzzy
+# semantic). It clears the ADR-009 bar: upstream-maintained tool, no API key on
+# the default path, tool-level install (not a pinned project dep), and an
+# embedded sqlite-vec index — no containers, no vector-DB server.
 #
 # Read first: .claude/docs/guides/using-rag.md
 
 set -euo pipefail
 
+# Always operate from the project root, wherever the script is invoked from — so
+# the .cocoindex_code/ index lands in the repo (this script lives at .claude/scripts/).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}/../.." || exit 1
+
+# --- config -----------------------------------------------------------------
+# Pin the tool (alpha, ~weekly releases — upgrade deliberately, not floating).
+RAG_TOOL_SPEC="${RAG_TOOL_SPEC:-cocoindex-code[full]==0.2.37}"
+
+# Keyless local embedding model. Default = CodeRankEmbed (137M, MIT): on-device,
+# no API key, ~550MB, laptop-CPU-fast, and the best code recall of the models
+# that actually load in cocoindex-code today (verified by a hands-on bake-off —
+# see ADR-026). The larger 1.5-2B code models (bge-code-v1, Qodo, SFR) currently
+# FAIL to load against cocoindex-code's pinned transformers; the 7B nomic-embed-code
+# loads but needs a GPU + ~16GB RAM. Override with RAG_EMBED_MODEL if you must.
+# TODO(project-init #515): re-check the larger models as cocoindex-code upgrades
+# transformers — if one then loads keyless AND beats CodeRankEmbed, wire it in here.
+RAG_EMBED_MODEL="${RAG_EMBED_MODEL:-nomic-ai/CodeRankEmbed}"
+RAG_EMBED_DEVICE="${RAG_EMBED_DEVICE:-cpu}"   # cpu | cuda | mps
+# ----------------------------------------------------------------------------
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "ERROR: uv is required (https://docs.astral.sh/uv/). Install it first." >&2
+  exit 1
+fi
+
+# Always (re)install the exact pinned spec with --force. This guarantees BOTH the
+# version AND the [full] extra even if a different — or slim, no-[full] — ccc is
+# already on PATH: without [full] (sentence-transformers) cocoindex-code falls back
+# to a key-required cloud provider, exactly the LightRAG trap ADR-009 forbids. A
+# version-only check can't see the extra, so we don't gamble — --force is
+# cache-backed (a relink, no large re-download when the version is already present).
+PINNED_VER="${RAG_TOOL_SPEC##*==}"
+echo "Ensuring cocoindex-code ${PINNED_VER} with the [full] (local, keyless) extra..."
+uv tool install --force "${RAG_TOOL_SPEC}"
+
+# Pin the keyless local model BEFORE init. There is no CLI flag for a local
+# (sentence-transformers) model, so write the global config directly. The
+# `provider:` line is mandatory — omitting it silently resolves to a cloud
+# (key-required) provider.
+GLOBAL_CFG="${COCOINDEX_CODE_DIR:-$HOME/.cocoindex_code}/global_settings.yml"
+SENTINEL="# Written by .claude/scripts/setup_rag.sh"
+mkdir -p "$(dirname "$GLOBAL_CFG")"
+# This is cocoindex-code's GLOBAL (cross-project) config. Don't silently clobber
+# one we didn't write — back it up first so another project's setup is recoverable.
+if [ -f "$GLOBAL_CFG" ] && ! head -n1 "$GLOBAL_CFG" | grep -qF "$SENTINEL"; then
+  cp "$GLOBAL_CFG" "${GLOBAL_CFG}.bak.$$"
+  echo "WARNING: backed up your existing ${GLOBAL_CFG} to ${GLOBAL_CFG}.bak.$$ before overwriting." >&2
+fi
+cat > "$GLOBAL_CFG" <<EOF
+${SENTINEL} — keyless, on-device embeddings.
+embedding:
+  provider: sentence-transformers
+  model: "${RAG_EMBED_MODEL}"
+  device: "${RAG_EMBED_DEVICE}"
+EOF
+echo "Pinned local embedding model: ${RAG_EMBED_MODEL} (device: ${RAG_EMBED_DEVICE})"
+
+echo "Initialising the project index config (.cocoindex_code/, auto-gitignored)..."
+# `ccc init` reads the keyless model from the global config written above, so it
+# never prompts; -f skips the parent-dir warning and is idempotent (re-runs print
+# "Project already initialized" and exit 0).
+ccc init -f
+
+echo "Building the semantic index (first run downloads the local model)..."
+ccc index
+
 cat <<'EOM'
-project-init — tier-3 RAG setup (seam only; nothing is installed)
 
-WHEN IT IS WORTH IT
-  RAG earns its keep only at MULTI-PROJECT / MONOREPO scale, where cross-corpus
-  semantic recall beats per-repo grep. For one small/medium repo the vault +
-  the Graphify code graph + grep already cover recall — skip this tier.
+Done — tier-3 RAG is live (nothing runs as a server; the index is a local file).
 
-HARD CONSTRAINTS (non-negotiable, from ADR-009's lesson)
-  - Upstream-maintained tool / plugin / MCP — never hand-rolled ingestion here.
-  - No API key on the default path (Graphify's on-device AST mode is the bar).
-  - Tool-level install only — no fast-moving Python dep pinned to the project.
-  - The index is a gitignored, derived cache (same boundary as graphify-out/).
+Query it:
+  ccc search "where do we handle retry/backoff"   # fuzzy semantic recall
+  ccc grep '<ast-pattern>'                          # structural search
 
-VETTED STARTING POINT (verify hands-on before adopting — see #495)
-  codebase-memory-mcp (DeusData, MIT) — on-device, single static binary, no
-  API key. Primarily a tree-sitter AST graph (overlaps Graphify); confirm its
-  on-device vector recall before treating it as a true L3 vector store.
-    https://github.com/DeusData/codebase-memory-mcp
+Expose it to agents over MCP (see .claude/rules/rag.md):
+  ccc mcp                                            # stdio MCP server
 
-  Rejected for the default path (fail the no-key / no-infra bar):
-    - zilliztech/claude-context — needs OpenAI/Voyage keys + a Milvus vector DB.
-    - Cognee — heavier KG-RAG platform; more ops than Graphify.
+Record the endpoint so a root orchestrator can discover it (#498):
+  in .claude/config.yaml set  memory.rag_endpoint: "ccc mcp"   (or the index path)
 
-THE OPEN DESIGN CALL (decide with a hands-on test — #495)
-  (A) L3 distinct from Graphify L2 — structural graph + a separate vector store.
-  (B) One tool REPLACES Graphify — L2/L3 collapse into graph-only vs graph+vector
-      modes of the same tool (this would supersede ADR-009's Graphify pick).
-
-WIRE IT (once you have chosen and installed a tool, outside this script)
-  1. Install the tool at tool level (e.g. its documented MCP/binary install).
-  2. Point agents at it — see .claude/rules/rag.md (already scaffolded).
-  3. Record the endpoint so a root orchestrator can discover it (#498):
-       in .claude/config.yaml set  memory.rag_endpoint: <url-or-path>
-  4. Keep the index out of git (add its cache dir to .gitignore).
-
-Nothing was installed. Re-run this any time as a reference.
+The .cocoindex_code/ index is a derived cache — gitignored, never hand-edited.
+Re-run this script any time to rebuild after large code changes.
 EOM

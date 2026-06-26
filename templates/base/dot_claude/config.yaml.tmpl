@@ -29,7 +29,7 @@ iac: {{iac}}            # none | opentofu — infrastructure-as-code overlay (AD
   memory_path: .claude/memory
 {{#if obsidian}}  vault_path: .claude/vault
 {{/if obsidian}}{{#if graphify}}  graph_path: graphify-out/graph.json
-{{/if graphify}}{{#if rag}}  rag_endpoint:        # tier 3 (ADR-024 §4): set after wiring a tool (.claude/scripts/setup_rag.sh); empty = seam scaffolded, engine not bundled (#495)
+{{/if graphify}}{{#if rag}}  rag_endpoint:        # tier 3 (ADR-024 §4, ADR-026): set after running .claude/scripts/setup_rag.sh (cocoindex-code, keyless/on-device); empty = not wired yet
 {{/if rag}}
 {{/if memory}}mcps:
   installed: {{installed_mcps_yaml}}
