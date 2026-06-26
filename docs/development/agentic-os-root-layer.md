@@ -68,6 +68,61 @@ registration breadcrumb; no daemon, no write-back.
    if present. Same hard constraints as ADR-024 §4 (upstream tool, no key on the
    default path, derived/gitignored index).
 
+## Aggregate-by-tier (the orchestrator-side mirror of degrade-by-tier)
+
+Each recall tier has a tier-appropriate cross-project aggregation strategy. This
+is the producer→consumer mirror of the per-project *degrade-by-tier* read rule:
+the descriptor's `tier` + paths (already shipped, #498) tell the orchestrator
+exactly which strategy to apply per project.
+
+| Tier | Per-project artifact | OS cross-project strategy | Cost | Engine |
+|---|---|---|---|---|
+| **0 auto** | `.claude/memory/MEMORY.md` (flat facts) | **direct-merge** — read + union each `MEMORY.md`; may cross-link facts between projects | cheapest | deterministic, no LLM |
+| **1 obsidian** | `.claude/vault/` (human prose) | **grep** for cheap recall, **or agent-synthesis** to summarize the "why" across projects | grep cheap / synthesis costly | LLM only for synthesis |
+| **2 graphify** | `graphify-out/graph.json` | **federate** — read each project's `graph_path`, union the code graphs | moderate | graphify CLI (per-repo) |
+| **3 rag** | `rag_endpoint` (or none) | **federated** (query each project's engine, merge) **or central** (one OS index over all corpora) | highest | a RAG tool (#495) |
+
+**Mixed-tier fleet.** Projects sit at different tiers; the orchestrator retrieves
+each project at *its own* tier (the highest its descriptor supports) and unions
+the results. Tier 1 is **high-value but high-cost** (the vault holds the *why*,
+but synthesizing prose needs an LLM) — not "least useful"; fall back to grep when
+you don't want to pay for synthesis. Build order follows cost: **deterministic
+first** (L0 direct-merge, L2 graph federation), then the LLM-assisted layers
+(L1 synthesis, L3 RAG).
+
+**Engines vs scaffolder.** `project-init` only *scaffolds the seam* for each tier
+(the graphify/RAG `setup_*.sh` + the descriptor field); it never runs an index.
+The orchestrator may *invoke* `project-init` to add a seam to a project that lacks
+one (a delegated write), but the **graphify CLI** / **RAG tool** build the indices
+and the **OS** federates/aggregates them.
+
+## Connection / transport model (already thought through)
+
+Three distinct edges, three different answers — only one is a network protocol:
+
+- **OS ↔ child projects — filesystem pull, no live connection.** The OS globs for
+  `.claude/config.yaml`, reads the descriptor + `MEMORY.md`/`graph.json`/vault.
+  Projects are passive file trees: **no daemon, no server, no write-back** in a
+  child (ADR-025 pull-only). The lone exception is **tier-3 *federated* RAG**,
+  where a project may expose a `rag_endpoint` the OS *queries* (that endpoint is
+  the project's own RAG tool, not a project-init service).
+- **OS ↔ harnesses (Claude Code / Cowork / Codex / …) — client-server via MCP.**
+  The OS is the MCP server; harnesses are clients. stdio local for the MVP; a
+  separately-gated HTTP/streamable adapter (own auth/threat model) only if remote
+  access is ever needed. This is the agnostic seam.
+- **OS ↔ other agents/orchestrators — A2A, deferred.** [A2A](https://a2aprotocol.ai)
+  (agent-to-agent) is the right protocol *if* you later run specialized agents or
+  federate across machines/users that must coordinate. Premature for a single-user
+  local OS; the headless core + MCP doesn't preclude adding an A2A adapter later.
+- **p2p — out of scope.** Only relevant for multi-machine/multi-user federation
+  (several people's agentic-OSes sharing), which conflicts with the small/local/
+  single-user charter. If ever needed it's a sync layer over the registry, not a
+  core concern.
+
+So between the OS and its projects there is deliberately **no client-server or
+p2p** — it's reads. The only client-server is **MCP** to the harnesses; **A2A**
+and **p2p** are future seams, not MVP needs.
+
 ## Boundary (carried from ADR-025)
 
 Do **not** build the orchestrator, a registry format, a daemon, RAG, or any
