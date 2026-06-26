@@ -25,14 +25,14 @@ set -euo pipefail
 # Pin the tool (alpha, ~weekly releases — upgrade deliberately, not floating).
 RAG_TOOL_SPEC="${RAG_TOOL_SPEC:-cocoindex-code[full]==0.2.37}"
 
-# Keyless local embedding model. Default is the small, laptop-CPU model; all
-# options below run fully on-device with NO API key.
-#   Snowflake/snowflake-arctic-embed-xs  22M  — default, instant on a CPU
-#   nomic-ai/CodeRankEmbed              137M  — code-specialised, best recall/size (MIT)
-#   nomic-ai/nomic-embed-code            7B   — max quality, but GPU + ~16GB RAM,
-#                                               multi-GB download, slow per-query on CPU
-RAG_EMBED_MODEL="${RAG_EMBED_MODEL:-Snowflake/snowflake-arctic-embed-xs}"
-RAG_EMBED_DEVICE="${RAG_EMBED_DEVICE:-cpu}"   # cpu | cuda | mps (use cuda/mps for the 7B model)
+# Keyless local embedding model. Default = CodeRankEmbed (137M, MIT): on-device,
+# no API key, ~550MB, laptop-CPU-fast, and the best code recall of the models
+# that actually load in cocoindex-code today (verified by a hands-on bake-off —
+# see ADR-026). The larger 1.5-2B code models (bge-code-v1, Qodo, SFR) currently
+# FAIL to load against cocoindex-code's pinned transformers; the 7B nomic-embed-code
+# loads but needs a GPU + ~16GB RAM. Override with RAG_EMBED_MODEL if you must.
+RAG_EMBED_MODEL="${RAG_EMBED_MODEL:-nomic-ai/CodeRankEmbed}"
+RAG_EMBED_DEVICE="${RAG_EMBED_DEVICE:-cpu}"   # cpu | cuda | mps
 # ----------------------------------------------------------------------------
 
 if ! command -v uv >/dev/null 2>&1; then
@@ -89,10 +89,5 @@ Record the endpoint so a root orchestrator can discover it (#498):
   in .claude/config.yaml set  memory.rag_endpoint: "ccc mcp"   (or the index path)
 
 The .cocoindex_code/ index is a derived cache — gitignored, never hand-edited.
-Re-run this script any time to rebuild after large changes or a model swap.
-
-Want the highest-quality (heavier) model instead? Re-run with, e.g.:
-  RAG_EMBED_MODEL=nomic-ai/CodeRankEmbed .claude/scripts/setup_rag.sh   # 137M, MIT
-  RAG_EMBED_MODEL=nomic-ai/nomic-embed-code RAG_EMBED_DEVICE=cuda \
-    .claude/scripts/setup_rag.sh                                        # 7B, needs a GPU
+Re-run this script any time to rebuild after large code changes.
 EOM

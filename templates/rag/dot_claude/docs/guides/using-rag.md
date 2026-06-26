@@ -37,20 +37,16 @@ opt-in (`--memory obsidian-graphify-rag`), never a preset default.
 .claude/scripts/setup_rag.sh
 ```
 
-This installs `ccc` (`uv tool install 'cocoindex-code[full]'`), pins a **keyless
-local embedding model**, and builds the index. The default model is
-`snowflake-arctic-embed-xs` (22M — instant on a laptop CPU). To trade size for
-code-retrieval quality, re-run with `RAG_EMBED_MODEL` set:
-
-| Model | Size | Notes |
-|---|---|---|
-| `Snowflake/snowflake-arctic-embed-xs` | 22M | default — keyless, laptop CPU |
-| `nomic-ai/CodeRankEmbed` | 137M | code-specialised, best recall-per-size (MIT) |
-| `nomic-ai/nomic-embed-code` | 7B | max quality, but needs a GPU + ~16GB RAM and a multi-GB download; set `RAG_EMBED_DEVICE=cuda` |
-
-All three run **fully on-device with no API key**. (A cloud provider is possible
-via cocoindex-code's `litellm` provider, but the scaffolded setup deliberately
-never takes that path — keep it keyless.)
+This installs `ccc` (`uv tool install 'cocoindex-code[full]'`), pins the
+**keyless local embedding model**, and builds the index. The model is
+`nomic-ai/CodeRankEmbed` (137M, MIT) — on-device, no API key, ~550MB, laptop-CPU
+fast, and the best code recall of the models that actually load in cocoindex-code
+today (chosen by a hands-on bake-off; see ADR-026 in the project-init repo). The
+larger 1.5–2B code models (bge-code-v1, Qodo, SFR) currently fail to load against
+cocoindex-code's pinned `transformers`; the 7B `nomic-embed-code` needs a GPU +
+~16GB RAM. You can override with `RAG_EMBED_MODEL=<hf-id>` if you have a reason to,
+but the default is the recommended choice — keep it keyless (never the cloud
+`litellm` provider).
 
 After setup, record the surface so a root orchestrator (#498/ADR-025) can
 discover it — set `memory.rag_endpoint` in `.claude/config.yaml` — and keep the

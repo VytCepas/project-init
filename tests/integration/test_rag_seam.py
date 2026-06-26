@@ -109,6 +109,14 @@ class TestEngineWired:
         for keyish in ("OPENAI_API_KEY", "VOYAGE_API_KEY", "api_key", "litellm"):
             assert keyish not in setup, f"default RAG path must stay keyless: {keyish}"
 
+    def test_default_model_is_coderank(self, tmp_path):
+        """Default embedding model is CodeRankEmbed — the best code-recall model that
+        actually loads in cocoindex-code (ADR-026 bake-off)."""
+        target = tmp_path / "p"
+        _scaffold_rag(target)
+        setup = (_claude(target) / "scripts" / "setup_rag.sh").read_text()
+        assert 'RAG_EMBED_MODEL="${RAG_EMBED_MODEL:-nomic-ai/CodeRankEmbed}"' in setup
+
     def test_no_container_or_server(self, tmp_path):
         """RAG must not require Docker or a vector-DB server (embedded sqlite-vec)."""
         target = tmp_path / "p"

@@ -46,13 +46,32 @@ are **complementary retrieval modes**, not substitutes. Keeping them separate pr
 ADR-009 and lets each be authoritative for what it is good at (composition rule, ADR-024 §2:
 Graphify authoritative for code structure; RAG authoritative for nothing — additive recall).
 
-### Embedding model: small keyless default, heavy model opt-in
+### Embedding model: a single keyless default — CodeRankEmbed
 
-`setup_rag.sh` defaults to `snowflake-arctic-embed-xs` (22M, instant on a laptop CPU, keyless).
-`RAG_EMBED_MODEL` swaps in `nomic-ai/CodeRankEmbed` (137M, MIT, best recall-per-size) or
-`nomic-ai/nomic-embed-code` (7B — flagged GPU/16GB-RAM, multi-GB download). All run on-device.
-The 7B is **not** the default: it punishes laptop users (slow indexing *and* per-query latency)
-for marginal quality gain — a 1.5B code model already matches it on code-retrieval benchmarks.
+`setup_rag.sh` defaults to `nomic-ai/CodeRankEmbed` (137M, MIT) — on-device, no API key,
+~550MB, laptop-CPU fast. It is the default because a **hands-on bake-off** (below) showed it is
+the best code-recall model that *actually loads* in cocoindex-code today. `RAG_EMBED_MODEL`
+remains an escape hatch, but is intentionally de-emphasised: the smaller `arctic-embed-xs`
+(22M) is weaker on code, and the larger 1.5–2B code models do not load at all (see below), so a
+multi-model wizard would be over-engineering for what is effectively one viable choice.
+
+### Bake-off (2026-06-26, hands-on, 14-concept confusable corpus, no-shared-keyword queries)
+
+Measured top-1 retrieval accuracy, all keyless/on-device on a 15GB-RAM box:
+
+| Model | Loads in cocoindex-code? | Top-1 | Note |
+|---|---|---|---|
+| `nomic-ai/CodeRankEmbed` (137M) | ✅ | **13/14** | **chosen default** |
+| `snowflake-arctic-embed-xs` (22M) | ✅ | 11/14 | general-purpose, weaker on code |
+| `BAAI/bge-code-v1` (~1.5B) | ❌ | — | `Unrecognized processing class` |
+| `Qodo/Qodo-Embed-1-1.5B` | ❌ | — | `Qwen2Config has no attribute rope_theta` |
+| `Salesforce/SFR-Embedding-Code-2B_R` | ❌ | — | `cannot import HybridCache` |
+| `nomic-ai/nomic-embed-code` (7B) | ⚠️ | — | curated, but ~28GB download + OOMs on 15GB RAM |
+
+**Root cause for the failures:** cocoindex-code 0.2.37 pins a bleeding-edge `transformers==5.12.1`,
+and the current crop of large Qwen2-based code embedding models break against it. So benchmark
+score is moot — *pluggability* is the binding constraint, and CodeRankEmbed wins it. Revisit the
+larger models when cocoindex-code's `transformers` pin and those models' code converge.
 
 ## Consequences
 
