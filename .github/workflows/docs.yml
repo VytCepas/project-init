@@ -15,13 +15,15 @@ on:
       - "docs/**"
       - "mkdocs.yml"
       - ".github/workflows/docs.yml"
+      # Redeploy when the docs toolchain itself moves (e.g. a mkdocs-material bump).
+      - "pyproject.toml"
+      - "uv.lock"
   workflow_dispatch:
 
-# Least privilege: the deploy job needs pages + id-token; nothing writes contents.
+# Least privilege at the top level: the build job only reads the repo.
+# The deploy job opts into pages + id-token explicitly below.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Never run two Pages deploys at once; let an in-flight deploy finish.
 concurrency:
@@ -43,8 +45,13 @@ jobs:
           cache-dependency-glob: "uv.lock"
           python-version: "3.12"
 
+      # Sync from the lockfile first (matches ci.yml) — deterministic deps and a
+      # fast failure if uv.lock is stale, rather than an implicit resolve.
+      - name: Sync docs dependencies
+        run: uv sync --extra docs --locked
+
       - name: Build the docs site
-        run: uv run --extra docs mkdocs build --strict
+        run: uv run mkdocs build --strict
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -55,6 +62,10 @@ jobs:
     name: Deploy to Pages
     needs: build
     runs-on: ubuntu-24.04
+    # Only the deploy job needs publish rights to Pages.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
