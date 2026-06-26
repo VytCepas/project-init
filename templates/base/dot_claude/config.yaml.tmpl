@@ -20,10 +20,15 @@ deploy: {{deploy_target}}            # none | cloud-run | fly | k8s | registry |
 iac: {{iac}}            # none | opentofu — infrastructure-as-code overlay (ADR-015)
 
 {{#if memory}}memory:
+  # Stable descriptor (#498): tier + resolved paths a root orchestrator reads to
+  # introspect this project. Anchors (memory_path, MEMORY.md) are invariant across
+  # tiers; higher tiers only ADD retrieval surfaces (vault, graph).
+  tier: {{memory_tier}}             # 0 auto | 1 obsidian-only | 2 obsidian-graphify
   stack: {{memory_stack}}{{#if obsidian}}         # obsidian-only | obsidian-graphify{{/if obsidian}}
+  memory_path: .claude/memory
 {{#if obsidian}}  vault_path: .claude/vault
-{{/if obsidian}}  memory_path: .claude/memory
-
+{{/if obsidian}}{{#if graphify}}  graph_path: graphify-out/graph.json
+{{/if graphify}}
 {{/if memory}}mcps:
   installed: {{installed_mcps_yaml}}
 

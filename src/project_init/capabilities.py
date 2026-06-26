@@ -151,6 +151,27 @@ def _chosen_options(variables: dict[str, str]) -> list[tuple[str, str]]:
     ]
 
 
+def _memory_descriptor(variables: dict[str, str]) -> list[tuple[str, str]]:
+    """The memory tier + resolved paths a root orchestrator reads (#498, ADR-024).
+
+    Anchors are invariant across tiers; higher tiers only add retrieval surfaces.
+    Derived from ``memory_stack`` exactly as the config record / gate vars are.
+    """
+    stack = variables.get("memory_stack", "none") or "none"
+    if stack == "none":
+        return [("Tier", "— (no memory backend)")]
+    rows = [
+        ("Tier", variables.get("memory_tier", "") or "?"),
+        ("Stack", stack),
+        ("memory_path", ".claude/memory"),
+    ]
+    if variables.get("obsidian"):
+        rows.append(("vault_path", ".claude/vault"))
+    if variables.get("graphify"):
+        rows.append(("graph_path", "graphify-out/graph.json"))
+    return rows
+
+
 def _table(headers: tuple[str, str], rows: list[tuple[str, str]]) -> list[str]:
     out = [f"| {headers[0]} | {headers[1]} |", "|---|---|"]
     for a, b in rows:
@@ -177,6 +198,13 @@ def render(variables: dict[str, str]) -> str:
         "## Chosen options",
         "",
         *_table(("Option", "Value"), _chosen_options(variables)),
+        "",
+        "## Memory",
+        "",
+        "Tier + resolved paths a root orchestrator (#479) reads to introspect this",
+        "project. Anchors are invariant across tiers; higher tiers only add surfaces.",
+        "",
+        *_table(("Field", "Value"), _memory_descriptor(variables)),
         "",
         f"## Skills ({len(skills)})",
         "",

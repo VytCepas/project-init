@@ -98,6 +98,17 @@ class TestVariableContract:
         # The vault-free stack maps to the `core` preset, NOT load_preset("none").
         assert preset_name == ("core" if stack == "none" else stack)
 
+    @pytest.mark.parametrize(
+        "stack,tier", [("none", ""), ("auto", "0"), ("obsidian-only", "1"), ("obsidian-graphify", "2")]
+    )
+    def test_memory_tier_parity(self, stack, tier):
+        """`memory_tier` (#498) must be emitted identically by all three paths."""
+        assert _build_variables(load_preset("core"), _inputs(stack))["memory_tier"] == tier
+        assert _backfill_variables({"memory_stack": stack})["memory_tier"] == tier
+        lines = ["language: python", "memory:", f"  stack: {stack}"]
+        _p, variables, _m = _migrate_semantic_config(lines)
+        assert variables["memory_tier"] == tier
+
     def test_migrate_no_memory_section_is_core_not_obsidian(self):
         # A core project renders config.yaml with NO `memory:` block. With the
         # JSON record stripped, the semantic fallback must default to `none`/core
