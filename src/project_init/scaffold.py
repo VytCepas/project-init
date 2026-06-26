@@ -212,6 +212,13 @@ def generate_preset(name: str, *, extends: str, description: str = "", version: 
 _AGENT_LAYERS = ("codex", "antigravity", "amp", "junie")
 
 
+# Version of the machine-readable descriptor contract a root orchestrator reads
+# (#498, ADR-025): the config.yaml `memory:` block schema + the top-level
+# descriptor fields. Bumped only when that contract changes shape — independent
+# of project_init_version (the tool version). A child config that PREDATES this
+# field is contract v0 by the reader's rule; the scaffolder always stamps current.
+CONTRACT_VERSION = "1"
+
 _MEMORY_TIERS = {
     "auto": "0",
     "obsidian-only": "1",

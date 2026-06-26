@@ -112,3 +112,84 @@ class TestUpgradeRoundTrip:
         _scaffold(target, "obsidian-only")
         _preset, variables, _manifest, _migrated = read_scaffold_record(target)
         assert variables["memory_tier"] == "1"
+
+
+class TestContractVersion:
+    """Descriptor contract version (#498, ADR-025): a stable schema version a root
+    orchestrator reads, at key path `project.project_init_contract_version` — in
+    the always-present `project:` block, deliberately NOT nested in `memory:`, so
+    it survives the vault-free `none` case; absent ⇒ v0 (reader)."""
+
+    def test_present_even_for_none_project(self, tmp_path):
+        # `core` has no memory backend, but the contract version is top-level —
+        # the exact opt-out case a nested version would have missed (Codex review).
+        target = tmp_path / "p"
+        _scaffold(target, "core")
+        text = (target / ".claude" / "config.yaml").read_text()
+        assert "project_init_contract_version: 1" in text
+        assert "\nmemory:" not in text  # still no memory block
+
+    def test_present_for_memory_project(self, tmp_path):
+        target = tmp_path / "p"
+        _scaffold(target, "obsidian-graphify")
+        assert "project_init_contract_version: 1" in (
+            target / ".claude" / "config.yaml"
+        ).read_text()
+
+    def test_backfill_fills_absent_and_preserves_present(self):
+        """Backward-compat: a pre-field record backfills to current (so strict
+        re-render works); an explicit recorded value is preserved (setdefault)."""
+        from project_init.upgrade import _backfill_variables
+
+        absent = _backfill_variables({"memory_stack": "obsidian-only", "language": "python"})
+        assert absent["project_init_contract_version"] == "1"
+        present = _backfill_variables(
+            {
+                "memory_stack": "obsidian-only",
+                "language": "python",
+                "project_init_contract_version": "0",
+            }
+        )
+        assert present["project_init_contract_version"] == "0"
+
+    def test_semantic_migration_preserves_explicit_version(self):
+        """A record-less config.yaml that still carries an explicit contract
+        version must keep it through migration, not be forced to current (Copilot
+        #508 review)."""
+        from project_init.upgrade import _migrate_semantic_config
+
+        lines = [
+            "project:\n",
+            '  name: "x"\n',
+            "  project_init_contract_version: 2\n",
+            "language: python\n",
+            "memory:\n",
+            "  stack: obsidian-only\n",
+        ]
+        _preset, variables, _manifest = _migrate_semantic_config(lines)
+        assert variables["project_init_contract_version"] == "2"
+
+    def test_upgrade_injects_visible_line_for_pre_field_project(self, tmp_path, capsys):
+        """A project whose visible config predates the field must GAIN the line on
+        `upgrade --apply` — config.yaml is not re-rendered, so without targeted
+        injection an orchestrator would read the upgraded child as v0 (Codex #508
+        P1)."""
+        target = tmp_path / "p"
+        _scaffold(target, "obsidian-only")
+        config = target / ".claude" / "config.yaml"
+        # Simulate a pre-field project: drop the visible line from the project:
+        # block ONLY (above the record marker) — leave the hidden record's
+        # variables JSON intact, exactly the state of a pre-field scaffold.
+        head, sep, tail = config.read_text().partition("# --- scaffold record")
+        head = "\n".join(
+            ln for ln in head.splitlines() if "project_init_contract_version" not in ln
+        )
+        config.write_text(head + "\n" + sep + tail)
+        assert "project_init_contract_version" not in config.read_text().partition(
+            "# --- scaffold record"
+        )[0]
+        capsys.readouterr()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        # The visible project: block (above the record marker) now carries it.
+        head = config.read_text().partition("# --- scaffold record")[0]
+        assert "project_init_contract_version: 1" in head

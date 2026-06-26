@@ -16,6 +16,7 @@ from project_init.mcps import (
     format_installed_mcps_yaml,
 )
 from project_init.scaffold import (
+    CONTRACT_VERSION,
     TemplateRenderError,
     list_presets,
     load_preset,
@@ -1535,6 +1536,7 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "project_description": project_description,
         "created_date": date.today().isoformat(),
         "project_init_version": __version__,
+        "project_init_contract_version": CONTRACT_VERSION,
         "project_init_url": __repo_url__,
         # Host-aware plugin-marketplace source (ADR-013, #248) — replaces the
         # github.com-only removeprefix. Provides project_init_repo + _url +

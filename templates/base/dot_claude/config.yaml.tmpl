@@ -6,6 +6,7 @@ project:
   description: "{{project_description}}"
   created: {{created_date}}
   project_init_version: {{project_init_version}}
+  project_init_contract_version: {{project_init_contract_version}}  # descriptor-contract schema a root orchestrator reads (#498, ADR-025); absent ⇒ v0
   project_init_plugin_version: {{project_init_plugin_version}}  # plugin payload version (ADR-010)
   profile: {{profile}}     # individual | standalone | org — distribution profile (ADR-013)
   enforcement: {{enforcement}}      # advisory | hard — see ADR-013 / #251
