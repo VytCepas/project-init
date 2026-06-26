@@ -27,6 +27,7 @@ Principles:
 - **One folder, `.claude/`**, for everything agentic. Project root stays clean.
 - **Memory is à-la-carte** — a superset ladder (ADR-024): flat agent-memory files (`--memory auto`), **plus** an Obsidian vault for humans (`obsidian`), **plus** Graphify for agents (`obsidian-graphify`), or **none at all** (`--memory none` / the vault-free `core` preset). When present, the vault and the agent index are separated on disk.
 - **The GitHub lifecycle is à-la-carte** — the issue → branch → PR → review → merge automation (DAG guard hooks, lifecycle scripts, board/validation workflows, issue/PR templates, lifecycle skills) ships by default but is declinable (`--lifecycle none`) for a forge-agnostic or minimalist scaffold. The forge-portable quality hooks (commit-msg, gitleaks, lint/format gate, prod-safety) stay either way (ADR-021).
+- **Low-token code map** — Python projects ship `.claude/scripts/gen_code_map.py`, a deterministic AST generator that writes `.claude/docs/CODE_MAP.md` (one line per module/class/function, from docstrings). Agents read it before grepping; in practice the map is ~3% of source size. Regenerate with `just code-map` (#496).
 - **Deterministic-first** — hooks and scripts are bash/python. LLM calls only where generative.
 - **Claude-first, portable core** — built and tested for Claude Code; other agents get instructions, not enforcement. See [Agent support tiers](#agent-support-tiers).
 - **`bun` and `uv` only** — no `npm`/`npx`/`pip`/`venv` anywhere in scaffolded projects.

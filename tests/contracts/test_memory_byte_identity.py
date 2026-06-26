@@ -13,8 +13,13 @@ changed rendered bytes — fix the template, do NOT regenerate the baseline.
 
 Exception (#497): the `auto`/`obsidian` tier split kept every file byte-identical
 EXCEPT `lint_memory.sh`, which gained deterministic staleness checks (a deliberate
-feature, not move-drift). Only that one hash was re-pinned in the baselines; all
-other files still guard the move invariant unchanged.
+feature, not move-drift). Only that one hash was re-pinned.
+
+Exception (#496): the code-map feature intentionally ADDS
+`.claude/scripts/gen_code_map.py` and edits AGENTS.md (the read-the-map pointer)
+and the justfile (the `code-map` recipe). Only those keys were re-pinned, after
+verifying every OTHER file still matched the baseline — the move invariant is
+intact for everything else.
 """
 
 from __future__ import annotations

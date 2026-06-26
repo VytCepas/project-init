@@ -32,6 +32,10 @@ scan:
 
 # what CI runs
 ci: lint test
+
+# regenerate .claude/docs/CODE_MAP.md (low-token "what does what" map; read before grepping)
+code-map:
+    uv run python .claude/scripts/gen_code_map.py
 {{/if python}}{{#if node}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
