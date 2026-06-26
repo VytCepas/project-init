@@ -20,7 +20,8 @@ three keys were re-pinned, after verifying every other file still matched the
 baseline — the move invariant is intact for everything else.
 
 Exception (#497/#498): later features re-pinned `lint_memory.sh` (staleness) and
-`.claude/config.yaml` (memory descriptor) the same way — only the intentionally
+`.claude/config.yaml` (memory descriptor `tier`/`graph_path`, then the top-level
+`project_init_contract_version`, ADR-025) the same way — only the intentionally
 changed key, after verifying no other drift.
 """
 

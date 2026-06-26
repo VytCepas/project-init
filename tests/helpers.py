@@ -30,6 +30,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "project_description": "A test project",
         "created_date": "2026-01-01",
         "project_init_version": "0.1.0",
+        "project_init_contract_version": "1",
         "project_init_url": "https://github.com/example/project-init",
         "project_init_repo": "example/project-init",
         "project_init_repo_url": "https://github.com/example/project-init.git",

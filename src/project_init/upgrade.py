@@ -45,6 +45,7 @@ from project_init.scaffold import (
     _GOVERNANCE_USER_FILES,
     _PRESERVE_DIRS,
     _RECORD_MARKER,
+    CONTRACT_VERSION,
     _matches_preserve_glob,
     _new_sibling,
     load_preset,
@@ -493,6 +494,11 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "project_description": fields.get("project.description", ""),
         "created_date": fields.get("project.created", ""),
         "project_init_version": fields.get("project.project_init_version", "0"),
+        # Staging re-renders current templates, so the descriptor contract is
+        # current (#498). A pre-field config.yaml stays user-owned and is not
+        # re-rendered, so it simply lacks the line — the orchestrator reads that
+        # absence as contract v0.
+        "project_init_contract_version": CONTRACT_VERSION,
         "language": language,
         "memory_stack": stack,
         "installed_mcps": ", ".join(installed_ids) if installed_ids else "none",
@@ -551,6 +557,10 @@ def _backfill_variables(variables: dict) -> dict:
     url = v.get("project_init_url", _MIGRATION_DEFAULTS["project_init_url"])
 
     derived: dict[str, str] = {
+        # Descriptor contract (#498): a pre-field record backfills to current so
+        # the staging strict-render succeeds; a post-field record carries its own
+        # value, which the setdefault below preserves.
+        "project_init_contract_version": CONTRACT_VERSION,
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "rag": "true" if "rag" in stack else "",

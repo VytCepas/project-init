@@ -112,3 +112,41 @@ class TestUpgradeRoundTrip:
         _scaffold(target, "obsidian-only")
         _preset, variables, _manifest, _migrated = read_scaffold_record(target)
         assert variables["memory_tier"] == "1"
+
+
+class TestContractVersion:
+    """Top-level `project_init_contract_version` (#498, ADR-025): a stable schema
+    version a root orchestrator reads. Deliberately top-level (not nested in
+    `memory:`) so it survives the vault-free `none` case; absent ⇒ v0 (reader)."""
+
+    def test_present_even_for_none_project(self, tmp_path):
+        # `core` has no memory backend, but the contract version is top-level —
+        # the exact opt-out case a nested version would have missed (Codex review).
+        target = tmp_path / "p"
+        _scaffold(target, "core")
+        text = (target / ".claude" / "config.yaml").read_text()
+        assert "project_init_contract_version: 1" in text
+        assert "\nmemory:" not in text  # still no memory block
+
+    def test_present_for_memory_project(self, tmp_path):
+        target = tmp_path / "p"
+        _scaffold(target, "obsidian-graphify")
+        assert "project_init_contract_version: 1" in (
+            target / ".claude" / "config.yaml"
+        ).read_text()
+
+    def test_backfill_fills_absent_and_preserves_present(self):
+        """Backward-compat: a pre-field record backfills to current (so strict
+        re-render works); an explicit recorded value is preserved (setdefault)."""
+        from project_init.upgrade import _backfill_variables
+
+        absent = _backfill_variables({"memory_stack": "obsidian-only", "language": "python"})
+        assert absent["project_init_contract_version"] == "1"
+        present = _backfill_variables(
+            {
+                "memory_stack": "obsidian-only",
+                "language": "python",
+                "project_init_contract_version": "0",
+            }
+        )
+        assert present["project_init_contract_version"] == "0"

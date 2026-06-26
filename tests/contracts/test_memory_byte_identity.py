@@ -22,8 +22,9 @@ verifying every OTHER file still matched the baseline — the move invariant is
 intact for everything else.
 
 Exception (#498): the memory descriptor intentionally edits `.claude/config.yaml`
-(adds `tier` + `graph_path` to the `memory:` block). Only that key was re-pinned,
-after verifying every other file still matched.
+(adds `tier` + `graph_path` to the `memory:` block, and later a top-level
+`project_init_contract_version` to the `project:` block, ADR-025). Only that key
+was re-pinned, after verifying every other file still matched.
 
 Exception (LightRAG cleanup): removing the dead `.claude/memory/.lightrag/`
 gitignore line (ADR-024) re-pinned `.gitignore` only.
