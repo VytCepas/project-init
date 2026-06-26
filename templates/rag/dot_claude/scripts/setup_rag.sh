@@ -47,22 +47,15 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-# Enforce the exact pin even if a different ccc is already installed (alpha tool,
-# ~weekly releases — a stale version would diverge from the scaffolded docs/tests).
-PINNED_VER="${RAG_TOOL_SPEC##*==}"   # single source of truth for the version
-installed_ver=""
-command -v ccc >/dev/null 2>&1 && \
-  installed_ver="$(uv tool list 2>/dev/null | awk '/^cocoindex-code /{sub(/^v/,"",$2); print $2}')"
-if [ "${installed_ver}" != "${PINNED_VER}" ]; then
-  echo "Installing cocoindex-code ${PINNED_VER} (uv tool install --force '${RAG_TOOL_SPEC}')..."
-  # The [full] extra is REQUIRED: it pulls sentence-transformers so embeddings run
-  # locally. Without it cocoindex-code falls back to a cloud provider that needs an
-  # API key — exactly the LightRAG trap ADR-009 forbids. --force pins the exact
-  # version (cached, so no large re-download when already present).
-  uv tool install --force "${RAG_TOOL_SPEC}"
-else
-  echo "cocoindex-code ${PINNED_VER} already installed — skipping install"
-fi
+# Always (re)install the exact pinned spec with --force. This guarantees BOTH the
+# version AND the [full] extra even if a different — or slim, no-[full] — ccc is
+# already on PATH: without [full] (sentence-transformers) cocoindex-code falls back
+# to a key-required cloud provider, exactly the LightRAG trap ADR-009 forbids. A
+# version-only check can't see the extra, so we don't gamble — --force is
+# cache-backed (a relink, no large re-download when the version is already present).
+PINNED_VER="${RAG_TOOL_SPEC##*==}"
+echo "Ensuring cocoindex-code ${PINNED_VER} with the [full] (local, keyless) extra..."
+uv tool install --force "${RAG_TOOL_SPEC}"
 
 # Pin the keyless local model BEFORE init. There is no CLI flag for a local
 # (sentence-transformers) model, so write the global config directly. The
