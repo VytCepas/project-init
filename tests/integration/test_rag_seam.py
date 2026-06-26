@@ -130,3 +130,25 @@ class TestUpgradeRoundTrip:
         assert "No drift" in capsys.readouterr().out
         block = (_claude(target) / "config.yaml").read_text().partition("\nmemory:")[2]
         assert "tier: 3" in block
+
+    def test_record_less_semantic_migration_does_not_crash(self, tmp_path, capsys):
+        """A tier-3 project that lost its JSON scaffold record must migrate, not
+        die on `Unknown preset 'obsidian-graphify-rag'` (the stack is --memory-only;
+        Codex #506 review). It falls back to the obsidian-graphify base preset and
+        keeps the rag tier/overlay via the recorded memory_stack."""
+        target = tmp_path / "p"
+        _scaffold_rag(target)
+        config = _claude(target) / "config.yaml"
+        text = config.read_text()
+        # Strip the appended JSON scaffold record to force the semantic-migration path.
+        marker = text.find("# --- scaffold record")
+        assert marker > 0
+        config.write_text(text[:marker].rstrip() + "\n")
+        capsys.readouterr()
+        # Pre-fix this raised `Unknown preset 'obsidian-graphify-rag'`; now it
+        # migrates cleanly (--decline-new resolves the #249 addition prompt).
+        assert main(["upgrade", str(target), "--decline-new", "all", "--apply"]) == 0
+        block = config.read_text().partition("\nmemory:")[2].partition("\nmcps:")[0]
+        assert "tier: 3" in block
+        assert "rag_endpoint" in block
+        assert (_claude(target) / "scripts" / "setup_rag.sh").exists()

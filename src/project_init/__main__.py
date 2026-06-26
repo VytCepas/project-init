@@ -727,9 +727,9 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
         "            [dim]You run later: pick & wire an upstream tool (engine[/dim]\n"
         "            [dim]NOT bundled) — an external index + a tool install[/dim]\n\n"
         "[cyan]Helps:[/cyan] agents recall why a decision was made weeks later;\n"
-        "tier 5 adds cross-corpus semantic search worth it only at [bold]multi-\n"
-        "project / monorepo[/bold] scale — for one small/medium repo, vault + the\n"
-        "graph + grep already win, so [bold]skip it[/bold] (default off).\n"
+        "the RAG rung (option 5, tier 3) adds cross-corpus semantic search worth\n"
+        "it only at [bold]multi-project / monorepo[/bold] scale — for one small/medium\n"
+        "repo, vault + the graph + grep already win, so [bold]skip it[/bold] (default off).\n"
         "Clean by default — pick [bold]none[/bold] and no memory is added."
     )
     console.print(Panel(body, title="Memory backend", border_style="cyan"))
@@ -818,7 +818,7 @@ def _choose_mise_interactive() -> bool:
         "Toolchain pinning (mise)",
         "A [bold]mise.toml[/bold] pins runtime/tool versions so every machine and "
         "CI run uses the same toolchain.\n\n"
-        "[cyan]Helps:[/cyan] reproducible builds; no \"works on my machine\".\n"
+        '[cyan]Helps:[/cyan] reproducible builds; no "works on my machine".\n'
         "[dim]Ownership: mise owns versions only (uv/bun own deps, just owns "
         "commands). Off by default.[/dim]",
         "Pin toolchain versions with mise (mise.toml)?",

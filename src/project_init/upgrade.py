@@ -227,8 +227,20 @@ def _git_three_way(base: str, ours: str, theirs: str) -> tuple[str, bool] | None
         tp.write_text(theirs, encoding="utf-8")
         try:
             r = subprocess.run(
-                ["git", "merge-file", "-p", "-L", "current", "-L", "base", "-L", "upgrade",
-                 str(op), str(bp), str(tp)],
+                [
+                    "git",
+                    "merge-file",
+                    "-p",
+                    "-L",
+                    "current",
+                    "-L",
+                    "base",
+                    "-L",
+                    "upgrade",
+                    str(op),
+                    str(bp),
+                    str(tp),
+                ],
                 capture_output=True,
                 text=True,
             )
@@ -461,9 +473,14 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
     # core. Defaulting to obsidian-only here would wrongly re-enable memory for a
     # core project whose JSON record was deleted (Copilot review, PR #473).
     stack = fields.get("memory.stack", "none")
-    # Memory stacks map 1:1 onto preset names EXCEPT the vault-free stack, whose
-    # preset is `core`, not `none` — load_preset("none") would fail.
-    preset_name = "core" if stack == "none" else stack
+    # Memory stacks map 1:1 onto preset names EXCEPT two that have no preset of
+    # their own: the vault-free `none` stack (preset is `core` — load_preset("none")
+    # would fail), and tier-3 `obsidian-graphify-rag`, which is --memory-only (#505)
+    # and falls back to its tier-2 base preset. In both cases the full stack is
+    # still recorded as `memory_stack` below, so overlay derivation (and the `rag`
+    # gate) re-render the right layers regardless of the preset name.
+    _stack_preset = {"none": "core", "obsidian-graphify-rag": "obsidian-graphify"}
+    preset_name = _stack_preset.get(stack, stack)
     language = fields.get("language", "none")
 
     try:
@@ -802,14 +819,18 @@ def apply_drift(
         # Clean 3-way merge: write the combined content in place.
         dest = target / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(report.merge_results[rel], encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
+        dest.write_text(
+            report.merge_results[rel], encoding="utf-8", newline="\n"
+        )  # LF on all hosts (PI-362)
     for rel in report.conflicts:
         # Prefer the conflict-marked merge (shows the overlap) when one exists,
         # else the raw new render. Either way the user's file is left intact.
         if rel in report.merge_results:
             sibling = _new_sibling(target / rel, report.merge_results[rel].encode("utf-8"))
             sibling.parent.mkdir(parents=True, exist_ok=True)
-            sibling.write_text(report.merge_results[rel], encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
+            sibling.write_text(
+                report.merge_results[rel], encoding="utf-8", newline="\n"
+            )  # LF on all hosts (PI-362)
             _mirror_mode(staging / rel, sibling)
         else:
             _copy_rendered(staging / rel, _new_sibling(target / rel, (staging / rel).read_bytes()))
