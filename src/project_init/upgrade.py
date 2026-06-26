@@ -494,11 +494,14 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         "project_description": fields.get("project.description", ""),
         "created_date": fields.get("project.created", ""),
         "project_init_version": fields.get("project.project_init_version", "0"),
-        # Staging re-renders current templates, so the descriptor contract is
-        # current (#498). A pre-field config.yaml stays user-owned and is not
-        # re-rendered, so it simply lacks the line — the orchestrator reads that
-        # absence as contract v0.
-        "project_init_contract_version": CONTRACT_VERSION,
+        # Descriptor contract (#498): preserve an explicitly recorded value (a
+        # post-field config.yaml that only lost its JSON record), else default to
+        # current since staging re-renders current templates. config.yaml stays
+        # user-owned and is not re-rendered, so a truly pre-field project simply
+        # lacks the line — the orchestrator reads that absence as contract v0.
+        "project_init_contract_version": fields.get(
+            "project.project_init_contract_version", CONTRACT_VERSION
+        ),
         "language": language,
         "memory_stack": stack,
         "installed_mcps": ", ".join(installed_ids) if installed_ids else "none",

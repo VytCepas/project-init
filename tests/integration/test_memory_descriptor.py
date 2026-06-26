@@ -115,9 +115,10 @@ class TestUpgradeRoundTrip:
 
 
 class TestContractVersion:
-    """Top-level `project_init_contract_version` (#498, ADR-025): a stable schema
-    version a root orchestrator reads. Deliberately top-level (not nested in
-    `memory:`) so it survives the vault-free `none` case; absent ⇒ v0 (reader)."""
+    """Descriptor contract version (#498, ADR-025): a stable schema version a root
+    orchestrator reads, at key path `project.project_init_contract_version` — in
+    the always-present `project:` block, deliberately NOT nested in `memory:`, so
+    it survives the vault-free `none` case; absent ⇒ v0 (reader)."""
 
     def test_present_even_for_none_project(self, tmp_path):
         # `core` has no memory backend, but the contract version is top-level —
@@ -150,3 +151,20 @@ class TestContractVersion:
             }
         )
         assert present["project_init_contract_version"] == "0"
+
+    def test_semantic_migration_preserves_explicit_version(self):
+        """A record-less config.yaml that still carries an explicit contract
+        version must keep it through migration, not be forced to current (Copilot
+        #508 review)."""
+        from project_init.upgrade import _migrate_semantic_config
+
+        lines = [
+            "project:\n",
+            '  name: "x"\n',
+            "  project_init_contract_version: 2\n",
+            "language: python\n",
+            "memory:\n",
+            "  stack: obsidian-only\n",
+        ]
+        _preset, variables, _manifest = _migrate_semantic_config(lines)
+        assert variables["project_init_contract_version"] == "2"

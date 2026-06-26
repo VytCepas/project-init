@@ -18,7 +18,7 @@ facts are surfaced for humans / non-Claude surfaces in `.claude/CAPABILITIES.md`
 
 ```yaml
 project:
-  project_init_contract_version: 1         # descriptor-contract schema version (top-level); absent ⇒ v0
+  project_init_contract_version: 1         # key path: project.project_init_contract_version (in the project: block, NOT in memory:); absent ⇒ v0
 memory:
   tier: 3                                  # 0 auto | 1 obsidian-only | 2 obsidian-graphify | 3 obsidian-graphify-rag
   stack: obsidian-graphify-rag
@@ -29,10 +29,11 @@ memory:
 ```
 
 A vault-free `none` project ships **no** `memory:` block (its absence *is* the
-signal — there is no memory backend to introspect). **Contract versioning is
-deliberately top-level (`project.project_init_contract_version`), not nested in
-`memory:`**, precisely so it survives the `none` case; a child config that
-predates the field is **contract v0** by the reader's rule below.
+signal — there is no memory backend to introspect). **Contract versioning lives
+at key path `project.project_init_contract_version` (inside the always-present
+`project:` block, deliberately NOT nested in `memory:`)**, precisely so it
+survives the `none` case; a child config that predates the field is **contract
+v0** by the reader's rule below.
 
 ## Tier → resolved paths
 
