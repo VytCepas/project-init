@@ -92,9 +92,15 @@ class TestCLI:
             )
         assert exc.value.code == 2  # argparse parser.error exit code
 
-    def test_quote_in_name_rejected_keeps_config_valid(self, tmp_path: Path):
-        """A double-quote in name/description/owner is rejected — it would corrupt
-        the double-quoted YAML value in config.yaml (e2e sweep)."""
+    @pytest.mark.parametrize(
+        "bad_name",
+        ['ev"il', "C:\\projects\\foo", "line\nbreak", "del\x7fchar"],
+        ids=["double-quote", "backslash", "newline", "del-0x7f"],
+    )
+    def test_yaml_breaking_name_rejected(self, tmp_path: Path, bad_name: str):
+        """Quotes/backslashes/newlines/control chars (incl. DEL) in name/desc/owner
+        are rejected — each would corrupt config.yaml's double-quoted YAML value
+        (e2e sweep + Codex/Copilot review)."""
         from project_init.__main__ import main
 
         with pytest.raises(SystemExit) as exc:
@@ -103,7 +109,7 @@ class TestCLI:
                     str(tmp_path / "p"),
                     "--non-interactive",
                     "--name",
-                    'ev"il',
+                    bad_name,
                     "--description",
                     "d",
                     "--language",

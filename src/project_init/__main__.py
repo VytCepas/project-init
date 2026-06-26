@@ -1875,20 +1875,25 @@ def _validate_text_inputs(inputs: ScaffoldInputs, parser: argparse.ArgumentParse
     """Reject text fields that would corrupt the rendered config.yaml.
 
     name/description/owner are embedded into a double-quoted YAML string in
-    config.yaml; a literal double-quote, newline, or control character there
-    produces invalid YAML (which then breaks ``upgrade`` and descriptor reads).
-    These are short single-line fields, so a clean rejection beats silent
-    corruption (e2e sweep).
+    config.yaml; a literal double-quote, backslash (an invalid/lossy YAML escape,
+    as in a Windows-style path), newline, or control character there produces
+    invalid YAML (which then breaks ``upgrade`` and descriptor reads). These are
+    short single-line fields, so a clean rejection beats silent corruption
+    (e2e sweep; Codex/Copilot review).
     """
     for flag, value in (
         ("name", inputs.project_name),
         ("description", inputs.project_description),
         ("owner", inputs.owner),
     ):
-        if '"' in value or any(ord(ch) < 32 for ch in value):
+        if (
+            '"' in value
+            or "\\" in value
+            or any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value)
+        ):
             parser.error(
-                f"--{flag} must not contain double-quotes, newlines, or control "
-                "characters (they corrupt the generated config.yaml)"
+                f"--{flag} must not contain double-quotes, backslashes, newlines, "
+                "or control characters (they corrupt the generated config.yaml)"
             )
 
 
