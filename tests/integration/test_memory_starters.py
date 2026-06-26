@@ -233,7 +233,9 @@ class TestLintMemoryScript:
             encoding="utf-8",
         )
         index = mem / "MEMORY.md"
-        index.write_text(index.read_text() + "- [probe](probe.md) — p\n", encoding="utf-8")
+        index.write_text(
+            index.read_text(encoding="utf-8") + "- [probe](probe.md) — p\n", encoding="utf-8"
+        )
 
         script = self.target / ".claude" / "scripts" / "lint_memory.sh"
         result = subprocess.run(

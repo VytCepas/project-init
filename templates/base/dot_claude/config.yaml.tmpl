@@ -20,7 +20,7 @@ deploy: {{deploy_target}}            # none | cloud-run | fly | k8s | registry |
 iac: {{iac}}            # none | opentofu — infrastructure-as-code overlay (ADR-015)
 
 {{#if memory}}memory:
-  stack: {{memory_stack}}         # obsidian-only | obsidian-graphify
+  stack: {{memory_stack}}{{#if obsidian}}         # obsidian-only | obsidian-graphify{{/if obsidian}}
 {{#if obsidian}}  vault_path: .claude/vault
 {{/if obsidian}}  memory_path: .claude/memory
 
