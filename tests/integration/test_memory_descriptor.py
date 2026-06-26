@@ -168,3 +168,28 @@ class TestContractVersion:
         ]
         _preset, variables, _manifest = _migrate_semantic_config(lines)
         assert variables["project_init_contract_version"] == "2"
+
+    def test_upgrade_injects_visible_line_for_pre_field_project(self, tmp_path, capsys):
+        """A project whose visible config predates the field must GAIN the line on
+        `upgrade --apply` — config.yaml is not re-rendered, so without targeted
+        injection an orchestrator would read the upgraded child as v0 (Codex #508
+        P1)."""
+        target = tmp_path / "p"
+        _scaffold(target, "obsidian-only")
+        config = target / ".claude" / "config.yaml"
+        # Simulate a pre-field project: drop the visible line from the project:
+        # block ONLY (above the record marker) — leave the hidden record's
+        # variables JSON intact, exactly the state of a pre-field scaffold.
+        head, sep, tail = config.read_text().partition("# --- scaffold record")
+        head = "\n".join(
+            ln for ln in head.splitlines() if "project_init_contract_version" not in ln
+        )
+        config.write_text(head + "\n" + sep + tail)
+        assert "project_init_contract_version" not in config.read_text().partition(
+            "# --- scaffold record"
+        )[0]
+        capsys.readouterr()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        # The visible project: block (above the record marker) now carries it.
+        head = config.read_text().partition("# --- scaffold record")[0]
+        assert "project_init_contract_version: 1" in head

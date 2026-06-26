@@ -767,11 +767,18 @@ def _mirror_mode(src: Path, dest: Path) -> None:
         dest.chmod(dest.stat().st_mode | 0o111)
 
 
-# Visible observability fields injected into the human `project:` block on upgrade
-# when a pre-#247/#248/#259 config lacks them (config.yaml is not re-rendered on
-# upgrade, so otherwise they live only in the hidden record). (key, comment) —
-# the value comes from the recorded/backfilled variables (#259).
-_PROJECT_OBSERVABILITY = (
+# Visible `project:` fields injected into the human config on upgrade when a
+# pre-existing config lacks them (config.yaml is not re-rendered on upgrade, so
+# otherwise they live only in the hidden record). (key, comment) — the value
+# comes from the recorded/backfilled variables. Inserted after the
+# project_init_version line, in declaration order. The contract version leads so
+# a pre-field project actually advances past v0 on `upgrade --apply` (#498,
+# ADR-025) — an orchestrator reads the visible YAML, not the hidden record.
+_PROJECT_VISIBLE_FIELDS = (
+    (
+        "project_init_contract_version",
+        "descriptor-contract schema a root orchestrator reads (#498, ADR-025); absent ⇒ v0",
+    ),
     ("project_init_plugin_version", "plugin payload version (ADR-010)"),
     ("profile", "individual | standalone | org — distribution profile (ADR-013)"),
     ("enforcement", "advisory | hard — see ADR-013 / #251"),
@@ -787,8 +794,8 @@ _UPDATES_BLOCK = (
 )
 
 
-def _ensure_observability_fields(text: str, variables: dict) -> str:
-    """Surface the observability record in the hand-editable config (#259).
+def _ensure_visible_project_fields(text: str, variables: dict) -> str:
+    """Surface recorded `project:` fields in the hand-editable config (#259, #498).
 
     Idempotent. Operates on the human section only (above the scaffold-record
     marker) so injected lines survive ``write_scaffold_record``'s strip-and-
@@ -799,7 +806,7 @@ def _ensure_observability_fields(text: str, variables: dict) -> str:
     head, sep, tail = text.partition(_RECORD_MARKER)
     missing = [
         f"  {key}: {variables.get(key, '')}  # {comment}"
-        for key, comment in _PROJECT_OBSERVABILITY
+        for key, comment in _PROJECT_VISIBLE_FIELDS
         if not re.search(rf"(?m)^\s+{re.escape(key)}:", head)
     ]
     if missing:
@@ -854,7 +861,7 @@ def apply_drift(
     if config_path.exists():
         text = config_path.read_text(encoding="utf-8")
         text = _VERSION_LINE_RE.sub(rf"\g<1>{variables['project_init_version']}", text, count=1)
-        text = _ensure_observability_fields(text, variables)
+        text = _ensure_visible_project_fields(text, variables)
         config_path.write_text(text, encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
 
     # Only files whose on-disk content now equals the render are recorded —
