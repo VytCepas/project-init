@@ -142,5 +142,5 @@ future project, started only on an explicit, separate decision.
 - `project_init` keeps its charter intact; the cross-project ambition is recorded
   as a *separate tool* with a do-not-build boundary, not scope-crept into the
   scaffolder.
-- A companion design note (`.claude/vault/design/agentic-os-root-layer.md`)
+- A companion design note (`docs/development/agentic-os-root-layer.md`)
   sketches the layer and the aggregation contract for when the build is greenlit.
