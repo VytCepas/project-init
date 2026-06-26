@@ -70,8 +70,11 @@ Measured top-1 retrieval accuracy, all keyless/on-device on a 15GB-RAM box:
 
 **Root cause for the failures:** cocoindex-code 0.2.37 pins a bleeding-edge `transformers==5.12.1`,
 and the current crop of large Qwen2-based code embedding models break against it. So benchmark
-score is moot — *pluggability* is the binding constraint, and CodeRankEmbed wins it. Revisit the
-larger models when cocoindex-code's `transformers` pin and those models' code converge.
+score is moot — *pluggability* is the binding constraint, and CodeRankEmbed wins it.
+
+**This ceiling is temporary — follow-up tracked in #515.** Re-run this bake-off when cocoindex-code's
+`transformers` pin and those models' code converge; if a larger model then loads keyless **and**
+beats CodeRankEmbed on recall, wire it into `setup_rag.sh` + `using-rag.md` and amend this ADR.
 
 ## Consequences
 

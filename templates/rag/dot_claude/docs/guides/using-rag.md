@@ -48,6 +48,12 @@ cocoindex-code's pinned `transformers`; the 7B `nomic-embed-code` needs a GPU +
 but the default is the recommended choice — keep it keyless (never the cloud
 `litellm` provider).
 
+> **Larger models are a moving target.** The bigger 1.5–2B code embedders score
+> higher on paper but don't load in cocoindex-code yet (an upstream `transformers`
+> pin issue). This is tracked in project-init **#515** — re-check as cocoindex-code
+> upgrades, and if a larger model then loads keyless and beats CodeRankEmbed, it
+> should be wired in as a new `RAG_EMBED_MODEL` option.
+
 After setup, record the surface so a root orchestrator (#498/ADR-025) can
 discover it — set `memory.rag_endpoint` in `.claude/config.yaml` — and keep the
 index out of git (`setup_rag.sh` adds `.cocoindex_code/` to `.gitignore`

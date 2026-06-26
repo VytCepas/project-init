@@ -31,6 +31,8 @@ RAG_TOOL_SPEC="${RAG_TOOL_SPEC:-cocoindex-code[full]==0.2.37}"
 # see ADR-026). The larger 1.5-2B code models (bge-code-v1, Qodo, SFR) currently
 # FAIL to load against cocoindex-code's pinned transformers; the 7B nomic-embed-code
 # loads but needs a GPU + ~16GB RAM. Override with RAG_EMBED_MODEL if you must.
+# TODO(project-init #515): re-check the larger models as cocoindex-code upgrades
+# transformers — if one then loads keyless AND beats CodeRankEmbed, wire it in here.
 RAG_EMBED_MODEL="${RAG_EMBED_MODEL:-nomic-ai/CodeRankEmbed}"
 RAG_EMBED_DEVICE="${RAG_EMBED_DEVICE:-cpu}"   # cpu | cuda | mps
 # ----------------------------------------------------------------------------
