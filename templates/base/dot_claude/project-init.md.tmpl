@@ -13,9 +13,9 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 ## Workflow
 
 1. **Start of session** — {{#if memory}}read [`memory/MEMORY.md`](memory/MEMORY.md), then {{/if memory}}check [`.claude/docs/adr/`](docs/adr/) for relevant decisions.
-2. **During work** — permanent decisions → [`.claude/docs/adr/`](docs/adr/){{#if memory}}; exploratory notes → [`vault/`](vault/); reusable facts → [`memory/`](memory/){{/if memory}}.
-{{#if memory}}3. **End of session** — run `/session_summary` to write a session log to [`vault/sessions/`](vault/sessions/).
-{{/if memory}}
+2. **During work** — permanent decisions → [`.claude/docs/adr/`](docs/adr/){{#if obsidian}}; exploratory notes → [`vault/`](vault/){{/if obsidian}}{{#if memory}}; reusable facts → [`memory/`](memory/){{/if memory}}.
+{{#if obsidian}}3. **End of session** — run `/session_summary` to write a session log to [`vault/sessions/`](vault/sessions/).
+{{/if obsidian}}
 ## Tools
 
 | Type | Name | Purpose |
