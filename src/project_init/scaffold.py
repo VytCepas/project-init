@@ -212,6 +212,21 @@ def generate_preset(name: str, *, extends: str, description: str = "", version: 
 _AGENT_LAYERS = ("codex", "antigravity", "amp", "junie")
 
 
+_MEMORY_TIERS = {"auto": "0", "obsidian-only": "1", "obsidian-graphify": "2"}
+
+
+def memory_tier(memory_stack: str) -> str:
+    """Descriptor tier number for *memory_stack* (#498, ADR-024).
+
+    The rung on the recall ladder a root orchestrator (#479) reads to feature-
+    detect a child's retrieval surfaces: ``auto``→0, ``obsidian-only``→1,
+    ``obsidian-graphify``→2. ``none`` returns ``""`` (no descriptor — the config
+    memory block is gated out). Single source for the scaffold + the two upgrade
+    emit paths so they never diverge (PI-189).
+    """
+    return _MEMORY_TIERS.get(memory_stack, "")
+
+
 def memory_layers(memory_stack: str) -> list[str]:
     """Template layers contributed by the memory backend (#466, #497).
 

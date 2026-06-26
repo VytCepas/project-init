@@ -50,6 +50,7 @@ nav:
     - Memory tier model: adr/adr-024-memory-tier-model.md
   - Development:
     - Template system: development/template-system.md
+    - Memory descriptor: development/memory-descriptor.md
     - Non-CLI surface matrix: development/non-cli-surface-matrix.md
     - Testing: development/testing.md
     - Measurement methodology: development/measurement-methodology.md
