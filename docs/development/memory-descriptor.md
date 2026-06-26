@@ -51,10 +51,17 @@ signal — there is no memory backend to introspect).
 
 ## Reading it
 
+The `memory:` block is YAML — read it with any YAML parser. Or, stdlib-only,
+read the JSON scaffold-record block project-init writes to the same file (its
+`variables:` line is single-line JSON carrying `memory_tier`/`memory_stack`):
+
 ```python
-import tomllib  # config.yaml's memory block is YAML; parse with a YAML reader,
-# or read the JSON `scaffold.variables` record appended by project-init upgrade,
-# which carries `memory_tier`/`memory_stack` directly.
+import json, re
+
+config_text = (project / ".claude" / "config.yaml").read_text(encoding="utf-8")
+m = re.search(r"^  variables: (\{.*\})$", config_text, re.MULTILINE)
+descriptor = json.loads(m.group(1)) if m else {}
+tier, stack = descriptor.get("memory_tier"), descriptor.get("memory_stack")
 ```
 
 A future root layer (#479) walks its registry of child projects, reads each
