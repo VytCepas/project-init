@@ -1871,6 +1871,41 @@ def _preset_main(argv: list[str]) -> int:
     return 0
 
 
+def _validate_text_inputs(inputs: ScaffoldInputs, parser: argparse.ArgumentParser) -> None:
+    """Reject text fields that would corrupt the rendered config.yaml.
+
+    name/description/owner are embedded into a double-quoted YAML string in
+    config.yaml; a literal double-quote, newline, or control character there
+    produces invalid YAML (which then breaks ``upgrade`` and descriptor reads).
+    These are short single-line fields, so a clean rejection beats silent
+    corruption (e2e sweep).
+    """
+    for flag, value in (
+        ("name", inputs.project_name),
+        ("description", inputs.project_description),
+        ("owner", inputs.owner),
+    ):
+        if '"' in value or any(ord(ch) < 32 for ch in value):
+            parser.error(
+                f"--{flag} must not contain double-quotes, newlines, or control "
+                "characters (they corrupt the generated config.yaml)"
+            )
+
+
+def _ensure_target_dir(target: Path, parser: argparse.ArgumentParser) -> None:
+    """Create the target directory, rejecting a non-directory target.
+
+    ``mkdir(exist_ok=True)`` would otherwise raise an uncaught FileExistsError
+    when the target already exists as a file/symlink (e2e sweep).
+    """
+    if target.exists() and not target.is_dir():
+        parser.error(f"target {target} exists and is not a directory")
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:  # e.g. PermissionError on a read-only parent
+        parser.error(f"cannot create target {target}: {exc.strerror or exc}")
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the scaffolding CLI; return the process exit code."""
     argv = list(sys.argv[1:]) if argv is None else list(argv)
@@ -1942,7 +1977,8 @@ def main(argv: list[str] | None = None) -> int:
             no_docs=args.no_docs,
             no_renovate=args.no_renovate,
         )
-    target.mkdir(parents=True, exist_ok=True)
+    _validate_text_inputs(inputs, parser)
+    _ensure_target_dir(target, parser)
 
     # Agent overlays append to the preset's layers (PI-137); --no-plugin
     # restores the shared hooks/skills copies via the fallback layer

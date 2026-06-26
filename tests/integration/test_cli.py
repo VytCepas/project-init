@@ -68,6 +68,102 @@ class TestCLI:
         with pytest.raises(SystemExit):
             main(["--non-interactive"])
 
+    def test_target_is_existing_file_rejected_cleanly(self, tmp_path: Path):
+        """A target that exists as a file must fail with a clean parser error,
+        not an uncaught FileExistsError from mkdir(exist_ok=True) (e2e sweep)."""
+        from project_init.__main__ import main
+
+        target = tmp_path / "afile"
+        target.write_text("x")
+        with pytest.raises(SystemExit) as exc:
+            main(
+                [
+                    str(target),
+                    "--non-interactive",
+                    "--name",
+                    "p",
+                    "--description",
+                    "d",
+                    "--language",
+                    "python",
+                    "--preset",
+                    "core",
+                ]
+            )
+        assert exc.value.code == 2  # argparse parser.error exit code
+
+    def test_quote_in_name_rejected_keeps_config_valid(self, tmp_path: Path):
+        """A double-quote in name/description/owner is rejected — it would corrupt
+        the double-quoted YAML value in config.yaml (e2e sweep)."""
+        from project_init.__main__ import main
+
+        with pytest.raises(SystemExit) as exc:
+            main(
+                [
+                    str(tmp_path / "p"),
+                    "--non-interactive",
+                    "--name",
+                    'ev"il',
+                    "--description",
+                    "d",
+                    "--language",
+                    "python",
+                    "--preset",
+                    "core",
+                ]
+            )
+        assert exc.value.code == 2
+        assert not (tmp_path / "p").exists()  # rejected before creating the dir
+
+    def test_apostrophe_in_name_allowed(self, tmp_path: Path):
+        """Single quotes are safe in double-quoted YAML — must NOT be rejected."""
+        from project_init.__main__ import main
+
+        target = tmp_path / "p"
+        rc = main(
+            [
+                str(target),
+                "--non-interactive",
+                "--name",
+                "Vy's tool",
+                "--description",
+                "A 'fast' one",
+                "--language",
+                "python",
+                "--preset",
+                "core",
+            ]
+        )
+        assert rc == 0
+        assert 'Vy\'s tool' in (target / ".claude" / "config.yaml").read_text()
+
+    def test_target_mkdir_oserror_reported_cleanly(self, tmp_path: Path, monkeypatch):
+        """A mkdir OSError (e.g. PermissionError on a read-only parent) must surface
+        as a clean parser error, not an uncaught traceback (e2e sweep)."""
+        from project_init import __main__
+        from project_init.__main__ import main
+
+        def boom(*_a, **_k):
+            raise PermissionError(13, "Permission denied")
+
+        monkeypatch.setattr(__main__.Path, "mkdir", boom)
+        with pytest.raises(SystemExit) as exc:
+            main(
+                [
+                    str(tmp_path / "sub"),
+                    "--non-interactive",
+                    "--name",
+                    "p",
+                    "--description",
+                    "d",
+                    "--language",
+                    "python",
+                    "--preset",
+                    "core",
+                ]
+            )
+        assert exc.value.code == 2
+
 
 class TestCLIGovernanceFlags:
     """PI-145: --license and --owner render governance files."""
