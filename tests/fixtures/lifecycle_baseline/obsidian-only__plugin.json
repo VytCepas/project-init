@@ -3,7 +3,7 @@
   ".claude/agents/README.md": "e2cabfd50c117914d948bcab94cf0a5f3611b97c0fca977bfc418ef7d5aa30cc",
   ".claude/agents/code-reviewer.md": "d384a5748dc54f49d0e4a763568abc2af7f6af7738d303b67007237e679b05c8",
   ".claude/agents/explore.md": "aa1a4fcd1d0b3af36b1241f50a697bcb5443468b3561a2cd3f0ecd4156b4fed8",
-  ".claude/config.yaml": "995a8f3a136441a392eebfbaba535e00b36eacc3756bd3f0e24539c8f0af4f9c",
+  ".claude/config.yaml": "3e8cbdf39f62f61226e072a595b78bd021be3e04e67ef04b6060d9ceb31f1ab7",
   ".claude/docs/README.md": "f62199d0d050d02c82e598ab44c791b6eb21c5a121e1899a0003cfb873a5d89b",
   ".claude/docs/adr/adr-001-memory-stack.md": "a7ac4beabd4de49cae82a90252416caf7bcda1d24a2071813a9045a2e2f7424d",
   ".claude/docs/adr/adr-002-mcp-choices.md": "e1125bde3850ace16f17cd9feaf54c21f7318f7eb6ff63bf33eded3cd5c8104a",

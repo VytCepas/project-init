@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from dataclasses import dataclass
 from datetime import date
@@ -335,6 +336,19 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail if any {{...}} placeholder survives rendering (PI-17)",
     )
+    p.add_argument(
+        "--list-presets",
+        action="store_true",
+        help="Print available presets and exit (machine-readable with --json) — for "
+        "orchestrator-driven scaffolding (#510)",
+    )
+    p.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit a machine-readable JSON result to stdout instead of the human "
+        "summary (scaffold result, or the preset list with --list-presets); for a "
+        "root orchestrator driving project-init (#510)",
+    )
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return p
 
@@ -512,6 +526,85 @@ _MEMORY_NEXT_STEPS = {
         "(engine not bundled — see .claude/docs/guides/using-rag.md)"
     ),
 }
+
+
+def _presets_payload(presets: list[dict]) -> list[dict]:
+    """Machine-readable preset list for an orchestrator (#510).
+
+    Name, description, and the default memory stack each preset scaffolds — enough
+    for a root layer to choose a preset before driving a non-interactive scaffold.
+    """
+    return [
+        {
+            "name": p.get("name", ""),
+            "description": p.get("description", ""),
+            "memory_stack": p.get("vars", {}).get("memory_stack", "none"),
+        }
+        for p in presets
+    ]
+
+
+def _scaffold_result_payload(
+    target: Path, created: list[Path], preset_name: str, variables: dict[str, str]
+) -> dict:
+    """Machine-readable scaffold result for an orchestrator (#510).
+
+    Carries the resolved memory descriptor (the same fields a root layer reads
+    from `.claude/config.yaml`, #498) so the caller can register the new project
+    without a second read. Path fields are present only at the tiers that ship
+    them; `rag_endpoint` is null until a tool is wired (tier 3).
+    """
+    memory: dict[str, object] = {}
+    if variables.get("memory"):
+        memory = {
+            "tier": variables.get("memory_tier", ""),
+            "stack": variables.get("memory_stack", "none"),
+            "memory_path": ".claude/memory",
+        }
+        if variables.get("obsidian"):
+            memory["vault_path"] = ".claude/vault"
+        if variables.get("graphify"):
+            memory["graph_path"] = "graphify-out/graph.json"
+        if variables.get("rag"):
+            memory["rag_endpoint"] = None  # tier 3: present, unset until wired (#495)
+    return {
+        "target": str(target.resolve()),
+        "preset": preset_name,
+        "contract_version": variables.get("project_init_contract_version", ""),
+        "memory": memory,
+        "config": ".claude/config.yaml",
+        "files_created": len(created),
+    }
+
+
+def _emit_scaffold_output(  # noqa: PLR0913 — one arg per piece of the result
+    args, target: Path, created: list[Path], preset: dict, variables: dict, inputs, conflicts
+) -> None:
+    """Emit the post-scaffold result.
+
+    A single JSON line (``--json``, #510) for an orchestrator, or the human rich
+    panel + conflict/MCP notices otherwise.
+    """
+    if args.json:
+        # Machine-readable result — sole stdout line, no rich panels. Conflicts
+        # (unmerged `.new` siblings) are surfaced too.
+        result = _scaffold_result_payload(target, created, preset["name"], variables)
+        result["conflicts"] = [str(sibling) for _orig, sibling in conflicts]
+        print(json.dumps(result))
+        return
+    _print_summary(target, created, preset["name"], variables.get("memory_stack", "none"))
+    if conflicts:
+        _print_conflicts(conflicts)
+    _print_mcp_commands(inputs.selected_mcps)
+
+
+def _emit_preset_list(presets: list[dict], *, as_json: bool) -> None:
+    """Print the preset list for `--list-presets` (#510): JSON array or a human line each."""
+    if as_json:
+        print(json.dumps(_presets_payload(presets)))
+        return
+    for p in _presets_payload(presets):
+        print(f"{p['name']:<20} {p['description']}  [memory: {p['memory_stack']}]")
 
 
 def _print_summary(
@@ -910,6 +1003,8 @@ WIZARD_MECHANICAL_FLAGS: frozenset[str] = frozenset(
         "no_egress",
         "non_interactive",
         "strict",
+        "list_presets",
+        "json",
         "version",
     }
 )
@@ -1700,7 +1795,11 @@ def _resolve_inputs(
         iac = resolve_iac(args.iac)
     except ValueError as e:
         parser.error(str(e))
-    _print_profile_notice(profile, no_plugin=no_plugin, no_egress=args.no_egress)
+    # In --json mode stdout must be the JSON result only (#510); skip the human
+    # profile/egress notice. (It is advisory output, not a silent default — the
+    # JSON result and the recorded config carry the resolved profile.)
+    if not getattr(args, "json", False):
+        _print_profile_notice(profile, no_plugin=no_plugin, no_egress=args.no_egress)
     return ScaffoldInputs(
         project_name=args.name,
         project_description=args.description,
@@ -1771,6 +1870,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    presets = list_presets()
+    if not presets:
+        sys.stderr.write("error: no presets found in templates/presets/\n")
+        return 1
+
+    # Discovery for an orchestrator (#510): list presets and exit, before any
+    # target/preset resolution (no --name/--target needed).
+    if args.list_presets:
+        _emit_preset_list(presets, as_json=args.json)
+        return 0
+
     if args.non_interactive:
         _require_non_interactive_args(args, parser)
 
@@ -1778,10 +1888,6 @@ def main(argv: list[str] | None = None) -> int:
 
     # Select preset BEFORE creating the target directory — a typo'd --preset
     # should fail without leaving an empty dir behind.
-    presets = list_presets()
-    if not presets:
-        sys.stderr.write("error: no presets found in templates/presets/\n")
-        return 1
     preset = _select_preset(args, parser, presets)
     # Memory backend fallback when --memory is absent (#466): the preset's stack
     # (obsidian-only/obsidian-graphify/core's "none"), default obsidian-only.
@@ -1861,10 +1967,7 @@ def main(argv: list[str] | None = None) -> int:
     from project_init.upgrade import write_scaffold_record
 
     write_scaffold_record(target, preset["name"], variables, created)
-    _print_summary(target, created, preset["name"], variables.get("memory_stack", "none"))
-    if conflicts:
-        _print_conflicts(conflicts)
-    _print_mcp_commands(inputs.selected_mcps)
+    _emit_scaffold_output(args, target, created, preset, variables, inputs, conflicts)
     return 0
 
 
