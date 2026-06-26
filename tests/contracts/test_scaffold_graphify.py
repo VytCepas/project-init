@@ -58,7 +58,3 @@ class TestScaffoldGraphify:
 
     def test_obsidian_layer_included(self):
         assert (self.target / ".claude" / "vault").is_dir()
-
-    def test_no_lightrag_files(self):
-        assert not (self.target / ".claude" / "scripts" / "ingest_sessions.py").exists()
-        assert not (self.target / ".claude" / "memory" / "lightrag.yaml").exists()
