@@ -170,8 +170,8 @@ def _memory_descriptor(variables: dict[str, str]) -> list[tuple[str, str]]:
     if variables.get("graphify"):
         rows.append(("graph_path", "graphify-out/graph.json"))
     if variables.get("rag"):
-        # Tier 3 (ADR-024 §4): the seam is scaffolded; the endpoint is empty
-        # until the user wires an engine via setup_rag.sh (#495 — not bundled).
+        # Tier 3 (ADR-024 §4, ADR-026): the overlay is scaffolded; the endpoint is
+        # empty until the user runs setup_rag.sh (cocoindex-code, keyless/on-device).
         rows.append(("rag_endpoint", "(unset — run .claude/scripts/setup_rag.sh)"))
     return rows
 

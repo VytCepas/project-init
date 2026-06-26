@@ -49,6 +49,7 @@ nav:
     - Wizard explanation standard: adr/adr-023-wizard-explanation-standard.md
     - Memory tier model: adr/adr-024-memory-tier-model.md
     - Agentic-OS root layer: adr/adr-025-agentic-os-root-layer.md
+    - Tier-3 RAG engine (cocoindex): adr/adr-026-tier3-rag-engine-cocoindex.md
   - Development:
     - Template system: development/template-system.md
     - Memory descriptor: development/memory-descriptor.md

@@ -19,7 +19,10 @@ __pycache__/
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md
 
-{{/if graphify}}{{#if obsidian}}# Obsidian (vault workspace state only; keep notes tracked)
+{{/if graphify}}{{#if rag}}# cocoindex-code RAG index (derived sqlite-vec cache; never committed)
+.cocoindex_code/
+
+{{/if rag}}{{#if obsidian}}# Obsidian (vault workspace state only; keep notes tracked)
 .claude/vault/.obsidian/workspace*
 .claude/vault/.obsidian/cache
 .claude/vault/.trash/

@@ -200,9 +200,10 @@ def _build_parser() -> argparse.ArgumentParser:
             "no vault — pure files, installs nothing), obsidian (auto PLUS a human "
             "Obsidian vault; alias for obsidian-only), obsidian-graphify (obsidian "
             "PLUS a derived code knowledge graph for agents), or obsidian-graphify-rag "
-            "(tier 3 — graphify PLUS a RAG *seam*: docs + a user-run setup stub + the "
-            "rag_endpoint descriptor, engine NOT bundled (#495); worth it only at "
-            "multi-project / monorepo scale). Overrides the preset's default."
+            "(tier 3 — graphify PLUS a keyless on-device semantic/vector recall surface; "
+            "run .claude/scripts/setup_rag.sh to install cocoindex-code — no API key, no "
+            "container; worth it only at multi-project / monorepo scale). Overrides the "
+            "preset's default."
         ),
     )
     p.add_argument(
@@ -520,10 +521,10 @@ _MEMORY_NEXT_STEPS = {
         "[bold]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/bold]"
     ),
     "obsidian-graphify-rag": (
-        "Memory: code graph + a RAG seam — run "
+        "Memory: code graph + semantic RAG — run "
         "[bold]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/bold], "
-        "then read [bold].claude/scripts/setup_rag.sh[/bold] to pick & wire a RAG tool "
-        "(engine not bundled — see .claude/docs/guides/using-rag.md)"
+        "then [bold].claude/scripts/setup_rag.sh[/bold] (installs cocoindex-code — "
+        "keyless, on-device; see .claude/docs/guides/using-rag.md)"
     ),
 }
 
@@ -826,10 +827,10 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
         "            [dim]Installs now: files only · You run later:[/dim]\n"
         "            [dim]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/dim]\n"
         "[bold]5. obsidian-graphify-rag[/bold]  [dim]graphify PLUS a semantic /[/dim]\n"
-        "            [dim]vector recall surface over the whole corpus (RAG seam)[/dim]\n"
-        "            [dim]Installs now: docs + a user-run setup stub only ·[/dim]\n"
-        "            [dim]You run later: pick & wire an upstream tool (engine[/dim]\n"
-        "            [dim]NOT bundled) — an external index + a tool install[/dim]\n\n"
+        "            [dim]vector recall surface over the whole corpus (RAG)[/dim]\n"
+        "            [dim]Installs now: files only · You run later:[/dim]\n"
+        "            [dim].claude/scripts/setup_rag.sh (cocoindex-code —[/dim]\n"
+        "            [dim]keyless, on-device; no container, no API key)[/dim]\n\n"
         "[cyan]Helps:[/cyan] agents recall why a decision was made weeks later;\n"
         "the RAG rung (option 5, tier 3) adds cross-corpus semantic search worth\n"
         "it only at [bold]multi-project / monorepo[/bold] scale — for one small/medium\n"

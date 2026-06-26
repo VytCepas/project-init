@@ -31,7 +31,7 @@ of the one below.
 | 0 | `auto` | `.claude/memory/` flat facts + `SCHEMA.md` + `lint_memory.sh` | none (pure files) | You want durable agent facts/decisions with zero tooling and no human vault to curate. |
 | 1 | `obsidian-only` | + `.claude/vault/` (sessions/decisions/design/knowledge) | optional Obsidian app | A human will curate notes/ADRs alongside agent facts. |
 | 2 | `obsidian-graphify` | + Graphify structural **code** knowledge graph | `uv tool install graphifyy` → run `setup_graphify.sh` | "How does the code fit together?" recall matters — agents should query the graph before grepping. |
-| 3 | `…-rag` | + semantic / vector retrieval over a corpus | an upstream tool/MCP (see §4) | **Multi-project / multi-repo / monorepo** scale, where cross-corpus semantic recall beats per-repo grep. **Parked — not built (#495).** |
+| 3 | `…-rag` | + semantic / vector retrieval over a corpus | `uv tool install 'cocoindex-code[full]'` → run `setup_rag.sh` (keyless, on-device; see §4, ADR-026) | **Multi-project / multi-repo / monorepo** scale, where cross-corpus semantic recall beats per-repo grep. Opt-in only. |
 
 Tiers 0–1 are the split of today's `obsidian` overlay (#497); tier 2 is unchanged from
 ADR-009; tier 3 is parked (§4).
@@ -70,6 +70,11 @@ overlay must therefore meet hard constraints, and the build is deferred:
 - **Candidate tools and the open A-vs-B question** (distinct rung vs. one tool that replaces
   Graphify and toggles graph-only/graph+vector — the latter would supersede ADR-009) are
   recorded in **#495**, to be decided with a hands-on test before any build.
+
+**Update (2026-06-26, #495 un-parked):** the engine decision is made in **ADR-026** — the
+engine is **cocoindex-code** (keyless, on-device sqlite-vec; no container, no API key), wired
+as **option A** (a distinct vector surface *alongside* Graphify, not replacing it). The seam
+from #505 becomes a real `setup_rag.sh` installer; tier 3 is now built, still opt-in.
 
 ### 5. External memory frameworks (Mem0 / Zep / Letta / Cognee) — rejected as bundled overlays
 

@@ -1,11 +1,13 @@
-"""Tier-3 RAG opt-in seam (#505, ADR-024 §4).
+"""Tier-3 RAG opt-in overlay (#505 seam, #495/ADR-026 engine; ADR-024 §4).
 
-Tier 3 (`obsidian-graphify-rag`) is a *seam*, not an engine: scaffolding it ships
-docs + a user-run setup stub + agent rules + the `rag_endpoint` descriptor, and
-installs nothing (the tool pick is parked in #495). It is opt-in via `--memory`
-only — deliberately not a preset, since RAG earns its keep only at multi-project
-scale. These tests pin that contract: the seam is present, the engine is absent,
-and tier-2 scaffolds stay free of any RAG residue.
+Tier 3 (`obsidian-graphify-rag`) adds a keyless, on-device semantic/vector recall
+surface over the corpus. The engine is cocoindex-code (`ccc`): scaffolding ships
+docs + a user-run `setup_rag.sh` (which installs the tool at tool level), agent
+rules, the gitignored index path, and the `rag_endpoint` descriptor. It is opt-in
+via `--memory` only — deliberately not a preset, since RAG earns its keep only at
+multi-project scale. These tests pin that contract: the overlay is present, the
+setup wires cocoindex-code keyless/on-device (no container, no API key), the
+index is gitignored, and tier-2 scaffolds stay free of any RAG residue.
 """
 
 from __future__ import annotations
@@ -85,15 +87,42 @@ class TestSeamScaffolded:
         assert "rag_endpoint" in section
 
 
-class TestEngineNotBundled:
-    def test_stub_installs_nothing(self, tmp_path):
-        """The seam stub must not install a tool — no package-manager invocation."""
+class TestEngineWired:
+    def test_setup_installs_cocoindex_at_tool_level(self, tmp_path):
+        """setup_rag.sh installs the engine as a uv tool (the Graphify pattern)."""
         target = tmp_path / "p"
         _scaffold_rag(target)
-        stub = (_claude(target) / "scripts" / "setup_rag.sh").read_text()
-        for forbidden in ("uv tool install", "pip install", "npm install", "bun add"):
-            assert forbidden not in stub, f"seam stub must not run: {forbidden}"
-        assert "installed" in stub.lower()  # it states that nothing was installed
+        setup = (_claude(target) / "scripts" / "setup_rag.sh").read_text()
+        assert "uv tool install" in setup
+        assert "cocoindex-code" in setup
+        # pinned, not floating (alpha tool, ~weekly releases)
+        assert "==0.2.37" in setup
+
+    def test_default_path_is_keyless_and_local(self, tmp_path):
+        """No API key on the default path (ADR-009 bar): local sentence-transformers,
+        the [full] extra, and no cloud-provider/key references in the install path."""
+        target = tmp_path / "p"
+        _scaffold_rag(target)
+        setup = (_claude(target) / "scripts" / "setup_rag.sh").read_text()
+        assert "cocoindex-code[full]" in setup  # [full] => local embeddings, no key
+        assert "provider: sentence-transformers" in setup
+        for keyish in ("OPENAI_API_KEY", "VOYAGE_API_KEY", "api_key", "litellm"):
+            assert keyish not in setup, f"default RAG path must stay keyless: {keyish}"
+
+    def test_no_container_or_server(self, tmp_path):
+        """RAG must not require Docker or a vector-DB server (embedded sqlite-vec)."""
+        target = tmp_path / "p"
+        _scaffold_rag(target)
+        setup = (_claude(target) / "scripts" / "setup_rag.sh").read_text()
+        for infra in ("docker", "milvus", "qdrant", "compose"):
+            assert infra not in setup.lower(), f"RAG must stay container-free: {infra}"
+
+    def test_index_is_gitignored(self, tmp_path):
+        """The derived cocoindex-code index must be gitignored, never committed."""
+        target = tmp_path / "p"
+        _scaffold_rag(target)
+        gitignore = (target / ".gitignore").read_text()
+        assert ".cocoindex_code/" in gitignore
 
 
 class TestTier2HasNoRagResidue:
@@ -119,6 +148,7 @@ class TestTier2HasNoRagResidue:
         assert not (c / "rules" / "rag.md").exists()
         block = (c / "config.yaml").read_text().partition("\nmemory:")[2].partition("\nmcps:")[0]
         assert "rag_endpoint" not in block
+        assert ".cocoindex_code/" not in (target / ".gitignore").read_text()
 
 
 class TestUpgradeRoundTrip:
