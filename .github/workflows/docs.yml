@@ -1,0 +1,75 @@
+name: Docs
+
+# Build the MkDocs Material site and publish it to GitHub Pages.
+# The `Documentation` URL in pyproject.toml / README.md points at
+# https://vytcepas.github.io/project-init/ — this workflow is what makes it live.
+#
+# One-time setup after this merges: repo Settings → Pages → Build and
+# deployment → Source = "GitHub Actions" (or run the deploy once via the
+# Actions tab). Until then the deploy step has nothing to publish to.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+      # Redeploy when the docs toolchain itself moves (e.g. a mkdocs-material bump).
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
+
+# Least privilege at the top level: the build job only reads the repo.
+# The deploy job opts into pages + id-token explicitly below.
+permissions:
+  contents: read
+
+# Never run two Pages deploys at once; let an in-flight deploy finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.12"
+
+      # Sync from the lockfile first (matches ci.yml) — deterministic deps and a
+      # fast failure if uv.lock is stale, rather than an implicit resolve.
+      - name: Sync docs dependencies
+        run: uv sync --extra docs --locked
+
+      - name: Build the docs site
+        run: uv run mkdocs build --strict
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    # Only the deploy job needs publish rights to Pages.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
