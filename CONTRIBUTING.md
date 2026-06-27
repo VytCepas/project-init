@@ -35,19 +35,24 @@ cover most needs. The scaffolder stays small and deterministic (no LLM calls).
 
 ## Making changes
 
-1. **Fork** the repo and create a branch named `type/short-slug`
-   (e.g. `fix/wizard-typo`, `feat/new-preset`). Types: `feat` `fix` `chore` `docs` `test`.
+1. **Fork** the repo and create a branch. Types: `feat` `fix` `chore` `docs` `test`.
+   - Issue-linked work: `type/PI-<n>-slug` (e.g. `feat/PI-42-new-preset`) so the
+     CI `validate-pr` workflow can keep branch, title, and body consistent.
+   - Minor work without a tracking issue: `type/slug` (e.g. `fix/wizard-typo`).
 2. **Templates are tested by scaffolding into a temp dir** — any change under
-   `templates/` should have a matching test in the focused `tests/test_*.py`
-   module for that behavior. Create a new focused file if none fits.
+   `templates/` should have a matching test in the focused
+   `tests/<layer>/test_*.py` module (`unit` / `integration` / `contracts` /
+   `smoke`) for that behavior. Create a new focused file if none fits.
 3. **Run `just ci`** locally and make sure it's green.
-4. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/)
-   (`type: description`), then open a pull request.
+4. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/),
+   then open a pull request. Issue-linked work uses an issue-key scope
+   (`type(PI-N): description`); no-issue work uses `type: description`.
 
 ## Pull requests
 
-- Use a Conventional-Commits PR title: `type: description` (the title becomes the
-  squash-merge commit message).
+- Use a Conventional-Commits PR title (it becomes the squash-merge commit
+  message): `type(PI-N): description` for issue-linked work, or `type: description`
+  for a minor fix with no tracking issue.
 - Fill in the pull request template — describe *what* changed and *why*, and link
   any related issue with `Closes #N`.
 - CI runs lint, the full test suite, a secret scan, and a wheel smoke test. All
