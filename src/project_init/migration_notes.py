@@ -15,6 +15,28 @@ import re
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "0.5.0": {
+        "summary": (
+            "Base is now à-la-carte and self-explaining (ADR-023, epic #470): a "
+            "core preset plus opt-out concerns — --memory none, --lifecycle "
+            "none, --no-docs, --no-renovate. Memory gains a tiered model "
+            "(ADR-024): memory/ split from vault/ as an auto tier with a "
+            "staleness lint, a low-token code-map for agents, and an opt-in "
+            "tier-3 code-RAG engine (--memory obsidian-graphify-rag, "
+            "cocoindex-code, keyless/on-device, ADR-026). Adds --observability "
+            "and --governance overlays, the "
+            "agentic-OS cross-project memory descriptor contract, and "
+            "orchestrator-friendly --json scaffold output."
+        ),
+        "action_required": (
+            "No action required to keep current behaviour — the new concerns "
+            "default ON (opt-out), so an upgrade scaffolds the same surface as "
+            "before. Tier-3 RAG is opt-in: scaffold with "
+            "--memory obsidian-graphify-rag, then run "
+            "`.claude/scripts/setup_rag.sh` in the project to install the "
+            "engine."
+        ),
+    },
     "0.4.0": {
         "summary": (
             "Delivery model (--delivery library|service|prototype) drives the "
