@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+import warnings
 from pathlib import Path
 
 from project_init.mcps import servers_for_ids
@@ -90,7 +91,16 @@ def canonical_hooks(variables: dict[str, str]) -> list[tuple[str, str]]:
     )
     try:
         data = json.loads(rendered)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        # The rendered settings.json is the file the project actually ships;
+        # invalid JSON here means the wired hooks are broken, not that there are
+        # none. Surface it instead of silently reporting an empty hook inventory
+        # (PI-535) — e.g. a custom preset with an unescaped quote in a command.
+        warnings.warn(
+            f"settings.json.tmpl rendered invalid JSON ({e}); CAPABILITIES.md will "
+            "list no wired hooks. Check the preset's command values for unescaped quotes.",
+            stacklevel=2,
+        )
         return []
     out: list[tuple[str, str]] = []
     for event, entries in (data.get("hooks") or {}).items():
@@ -242,12 +252,27 @@ def render(variables: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
-def emit(target: Path, variables: dict[str, str]) -> list[Path]:
+def emit(
+    target: Path,
+    variables: dict[str, str],
+    *,
+    first_scaffold: bool = True,
+    conflicts: list[tuple[Path, Path]] | None = None,
+) -> list[Path]:
     """Write .claude/CAPABILITIES.md.
 
-    Always (over)written — it is a generated inventory, not user-editable config.
+    A generated inventory (not user-editable), overwritten on every re-run and
+    upgrade — except that a pre-existing user file at this path is never clobbered
+    on the *first* scaffold, or on a later run while an unmerged ``.new`` sibling
+    from an earlier run is still pending: the render is parked as a ``.new``
+    sibling instead (PI-535).
     """
-    dest = target / _OUTPUT_REL
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(render(variables), encoding="utf-8", newline="\n")
-    return [_OUTPUT_REL]
+    from project_init.scaffold import _emit_generated
+
+    return _emit_generated(
+        target / _OUTPUT_REL,
+        render(variables),
+        first_scaffold=first_scaffold,
+        conflicts=conflicts,
+        rel=_OUTPUT_REL,
+    )

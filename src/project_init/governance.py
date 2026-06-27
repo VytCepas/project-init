@@ -118,9 +118,26 @@ def render_aibom(target: Path, variables: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
-def emit(target: Path, variables: dict[str, str]) -> list[Path]:
-    """Write ``.claude/governance/ai-bom.generated.md`` (always overwritten)."""
-    dest = target / _OUTPUT_REL
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(render_aibom(target, variables), encoding="utf-8", newline="\n")
-    return [_OUTPUT_REL]
+def emit(
+    target: Path,
+    variables: dict[str, str],
+    *,
+    first_scaffold: bool = True,
+    conflicts: list[tuple[Path, Path]] | None = None,
+) -> list[Path]:
+    """Write ``.claude/governance/ai-bom.generated.md``.
+
+    A generated inventory, overwritten on every re-run and upgrade — except that a
+    pre-existing user file at this path is preserved as a ``.new`` sibling (never
+    clobbered) on the *first* scaffold, or on a later run while an unmerged ``.new``
+    sibling from an earlier run is still pending (PI-535).
+    """
+    from project_init.scaffold import _emit_generated
+
+    return _emit_generated(
+        target / _OUTPUT_REL,
+        render_aibom(target, variables),
+        first_scaffold=first_scaffold,
+        conflicts=conflicts,
+        rel=_OUTPUT_REL,
+    )

@@ -1961,12 +1961,39 @@ def _validate_text_inputs(inputs: ScaffoldInputs, parser: argparse.ArgumentParse
         if (
             '"' in value
             or "\\" in value
-            or any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value)
+            # 0x85 (NEL), 0x2028 (LINE SEPARATOR), 0x2029 (PARAGRAPH SEPARATOR)
+            # are > 0x20 so they slip past the C0 check, but Python's
+            # str.splitlines() treats them as line breaks — they'd split a
+            # single-line YAML value mid-parse on a later upgrade (PI-535).
+            or any(
+                ord(ch) < 0x20 or ord(ch) in (0x7F, 0x85, 0x2028, 0x2029) for ch in value
+            )
         ):
             parser.error(
                 f"--{flag} must not contain double-quotes, backslashes, newlines, "
-                "or control characters (they corrupt the generated config.yaml)"
+                "or control/line-separator characters (they corrupt the generated config.yaml)"
             )
+
+
+def _validate_existing_config(target: Path, parser: argparse.ArgumentParser) -> None:
+    """Reject a pre-existing, undecodable ``.claude/config.yaml`` before any writes.
+
+    The scaffold/upgrade readers tolerate non-UTF-8 bytes (errors="ignore") so
+    they don't crash mid-run, but ``write_scaffold_record`` rewrites the config
+    with strict UTF-8 afterwards. Letting the scaffold proceed would fail *late*,
+    after files are written — a partial-write state. Decode-check up front so the
+    run aborts cleanly with nothing changed (PI-535, Codex review).
+    """
+    config = target / ".claude" / "config.yaml"
+    if not config.is_file():
+        return
+    try:
+        config.read_bytes().decode("utf-8")
+    except UnicodeDecodeError:
+        parser.error(
+            f"existing {config} is not valid UTF-8 — fix or remove it before scaffolding "
+            "(project-init reads and rewrites this file as UTF-8)"
+        )
 
 
 def _ensure_target_dir(target: Path, parser: argparse.ArgumentParser) -> None:
@@ -2059,6 +2086,7 @@ def main(argv: list[str] | None = None) -> int:
             no_renovate=args.no_renovate,
         )
     _validate_text_inputs(inputs, parser)
+    _validate_existing_config(target, parser)
     _ensure_target_dir(target, parser)
 
     # Agent overlays append to the preset's layers (PI-137); --no-plugin

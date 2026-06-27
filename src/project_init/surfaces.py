@@ -290,7 +290,12 @@ def emit(
     written: list[Path] = []
     for rel, content in planned_files(agents, servers).items():
         dest = target / rel
-        if dest.exists() and dest.read_text(encoding="utf-8") == content:
+        encoded = content.encode("utf-8")
+        # Compare bytes, not decoded text: a non-UTF-8 existing file must not
+        # crash the scaffold (read_text would raise UnicodeDecodeError), and a
+        # CRLF file must register as *different* from the LF render rather than
+        # read-normalize to "identical" and silently drift (PI-535).
+        if dest.exists() and dest.read_bytes() == encoded:
             continue
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -298,7 +303,7 @@ def emit(
             written.append(Path(rel))
             continue
         # Exists and differs — surface a .new sibling, never clobber.
-        sibling = _new_sibling(dest, content.encode("utf-8"))
+        sibling = _new_sibling(dest, encoded)
         sibling.write_text(content, encoding="utf-8", newline="\n")
         rec = Path(rel).parent / sibling.name
         written.append(rec)

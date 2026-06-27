@@ -94,8 +94,24 @@ class TestCLI:
 
     @pytest.mark.parametrize(
         "bad_name",
-        ['ev"il', "C:\\projects\\foo", "line\nbreak", "del\x7fchar"],
-        ids=["double-quote", "backslash", "newline", "del-0x7f"],
+        [
+            'ev"il',
+            "C:\\projects\\foo",
+            "line\nbreak",
+            "del\x7fchar",
+            "nel\x85here",
+            "lsep\u2028here",
+            "psep\u2029here",
+        ],
+        ids=[
+            "double-quote",
+            "backslash",
+            "newline",
+            "del-0x7f",
+            "nel-0x85",
+            "line-sep-2028",
+            "para-sep-2029",
+        ],
     )
     def test_yaml_breaking_name_rejected(self, tmp_path: Path, bad_name: str):
         """Quotes/backslashes/newlines/control chars (incl. DEL) in name/desc/owner
@@ -120,6 +136,35 @@ class TestCLI:
             )
         assert exc.value.code == 2
         assert not (tmp_path / "p").exists()  # rejected before creating the dir
+
+    def test_non_utf8_existing_config_rejected_before_writes(self, tmp_path: Path):
+        """A pre-existing non-UTF-8 .claude/config.yaml is rejected up front, with
+        nothing written — not a late crash after partial scaffold (PI-535)."""
+        from project_init.__main__ import main
+
+        target = tmp_path / "p"
+        (target / ".claude").mkdir(parents=True)
+        (target / ".claude" / "config.yaml").write_bytes(b"\xff\xfe not utf-8 \x80")
+
+        with pytest.raises(SystemExit) as exc:
+            main(
+                [
+                    str(target),
+                    "--non-interactive",
+                    "--name",
+                    "x",
+                    "--description",
+                    "d",
+                    "--language",
+                    "python",
+                    "--preset",
+                    "core",
+                ]
+            )
+        assert exc.value.code == 2
+        # Aborted cleanly: no scaffold artifacts written alongside the bad config.
+        assert not (target / "AGENTS.md").exists()
+        assert not (target / ".claude" / "settings.json").exists()
 
     def test_apostrophe_in_name_allowed(self, tmp_path: Path):
         """Single quotes are safe in double-quoted YAML — must NOT be rejected."""

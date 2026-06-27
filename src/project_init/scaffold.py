@@ -379,7 +379,10 @@ def read_preserve_globs(target: Path) -> list[str]:
     """
     config = target / ".claude" / "config.yaml"
     try:
-        text = config.read_text(encoding="utf-8")
+        # errors="ignore" so a pre-existing non-UTF-8 config.yaml degrades to
+        # "no extra globs" instead of crashing the first scaffold (PI-535) —
+        # consistent with _has_scaffold_record's tolerance of undecodable bytes.
+        text = config.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return []
     # Greedy capture to the last ``]`` so globs with fnmatch character classes
@@ -745,13 +748,19 @@ def scaffold(
     # Per-surface config generation (ADR-017 / PI-366): emit hooks + MCP for the
     # selected GUI surfaces from the canonical surface table + MCP catalog. Runs
     # against the committed target (after _commit_staged in strict mode).
-    created += _emit_generated_files(target, variables, conflicts)
+    created += _emit_generated_files(
+        target, variables, conflicts, first_scaffold=first_scaffold
+    )
 
     return created
 
 
 def _emit_generated_files(
-    target: Path, variables: dict[str, str], conflicts: list[tuple[Path, Path]] | None
+    target: Path,
+    variables: dict[str, str],
+    conflicts: list[tuple[Path, Path]] | None,
+    *,
+    first_scaffold: bool = True,
 ) -> list[Path]:
     """Post-copy generated files.
 
@@ -774,12 +783,49 @@ def _emit_generated_files(
         conflicts=conflicts,
     )
     # Surface-independent capabilities inventory (PI-374).
-    created += capabilities.emit(target, variables)
+    created += capabilities.emit(
+        target, variables, first_scaffold=first_scaffold, conflicts=conflicts
+    )
     # Governance AIBOM (ADR-018, #412): installed MCPs + detected CCR routes. The
     # user-owned ai-declarations.md (seeded by the overlay copy, preserved via
     # config.yaml globs) is never touched here.
     if variables.get("governance"):
         from project_init import governance
 
-        created += governance.emit(target, variables)
+        created += governance.emit(
+            target, variables, first_scaffold=first_scaffold, conflicts=conflicts
+        )
     return created
+
+
+def _emit_generated(
+    dest: Path,
+    content: str,
+    *,
+    first_scaffold: bool,
+    conflicts: list[tuple[Path, Path]] | None,
+    rel: Path,
+) -> list[Path]:
+    """Write an always-regenerated generated file, never-clobbering on first scaffold.
+
+    Generated inventories (CAPABILITIES.md, the AIBOM) are project-init-owned and
+    overwritten on every re-run/upgrade. But on the *first* scaffold — or any later
+    run while an unmerged ``.new`` sibling from an earlier run is still pending — a
+    pre-existing user file at that path must not be clobbered: write a ``.new``
+    sibling and record the conflict, mirroring the template-file protection in
+    :func:`scaffold` (PI-535). The pending-sibling check closes the run-2 data-loss
+    path a plain ``first_scaffold`` guard would leave open (Codex review). Protection
+    only engages when a *conflicts* list is passed (so the clean-staging render in
+    ``upgrade`` keeps overwriting).
+    """
+    encoded = content.encode("utf-8")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    protect = first_scaffold or _has_pending_sibling(dest)
+    if protect and conflicts is not None and dest.exists() and dest.read_bytes() != encoded:
+        sibling = _new_sibling(dest, encoded)
+        sibling.write_text(content, encoding="utf-8", newline="\n")
+        rec = rel.parent / sibling.name
+        conflicts.append((rel, rec))
+        return [rec]
+    dest.write_text(content, encoding="utf-8", newline="\n")
+    return [rel]
