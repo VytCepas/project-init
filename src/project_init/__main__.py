@@ -1606,6 +1606,57 @@ def _upgrade_main(argv: list[str]) -> int:
     return rc
 
 
+def _concern_main(argv: list[str], *, enable: bool) -> int:
+    """Parse and run `project-init add|remove <concern>` (#528)."""
+    import argparse
+
+    from project_init.concerns import CONCERNS, MEMORY_STACKS, apply_concern
+    from project_init.upgrade import (
+        _enforce_clean_tree,
+        _git_worktree_status,
+        _print_undo_hint,
+    )
+
+    verb = "add" if enable else "remove"
+    tail = "" if enable else " and deletes its files (byte-unmodified only)"
+    p = argparse.ArgumentParser(
+        prog=f"project-init {verb}",
+        description=(
+            f"{verb.capitalize()} a concern on an already-scaffolded project, without "
+            f"re-running the wizard. Re-renders the shared wiring with the concern "
+            f"flipped {'on' if enable else 'off'}{tail}."
+        ),
+    )
+    p.add_argument("concern", help="one of: " + ", ".join(CONCERNS))
+    if enable:
+        stacks = ", ".join(s for s in MEMORY_STACKS if s != "none")
+        p.add_argument("value", nargs="?", help=f"for `add memory`: a stack ({stacks})")
+    p.add_argument("--target", default=".", help="scaffolded project dir (default: .)")
+    p.add_argument(
+        "--apply", action="store_true", help="apply changes (default: dry-run report)"
+    )
+    p.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="permit --apply on a dirty git work tree (default: refuse)",
+    )
+    args = p.parse_args(argv)
+    target = Path(args.target).resolve()
+    value = getattr(args, "value", None)
+
+    git_status = None
+    if args.apply:
+        git_status = _git_worktree_status(target)
+        blocked = _enforce_clean_tree(git_status, allow_dirty=args.allow_dirty, target=target)
+        if blocked is not None:
+            return blocked
+
+    rc = apply_concern(target, args.concern, enable=enable, value=value, apply=args.apply)
+    if args.apply and rc == 0:
+        _print_undo_hint(git_status, target)
+    return rc
+
+
 def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
     """Assemble the template render context from the resolved inputs."""
     project_name = inputs.project_name
@@ -1914,10 +1965,14 @@ def _ensure_target_dir(target: Path, parser: argparse.ArgumentParser) -> None:
 def main(argv: list[str] | None = None) -> int:
     """Run the scaffolding CLI; return the process exit code."""
     argv = list(sys.argv[1:]) if argv is None else list(argv)
-    if argv[:1] == ["upgrade"]:
-        return _upgrade_main(argv[1:])
-    if argv[:1] == ["preset"]:
-        return _preset_main(argv[1:])
+    _subcommands = {
+        "upgrade": lambda a: _upgrade_main(a),
+        "add": lambda a: _concern_main(a, enable=True),
+        "remove": lambda a: _concern_main(a, enable=False),
+        "preset": lambda a: _preset_main(a),
+    }
+    if argv[:1] and argv[0] in _subcommands:
+        return _subcommands[argv[0]](argv[1:])
     parser = _build_parser()
     args = parser.parse_args(argv)
 
