@@ -142,6 +142,25 @@ def test_capabilities_re_run_overwrites_generated_file(tmp_path: Path):
     assert not (target / ".claude" / "CAPABILITIES.md.new").exists()
 
 
+def test_generated_file_protected_while_new_sibling_pending(tmp_path: Path):
+    """Run-2 data-loss guard (Codex review): once a first scaffold parks a user
+    file as ``.new``, a later run (first_scaffold=False) must keep protecting the
+    original until the user merges the sibling — not silently overwrite it."""
+    target = tmp_path / "p"
+    dest = target / ".claude" / "CAPABILITIES.md"
+    dest.parent.mkdir(parents=True)
+    dest.write_text("# my own notes\n")
+
+    # Run 1: first scaffold — original preserved, render parked as .new.
+    capabilities.emit(target, make_variables(), first_scaffold=True, conflicts=[])
+    assert dest.read_text() == "# my own notes\n"
+    assert (target / ".claude" / "CAPABILITIES.md.new").is_file()
+
+    # Run 2: NOT first scaffold, but the .new is still unmerged — original kept.
+    capabilities.emit(target, make_variables(), first_scaffold=False, conflicts=[])
+    assert dest.read_text() == "# my own notes\n", "run-2 clobbered the user file"
+
+
 def test_governance_first_scaffold_preserves_pre_existing_file(tmp_path: Path):
     target = tmp_path / "p"
     dest = target / ".claude" / "governance" / "ai-bom.generated.md"

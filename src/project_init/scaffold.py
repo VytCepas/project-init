@@ -809,15 +809,19 @@ def _emit_generated(
     """Write an always-regenerated generated file, never-clobbering on first scaffold.
 
     Generated inventories (CAPABILITIES.md, the AIBOM) are project-init-owned and
-    overwritten on every re-run/upgrade. But on the *first* scaffold a pre-existing
-    user file at that path must not be clobbered — write a ``.new`` sibling instead
-    and record the conflict, mirroring :func:`surfaces.emit` (PI-535). Protection
+    overwritten on every re-run/upgrade. But on the *first* scaffold — or any later
+    run while an unmerged ``.new`` sibling from an earlier run is still pending — a
+    pre-existing user file at that path must not be clobbered: write a ``.new``
+    sibling and record the conflict, mirroring the template-file protection in
+    :func:`scaffold` (PI-535). The pending-sibling check closes the run-2 data-loss
+    path a plain ``first_scaffold`` guard would leave open (Codex review). Protection
     only engages when a *conflicts* list is passed (so the clean-staging render in
     ``upgrade`` keeps overwriting).
     """
     encoded = content.encode("utf-8")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    if first_scaffold and conflicts is not None and dest.exists() and dest.read_bytes() != encoded:
+    protect = first_scaffold or _has_pending_sibling(dest)
+    if protect and conflicts is not None and dest.exists() and dest.read_bytes() != encoded:
         sibling = _new_sibling(dest, encoded)
         sibling.write_text(content, encoding="utf-8", newline="\n")
         rec = rel.parent / sibling.name

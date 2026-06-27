@@ -100,8 +100,8 @@ class TestCLI:
             "line\nbreak",
             "del\x7fchar",
             "nel\x85here",
-            "lsep here",
-            "psep here",
+            "lsep\u2028here",
+            "psep\u2029here",
         ],
         ids=[
             "double-quote",
