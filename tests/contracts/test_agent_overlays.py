@@ -28,6 +28,30 @@ _JUNIE_SKILLS = _REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
 
 _BASE_PLAN = _REPO_ROOT / "templates" / "base" / "dot_claude" / "skills" / "plan" / "SKILL.md.tmpl"
 
+# Lifecycle skills are shipped into the agent layers gated on {{#if lifecycle}}
+# as SKILL.md.tmpl (PI-537 #5) so `--lifecycle none` drops them; core skills
+# stay plain SKILL.md. These helpers read either form.
+_GATE_PREFIX = "{{#if lifecycle}}"
+_GATE_SUFFIX = "{{/if lifecycle}}"
+
+
+def _agent_skill_names(skills_dir: Path) -> set[str]:
+    return {p.parent.name for p in skills_dir.glob("*/SKILL.md")} | {
+        p.parent.name for p in skills_dir.glob("*/SKILL.md.tmpl")
+    }
+
+
+def _agent_skill_body(skills_dir: Path, name: str) -> bytes:
+    """Canonical SKILL.md bytes for an agent-layer skill, unwrapping any gate."""
+    plain = skills_dir / name / "SKILL.md"
+    if plain.is_file():
+        return plain.read_bytes()
+    text = (skills_dir / name / "SKILL.md.tmpl").read_text(encoding="utf-8")
+    assert text.startswith(_GATE_PREFIX) and text.endswith(_GATE_SUFFIX), (
+        f"{name}: gated agent skill must wrap its body in {{#if lifecycle}}"
+    )
+    return text[len(_GATE_PREFIX) : -len(_GATE_SUFFIX)].encode("utf-8")
+
 
 def _canonical_skill_map() -> dict[str, Path]:
     """The full skill set the agent surfaces carry: core (fallback) + lifecycle
@@ -244,19 +268,17 @@ class TestSyncedCopiesInRepo:
 
     def test_codex_skill_sources_in_sync(self):
         template = _canonical_skill_map()
-        codex = {p.parent.name: p for p in _CODEX_SKILLS.glob("*/SKILL.md")}
-        assert set(template) == set(codex)
+        assert set(template) == _agent_skill_names(_CODEX_SKILLS)
         for name, path in template.items():
-            assert codex[name].read_bytes() == path.read_bytes(), (
+            assert _agent_skill_body(_CODEX_SKILLS, name) == path.read_bytes(), (
                 f"codex skill {name} drifted — run `just sync-plugin`"
             )
 
     def test_antigravity_skill_sources_in_sync(self):
         template = _canonical_skill_map()
-        antigravity = {p.parent.name: p for p in _ANTIGRAVITY_SKILLS.glob("*/SKILL.md")}
-        assert set(template) == set(antigravity)
+        assert set(template) == _agent_skill_names(_ANTIGRAVITY_SKILLS)
         for name, path in template.items():
-            assert antigravity[name].read_bytes() == path.read_bytes(), (
+            assert _agent_skill_body(_ANTIGRAVITY_SKILLS, name) == path.read_bytes(), (
                 f"antigravity skill {name} drifted — run `just sync-plugin`"
             )
 
@@ -287,10 +309,9 @@ class TestSyncedCopiesInRepo:
         canonical SKILL.md set, synced via `just sync-plugin`."""
         template = _canonical_skill_map()
         for label, skills_dir in (("amp", _AMP_SKILLS), ("junie", _JUNIE_SKILLS)):
-            mirror = {p.parent.name: p for p in skills_dir.glob("*/SKILL.md")}
-            assert set(template) == set(mirror), f"{label} skill set drifted"
+            assert set(template) == _agent_skill_names(skills_dir), f"{label} skill set drifted"
             for name, path in template.items():
-                assert mirror[name].read_bytes() == path.read_bytes(), (
+                assert _agent_skill_body(skills_dir, name) == path.read_bytes(), (
                     f"{label} skill {name} drifted — run `just sync-plugin`"
                 )
 

@@ -302,3 +302,49 @@ class TestPluginSplit:
         assert "UserPromptSubmit" not in events
         assert not (root / "hooks" / "github_command_guard.sh").exists()
         assert not (root / "skills" / "create_issue").exists()
+
+
+class TestAgentSurfaceLifecycleSkills:
+    """PI-537 #5: the per-agent skill layers (codex/antigravity) gate lifecycle
+    skills on {{#if lifecycle}}, so `--lifecycle none` drops them from
+    `.agents/skills` just as it does from `.claude/skills` — previously they
+    leaked, referencing scripts the declined concern never scaffolds."""
+
+    _LIFECYCLE = ("create_issue", "start_task", "github_workflow", "request_review", "audit")
+
+    def _scaffold(self, target: Path, lifecycle: str) -> int:
+        from project_init.__main__ import main
+
+        return main(
+            [
+                str(target),
+                "--non-interactive",
+                "--preset",
+                "core",
+                "--name",
+                "x",
+                "--description",
+                "y",
+                "--language",
+                "python",
+                "--lifecycle",
+                lifecycle,
+                "--agents",
+                "claude,codex,antigravity",
+            ]
+        )
+
+    def test_agents_skills_omit_lifecycle_when_none(self, tmp_path: Path):
+        target = tmp_path / "p"
+        assert self._scaffold(target, "none") == 0
+        skills = target / ".agents" / "skills"
+        for sk in self._LIFECYCLE:
+            assert not (skills / sk).exists(), f"lifecycle agent skill leaked: {sk}"
+        assert (skills / "add_hook" / "SKILL.md").is_file()  # core skill stays
+
+    def test_agents_skills_include_lifecycle_when_github(self, tmp_path: Path):
+        target = tmp_path / "p"
+        assert self._scaffold(target, "github") == 0
+        skills = target / ".agents" / "skills"
+        for sk in self._LIFECYCLE:
+            assert (skills / sk / "SKILL.md").is_file(), f"lifecycle agent skill missing: {sk}"

@@ -470,24 +470,24 @@ def render_html(report: dict, transcript: Path) -> str:
 <p class="muted">Aggregate-only, zero-egress. Transcript: {escape(str(transcript))}</p>
 <div class="grid">
 <div class="card"><h2>Cost (approx)</h2>
-<p class="kpi">${c['total_cost_usd']:.2f}</p>
-<p class="muted">{c['total_tokens']:,} tokens · {c['cache_read_ratio']:.0%} cache-read</p></div>
+<p class="kpi">${c["total_cost_usd"]:.2f}</p>
+<p class="muted">{c["total_tokens"]:,} tokens · {c["cache_read_ratio"]:.0%} cache-read</p></div>
 <div class="card"><h2>Productivity</h2>
-<p class="kpi">{p['loc_added_approx']:,} LoC</p>
-<p class="muted">{p['edits']} edits · {p['writes']} writes · {p['commits'] if p['commits'] is not None else 'n/a'} commits</p></div>
+<p class="kpi">{p["loc_added_approx"]:,} LoC</p>
+<p class="muted">{p["edits"]} edits · {p["writes"]} writes · {p["commits"] if p["commits"] is not None else "n/a"} commits</p></div>
 <div class="card"><h2>Reliability</h2>
-<p class="kpi">{r['error_rate']:.0%} errors</p>
-<p class="muted">{r['tool_calls']} calls · {r['errors']} errors</p></div>
+<p class="kpi">{r["error_rate"]:.0%} errors</p>
+<p class="muted">{r["tool_calls"]} calls · {r["errors"]} errors</p></div>
 </div>
-<h2>Adoption — Skills</h2>{_bars(a['skills'])}
-<h2>Adoption — Sub-agents</h2>{_bars(a['subagents'])}
-<h2>Adoption — Tools</h2>{_bars(a['tools'])}
-<h2>Adoption — MCP tools</h2>{_bars(a['mcp_tools'])}
-<h2>Adoption — Hooks (self-log)</h2>{_bars(a['hooks'])}
+<h2>Adoption — Skills</h2>{_bars(a["skills"])}
+<h2>Adoption — Sub-agents</h2>{_bars(a["subagents"])}
+<h2>Adoption — Tools</h2>{_bars(a["tools"])}
+<h2>Adoption — MCP tools</h2>{_bars(a["mcp_tools"])}
+<h2>Adoption — Hooks (self-log)</h2>{_bars(a["hooks"])}
 <h2>Cost by model</h2>
 <table><tr><th>Model</th><th>Msgs</th><th>Input</th><th>Output</th><th>Cache read</th><th>Cost</th></tr>
 {rows}</table>
-<h2>Reliability — errors by tool</h2>{_bars(r['errors_by_tool'])}
+<h2>Reliability — errors by tool</h2>{_bars(r["errors_by_tool"])}
 <p class="muted">Accept/reject and exact active-time are OTEL-only and not captured here.</p>
 </body></html>
 """

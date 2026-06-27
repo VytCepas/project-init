@@ -89,10 +89,12 @@ def test_gh_callers_have_presence_guard(scaffolded: Path):
 def test_audit_stat_guidance_is_portable():
     for mirror in (
         # audit moved to the lifecycle_fallback overlay (#476); agent-surface
-        # copies (codex/antigravity) still carry it via the sync.
+        # copies (codex/antigravity) still carry it via the sync, now gated as
+        # SKILL.md.tmpl ({{#if lifecycle}}, PI-537 #5) — the wrapped body keeps
+        # the portable stat guidance.
         _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills" / "audit" / "SKILL.md",
-        _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills" / "audit" / "SKILL.md",
-        _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills" / "audit" / "SKILL.md",
+        _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills" / "audit" / "SKILL.md.tmpl",
+        _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills" / "audit" / "SKILL.md.tmpl",
     ):
         text = mirror.read_text()
         assert "stat -f '%Lp'" in text, f"{mirror}: missing BSD/macOS stat fallback"

@@ -106,3 +106,23 @@ def test_scaffolded_settings_hooks_pin_bash_shell(tmp_path: Path):
         assert hook.get("shell") == "bash", (
             f'settings.json hook {hook.get("command")!r} must set "shell": "bash"'
         )
+
+
+def test_lint_hooks_do_not_leak_ruff_stdout():
+    """PI-537 #2: pre_commit_gate / post_edit_lint emit a JSON hook response, so
+    the auto-fix ruff calls must silence stdout too — `ruff --quiet` still prints
+    diagnostics there, which would leak before the JSON and break consumers."""
+    from pathlib import Path
+
+    root = (
+        Path(__file__).resolve().parents[2]
+        / "templates"
+        / "fallback"
+        / "dot_claude"
+        / "hooks"
+    )
+    for name in ("pre_commit_gate.sh", "post_edit_lint.sh"):
+        for line in (root / name).read_text().splitlines():
+            s = line.strip()
+            if ("ruff check --fix" in s or "ruff format" in s) and s.endswith("|| true"):
+                assert ">/dev/null 2>&1" in s, f"{name}: ruff fix/format line leaks stdout: {s}"
