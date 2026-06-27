@@ -159,6 +159,75 @@ class TestRoundTripAndErrors:
         assert rc == 0
 
 
+class TestPurgeExport:
+    """Slice 2 (#531): explicit source-data deletion/transfer on `remove memory`."""
+
+    def _mem_project(self, target: Path, content: str = "hard-won") -> Path:
+        _scaffold(target, memory_stack="obsidian-only")
+        note = target / ".claude/vault/knowledge/note.md"
+        note.parent.mkdir(parents=True, exist_ok=True)
+        note.write_text(content)
+        return note
+
+    def test_default_keeps_source_data(self, tmp_path: Path):
+        target = tmp_path / "p"
+        note = self._mem_project(target)
+        apply_concern(target, "memory", enable=False, apply=True)
+        assert note.is_file()
+        assert (target / ".claude/memory").exists()
+
+    def test_purge_deletes_source_data(self, tmp_path: Path):
+        target = tmp_path / "p"
+        self._mem_project(target)
+        apply_concern(target, "memory", enable=False, apply=True, purge=True)
+        assert not (target / ".claude/vault").exists()
+        assert not (target / ".claude/memory").exists()
+        assert '"memory_stack": "none"' in _config(target)
+
+    def test_export_moves_source_data_out(self, tmp_path: Path):
+        target = tmp_path / "p"
+        self._mem_project(target, content="my knowledge")
+        dest = tmp_path / "exported"
+        apply_concern(target, "memory", enable=False, apply=True, export_dir=dest)
+        assert not (target / ".claude/vault").exists()
+        assert not (target / ".claude/memory").exists()
+        moved = dest / ".claude/vault/knowledge/note.md"
+        assert moved.is_file()
+        assert moved.read_text() == "my knowledge"
+
+    def test_dry_run_purge_keeps_data(self, tmp_path: Path):
+        target = tmp_path / "p"
+        self._mem_project(target)
+        apply_concern(target, "memory", enable=False, apply=False, purge=True)
+        assert (target / ".claude/memory").exists()  # dry run touches nothing
+
+    def test_purge_and_export_mutually_exclusive(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        self._mem_project(target)
+        rc = apply_concern(
+            target, "memory", enable=False, apply=True, purge=True, export_dir=tmp_path / "e"
+        )
+        assert rc == 1
+        assert "mutually exclusive" in capsys.readouterr().err
+
+    def test_purge_rejected_on_add(self, tmp_path: Path, capsys):
+        target = _scaffold(tmp_path / "p")
+        rc = apply_concern(target, "memory", enable=True, value="auto", apply=True, purge=True)
+        assert rc == 1
+        assert "apply to `remove`" in capsys.readouterr().err
+
+    def test_purge_cleans_leftovers_after_plain_remove(self, tmp_path: Path):
+        # A preserved governance user file survives a plain remove; a later --purge
+        # must still clean it even though the concern flag is already off (no change).
+        target = _scaffold(tmp_path / "p", governance=True)
+        leftover = target / ".claude/governance/ai-declarations.md"
+        assert leftover.is_file()
+        apply_concern(target, "governance", enable=False, apply=True)
+        assert leftover.is_file()  # plain remove keeps the user file
+        apply_concern(target, "governance", enable=False, apply=True, purge=True)
+        assert not leftover.exists()  # purge cleans it despite the no-op toggle
+
+
 class TestCLIDispatch:
     """`main()` routes `add`/`remove` to the engine and parses args (#528)."""
 
