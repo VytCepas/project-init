@@ -1,6 +1,9 @@
 # project-init
 
 [![CI](https://github.com/VytCepas/project-init/actions/workflows/ci.yml/badge.svg)](https://github.com/VytCepas/project-init/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/project-init)](https://pypi.org/project/project-init/)
+[![Python versions](https://img.shields.io/pypi/pyversions/project-init)](https://pypi.org/project/project-init/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Scaffolder for agentic-development infrastructure. One command drops a `.claude/` folder into any project so Claude Code (and other agents) have memory, docs, hooks, and curated MCPs ready to go.
 
@@ -91,7 +94,7 @@ Two honest caveats hold across all of it:
 
 Two install paths — pick by how you'll invoke it:
 
-**CLI-only, from PyPI** (after the first published release; ADR-011). Gives
+**CLI-only, from [PyPI](https://pypi.org/project/project-init/)** (ADR-011). Gives
 you the `project-init` command — no `/project-init` slash command:
 
 ```bash
@@ -335,7 +338,9 @@ Run `project-init --help` and pick from `core` (vault-free), `auto` (memory file
 ## Positioning in the ecosystem
 
 Where project-init sits relative to the (fast-moving) community landscape, so
-adopters know what this tool owns and where it defers:
+adopters know what this tool owns and where it defers. For the full
+four-category comparison and the moat, see
+[docs/positioning.md](docs/positioning.md):
 
 - **What this scaffolder owns**: project infrastructure files (CI workflows,
   `.gitignore`, GitHub issue/PR templates and board automation),

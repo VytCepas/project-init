@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use project-init, please cite it using these metadata."
+title: project-init
+type: software
+authors:
+  - given-names: Vytautas
+    family-names: Čepas
+    email: vyt.cepas.ve@gmail.com
+repository-code: https://github.com/VytCepas/project-init
+url: https://vytcepas.github.io/project-init/
+license: Apache-2.0
+version: 0.5.0

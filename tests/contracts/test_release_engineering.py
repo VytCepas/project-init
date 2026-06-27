@@ -83,7 +83,7 @@ class TestInstallScriptPinning:
         pull only happens on an explicit main checkout."""
         content = self._script()
         assert "checkout -q main" in content
-        assert "checkout -q \"$REF\"" in content
+        assert 'checkout -q "$REF"' in content
 
 
 class TestVersionConsistency:
@@ -92,6 +92,15 @@ class TestVersionConsistency:
         init = (_REPO_ROOT / "src" / "project_init" / "__init__.py").read_text()
         version = pyproject["project"]["version"]
         assert f'__version__ = "{version}"' in init
+
+    def test_citation_version_matches_pyproject(self):
+        # CITATION.cff is a third version file (with pyproject.toml and __init__.py);
+        # assert the exact unquoted CFF field line so it can't drift on release.
+        # String match, not yaml.load — pyyaml is not a dependency.
+        pyproject = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text())
+        citation = (_REPO_ROOT / "CITATION.cff").read_text()
+        version = pyproject["project"]["version"]
+        assert f"version: {version}" in citation
 
     def test_readme_documents_pinning_and_update(self):
         content = (_REPO_ROOT / "README.md").read_text()
