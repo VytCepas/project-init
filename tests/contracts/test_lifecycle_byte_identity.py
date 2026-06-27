@@ -23,6 +23,11 @@ Exception (#497/#498): later features re-pinned `lint_memory.sh` (staleness) and
 `.claude/config.yaml` (memory descriptor `tier`/`graph_path`, then the top-level
 `project_init_contract_version`, ADR-025) the same way — only the intentionally
 changed key, after verifying no other drift.
+
+Exception (PI-526): the concern-decoupled skills `save_memory`, `status`, and
+`session_summary` gained deterministic presence-checks in their bodies — a
+deliberate fix, not move-drift. Only those three SKILL.md hashes were re-pinned
+(no_plugin combos), after verifying every other file still matched.
 """
 
 from __future__ import annotations

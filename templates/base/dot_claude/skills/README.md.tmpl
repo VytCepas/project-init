@@ -7,8 +7,8 @@ Each skill is a directory `.claude/skills/<name>/SKILL.md`. See [`INDEX.md`](IND
 | Skill | When to use |
 |---|---|
 | `plan` | Plan a non-trivial change before implementing |
-| `session_summary` | End of session — summarize work and save to vault |
-{{#if lifecycle}}| `start_task` | Before any non-trivial task — create a GitHub Issue |
+{{#if obsidian}}| `session_summary` | End of session — summarize work and save to vault |
+{{/if obsidian}}{{#if lifecycle}}| `start_task` | Before any non-trivial task — create a GitHub Issue |
 {{/if lifecycle}}| `add_hook` | When you need a new deterministic hook (safety, lint, logging) |
 | `add_command` | When you need a new slash command for a recurring workflow |
 {{/if no_plugin}}{{#if plugin_mode}}

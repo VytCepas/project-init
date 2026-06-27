@@ -8,7 +8,9 @@ allowed-tools: Read Write Glob
 
 Save this to project memory: $ARGUMENTS
 
-Follow the memory convention in `.claude/memory/README.md`:
+**First check the memory tier is enabled.** If `.claude/memory/` does not exist, this project declined the memory tier (`--memory none`) — do **not** create it. Tell the user memory is not enabled here and stop.
+
+Otherwise, follow the memory convention in `.claude/memory/README.md`:
 
 1. Decide the memory type (user / feedback / project / reference)
 2. Choose a descriptive filename (e.g., `feedback_testing.md`, `project_deadline.md`)
