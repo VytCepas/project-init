@@ -94,8 +94,24 @@ class TestCLI:
 
     @pytest.mark.parametrize(
         "bad_name",
-        ['ev"il', "C:\\projects\\foo", "line\nbreak", "del\x7fchar"],
-        ids=["double-quote", "backslash", "newline", "del-0x7f"],
+        [
+            'ev"il',
+            "C:\\projects\\foo",
+            "line\nbreak",
+            "del\x7fchar",
+            "nel\x85here",
+            "lsep here",
+            "psep here",
+        ],
+        ids=[
+            "double-quote",
+            "backslash",
+            "newline",
+            "del-0x7f",
+            "nel-0x85",
+            "line-sep-2028",
+            "para-sep-2029",
+        ],
     )
     def test_yaml_breaking_name_rejected(self, tmp_path: Path, bad_name: str):
         """Quotes/backslashes/newlines/control chars (incl. DEL) in name/desc/owner

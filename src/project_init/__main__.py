@@ -1961,11 +1961,17 @@ def _validate_text_inputs(inputs: ScaffoldInputs, parser: argparse.ArgumentParse
         if (
             '"' in value
             or "\\" in value
-            or any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value)
+            # 0x85 (NEL), 0x2028 (LINE SEPARATOR), 0x2029 (PARAGRAPH SEPARATOR)
+            # are > 0x20 so they slip past the C0 check, but Python's
+            # str.splitlines() treats them as line breaks — they'd split a
+            # single-line YAML value mid-parse on a later upgrade (PI-535).
+            or any(
+                ord(ch) < 0x20 or ord(ch) in (0x7F, 0x85, 0x2028, 0x2029) for ch in value
+            )
         ):
             parser.error(
                 f"--{flag} must not contain double-quotes, backslashes, newlines, "
-                "or control characters (they corrupt the generated config.yaml)"
+                "or control/line-separator characters (they corrupt the generated config.yaml)"
             )
 
 

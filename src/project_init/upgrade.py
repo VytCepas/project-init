@@ -58,6 +58,13 @@ from project_init.scaffold import (
 
 _CONFIG_REL = Path(".claude/config.yaml")
 _VERSION_LINE_RE = re.compile(r"^(\s*project_init_version:\s*).*$", re.MULTILINE)
+# A never-clobber sibling: `<file>.new` or `<file>.new.N` (see scaffold._new_sibling).
+_SIBLING_RE = re.compile(r"\.new(\.\d+)?$")
+
+
+def _is_sibling(rel: Path) -> bool:
+    """True if *rel* is a `.new`/`.new.N` overwrite-protection sibling (PI-535)."""
+    return bool(_SIBLING_RE.search(rel.name))
 
 # Variables that pre-record config files cannot recover; filled with the
 # scaffolder's defaults during migration (see read_scaffold_record).
@@ -358,7 +365,11 @@ def write_scaffold_record(
     manifest: dict[str, str] = {}
     base: dict[str, str] = {}
     for rel in sorted(set(created)):
-        if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
+        # A `.new`/`.new.N` sibling is a user-merge artifact (a render parked
+        # next to a file we refused to clobber), not a managed file — recording
+        # it would make the next upgrade report it as spurious `removed` drift
+        # (PI-535).
+        if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs) or _is_sibling(rel):
             continue
         path = target / rel
         if path.is_file():
