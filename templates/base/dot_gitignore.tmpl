@@ -15,7 +15,21 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-{{#if graphify}}# Graphify (derived graph artifacts; keep GRAPH_REPORT.md tracked)
+{{#if node}}# Node
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+.npm/
+
+{{/if node}}{{#if go}}# Go
+/bin/
+*.exe
+*.test
+*.out
+vendor/
+
+{{/if go}}{{#if graphify}}# Graphify (derived graph artifacts; keep GRAPH_REPORT.md tracked)
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md
 

@@ -88,6 +88,21 @@ class TestGating:
         assert _render_file("base/renovate.json.tmpl", renovate="true").strip()
         assert _render_file("base/renovate.json.tmpl", renovate="").strip() == ""
 
+    def test_docs_index_gates_on_want_docs(self):
+        # the docs/ Diátaxis tree must also gate on want_docs, not just the
+        # mkdocs/typedoc configs (mini-project sweep: --no-docs left docs/ behind).
+        assert _render_file("base/docs/index.md.tmpl", python="true", want_docs="true").strip()
+        assert _render_file("base/docs/index.md.tmpl", python="true", want_docs="").strip() == ""
+        assert _render_file("base/docs/tutorials/index.md.tmpl", want_docs="").strip() == ""
+
+    def test_gitignore_has_language_blocks(self):
+        # node/go scaffolds must ignore their build dirs; python output unchanged
+        # (mini-project sweep: --language node never ignored node_modules/).
+        py = _render_file("base/dot_gitignore.tmpl", python="true")
+        assert "node_modules/" not in py and "vendor/" not in py
+        assert "node_modules/" in _render_file("base/dot_gitignore.tmpl", node="true")
+        assert "vendor/" in _render_file("base/dot_gitignore.tmpl", go="true")
+
     def test_docs_configs_are_local_only_no_published_site(self):
         # PI-343/ADR-004 retired the GitHub Pages docs.yml; the configs must not
         # claim a publish workflow (Codex ADR-022 review).
@@ -113,6 +128,17 @@ class TestScaffoldGating:
         target = tmp_path / "p"
         scaffold(target, memory_preset("core"), make_variables(renovate=""), strict=True)
         assert not (target / "renovate.json").exists()
+
+    def test_no_docs_omits_docs_tree(self, tmp_path: Path):
+        target = tmp_path / "p"
+        scaffold(target, memory_preset("core"), make_variables(python="true", want_docs=""), strict=True)
+        assert not (target / "docs").exists()
+
+    def test_default_ships_docs_tree(self, tmp_path: Path):
+        target = tmp_path / "p"
+        scaffold(target, memory_preset("core"), make_variables(python="true"), strict=True)
+        assert (target / "docs" / "index.md").is_file()
+        assert (target / "docs" / "tutorials" / "index.md").is_file()
 
 
 def _scaffold_cli(target: Path, *extra: str) -> None:
