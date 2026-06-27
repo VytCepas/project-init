@@ -31,8 +31,8 @@ Scaffolded with [project-init]({{project_init_url}}) on {{created_date}}.
 | Script | `promote_review.sh` | mark PR ready (board card moves automatically) |
 | Script | `monitor_pr.sh <n> [--merge]` | wait for CI; --merge squash-merges when clean |
 | Script | `finish_pr.sh [n] [--review-cycle N]` | push branch, mark ready, monitor checks/review, and merge |
-{{/if lifecycle}}| Skill | `session_summary` | summarise session and save to vault |
-| Skill | `add_hook` | add a new deterministic hook |
+{{/if lifecycle}}{{#if obsidian}}| Skill | `session_summary` | summarise session and save to vault |
+{{/if obsidian}}| Skill | `add_hook` | add a new deterministic hook |
 | Skill | `add_command` | add a new slash command |
 {{#if lifecycle}}| Skill | `audit` | full project health scan, creates issue with findings |
 {{/if lifecycle}}| Agent | `reviewer` | code review specialist |

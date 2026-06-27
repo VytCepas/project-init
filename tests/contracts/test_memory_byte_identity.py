@@ -28,6 +28,12 @@ was re-pinned, after verifying every other file still matched.
 
 Exception (LightRAG cleanup): removing the dead `.claude/memory/.lightrag/`
 gitignore line (ADR-024) re-pinned `.gitignore` only.
+
+Exception (PI-526): the concern-decoupled skills `save_memory`, `status`, and
+`session_summary` gained deterministic presence-checks in their bodies (don't
+write to `.claude/memory/` or `.claude/vault/` when that concern was declined) —
+a deliberate fix, not move-drift. Only those three SKILL.md hashes were re-pinned
+(no_plugin combos), after verifying every other file still matched.
 """
 
 from __future__ import annotations

@@ -11,9 +11,9 @@ Load the relevant skill file when the trigger applies. Do not load all skills at
 {{#if lifecycle}}| Request review on a draft PR | `.claude/skills/request_review/SKILL.md` |
 | Push, review, or merge a PR | `.claude/skills/github_workflow/SKILL.md` |
 {{/if lifecycle}}| Show project status and open items | `.claude/skills/status/SKILL.md` |
-| Summarize the session | `.claude/skills/session_summary/SKILL.md` |
-| Save something to project memory | `.claude/skills/save_memory/SKILL.md` |
-| Record an architectural decision (ADR) | `.claude/skills/add_adr/SKILL.md` |
+{{#if obsidian}}| Summarize the session | `.claude/skills/session_summary/SKILL.md` |
+{{/if obsidian}}{{#if memory}}| Save something to project memory | `.claude/skills/save_memory/SKILL.md` |
+{{/if memory}}| Record an architectural decision (ADR) | `.claude/skills/add_adr/SKILL.md` |
 | Add a hook | `.claude/skills/add_hook/SKILL.md` |
 | Add a slash command | `.claude/skills/add_command/SKILL.md` |
 {{#if lifecycle}}| Audit project health | `.claude/skills/audit/SKILL.md` |
