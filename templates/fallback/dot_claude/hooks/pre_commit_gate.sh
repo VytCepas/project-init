@@ -45,12 +45,12 @@ while IFS= read -r _f; do [ -n "$_f" ] && STAGED_PY+=("$_f"); done \
 if [ "${#STAGED_PY[@]}" -gt 0 ]; then
     LINT_OUT=""
     if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
-        uv run ruff check --fix --quiet "${STAGED_PY[@]}" 2>/dev/null || true
-        uv run ruff format --quiet "${STAGED_PY[@]}" 2>/dev/null || true
+        uv run ruff check --fix --quiet "${STAGED_PY[@]}" >/dev/null 2>&1 || true
+        uv run ruff format --quiet "${STAGED_PY[@]}" >/dev/null 2>&1 || true
         LINT_OUT=$(uv run ruff check --quiet "${STAGED_PY[@]}" 2>&1 || true)
     elif command -v ruff &>/dev/null; then
-        ruff check --fix --quiet "${STAGED_PY[@]}" 2>/dev/null || true
-        ruff format --quiet "${STAGED_PY[@]}" 2>/dev/null || true
+        ruff check --fix --quiet "${STAGED_PY[@]}" >/dev/null 2>&1 || true
+        ruff format --quiet "${STAGED_PY[@]}" >/dev/null 2>&1 || true
         LINT_OUT=$(ruff check --quiet "${STAGED_PY[@]}" 2>&1 || true)
     fi
     if [ -n "$LINT_OUT" ]; then

@@ -805,6 +805,42 @@ _UPDATES_BLOCK = (
 )
 
 
+# The derived `memory:` descriptor block: from its `memory:` header through the
+# blank line up to the next top-level key (`mcps:`). Absent entirely when memory
+# is `none`. `mcps:` always follows it in config.yaml.tmpl.
+_MEMORY_SECTION_RE = re.compile(r"(?ms)^memory:\n.*?(?=^mcps:)")
+
+
+def _memory_section(text: str) -> str:
+    """The `memory:` descriptor block in *text*, or '' if memory is absent."""
+    m = _MEMORY_SECTION_RE.search(text)
+    return m.group(0) if m else ""
+
+
+def _sync_memory_block(text: str, staging: Path) -> str:
+    """Refresh the derived `memory:` descriptor from the freshly rendered config.
+
+    config.yaml is never re-rendered wholesale on upgrade/concern-toggle (it
+    carries hand-edited fields like project_key and safety.allow), so a memory
+    tier change would otherwise leave the visible `memory:` block (tier, stack,
+    paths) stale while the hidden scaffold record is correct — an orchestrator
+    reading the visible descriptor would get a lie (PI-537 #1). Splice in just
+    that block from the staging render; every other line is untouched. Handles
+    add (none→tier), change (tier→tier), and remove (tier→none).
+    """
+    staged_config = staging / _CONFIG_REL
+    if not staged_config.is_file():
+        return text
+    new_mem = _memory_section(staged_config.read_text(encoding="utf-8"))
+    old_mem = _memory_section(text)
+    if old_mem == new_mem:
+        return text
+    if old_mem:  # change or remove (new_mem may be '')
+        return text.replace(old_mem, new_mem, 1)
+    # add: insert the block immediately before the `mcps:` key
+    return re.sub(r"(?m)^mcps:", lambda _m: new_mem + "mcps:", text, count=1)
+
+
 def _ensure_visible_project_fields(text: str, variables: dict) -> str:
     """Surface recorded `project:` fields in the hand-editable config (#259, #498).
 
@@ -866,13 +902,15 @@ def apply_drift(
         else:
             _copy_rendered(staging / rel, _new_sibling(target / rel, (staging / rel).read_bytes()))
 
-    # Targeted config.yaml updates: the human-readable version line, then the
-    # scaffold record (variables + a manifest reflecting post-apply state).
+    # Targeted config.yaml updates: the human-readable version line, the derived
+    # memory descriptor (which a concern toggle changes), then the scaffold record
+    # (variables + a manifest reflecting post-apply state).
     config_path = target / _CONFIG_REL
     if config_path.exists():
         text = config_path.read_text(encoding="utf-8")
         text = _VERSION_LINE_RE.sub(rf"\g<1>{variables['project_init_version']}", text, count=1)
         text = _ensure_visible_project_fields(text, variables)
+        text = _sync_memory_block(text, staging)
         config_path.write_text(text, encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
 
     # Only files whose on-disk content now equals the render are recorded —

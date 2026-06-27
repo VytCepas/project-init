@@ -38,12 +38,12 @@ case "$FILE" in
         # Prefer 'uv run ruff' inside a uv-managed project so the hook uses
         # the same ruff the project itself uses; fall back to a system ruff.
         if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
-            uv run ruff check --fix --quiet "$FILE" 2>/dev/null || true
-            uv run ruff format --quiet "$FILE" 2>/dev/null || true
+            uv run ruff check --fix --quiet "$FILE" >/dev/null 2>&1 || true
+            uv run ruff format --quiet "$FILE" >/dev/null 2>&1 || true
             ERRORS=$(uv run ruff check --quiet "$FILE" 2>&1 || true)
         elif command -v ruff &>/dev/null; then
-            ruff check --fix --quiet "$FILE" 2>/dev/null || true
-            ruff format --quiet "$FILE" 2>/dev/null || true
+            ruff check --fix --quiet "$FILE" >/dev/null 2>&1 || true
+            ruff format --quiet "$FILE" >/dev/null 2>&1 || true
             ERRORS=$(ruff check --quiet "$FILE" 2>&1 || true)
         fi
         ;;

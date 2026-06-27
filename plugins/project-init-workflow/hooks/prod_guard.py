@@ -42,18 +42,27 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     # stays flag-specific (only skips leading `-tokens`) so a read-only
     # `plan -destroy` is NOT flagged. Routine `apply -auto-approve` is
     # intentionally not flagged; only destroy / apply-with-destroy is.
-    (re.compile(r"\b(?:terraform|tofu)\s+(?:-\S+\s+)*(destroy|apply\s+.*-destroy)\b"),
-     "terraform/tofu destroy/apply -destroy"),
+    (
+        re.compile(r"\b(?:terraform|tofu)\s+(?:-\S+\s+)*(destroy|apply\s+.*-destroy)\b"),
+        "terraform/tofu destroy/apply -destroy",
+    ),
     (re.compile(rf"\bkubectl\b{_SEG}\bdelete\b"), "kubectl delete"),
     (re.compile(rf"\bhelm\b{_SEG}\b(uninstall|delete)\b"), "helm uninstall"),
     (re.compile(rf"\baws\b{_SEG}\b(delete|terminate|remove)\S*\b"), "aws delete/terminate"),
-    (re.compile(rf"\baws\b{_SEG}\bs3\s+(rb\b|rm\b{_SEG}--recursive)"), "aws s3 bucket/recursive removal"),
+    (
+        re.compile(rf"\baws\b{_SEG}\bs3\s+(rb\b|rm\b{_SEG}--recursive)"),
+        "aws s3 bucket/recursive removal",
+    ),
     (re.compile(rf"\bgcloud\b{_SEG}\bdelete\b"), "gcloud delete"),
     (re.compile(rf"\baz\b{_SEG}\bdelete\b"), "az delete"),
     (re.compile(r"\bdrop\s+(table|database|schema)\b", re.IGNORECASE), "SQL DROP"),
     (re.compile(r"\btruncate\s+table\b", re.IGNORECASE), "SQL TRUNCATE"),
-    (re.compile(r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)[a-zA-Z]*\s+(/(?!tmp\b)|~)"),
-     "recursive force-remove outside the project"),
+    (
+        re.compile(
+            r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)[a-zA-Z]*\s+(/(?!tmp\b)|~)"
+        ),
+        "recursive force-remove outside the project",
+    ),
     (re.compile(r"\bgh\s+repo\s+delete\b"), "gh repo delete"),
     (re.compile(r"\bdocker\s+(volume\s+prune|system\s+prune)\b"), "docker prune"),
 ]

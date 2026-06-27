@@ -143,6 +143,31 @@ def _ship_base_plan(dest: Path) -> None:
             shutil.copy2(f, dest / name)
 
 
+def _ship_gated_skill(src: Path, dest: Path, var: str) -> None:
+    """Copy a skill into an agent layer with its SKILL.md gated on ``{{#if var}}``.
+
+    The per-agent skill set is appended unconditionally for every selected
+    surface (`overlay_layers`), so a lifecycle skill shipped here would leak into
+    `.agents/skills` even under `--lifecycle none` — referencing scripts the
+    declined concern never scaffolds (PI-537 #5). Wrapping SKILL.md in
+    ``{{#if lifecycle}}`` and shipping it as a ``.tmpl`` makes the scaffold engine
+    skip it (empty render) when the concern is off, while rendering byte-identically
+    when on. These lifecycle SKILL.md bodies carry no ``{{…}}`` of their own, so the
+    wrap is the only placeholder the renderer sees.
+    """
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in sorted(src.iterdir()):
+        if not f.is_file():
+            continue
+        if f.name == "SKILL.md":
+            body = f.read_text(encoding="utf-8")
+            (dest / "SKILL.md.tmpl").write_text(
+                f"{{{{#if {var}}}}}{body}{{{{/if {var}}}}}", encoding="utf-8"
+            )
+        else:
+            shutil.copy2(f, dest / f.name)
+
+
 def _sync_agent_skills() -> list[str]:
     """Byte-identical SKILL.md trees per surface (Codex/Antigravity/Amp/Junie).
 
@@ -151,8 +176,13 @@ def _sync_agent_skills() -> list[str]:
     standalone — all discover `<dir>/<name>/SKILL.md` natively, no command
     pointers (PI-386, PI-397). The full set is the core + lifecycle skills plus
     the base `plan` skill (PI-491), so it matches the CAPABILITIES inventory.
+
+    Lifecycle skills are shipped gated on ``{{#if lifecycle}}`` (PI-537 #5) so a
+    `--lifecycle none` scaffold drops them from `.agents/skills` just as it does
+    from `.claude/skills`.
     """
     synced = []
+    lifecycle_names = {d.name for d in lifecycle_skill_dirs()}
     for label, dest in (
         ("codex", CODEX_SKILLS),
         ("antigravity", ANTIGRAVITY_SKILLS),
@@ -162,7 +192,10 @@ def _sync_agent_skills() -> list[str]:
         if dest.exists():
             shutil.rmtree(dest)
         for skill_dir in all_skill_dirs():
-            shutil.copytree(skill_dir, dest / skill_dir.name)
+            if skill_dir.name in lifecycle_names:
+                _ship_gated_skill(skill_dir, dest / skill_dir.name, "lifecycle")
+            else:
+                shutil.copytree(skill_dir, dest / skill_dir.name)
             synced.append(f"{label}:skills/{skill_dir.name}")
         _ship_base_plan(dest / "plan")
         synced.append(f"{label}:skills/plan")

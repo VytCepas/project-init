@@ -209,10 +209,13 @@ class TestGithubWorkflowProductionBoundary:
     _REPO = Path(__file__).resolve().parents[2]
     # github_workflow moved to the lifecycle_fallback overlay + the
     # project-init-lifecycle plugin (#476); the agent-surface copies stay.
+    # The codex/antigravity copies ship gated as SKILL.md.tmpl ({{#if lifecycle}})
+    # so `--lifecycle none` drops them (PI-537 #5); the wrapped body still carries
+    # the production-boundary text.
     _SKILLS = [
         _REPO / "templates/lifecycle_fallback/dot_claude/skills/github_workflow/SKILL.md",
-        _REPO / "templates/codex/dot_agents/skills/github_workflow/SKILL.md",
-        _REPO / "templates/antigravity/dot_agents/skills/github_workflow/SKILL.md",
+        _REPO / "templates/codex/dot_agents/skills/github_workflow/SKILL.md.tmpl",
+        _REPO / "templates/antigravity/dot_agents/skills/github_workflow/SKILL.md.tmpl",
         _REPO / "plugins/project-init-lifecycle/skills/github_workflow/SKILL.md",
     ]
 

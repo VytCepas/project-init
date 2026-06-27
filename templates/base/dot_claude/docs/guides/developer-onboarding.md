@@ -102,7 +102,7 @@ best-effort. If the project was scaffolded with extra agents (`--agents`):
 | Agent | What you get | Setup per clone |
 |---|---|---|
 | Claude Code | full tier: hooks, skills, settings | none (plus `install_hooks.sh` like everyone) |
-| Codex | shared skills at `.agents/skills/`, command guard wired via `.codex/hooks.json` (advisory; codex 0.138.0 may not fire project hooks) | none |
+| Codex | shared skills at `.agents/skills/`, command guard wired via `.codex/hooks.json` (advisory; some Codex versions gate project hooks behind a one-time trust/enable step) | none |
 | Antigravity (`agy`) | skills at `.agents/skills/`, command guard via `.agents/hooks.json` (experimental), MCP via `.agents/mcp_config.json` | none (`.agents/` is auto-discovered) |
 | Ollama-based (Aider, Goose, …) | AGENTS.md instructions, portable scripts, markdown memory | none |
 

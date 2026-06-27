@@ -255,3 +255,34 @@ class TestCLIDispatch:
         rc = main(["remove", "governance", "--target", str(target), "--apply"])
         assert rc == 0
         assert not (target / ".claude/governance/README.md").exists()
+
+
+class TestMemoryVisibleDescriptor:
+    """PI-537 #1: a memory toggle must refresh the *visible* `memory:` descriptor
+    in config.yaml (tier/stack/paths), not only the hidden scaffold record — an
+    orchestrator reads the visible descriptor."""
+
+    def test_add_memory_updates_visible_descriptor(self, tmp_path: Path):
+        target = _scaffold(tmp_path / "p", memory_stack="auto")
+        assert "stack: auto" in _config(target)
+        assert "tier: 0" in _config(target)
+
+        rc = apply_concern(target, "memory", enable=True, value="obsidian-graphify", apply=True)
+        assert rc == 0
+        cfg = _config(target)
+        assert "stack: obsidian-graphify" in cfg
+        assert "tier: 2" in cfg
+        assert "graph_path:" in cfg
+        # the hidden record agrees
+        assert '"memory_stack": "obsidian-graphify"' in cfg
+
+    def test_remove_memory_clears_visible_descriptor(self, tmp_path: Path):
+        target = _scaffold(tmp_path / "p", memory_stack="obsidian-graphify")
+        assert "stack: obsidian-graphify" in _config(target)
+
+        rc = apply_concern(target, "memory", enable=False, value=None, apply=True)
+        assert rc == 0
+        cfg = _config(target)
+        assert "\nmemory:\n" not in cfg, "stale memory: block left in visible config"
+        assert "tier:" not in cfg
+        assert '"memory_stack": "none"' in cfg

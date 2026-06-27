@@ -1,4 +1,4 @@
----
+{{#if lifecycle}}---
 name: audit
 description: Full project health audit — scans hooks, skills, scripts, rules, CI config, docs, and GitHub workflow for inconsistencies, broken references, and common mistakes. Creates a GitHub issue with findings and optionally starts fixing them.
 when_to_use: Use when the user says "audit the project", "health check", "scan for issues", "hardening pass", or "review everything".
@@ -145,3 +145,4 @@ If `$ARGUMENTS` contains `--fix`:
 4. Push and finish: `.claude/scripts/finish_pr.sh <n>`
 
 If `--fix` is not specified, stop after Phase 4 and report the issue number.
+{{/if lifecycle}}

@@ -1953,6 +1953,13 @@ def _validate_text_inputs(inputs: ScaffoldInputs, parser: argparse.ArgumentParse
     short single-line fields, so a clean rejection beats silent corruption
     (e2e sweep; Codex/Copilot review).
     """
+    # name/description are required, single-line, human-facing fields: a value
+    # that is empty or only whitespace slips past the `if not args.name` check
+    # (a space is truthy) and renders literal blanks into pyproject.toml / docs.
+    for flag, value in (("name", inputs.project_name), ("description", inputs.project_description)):
+        if not value.strip():
+            parser.error(f"--{flag} must not be empty or whitespace-only")
+
     for flag, value in (
         ("name", inputs.project_name),
         ("description", inputs.project_description),
@@ -2117,17 +2124,22 @@ def main(argv: list[str] | None = None) -> int:
     # and writes a `.new` sibling rather than clobbering it. Always pass the list
     # so a re-run before the user merges a prior conflict stays protected too.
     conflicts: list[tuple[Path, Path]] = []
+    from project_init.upgrade import write_scaffold_record
+
     try:
         created = scaffold(target, preset, variables, strict=args.strict, conflicts=conflicts)
+        # Record the scaffold inputs + rendered-content hashes so a later
+        # `project-init upgrade` can re-render faithfully and detect drift.
+        write_scaffold_record(target, preset["name"], variables, created)
     except TemplateRenderError as e:
         sys.stderr.write(f"error: {e}\n")
         return 2
+    except OSError as e:
+        # A read-only/full/permission-denied target must surface a clean error,
+        # not a raw traceback (e.g. PermissionError writing into a 0555 dir).
+        sys.stderr.write(f"error: cannot write scaffold into {target}: {e.strerror or e}\n")
+        return 1
 
-    # Record the scaffold inputs + rendered-content hashes so a later
-    # `project-init upgrade` can re-render faithfully and detect drift.
-    from project_init.upgrade import write_scaffold_record
-
-    write_scaffold_record(target, preset["name"], variables, created)
     _emit_scaffold_output(args, target, created, preset, variables, inputs, conflicts)
     return 0
 

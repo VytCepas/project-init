@@ -22,9 +22,22 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+
 # The shared, fail-open guard adapter (reused across surfaces); the scaffolder
 # already ships it at this path for codex/antigravity.
-_GUARD = ".claude/hooks/_py.sh .claude/hooks/agent_guard_adapter.py"
+def _guard_command(surface: str) -> str:
+    """Command-guard invocation that resolves from the git repo root (PI-537).
+
+    Agent surfaces run hooks in the session's working directory, which may be a
+    subdirectory of the project; a bare relative ``.claude/hooks/_py.sh …`` then
+    exits 127 from there and fails open. Wrap it so it ``cd``s to the git toplevel
+    first (falling back to the current dir outside a repo — the old behavior),
+    then ``exec``s the guard so stdin (the tool-call JSON) is inherited.
+    """
+    return (
+        "sh -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && "
+        f"exec .claude/hooks/_py.sh .claude/hooks/agent_guard_adapter.py {surface}'"
+    )
 
 # --- canonical MCP rendering -------------------------------------------------
 
@@ -124,7 +137,7 @@ def render_cursor_hooks() -> str:
         "version": 1,
         "hooks": {
             "beforeShellExecution": [
-                {"command": f"{_GUARD} cursor", "type": "command"}
+                {"command": _guard_command("cursor"), "type": "command"}
             ],
         },
     }
@@ -145,7 +158,7 @@ def render_antigravity_hooks() -> str:
             "PreToolUse": [
                 {
                     "matcher": "*",
-                    "hooks": [{"type": "command", "command": f"{_GUARD} antigravity"}],
+                    "hooks": [{"type": "command", "command": _guard_command("antigravity")}],
                 }
             ]
         }

@@ -1,4 +1,4 @@
----
+{{#if lifecycle}}---
 name: start_task
 description: Creates a GitHub Issue, branch, and draft PR before implementation begins. Use before any non-trivial task to keep work traceable — one issue, one branch, one PR.
 when_to_use: Use when the user says "start work on X", "create a ticket for Y", or "begin a new task". Do not use for trivial one-off changes that don't need tracking.
@@ -46,3 +46,4 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 - Every non-trivial task must have a GitHub Issue, a branch, and a draft PR — all before the first line of implementation code.
 - One issue → one branch → one PR.
 - `board-automation.yml` moves the board card to **In Progress** automatically when the PR is opened. No manual board move needed.
+{{/if lifecycle}}

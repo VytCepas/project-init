@@ -166,6 +166,64 @@ class TestCLI:
         assert not (target / "AGENTS.md").exists()
         assert not (target / ".claude" / "settings.json").exists()
 
+    @pytest.mark.parametrize("blank", ["   ", "\t", " \t "], ids=["spaces", "tab", "mixed"])
+    def test_whitespace_only_name_rejected(self, tmp_path: Path, blank: str):
+        """PI-537 #8: a whitespace-only name is truthy so it slips past the
+        `if not args.name` check — it must be rejected, not rendered as blanks."""
+        from project_init.__main__ import main
+
+        with pytest.raises(SystemExit) as exc:
+            main(
+                [
+                    str(tmp_path / "p"),
+                    "--non-interactive",
+                    "--name",
+                    blank,
+                    "--description",
+                    "d",
+                    "--language",
+                    "python",
+                    "--preset",
+                    "core",
+                ]
+            )
+        assert exc.value.code == 2
+        assert not (tmp_path / "p").exists()
+
+    def test_readonly_target_reports_clean_error(self, tmp_path: Path, capsys):
+        """PI-537 #7: a write into a read-only target surfaces a clean error, not
+        a raw PermissionError traceback."""
+        import os
+
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            pytest.skip("root bypasses file permissions")
+        from project_init.__main__ import main
+
+        target = tmp_path / "ro"
+        target.mkdir()
+        target.chmod(0o555)
+        try:
+            rc = main(
+                [
+                    str(target),
+                    "--non-interactive",
+                    "--name",
+                    "x",
+                    "--description",
+                    "y",
+                    "--language",
+                    "python",
+                    "--preset",
+                    "core",
+                ]
+            )
+        finally:
+            target.chmod(0o755)  # restore so tmp cleanup can remove it
+        assert rc == 1
+        err = capsys.readouterr().err
+        assert "cannot write scaffold" in err
+        assert "Traceback" not in err
+
     def test_apostrophe_in_name_allowed(self, tmp_path: Path):
         """Single quotes are safe in double-quoted YAML — must NOT be rejected."""
         from project_init.__main__ import main
