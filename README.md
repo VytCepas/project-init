@@ -306,6 +306,49 @@ fields; without recorded hashes or a base, every modified file is conservatively
 treated as a conflict (`.new` sibling). Run `upgrade --apply` once and the record
 is written for next time.
 
+### Adding or removing a concern later
+
+Changed your mind about a tier you declined (or want to drop one)? `add` and
+`remove` toggle a single concern on an **already-scaffolded** project — no need to
+re-run the wizard. They reuse the upgrade engine, so the shared wiring
+(`settings.json`, `config.yaml`, CI) is re-rendered with the concern flipped.
+
+```bash
+project-init add governance --target /path/to/proj          # dry-run: report only
+project-init add governance --target /path/to/proj --apply  # land it
+project-init add memory obsidian-only --target /path --apply # memory takes a tier
+project-init remove lifecycle --target /path/to/proj --apply # drop a concern
+```
+
+Concerns: `lifecycle`, `governance`, `observability`, `multi-model`, `docs`,
+`renovate`, and `memory <stack>` (`auto` · `obsidian-only` · `obsidian-graphify` ·
+`obsidian-graphify-rag` · `none`).
+
+- **Dry-run by default** — without `--apply` it only reports what would change.
+- **`--apply` is git-guarded** — it refuses a dirty work tree (so the change lands
+  as one revertible diff); `--allow-dirty` overrides.
+- **`remove` never destroys your edits** — it deletes a concern's files only when
+  they are byte-identical to what it scaffolded; a file you edited is kept and
+  reported.
+- **Your notes are safe** — `remove memory` unwires the tier but **keeps**
+  `.claude/memory/` and `.claude/vault/` (your accumulated notes) by default. To
+  also handle that source data, opt in explicitly:
+
+  ```bash
+  project-init remove memory --target /path --apply --export ~/notes-backup  # move it out first
+  project-init remove memory --target /path --apply --purge                  # delete it (destructive)
+  ```
+
+  `--purge` and `--export` are mutually exclusive; `--purge` prints what it will
+  delete and (like all `--apply` runs) requires a clean tree, so the data is
+  recoverable from git. The same flags also clean **governance** user files.
+
+**Known limits.** `multi-model`'s CCR config lives in your global `~/.config`
+(outside the project), so `--purge` does not touch it. A memory tier *downgrade*
+done via `add memory <lower-tier>` keeps the now-unused higher-tier data in place;
+to drop it, `remove memory --purge` then `add memory <tier>` again, or delete the
+directory yourself.
+
 ## Uninstall
 
 ```bash

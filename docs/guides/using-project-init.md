@@ -183,6 +183,30 @@ The graph rebuilds incrementally per commit; agents query `graphify-out/graph.js
 
 **Re-run to update**: `/project-init` is safe to re-run anytime. It never overwrites `memory/` or `vault/` content.
 
+**Add or remove a whole concern later**: to opt into a tier you declined at init —
+or drop one you no longer want — use `add` / `remove` instead of re-running the
+wizard. They toggle one concern and re-render the shared wiring:
+
+```bash
+project-init add governance --target . --apply        # opt into a declined tier
+project-init add memory obsidian-only --target . --apply
+project-init remove lifecycle --target . --apply       # drop a concern
+```
+
+Concerns: `lifecycle`, `governance`, `observability`, `multi-model`, `docs`,
+`renovate`, `memory <stack>`. Both default to a **dry-run** (report only) until you
+pass `--apply`, which requires a clean git tree.
+
+`remove` deletes only the files it scaffolded unchanged — your edits are kept. And
+`remove memory` **keeps your notes** (`memory/`, `vault/`) by default; to also move
+or delete that source data, add `--export <dir>` (move it out first) or `--purge`
+(delete it — destructive, commit first so git can recover it):
+
+```bash
+project-init remove memory --target . --apply --export ~/notes-backup
+project-init remove memory --target . --apply --purge
+```
+
 ---
 
 ## 8. Validation After Scaffolding
