@@ -161,8 +161,10 @@ def _ship_gated_skill(src: Path, dest: Path, var: str) -> None:
             continue
         if f.name == "SKILL.md":
             body = f.read_text(encoding="utf-8")
+            # newline="\n": keep the synced tree byte-identical across hosts so a
+            # Windows checkout can't introduce CRLF and break the sync contract.
             (dest / "SKILL.md.tmpl").write_text(
-                f"{{{{#if {var}}}}}{body}{{{{/if {var}}}}}", encoding="utf-8"
+                f"{{{{#if {var}}}}}{body}{{{{/if {var}}}}}", encoding="utf-8", newline="\n"
             )
         else:
             shutil.copy2(f, dest / f.name)

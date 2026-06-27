@@ -2135,9 +2135,12 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"error: {e}\n")
         return 2
     except OSError as e:
-        # A read-only/full/permission-denied target must surface a clean error,
-        # not a raw traceback (e.g. PermissionError writing into a 0555 dir).
-        sys.stderr.write(f"error: cannot write scaffold into {target}: {e.strerror or e}\n")
+        # Any I/O failure during scaffolding (a read-only/full target, or a
+        # missing/unreadable template) must surface a clean error, not a raw
+        # traceback. Name the actual failing path + OS reason so a permission
+        # problem reads differently from a missing template (Copilot review).
+        where = f" ({e.filename})" if getattr(e, "filename", None) else ""
+        sys.stderr.write(f"error: scaffolding into {target} failed: {e.strerror or e}{where}\n")
         return 1
 
     _emit_scaffold_output(args, target, created, preset, variables, inputs, conflicts)

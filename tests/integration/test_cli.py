@@ -221,7 +221,8 @@ class TestCLI:
             target.chmod(0o755)  # restore so tmp cleanup can remove it
         assert rc == 1
         err = capsys.readouterr().err
-        assert "cannot write scaffold" in err
+        assert "scaffolding into" in err and "failed" in err
+        assert str(target) in err
         assert "Traceback" not in err
 
     def test_apostrophe_in_name_allowed(self, tmp_path: Path):
