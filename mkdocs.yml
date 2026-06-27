@@ -20,6 +20,7 @@ theme:
 
 nav:
   - Home: README.md
+  - Positioning: positioning.md
   - Guide:
     - Using project-init: guides/using-project-init.md
     - Org fork lifecycle (runbook): guides/org-fork-lifecycle.md

@@ -49,8 +49,9 @@ import on EMU.
 
 The fork owns its releases:
 
-1. Bump the version in `src/project_init/__init__.py` (`__version__`) and
-   `pyproject.toml`, on a branch → PR → merge.
+1. Bump the version in `src/project_init/__init__.py` (`__version__`),
+   `pyproject.toml`, and `CITATION.cff` (`version:`), on a branch → PR → merge.
+   A contract test (`test_release_engineering.py`) enforces that all three agree.
 2. Tag the release — `release.yml` triggers on a tag push:
    `git tag vX.Y.Z && git push origin vX.Y.Z`. If your org's rulesets or the
    workflow guard restrict tag pushes, create the tag via the API instead:
