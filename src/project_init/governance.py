@@ -127,9 +127,10 @@ def emit(
 ) -> list[Path]:
     """Write ``.claude/governance/ai-bom.generated.md``.
 
-    A generated inventory, overwritten on every re-run and upgrade; on the *first*
-    scaffold a pre-existing user file at this path is preserved as a ``.new``
-    sibling rather than clobbered (PI-535).
+    A generated inventory, overwritten on every re-run and upgrade — except that a
+    pre-existing user file at this path is preserved as a ``.new`` sibling (never
+    clobbered) on the *first* scaffold, or on a later run while an unmerged ``.new``
+    sibling from an earlier run is still pending (PI-535).
     """
     from project_init.scaffold import _emit_generated
 

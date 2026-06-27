@@ -262,8 +262,10 @@ def emit(
     """Write .claude/CAPABILITIES.md.
 
     A generated inventory (not user-editable), overwritten on every re-run and
-    upgrade. On the *first* scaffold a pre-existing user file at this path is
-    never clobbered — a ``.new`` sibling is written instead (PI-535).
+    upgrade — except that a pre-existing user file at this path is never clobbered
+    on the *first* scaffold, or on a later run while an unmerged ``.new`` sibling
+    from an earlier run is still pending: the render is parked as a ``.new``
+    sibling instead (PI-535).
     """
     from project_init.scaffold import _emit_generated
 
