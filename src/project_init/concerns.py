@@ -174,28 +174,102 @@ def _seed_preserved(
     return seeded
 
 
+def _orphaned_preserved(target: Path, rendered: list[Path]) -> list[Path]:
+    """Preserved source files present on disk but no longer in the new render.
+
+    Preserved files (``.claude/memory/``, ``.claude/vault/``, governance user
+    files) are normally kept on every re-render. After a toggle that drops their
+    concern, the new staging render no longer produces them — so a preserved file
+    whose path is absent from *rendered* is orphaned source data, the target of
+    ``--purge`` / ``--export``.
+    """
+    preserve_globs = read_preserve_globs(target)
+    rendered_set = {r.as_posix() for r in rendered}
+    claude = target / ".claude"
+    if not claude.is_dir():
+        return []
+    out: list[Path] = []
+    for p in sorted(claude.rglob("*")):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(target)
+        if _is_preserved(rel, preserve_globs) and rel.as_posix() not in rendered_set:
+            out.append(rel)
+    return out
+
+
+def _purge_or_export(
+    target: Path, orphaned: list[Path], *, purge: bool, export_dir: Path | None
+) -> list[Path]:
+    """Delete (*purge*) or move (*export_dir*) the orphaned preserved files.
+
+    Exported files keep their relative path under *export_dir*. Empty directories
+    left behind are pruned. Returns the handled paths.
+    """
+    handled: list[Path] = []
+    for rel in orphaned:
+        src = target / rel
+        if not src.is_file():
+            continue
+        if export_dir is not None:
+            dest = export_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dest))
+        else:
+            src.unlink()
+        handled.append(rel)
+    _prune_empty_dirs(target, handled)
+    return handled
+
+
 def _prune_empty_dirs(target: Path, deleted: list[Path]) -> None:
-    """Remove now-empty parent directories left by deleted files (up to target)."""
-    seen: set[Path] = set()
+    """Remove now-empty directories left by removed files (up to, not incl. target).
+
+    Collects every ancestor dir of the removed files and prunes empties
+    deepest-first, so a parent that becomes empty only after its last child dir is
+    removed is still pruned (order-independent).
+    """
+    dirs: set[Path] = set()
     for rel in deleted:
         d = (target / rel).parent
-        while d != target and d not in seen and d.is_dir():
-            seen.add(d)
-            try:
-                next(d.iterdir())
-                break  # not empty
-            except StopIteration:
-                d.rmdir()
-                d = d.parent
+        while d != target:
+            dirs.add(d)
+            d = d.parent
+    for d in sorted(dirs, key=lambda p: len(p.parts), reverse=True):
+        if d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
 
 
-def apply_concern(
+def _validate_flags(*, enable: bool, purge: bool, export_dir: Path | None) -> str | None:
+    """Return an error message if the purge/export flags are misused, else None."""
+    if (purge or export_dir is not None) and enable:
+        return "--purge/--export apply to `remove`, not `add`"
+    if purge and export_dir is not None:
+        return "--purge and --export are mutually exclusive"
+    return None
+
+
+def _apply_source(
+    target: Path, report, *, apply: bool, purge: bool, export_dir: Path | None
+) -> list[Path]:
+    """Compute orphaned preserved source data; delete/move it when *apply*."""
+    if not (purge or export_dir is not None):
+        return []
+    source = _orphaned_preserved(target, report.rendered)
+    if apply:
+        _purge_or_export(target, source, purge=purge, export_dir=export_dir)
+    return source
+
+
+def apply_concern(  # noqa: PLR0913 — flags map 1:1 to the add/remove CLI options
     target: Path,
     concern: str,
     *,
     enable: bool,
     value: str | None = None,
     apply: bool,
+    purge: bool = False,
+    export_dir: Path | None = None,
 ) -> int:
     """Toggle *concern* on the scaffold at *target*; return a process exit code.
 
@@ -203,8 +277,17 @@ def apply_concern(
     nothing. With *apply* it re-renders the shared wiring with the concern's flag
     flipped, lands the concern's files (add) or deletes its orphaned files
     (remove, byte-unmodified only), and refreshes ``.claude/config.yaml``.
+
+    *purge* / *export_dir* (remove only, mutually exclusive) act on **orphaned
+    preserved source data** — the user's ``.claude/memory/`` / ``.claude/vault/``
+    notes that ``remove`` keeps by default: *purge* deletes them, *export_dir*
+    moves them out first. Without either, source data is left in place.
     """
     verb = "add" if enable else "remove"
+    flag_error = _validate_flags(enable=enable, purge=purge, export_dir=export_dir)
+    if flag_error:
+        sys.stderr.write(f"error: {flag_error}\n")
+        return 1
     try:
         preset_name, variables, manifest, _migrated = read_scaffold_record(target)
     except UpgradeError as e:
@@ -219,7 +302,11 @@ def apply_concern(
         sys.stderr.write(f"error: {e}\n")
         return 1
 
-    if new_vars == {**variables, "project_init_version": __version__}:
+    no_change = new_vars == {**variables, "project_init_version": __version__}
+    # A no-op toggle still proceeds when --purge/--export is set: the concern may
+    # already be off yet leave preserved source data (notes, governance user files)
+    # the user now wants deleted/moved.
+    if no_change and not (purge or export_dir is not None):
         print(f"{concern} is already {'present' if enable else 'absent'} — nothing to do.")
         return 0
 
@@ -235,13 +322,15 @@ def apply_concern(
         report = compute_drift(target, staging, rendered, manifest, read_base(target))
         deleted: list[Path] = []
         kept: list[Path] = []
-
         if apply:
             apply_drift(target, staging, report, preset_name, new_vars)
             deleted, kept = _delete_orphans(target, report.removed, manifest)
+        source = _apply_source(target, report, apply=apply, purge=purge, export_dir=export_dir)
         seeded = _seed_preserved(target, staging, report.rendered, write=apply)
 
         _print_summary(verb, concern, report, deleted, kept, seeded, applied=apply)
+        if purge or export_dir is not None:
+            _print_source(source, purge=purge, export_dir=export_dir, applied=apply)
         note = _advisory(concern, enable=enable)
         if note:
             print(f"\nnote: {note}")
@@ -289,3 +378,21 @@ def _print_summary(  # noqa: PLR0913 — one list per drift category, all distin
         )
     if not applied:
         print("  (re-run with --apply to make these changes)")
+
+
+def _print_source(
+    source: list[Path], *, purge: bool, export_dir: Path | None, applied: bool
+) -> None:
+    if not source:
+        print("  source data: none orphaned by this change.")
+        return
+    files = ", ".join(p.as_posix() for p in sorted(source)[:8])
+    if purge:
+        verb = "PURGED — permanently deleted" if applied else "WOULD PURGE (permanently delete)"
+    else:
+        verb = f"exported to {export_dir}" if applied else f"would export to {export_dir}"
+    print(f"  source data {verb} ({len(source)}): {files}")
+    if purge and not applied:
+        print(
+            "  ⚠ --purge deletes your notes — commit them to git first (then they're recoverable)."
+        )

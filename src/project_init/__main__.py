@@ -1640,9 +1640,22 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
         action="store_true",
         help="permit --apply on a dirty git work tree (default: refuse)",
     )
+    if not enable:
+        src = p.add_mutually_exclusive_group()
+        src.add_argument(
+            "--purge",
+            action="store_true",
+            help="also DELETE orphaned source data (memory/vault notes) — destructive",
+        )
+        src.add_argument(
+            "--export",
+            metavar="DIR",
+            help="move orphaned source data (memory/vault notes) to DIR before removing",
+        )
     args = p.parse_args(argv)
     target = Path(args.target).resolve()
     value = getattr(args, "value", None)
+    export_dir = Path(args.export).resolve() if getattr(args, "export", None) else None
 
     git_status = None
     if args.apply:
@@ -1651,7 +1664,15 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
         if blocked is not None:
             return blocked
 
-    rc = apply_concern(target, args.concern, enable=enable, value=value, apply=args.apply)
+    rc = apply_concern(
+        target,
+        args.concern,
+        enable=enable,
+        value=value,
+        apply=args.apply,
+        purge=getattr(args, "purge", False),
+        export_dir=export_dir,
+    )
     if args.apply and rc == 0:
         _print_undo_hint(git_status, target)
     return rc
