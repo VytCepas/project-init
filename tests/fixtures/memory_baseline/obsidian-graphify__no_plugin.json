@@ -19,7 +19,7 @@
   ".claude/hooks/README.md": "9a6533d1f8ad8cc667683ba58bbda5e524c230931f65c77cb2d477c72c080061",
   ".claude/hooks/_py.sh": "41c28f08f42df48131b052aa6a74f0b49b2baa17624e4c17e2f6ca4c289ad100",
   ".claude/hooks/_usage_log.sh": "9684c3821fd3ac2cbac334a3f2ccb6de6c5792062b1bc30702001c02d19da5de",
-  ".claude/hooks/dag_workflow.py": "b143f12e5f94ecd7b78ed7c9b0e99e5db16b541c1e7edf0870ac86ea38fa863d",
+  ".claude/hooks/dag_workflow.py": "04d34eebb7ae9184ffe40cf0dfe04bfa75b8df10add87853229ff0f596191357",
   ".claude/hooks/github_command_guard.sh": "14bcf3da720916a0fdaec22febb33401c60d79717cc0035880c7c84b2cd428f1",
   ".claude/hooks/post_edit_lint.sh": "6bccb22869a6630e0b8fe739a509a5277ce6fad249093e622f1a9466b7687789",
   ".claude/hooks/pre_commit_gate.sh": "060072ea89a9c8fbd6feea761e58af330b84e24a302a815faa2facdd10e7b0b8",
