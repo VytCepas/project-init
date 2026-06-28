@@ -429,15 +429,23 @@ four-category comparison and the moat, see
 
 ```
 project-init/
-├── pyproject.toml            # uv-managed, rich-only runtime dep, ruff-only dev
-├── install.sh                # bootstrap one-liner
-├── src/project_init/         # wizard CLI + scaffold engine
+├── pyproject.toml              # uv-managed, rich-only runtime dep, ruff-only dev
+├── install.sh                  # bootstrap one-liner
+├── src/project_init/           # wizard CLI + scaffold engine (scaffold, concerns, surfaces, mcps, …)
 ├── templates/
-│   ├── base/                 # always copied (no memory backend of its own)
-│   ├── obsidian/             # vault + agent-memory overlay; derived from memory_stack (#466)
-│   ├── graphify/             # Graphify memory overlay (implies obsidian)
-│   └── presets/              # toml preset definitions
-└── tests/                    # focused pytest modules by behavior area
+│   ├── base/                   # always copied
+│   ├── fallback/               # shared hooks/skills — rendered only with --no-plugin (ADR-010)
+│   ├── presets/                # toml preset definitions
+│   ├── obsidian/               # vault + agent-memory overlay
+│   ├── graphify/               # Graphify memory overlay (implies obsidian)
+│   ├── rag/                    # tier-3 RAG memory overlay
+│   ├── lifecycle/              # git lifecycle enforcement (+ lifecycle_fallback for --no-plugin)
+│   ├── multi_model/            # CCR model-switching overlay (--multi-model)
+│   ├── observability/          # transcript metrics overlay (--observability)
+│   ├── governance/             # AI governance overlay (--governance)
+│   ├── auto/                   # always-on emitted artifacts
+│   └── amp/ antigravity/ codex/ junie/  # per-surface wiring overlays (--agents)
+└── tests/                      # focused pytest modules by behavior area
 ```
 
 ## Status
