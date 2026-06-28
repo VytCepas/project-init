@@ -1,5 +1,6 @@
 {
   "name": "project-init",
+  "description": "Plugins extracted from the project-init scaffolder: forge-agnostic quality and safety hooks plus general skills (project-init-workflow), and GitHub issue->branch->PR->review->merge lifecycle automation (project-init-lifecycle).",
   "owner": {
     "name": "Vytautas Čepas",
     "url": "https://github.com/VytCepas"
