@@ -28,6 +28,12 @@ Exception (PI-526): the concern-decoupled skills `save_memory`, `status`, and
 `session_summary` gained deterministic presence-checks in their bodies — a
 deliberate fix, not move-drift. Only those three SKILL.md hashes were re-pinned
 (no_plugin combos), after verifying every other file still matched.
+
+Exception (PI-550): `dag_workflow.py` gained `_strip_text_flag_values` so the
+command-guard no longer false-positives on blocked-command phrases inside
+free-text flag values (`--body`/`-m`/`--title`/`--notes`). A deliberate guard
+fix, not move-drift. Only the `.claude/hooks/dag_workflow.py` hash was re-pinned
+across all four combos, after verifying every other file still matched.
 """
 
 from __future__ import annotations

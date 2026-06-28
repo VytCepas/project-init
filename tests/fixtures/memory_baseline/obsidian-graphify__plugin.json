@@ -18,7 +18,7 @@
   ".claude/docs/guides/using-memory.md": "433598cd17ee0a7d98f2987100cae5426947ee8edb8e0b2dfa7c7786a7b94e1e",
   ".claude/hooks/README.md": "9a6533d1f8ad8cc667683ba58bbda5e524c230931f65c77cb2d477c72c080061",
   ".claude/hooks/_py.sh": "41c28f08f42df48131b052aa6a74f0b49b2baa17624e4c17e2f6ca4c289ad100",
-  ".claude/hooks/dag_workflow.py": "b143f12e5f94ecd7b78ed7c9b0e99e5db16b541c1e7edf0870ac86ea38fa863d",
+  ".claude/hooks/dag_workflow.py": "04d34eebb7ae9184ffe40cf0dfe04bfa75b8df10add87853229ff0f596191357",
   ".claude/hooks/prod_guard.py": "b801d9f46b0b91f3af75e3b8b55fae869561e1f4f1bb161ef8c9812d2516ef9f",
   ".claude/memory/MEMORY.md": "544dac81979cbe795cc55a020360c2569036381b62f879d10ce8dffdc0de0791",
   ".claude/memory/README.md": "ff7e14d842d875f537d7d3a6cbe18df47e754088949804f94f348e300bbcbc5e",

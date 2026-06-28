@@ -285,6 +285,47 @@ class TestGuardSteering:
         out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
         assert out is None
 
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # #550: a blocked-command phrase living inside a free-text flag value
+            # is prose, not an invocation, and must not trip the guard.
+            'gh issue comment 5 --body "see the blocked git push main screenshot"',
+            'gh pr comment 5 -b "do not git push origin main here"',
+            "git commit -m 'docs: explain why git push main is blocked'",
+            'gh release create v1 --notes "no more git push master"',
+            'gh issue comment 5 --body="quoting git push origin main inline"',
+            'gh pr edit 5 --title "git push main guard fix" --body "x"',
+        ],
+    )
+    def test_allows_blocked_phrase_inside_text_flag_value(self, cmd: str, tmp_path: Path):
+        """#550: free-text flag values (--body/-b, --message/-m, --title/-t,
+        --notes) are masked before pattern scanning, so prose mentioning a
+        blocked command does not produce a false-positive denial."""
+        out = _run_guard({"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert out is None
+
+    def test_still_blocks_command_substitution_inside_body(self, tmp_path: Path):
+        """#550 evasion guard: a value containing a command substitution IS
+        executed, so masking must leave it intact and the inner merge must
+        still be caught (monitor_pr.sh redirect exists in this repo)."""
+        out = _run_guard(
+            {"tool_input": {"command": 'gh pr comment 5 --body "$(gh pr merge 9)"'}},
+            cwd=tmp_path,
+        )
+        assert _denied(out)
+        assert "monitor_pr.sh" in _deny_reason(out)
+
+    def test_masked_flag_does_not_hide_a_real_following_push(self, tmp_path: Path):
+        """#550: masking a flag value must not swallow a real push-to-main that
+        follows it in the same command line."""
+        out = _run_guard(
+            {"tool_input": {"command": 'git commit -m "wip" && git push origin main'}},
+            cwd=tmp_path,
+        )
+        assert _denied(out)
+        assert "main/master" in _deny_reason(out)
+
     def test_innocuous_command_passes(self, tmp_path: Path):
         out = _run_guard({"tool_input": {"command": "ls -la"}}, cwd=tmp_path)
         assert out is None

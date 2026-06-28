@@ -297,6 +297,37 @@ def _strip_heredocs(cmd: str) -> str:
     return _HEREDOC_RE.sub("", cmd)
 
 
+# Free-text flag values carry arbitrary prose (commit messages, issue/PR comment
+# and release bodies, titles) that must not be scanned for command patterns — a
+# `--body` mentioning the literal "git push main" is data, not an invocation.
+_TEXT_FLAG_RE = re.compile(
+    r"""(?P<flag>--body|--message|--title|--notes|-b|-m|-t)   # known free-text flags
+        (?:=|\s+)                                             # = or whitespace separator
+        (?P<q>['"])                                           # opening quote
+        (?P<val>(?:\\.|(?!(?P=q)).)*)                         # value (escapes allowed)
+        (?P=q)                                                # matching closing quote
+    """,
+    re.VERBOSE | re.DOTALL,
+)
+
+
+def _strip_text_flag_values(cmd: str) -> str:
+    """Blank the quoted value of known free-text flags so prose can't trip the
+    pattern rules. Values containing a command substitution (``$(`` or a
+    backtick) are left intact — those ARE executed, so the rules must still see
+    them. Flag values are otherwise inert data: masking loses no real
+    enforcement (an actual ``git push origin main`` uses a positional ref, not a
+    flag value, and stays blocked)."""
+
+    def _blank(m: re.Match[str]) -> str:
+        val = m.group("val")
+        if "$(" in val or "`" in val:
+            return m.group(0)
+        return f'{m.group("flag")} ""'
+
+    return _TEXT_FLAG_RE.sub(_blank, cmd)
+
+
 def _redirect_target_exists(reason: str) -> bool:
     """Best-effort: scan the redirect message for a `.claude/scripts/<name>`
     reference and check whether the file exists. If no reference is found,
@@ -325,9 +356,10 @@ def guard(payload: dict) -> dict | None:
     if not cmd:
         return None
 
-    # Strip heredoc bodies so pattern rules don't fire on body content
-    # (e.g. `gh issue create --body "$(cat <<'EOF'\n...git push...\nEOF\n)"`)
-    cmd_scan = _strip_heredocs(cmd)
+    # Strip heredoc bodies and free-text flag values so pattern rules don't fire
+    # on prose content (e.g. `gh issue create --body "$(cat <<'EOF'\n...git
+    # push...\nEOF\n)"`, or `gh pr comment --body "...git push main..."`).
+    cmd_scan = _strip_text_flag_values(_strip_heredocs(cmd))
 
     for pattern, target, message in COMMAND_RULES:
         if not pattern.search(cmd_scan):
