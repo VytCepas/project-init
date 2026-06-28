@@ -7,6 +7,14 @@
 
 Scaffolder for agentic-development infrastructure. One command drops a `.claude/` folder into any project so Claude Code (and other agents) have memory, docs, hooks, and curated MCPs ready to go.
 
+**Who it's for** — solo devs and small teams running Claude Code seriously across multiple repos who want consistent, *enforced* agent infrastructure (CI, a git-lifecycle DAG guard, memory, curated MCPs) — not a hand-maintained `.claude/` per project.
+
+```bash
+uvx project-init .        # scaffold into the current directory
+```
+
+→ **How it compares** to other scaffolders and Claude Code plugins: [docs/positioning.md](docs/positioning.md).
+
 ## What it gives you
 
 Inside any target project:
@@ -34,6 +42,52 @@ Principles:
 - **Deterministic-first** — hooks and scripts are bash/python. LLM calls only where generative.
 - **Claude-first, portable core** — built and tested for Claude Code; other agents get instructions, not enforcement. See [Agent support tiers](#agent-support-tiers).
 - **`bun` and `uv` only** — no `npm`/`npx`/`pip`/`venv` anywhere in scaffolded projects.
+
+## Install (one-time)
+
+Two install paths — pick by how you'll invoke it:
+
+**CLI-only, from [PyPI](https://pypi.org/project/project-init/)** (ADR-011). Gives
+you the `project-init` command — no `/project-init` slash command:
+
+```bash
+uv tool install project-init   # or one-off: uvx project-init .
+```
+
+**Full setup, from git** — adds the Claude Code slash command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
+```
+
+This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to `~/.local/share/project-init` (override with `PROJECT_INIT_HOME=...`) **pinned to the latest tagged release**, and writes a user-level slash command at `~/.claude/commands/project-init.md`.
+
+Pin a specific version, or opt into the unreleased development head:
+
+```bash
+PROJECT_INIT_REF=v0.5.1 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
+PROJECT_INIT_REF=main   bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
+```
+
+Direct tool install without the slash command (any pinned tag):
+
+```bash
+uv tool install git+https://github.com/VytCepas/project-init@v0.5.1
+```
+
+Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
+
+### Platform requirements
+
+macOS, Linux, and WSL work out of the box. The scaffolded hooks and lifecycle
+scripts are bash (a single bash-3.2 portability floor, epic #359) — so on **native Windows
+(non-WSL)** you need **[Git for Windows](https://gitforwindows.org/)** (it ships
+`bash`/`sh` + coreutils), and you should run from a **Git Bash** shell. Claude
+Code then runs hooks through Git Bash automatically; the wired hooks also pin
+`"shell": "bash"` to make that explicit. Without Git for Windows, Claude Code
+falls back to PowerShell, which can't run a bash hook — so the enforcement
+hooks won't fire. PowerShell-only is not a supported target; there are no
+`.ps1` equivalents by design. (WSL remains the smoothest Windows path.)
 
 ## Agent support tiers
 
@@ -89,52 +143,6 @@ Two honest caveats hold across all of it:
 - **Automated testing covers the Claude Code artifacts + the rendered per-surface
   files.** The suite validates settings/skills/hooks/MCP and the generated
   surface configs; no GUI agent is driven live in CI.
-
-## Install (one-time)
-
-Two install paths — pick by how you'll invoke it:
-
-**CLI-only, from [PyPI](https://pypi.org/project/project-init/)** (ADR-011). Gives
-you the `project-init` command — no `/project-init` slash command:
-
-```bash
-uv tool install project-init   # or one-off: uvx project-init .
-```
-
-**Full setup, from git** — adds the Claude Code slash command:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
-```
-
-This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to `~/.local/share/project-init` (override with `PROJECT_INIT_HOME=...`) **pinned to the latest tagged release**, and writes a user-level slash command at `~/.claude/commands/project-init.md`.
-
-Pin a specific version, or opt into the unreleased development head:
-
-```bash
-PROJECT_INIT_REF=v0.5.1 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
-PROJECT_INIT_REF=main   bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
-```
-
-Direct tool install without the slash command (any pinned tag):
-
-```bash
-uv tool install git+https://github.com/VytCepas/project-init@v0.5.1
-```
-
-Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
-
-### Platform requirements
-
-macOS, Linux, and WSL work out of the box. The scaffolded hooks and lifecycle
-scripts are bash (a single bash-3.2 portability floor, epic #359) — so on **native Windows
-(non-WSL)** you need **[Git for Windows](https://gitforwindows.org/)** (it ships
-`bash`/`sh` + coreutils), and you should run from a **Git Bash** shell. Claude
-Code then runs hooks through Git Bash automatically; the wired hooks also pin
-`"shell": "bash"` to make that explicit. Without Git for Windows, Claude Code
-falls back to PowerShell, which can't run a bash hook — so the enforcement
-hooks won't fire. PowerShell-only is not a supported target; there are no
-`.ps1` equivalents by design. (WSL remains the smoothest Windows path.)
 
 ## Use
 
@@ -421,15 +429,23 @@ four-category comparison and the moat, see
 
 ```
 project-init/
-├── pyproject.toml            # uv-managed, rich-only runtime dep, ruff-only dev
-├── install.sh                # bootstrap one-liner
-├── src/project_init/         # wizard CLI + scaffold engine
+├── pyproject.toml              # uv-managed, rich-only runtime dep, ruff-only dev
+├── install.sh                  # bootstrap one-liner
+├── src/project_init/           # wizard CLI + scaffold engine (scaffold, concerns, surfaces, mcps, …)
 ├── templates/
-│   ├── base/                 # always copied (no memory backend of its own)
-│   ├── obsidian/             # vault + agent-memory overlay; derived from memory_stack (#466)
-│   ├── graphify/             # Graphify memory overlay (implies obsidian)
-│   └── presets/              # toml preset definitions
-└── tests/                    # focused pytest modules by behavior area
+│   ├── base/                   # always copied
+│   ├── fallback/               # shared hooks/skills — rendered only with --no-plugin (ADR-010)
+│   ├── presets/                # toml preset definitions
+│   ├── obsidian/               # vault + agent-memory overlay
+│   ├── graphify/               # Graphify memory overlay (implies obsidian)
+│   ├── rag/                    # tier-3 RAG memory overlay
+│   ├── lifecycle/              # git lifecycle enforcement (+ lifecycle_fallback for --no-plugin)
+│   ├── multi_model/            # CCR model-switching overlay (--multi-model)
+│   ├── observability/          # transcript metrics overlay (--observability)
+│   ├── governance/             # AI governance overlay (--governance)
+│   ├── auto/                   # always-on emitted artifacts
+│   └── amp/ antigravity/ codex/ junie/  # per-surface wiring overlays (--agents)
+└── tests/                      # focused pytest modules by behavior area
 ```
 
 ## Status
