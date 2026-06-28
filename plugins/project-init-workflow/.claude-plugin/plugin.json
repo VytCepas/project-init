@@ -2,7 +2,7 @@
   "name": "project-init-workflow",
   "displayName": "project-init Workflow",
   "version": "0.1.0",
-  "description": "GitHub lifecycle skills and deterministic guard hooks from project-init: issue->branch->PR->review->merge workflow, commit gating, and session bootstrap.",
+  "description": "Forge-agnostic quality and safety hooks plus general skills from project-init: commit gating, lint-on-edit, prod-safety guard, and session bootstrap. The always-on core payload; GitHub lifecycle automation lives in the separate project-init-lifecycle plugin.",
   "author": {
     "name": "Vytautas Čepas",
     "url": "https://github.com/VytCepas"
