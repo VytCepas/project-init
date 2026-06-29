@@ -60,6 +60,21 @@ def test_session_setup_fingerprint_is_shasum_aware():
         assert "cksum" in text, f"{path}: no POSIX cksum fallback when neither exists"
 
 
+def test_session_setup_syncs_dev_group_without_masking():
+    """PI #552/#553: the Python bootstrap must `uv sync --group dev` (project-init
+    scaffolds `dev` as a PEP 735 dependency-group, so `--extra dev` errors), and
+    must NOT mask the failure behind `2>/dev/null || uv sync` — a degraded,
+    dev-less sync reported as success would cache the stamp and never retry."""
+    for path in _hook_files("session_setup.sh"):
+        code = _code_lines(path.read_text())
+        assert "uv sync --group dev" in code, f"{path}: must sync the dev group"
+        assert "--extra dev" not in code, f"{path}: --extra dev errors on a PEP 735 group"
+        # The silent-masking pattern must be gone so a real failure surfaces.
+        assert "2>/dev/null || uv sync" not in code, (
+            f"{path}: must not mask a failed sync behind a dev-less fallback"
+        )
+
+
 def test_commit_gate_builds_arrays_portably():
     """Staged-file lists are read with a while-loop, not mapfile."""
     for path in _hook_files("pre_commit_gate.sh"):

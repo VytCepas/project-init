@@ -424,31 +424,37 @@ wheels = [
 
 [[package]]
 name = "project-init"
-version = "0.5.2"
+version = "0.5.3"
 source = { editable = "." }
 dependencies = [
     { name = "rich" },
 ]
 
 [package.optional-dependencies]
+docs = [
+    { name = "mkdocs-material" },
+]
+
+[package.dev-dependencies]
 dev = [
     { name = "pytest" },
     { name = "pytest-xdist" },
     { name = "ruff" },
 ]
-docs = [
-    { name = "mkdocs-material" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.7.6" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "rich", specifier = ">=13.7" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
 ]
-provides-extras = ["dev", "docs"]
+provides-extras = ["docs"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-xdist", specifier = ">=3.0" },
+    { name = "ruff", specifier = ">=0.4" },
+]
 
 [[package]]
 name = "pygments"

@@ -120,11 +120,17 @@ class TestBranchProtectionBootstrap:
         assert '"allow_force_pushes": false' in script
 
     def test_protection_requires_generated_ci_checks(self):
-        """The required contexts must cover the scaffolded CI workflow's
-        unconditional jobs, or 'require CI green' is an empty promise."""
+        """The required contexts must use the bare check-run names GitHub reports
+        (PI #555): the single "CI gate" job (which `needs:` the matrix + secret
+        scan) plus the PR-format check. The old "CI / Lint and test" /
+        "review/decision" contexts never matched a real check-run and left main
+        permanently `blocked`."""
         script = _SETUP_GITHUB.read_text()
-        assert '"CI / Lint and test"' in script
-        assert '"CI / Secret scan (gitleaks)"' in script
+        assert '"CI gate"' in script
+        assert '"Check PR title, branch, and linked issue"' in script
+        # The un-matchable contexts that caused the deadlock must be gone.
+        assert '"CI / Lint and test"' not in script
+        assert '"review/decision"' not in script
 
     def test_protect_sets_squash_only_merge_policy(self):
         """--protect centralizes the repo merge policy (lifted from the removed
