@@ -64,6 +64,26 @@ COMBOS = [
 # test_lifecycle_none.py, not byte-identity.
 _GENERATED = {".claude/CAPABILITIES.md"}
 
+# Files added or intentionally edited AFTER the frozen baseline was captured —
+# legitimate content changes, not the static template move this contract guards.
+# Excluded from both sides (same mechanism as the settings.json / CAPABILITIES.md
+# carve-outs); their correctness is covered by the focused template/governance
+# contracts, not byte-identity.
+#   • .gitleaks.toml — new base file shipping with the gitleaks CI job (#554)
+#   • ci.yml — gained the all-green "CI gate" job (#555)
+#   • setup_github.sh — bare required-check contexts + board SSOT (#555/#556)
+#   • create_issue.sh / board-automation.yml / config.yaml — board-number SSOT (#556)
+#   • session_setup.sh — `uv sync --group dev`, no silent-failure masking (#552/#553)
+_ADDED_SINCE_BASELINE = {
+    ".gitleaks.toml",
+    ".github/workflows/ci.yml",
+    ".claude/scripts/setup_github.sh",
+    ".claude/scripts/create_issue.sh",
+    ".github/workflows/board-automation.yml",
+    ".claude/config.yaml",
+    ".claude/hooks/session_setup.sh",
+}
+
 
 def _manifest(target: Path) -> dict[str, str]:
     out: dict[str, str] = {}
@@ -98,7 +118,7 @@ def test_lifecycle_move_byte_identical(preset_name: str, no_plugin: bool, tmp_pa
     # plugin enablement (#476 plugin split) — an intended edit, not move drift.
     # The no-plugin hook gating IS designed byte-identical-when-ON, so it stays
     # in the comparison. The plugin-mode change is covered by test_lifecycle_none.
-    drop = set(_GENERATED)
+    drop = set(_GENERATED) | _ADDED_SINCE_BASELINE
     if not no_plugin:
         drop.add(".claude/settings.json")
     got = {k: v for k, v in got.items() if k not in drop}

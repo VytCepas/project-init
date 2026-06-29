@@ -4,7 +4,7 @@
 
 # install/sync dev dependencies
 setup:
-    uv sync --extra dev
+    uv sync --group dev
 
 # lint (docstring + complexity gates per pyproject.toml)
 lint:

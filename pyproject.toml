@@ -28,13 +28,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+docs = [
+    "mkdocs-material>=9.7.6",
+]
+
+# Dev tooling lives in a PEP 735 dependency-group — the layout project-init
+# scaffolds into target projects (`uv sync --group dev`). Dogfooding it here
+# keeps the bootstrap consistent across the repo and its templates (PI #552).
+[dependency-groups]
 dev = [
     "ruff>=0.4",
     "pytest>=8.0",
     "pytest-xdist>=3.0",
-]
-docs = [
-    "mkdocs-material>=9.7.6",
 ]
 
 [project.scripts]

@@ -20,6 +20,22 @@ command -v gh >/dev/null 2>&1 || { echo "error: GitHub CLI (gh) not found — in
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 PY="$SCRIPT_DIR/../hooks/_py.sh"
 
+# Single source of truth for the GitHub Project board number (PI #556):
+# the PROJECT_NUMBER env var overrides; otherwise read github_project_number
+# from .claude/config.yaml (shared with board-automation.yml / setup_github.sh);
+# default 1. Account-scoped numbering means a real board is rarely #1, so the
+# three consumers must agree or board state silently splits across projects.
+resolve_project_number() {
+  if [ -n "${PROJECT_NUMBER:-}" ]; then
+    printf '%s\n' "$PROJECT_NUMBER"
+    return
+  fi
+  local configured=""
+  configured=$(grep -E '^[[:space:]]*github_project_number:' "$SCRIPT_DIR/../config.yaml" 2>/dev/null \
+    | head -n1 | sed 's/#.*$//' | grep -oE '[0-9]+' | head -n1 || true)
+  printf '%s\n' "${configured:-1}"
+}
+
 VALID_TYPES="feat fix chore docs test"
 VALID_SCALES="epic task"
 VALID_PRIORITIES="high medium low"
@@ -409,13 +425,13 @@ ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
 # board. They are also written into the issue body above (PI-201) so the issue
 # is self-contained and passes issue-validation.yml; the board copy makes them
 # sortable/filterable for humans.
-# PROJECT_NUMBER defaults to 1; override with the env var if needed.
+# Board number resolves via resolve_project_number() (config.yaml SSOT, #556).
 # ---------------------------------------------------------------------------
 sync_project_fields() {
   local issue_num="$1"
   local project_num owner repo_name project_data project_id item_id
 
-  project_num="${PROJECT_NUMBER:-1}"
+  project_num="$(resolve_project_number)"
   owner=$(gh repo view --json owner -q .owner.login)
   repo_name=$(gh repo view --json name -q .name)
 

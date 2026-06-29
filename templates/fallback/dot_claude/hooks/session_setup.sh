@@ -53,7 +53,13 @@ bootstrap() {
     && just --show setup >/dev/null 2>&1; then
     just setup
   elif [ -f pyproject.toml ] && command -v uv >/dev/null 2>&1; then
-    uv sync --extra dev 2>/dev/null || uv sync
+    # PEP 735: project-init scaffolds `dev` as a [dependency-groups] table, so
+    # sync the group (PI #552). A single command with no `2>/dev/null || uv sync`
+    # masking: a real failure must surface as a nonzero exit (→ the "bootstrap
+    # failed" branch below) instead of silently falling back to a dev-less venv
+    # that lies "synced" and caches the stamp so the next session never retries
+    # (PI #553).
+    uv sync --group dev
   elif [ -f package.json ] && command -v bun >/dev/null 2>&1; then
     bun install
   elif [ -f go.mod ] && command -v go >/dev/null 2>&1; then

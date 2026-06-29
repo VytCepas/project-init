@@ -93,7 +93,9 @@ class TestIssueMetadataScaffold:
         content = script.read_text()
         assert "branches/main/protection" in content
         assert "Copilot code review" in content
-        assert "Validate PR / Check PR title, branch, and linked issue" in content
+        # Bare check-run name GitHub actually reports — not the "Validate PR /"
+        # prefixed form, which never matched and left main `blocked` (PI #555).
+        assert "Check PR title, branch, and linked issue" in content
 
     def test_project_init_references_github_setup(self):
         content = (self.target / ".claude" / "project-init.md").read_text()

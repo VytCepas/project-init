@@ -200,6 +200,44 @@ class TestScaffoldGitHubFiles:
         assert "uv sync --group dev" in content
         assert "uv sync --extra dev" not in content
 
+    def test_ci_has_all_green_gate_job(self):
+        """PI #555: a single 'CI gate' job that `needs:` the matrix + secret scan
+        is the one required status check, so branch protection never references an
+        un-expanded matrix leg GitHub can't match (which left main `blocked`)."""
+        content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "name: CI gate" in content
+        assert "needs: [lint-and-test, secret-scan]" in content
+        # Must run even when an upstream job fails, then fail unless all succeeded.
+        assert "if: always()" in content
+
+    def test_board_automation_reads_project_number_from_config(self):
+        """PI #556: the board number is read from .claude/config.yaml (the single
+        source of truth shared with create_issue.sh / setup_github.sh), not a
+        hardcoded `PROJECT_NUMBER: 1` that drifts from a real (non-#1) board."""
+        content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
+        assert "github_project_number" in content
+        assert "PROJECT_NUMBER=$num" in content
+        # The hardcoded literal that split board state must be gone.
+        assert "PROJECT_NUMBER: 1" not in content
+
+    def test_setup_github_reads_project_number_from_config(self):
+        """PI #556: setup_github.sh resolves the board number from config.yaml
+        too, so all three consumers agree."""
+        content = (self.target / ".claude" / "scripts" / "setup_github.sh").read_text()
+        assert "github_project_number" in content
+
+    def test_gitleaks_config_shipped(self):
+        """PI #554: the gitleaks secret-scan job ships in base CI, so a matching
+        .gitleaks.toml must ship too — otherwise a fresh scaffold fails its first
+        CI run when gitleaks flags the high-entropy hashes in the generated
+        .claude/config.yaml scaffold record."""
+        cfg = self.target / ".gitleaks.toml"
+        assert cfg.is_file(), ".gitleaks.toml must ship alongside the gitleaks CI job"
+        content = cfg.read_text()
+        assert "useDefault = true" in content
+        # The scaffold record (.claude/config.yaml) must be allowlisted.
+        assert "config" in content and "claude" in content
+
     def test_ci_does_not_hardcode_python_version(self):
         """PI-208: a pinned Python version drifts below requires-python; let uv
         resolve the project's interpreter from .python-version/requires-python.
