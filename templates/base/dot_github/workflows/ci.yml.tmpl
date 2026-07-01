@@ -356,6 +356,37 @@ jobs:
           # (free key from gitleaks.io). Personal accounts need no license.
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
+  # Semgrep: semantic/AST security backstop. gitleaks (above) is string-
+  # pattern secret scanning; semgrep catches unsafe subprocess calls, SQL
+  # injection, and other OWASP Top 10 shapes gitleaks can't see. Explicit
+  # rulesets (not --config=auto) for reproducibility. Not in ci-gate's
+  # needs — a finding never blocks a merge while the false-positive rate is
+  # calibrated, but --error still fails this job's own step so findings are
+  # visible. Promote to ci-gate's needs once calibrated.
+  semgrep:
+    name: Semgrep (semantic security scan)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history: --baseline-commit (PR-only, below) needs the base
+          # commit reachable, not just the latest diff.
+          fetch-depth: 0
+
+      - name: Run Semgrep
+        env:
+          SEMGREP_ENABLE_VERSION_CHECK: "0"
+        run: |
+          pip install --quiet semgrep==1.168.0
+          RULESETS="--config p/secrets --config p/owasp-top-ten{{#if python}} --config p/python{{/if python}}{{#if node}} --config p/typescript{{/if node}}{{#if go}} --config p/golang{{/if go}}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Scan only the diff against the PR's base commit.
+            semgrep scan --error --metrics=off $RULESETS \
+              --baseline-commit "${{ github.event.pull_request.base.sha }}"
+          else
+            semgrep scan --error --metrics=off $RULESETS
+          fi
+
   # All-green gate (PI #555): the SINGLE required status check for branch
   # protection. Branch protection requires only "CI gate", so the required
   # context is robust to matrix changes — adding/removing a {{#if python}}Python version{{/if python}}{{#if node}}runtime{{/if node}}{{#if go}}runtime{{/if go}}

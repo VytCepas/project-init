@@ -270,6 +270,47 @@ class TestBashLintGate:
         assert "shfmt -d -i 2" in ci
 
 
+class TestSemgrepGate:
+    """PI-565: semantic security backstop, always-on (like secret-scan), with
+    a per-language ruleset and no-language still getting secrets/OWASP."""
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "none"])
+    def test_semgrep_job_present_and_non_blocking(self, tmp_target: Path, language):
+        target = _scaffold_language(tmp_target, language)
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "semgrep:" in ci
+        assert "p/secrets" in ci
+        assert "p/owasp-top-ten" in ci
+        assert "--baseline-commit" in ci
+
+        gate_start = ci.index("ci-gate:")
+        gate_needs_line = next(
+            line for line in ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
+        )
+        assert "semgrep" not in gate_needs_line, "semgrep must stay non-blocking initially"
+
+    def test_python_ruleset_selected(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "python")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "p/python" in ci
+        assert "p/typescript" not in ci
+        assert "p/golang" not in ci
+
+    def test_node_ruleset_selected(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "node")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "p/typescript" in ci
+        assert "p/python" not in ci
+        assert "p/golang" not in ci
+
+    def test_go_ruleset_selected(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "go")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "p/golang" in ci
+        assert "p/python" not in ci
+        assert "p/typescript" not in ci
+
+
 class TestQualityPlugins:
     def test_pr_review_toolkit_enabled(self, tmp_target: Path):
         target = _scaffold_language(tmp_target, "python")
