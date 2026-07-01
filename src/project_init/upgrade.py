@@ -79,7 +79,7 @@ _MIGRATION_DEFAULTS = {
     "project_init_version_prev": "",
 }
 
-_LANGUAGE_FLAGS = ("python", "node", "go")
+_LANGUAGE_FLAGS = ("python", "node", "go", "rust")
 
 
 def _overlay_off_defaults() -> dict[str, str]:

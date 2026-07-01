@@ -113,7 +113,43 @@ scan:
 
 # what CI runs
 ci: lint test
-{{/if go}}{{#if delivery_service}}
+{{/if go}}{{#if rust}}# justfile — the canonical command interface (scaffolded by project-init).
+# `just --list` shows every recipe. Recipes are thin wrappers — logic lives
+# in the tools and their configs, never in this file.
+
+# fetch dependencies
+setup:
+    cargo fetch
+
+# build the project
+build:
+    cargo build
+
+# lint project code (clippy pedantic + cognitive-complexity gate per clippy.toml)
+lint:
+    cargo clippy -- -D warnings -D clippy::pedantic
+    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+
+# auto-format project code
+format:
+    cargo fmt
+
+# run the test suite
+test:
+    cargo test
+
+# docs: nothing to build locally — docs.rs renders published crate docs
+docs:
+    @echo "docs.rs renders published crate docs — nothing to build locally"
+
+# scan staged changes for secrets (same scan as the pre-commit git hook)
+scan:
+    gitleaks git --pre-commit --staged --redact --no-banner --verbose
+
+# what CI runs
+ci: lint test
+{{/if rust}}{{#if delivery_service}}
 # --- container parity (delivery=service): same image local and in cloud ---
 
 # build + run the app (and any backing services) locally

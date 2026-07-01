@@ -19,7 +19,9 @@ from tests.helpers import fallback_preset, fallback_variables
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
-    flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go")}
+    flags = {
+        lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")
+    }
     scaffold(target, fallback_preset(), fallback_variables(language=language, **flags))
     return target
 
@@ -76,6 +78,7 @@ class TestPythonToolchain:
         assert not (self.target / "eslint.config.mjs").exists()
         assert not (self.target / ".golangci.yml").exists()
         assert not (self.target / "typedoc.json").exists()
+        assert not (self.target / "clippy.toml").exists()
 
 
 class TestNodeToolchain:
@@ -107,6 +110,7 @@ class TestNodeToolchain:
         assert not (self.target / "mkdocs.yml").exists()
         assert not (self.target / ".golangci.yml").exists()
         assert not (self.target / "mypy.ini").exists()
+        assert not (self.target / "clippy.toml").exists()
 
 
 class TestGoToolchain:
@@ -143,6 +147,36 @@ class TestGoToolchain:
         assert not (self.target / "eslint.config.mjs").exists()
         assert not (self.target / "typedoc.json").exists()
         assert not (self.target / "mypy.ini").exists()
+        assert not (self.target / "clippy.toml").exists()
+
+
+class TestRustToolchain:
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = _scaffold_language(tmp_target, "rust")
+
+    def test_cargo_config_rendered(self):
+        config = tomllib.loads((self.target / ".cargo" / "config.toml").read_text())
+        assert config["build"]["rustflags"] == ["-D", "warnings"]
+
+    def test_clippy_config_rendered(self):
+        config = tomllib.loads((self.target / "clippy.toml").read_text())
+        assert config["cognitive-complexity-threshold"] == 10
+
+    def test_rustfmt_config_rendered(self):
+        content = (self.target / "rustfmt.toml").read_text()
+        assert "edition" in content
+
+    def test_no_docs_workflow(self):
+        """Rust needs no docs site — docs.rs renders published crate docs."""
+        assert not (self.target / ".github" / "workflows" / "docs.yml").exists()
+
+    def test_no_other_language_configs(self):
+        assert not (self.target / "ruff.toml").exists()
+        assert not (self.target / "eslint.config.mjs").exists()
+        assert not (self.target / "typedoc.json").exists()
+        assert not (self.target / "mypy.ini").exists()
+        assert not (self.target / ".golangci.yml").exists()
 
 
 class TestNoLanguage:
@@ -157,13 +191,16 @@ class TestNoLanguage:
             "mkdocs.yml",
             "typedoc.json",
             "mypy.ini",
+            "clippy.toml",
+            "rustfmt.toml",
+            ".cargo/config.toml",
             ".github/workflows/docs.yml",
         ):
             assert not (target / name).exists(), f"{name} must not render for language=none"
 
     def test_strict_mode_skips_empty_renders(self, tmp_target: Path):
         """Strict mode must not trip over language-gated files rendering empty."""
-        flags = {lang: "" for lang in ("python", "node", "go")}
+        flags = {lang: "" for lang in ("python", "node", "go", "rust")}
         created = scaffold(
             tmp_target,
             fallback_preset(),
@@ -236,7 +273,7 @@ class TestCiQualityGates:
     def test_mutmut_schedule_present_for_python(self):
         assert "cron:" in self.ci
 
-    @pytest.mark.parametrize("language", ["node", "go"])
+    @pytest.mark.parametrize("language", ["node", "go", "rust"])
     def test_mutmut_schedule_absent_for_other_languages(self, tmp_target: Path, language):
         target = _scaffold_language(tmp_target, language)
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
@@ -248,14 +285,14 @@ class TestBashLintGate:
     """PI-562: shellcheck + shfmt gate .claude/**/*.sh regardless of language —
     bash agent infra always ships, so the gate isn't tied to any one language."""
 
-    @pytest.mark.parametrize("language", ["python", "node", "go"])
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
     def test_lint_recipe_runs_shellcheck_and_shfmt(self, tmp_target: Path, language):
         target = _scaffold_language(tmp_target, language)
         justfile = (target / "justfile").read_text()
         assert "shellcheck -S error -x" in justfile
         assert "shfmt -d -i 2" in justfile
 
-    @pytest.mark.parametrize("language", ["python", "node", "go"])
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
     def test_ci_installs_shfmt(self, tmp_target: Path, language):
         target = _scaffold_language(tmp_target, language)
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
@@ -309,6 +346,13 @@ class TestSemgrepGate:
         assert "p/golang" in ci
         assert "p/python" not in ci
         assert "p/typescript" not in ci
+
+    def test_rust_ruleset_selected(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "rust")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "p/rust" in ci
+        assert "p/python" not in ci
+        assert "p/golang" not in ci
 
 
 class TestQualityPlugins:

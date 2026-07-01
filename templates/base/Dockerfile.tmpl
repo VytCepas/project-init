@@ -53,4 +53,20 @@ ENV PORT=8080
 EXPOSE 8080
 # TODO: ensure your server reads $PORT and listens on 0.0.0.0
 ENTRYPOINT ["/app/server"]
-{{/if go}}{{/if delivery_service}}
+{{/if go}}{{#if rust}}# --- build stage: compile a release binary ---
+FROM rust:1-slim-bookworm AS build
+WORKDIR /src
+COPY Cargo.toml Cargo.lock* ./
+COPY . .
+RUN cargo build --release
+
+# --- runtime stage: slim base (dynamically-linked glibc binary) ---
+FROM debian:bookworm-slim AS runtime
+WORKDIR /app
+# TODO: replace <crate-name> with your Cargo.toml package name
+COPY --from=build /src/target/release/<crate-name> /app/server
+ENV PORT=8080
+EXPOSE 8080
+# TODO: ensure your server reads $PORT and listens on 0.0.0.0
+ENTRYPOINT ["/app/server"]
+{{/if rust}}{{/if delivery_service}}

@@ -24,11 +24,18 @@ _COMMANDS = {
     "python": ("uv run ruff check .", "uv run ruff format .", "uv run pytest"),
     "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
     "go": ("golangci-lint run", "gofumpt -w .", "go test ./..."),
+    "rust": (
+        "cargo clippy -- -D warnings -D clippy::pedantic",
+        "cargo fmt --check",
+        "cargo test",
+    ),
 }
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
-    flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go")}
+    flags = {
+        lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")
+    }
     lint, fmt, test = _COMMANDS.get(language, ("", "", ""))
     variables = fallback_variables(
         language=language, lint_command=lint, format_command=fmt, test_command=test, **flags
@@ -50,6 +57,7 @@ class TestJustfilePerLanguage:
             ("python", "uv run ruff check .", "pytest -n auto"),
             ("node", "bunx eslint .", "bun test"),
             ("go", "golangci-lint run", "go test ./..."),
+            ("rust", "cargo clippy", "cargo test"),
         ],
     )
     def test_recipes_match_toolchain(self, tmp_path: Path, language, lint_cmd, test_cmd):
@@ -129,6 +137,12 @@ class TestRecipesAreTheSingleCallsite:
 
     def test_node_ci_calls_just(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "node")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just lint" in ci
+        assert "just test" in ci
+
+    def test_rust_ci_calls_just(self, tmp_path: Path):
+        target = _scaffold_language(tmp_path / "r", "rust")
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just lint" in ci
         assert "just test" in ci

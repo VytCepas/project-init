@@ -17,9 +17,9 @@ from tests.helpers import make_variables
 
 
 def _service(target: Path, language: str = "python", **extra: str) -> Path:
-    # make_variables sets python/node/go independently of `language` — set them
-    # explicitly to match the requested runtime (mirrors test_parity_bundle).
-    flags = {"python": "", "node": "", "go": ""}
+    # make_variables sets python/node/go/rust independently of `language` — set
+    # them explicitly to match the requested runtime (mirrors test_parity_bundle).
+    flags = {"python": "", "node": "", "go": "", "rust": ""}
     flags[language] = "true"
     scaffold(
         target,

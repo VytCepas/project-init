@@ -209,6 +209,28 @@ jobs:
       - name: Tests
         run: just test
 {{/if go}}
+{{#if rust}}
+      # Bundles Swatinem/rust-cache internally — no separate cache step needed.
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+
+      # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      - name: Install shfmt
+        run: |
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o /usr/local/bin/shfmt
+          chmod +x /usr/local/bin/shfmt
+
+      - name: Install just
+        uses: extractions/setup-just@v4
+
+      - name: Lint
+        run: just lint
+
+      - name: Tests
+        run: just test
+{{/if rust}}
 
       - name: Post failure summary
         if: failure() && github.event_name == 'pull_request'
@@ -378,7 +400,7 @@ jobs:
           SEMGREP_ENABLE_VERSION_CHECK: "0"
         run: |
           pip install --quiet semgrep==1.168.0
-          RULESETS="--config p/secrets --config p/owasp-top-ten{{#if python}} --config p/python{{/if python}}{{#if node}} --config p/typescript{{/if node}}{{#if go}} --config p/golang{{/if go}}"
+          RULESETS="--config p/secrets --config p/owasp-top-ten{{#if python}} --config p/python{{/if python}}{{#if node}} --config p/typescript{{/if node}}{{#if go}} --config p/golang{{/if go}}{{#if rust}} --config p/rust{{/if rust}}"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             # Scan only the diff against the PR's base commit.
             semgrep scan --error --metrics=off $RULESETS \
@@ -389,7 +411,7 @@ jobs:
 
   # All-green gate (PI #555): the SINGLE required status check for branch
   # protection. Branch protection requires only "CI gate", so the required
-  # context is robust to matrix changes — adding/removing a {{#if python}}Python version{{/if python}}{{#if node}}runtime{{/if node}}{{#if go}}runtime{{/if go}}
+  # context is robust to matrix changes — adding/removing a {{#if python}}Python version{{/if python}}{{#if node}}runtime{{/if node}}{{#if go}}runtime{{/if go}}{{#if rust}}runtime{{/if rust}}
   # never renames the required check, and there is no un-expanded matrix name
   # (e.g. "Lint and test (3.11)") for GitHub to fail to match against, which is
   # what left main permanently `blocked` before. `if: always()` so the gate runs

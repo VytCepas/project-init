@@ -108,6 +108,7 @@ _ADDED_SINCE_BASELINE = {
     ".claude/hooks/package_guard.py",
     ".claude/settings.json",
     "AGENTS.md",
+    ".claude/rules/rust.md",
 }
 
 

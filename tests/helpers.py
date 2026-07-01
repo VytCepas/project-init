@@ -68,6 +68,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "python": "true",
         "node": "",
         "go": "",
+        "rust": "",
         "justfile": "true",
         "devcontainer": "",
         "mise": "",

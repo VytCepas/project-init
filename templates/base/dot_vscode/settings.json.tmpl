@@ -3,6 +3,9 @@
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff"
   }{{/if python}}{{#if go}},
-  "go.formatTool": "gofmt"{{/if go}}
+  "go.formatTool": "gofumpt"{{/if go}}{{#if rust}},
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  }{{/if rust}}
 }
 {{/if vscode}}
