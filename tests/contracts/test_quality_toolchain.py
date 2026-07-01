@@ -79,6 +79,7 @@ class TestPythonToolchain:
         assert not (self.target / ".golangci.yml").exists()
         assert not (self.target / "typedoc.json").exists()
         assert not (self.target / "clippy.toml").exists()
+        assert not (self.target / "tsconfig.base.json").exists()
 
 
 class TestNodeToolchain:
@@ -92,6 +93,27 @@ class TestNodeToolchain:
         assert "eslint-plugin-jsdoc" in content
         assert "eslint-plugin-tsdoc" in content
         assert 'complexity: ["error", 10]' in content
+        assert "tseslint.configs.strict" in content
+
+    def test_tsconfig_base_rendered_and_parseable(self):
+        config = json.loads((self.target / "tsconfig.base.json").read_text())
+        options = config["compilerOptions"]
+        assert options["strict"] is True
+        assert options["noUncheckedIndexedAccess"] is True
+        assert options["exactOptionalPropertyTypes"] is True
+
+    def test_tsconfig_extends_base(self):
+        config = json.loads((self.target / "tsconfig.json").read_text())
+        assert config["extends"] == "./tsconfig.base.json"
+
+    def test_typecheck_recipe_and_ci_wired(self):
+        justfile = (self.target / "justfile").read_text()
+        assert "typecheck:" in justfile
+        assert "tsc --noEmit" in justfile
+        assert "ci: lint typecheck test" in justfile
+
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just typecheck" in ci
 
     def test_typedoc_config_rendered_and_parseable(self):
         raw = (self.target / "typedoc.json").read_text()
@@ -148,6 +170,7 @@ class TestGoToolchain:
         assert not (self.target / "typedoc.json").exists()
         assert not (self.target / "mypy.ini").exists()
         assert not (self.target / "clippy.toml").exists()
+        assert not (self.target / "tsconfig.base.json").exists()
 
 
 class TestRustToolchain:
@@ -177,6 +200,7 @@ class TestRustToolchain:
         assert not (self.target / "typedoc.json").exists()
         assert not (self.target / "mypy.ini").exists()
         assert not (self.target / ".golangci.yml").exists()
+        assert not (self.target / "tsconfig.base.json").exists()
 
 
 class TestNoLanguage:
@@ -194,6 +218,8 @@ class TestNoLanguage:
             "clippy.toml",
             "rustfmt.toml",
             ".cargo/config.toml",
+            "tsconfig.base.json",
+            "tsconfig.json",
             ".github/workflows/docs.yml",
         ):
             assert not (target / name).exists(), f"{name} must not render for language=none"

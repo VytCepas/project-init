@@ -66,6 +66,16 @@ case "$FILE" in
     bunx eslint --fix --quiet "$FILE" 2>/dev/null || true
     ERRORS=$(bunx eslint --quiet "$FILE" 2>&1 || true)
   fi
+  # tsc has no --fix and no single-file mode that respects tsconfig; it only
+  # surfaces errors (strict mode, per tsconfig.base.json). .ts/.tsx only —
+  # plain .js/.jsx isn't type-checked without checkJs.
+  case "$FILE" in
+  *.ts | *.tsx)
+    if [ -z "$ERRORS" ] && [ -f "$ROOT/tsconfig.json" ] && command -v bunx &>/dev/null; then
+      ERRORS=$(cd "$ROOT" && bunx tsc --noEmit 2>&1 || true)
+    fi
+    ;;
+  esac
   ;;
 *.sh)
   # shfmt auto-fixes (like ruff format); shellcheck only surfaces errors.

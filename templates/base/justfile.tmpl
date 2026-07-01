@@ -55,13 +55,17 @@ code-map:
 
 # install the lint/format gate toolchain (eslint.config.mjs imports these)
 setup:
-    bun add -d eslint typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc @biomejs/biome
+    bun add -d eslint typescript typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc @biomejs/biome
 
 # lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs)
 lint:
     bunx eslint .
     find .claude -name '*.sh' -exec shellcheck -S error -x {} +
     find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+
+# static type check (strict mode per tsconfig.base.json)
+typecheck:
+    bunx tsc --noEmit
 
 # auto-format project code (Biome is the formatter; eslint owns the gates)
 format:
@@ -80,7 +84,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test
+ci: lint typecheck test
 {{/if node}}{{#if go}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.

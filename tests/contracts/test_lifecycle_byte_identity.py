@@ -109,6 +109,7 @@ _ADDED_SINCE_BASELINE = {
     ".claude/settings.json",
     "AGENTS.md",
     ".claude/rules/rust.md",
+    ".claude/rules/typescript.md",
 }
 
 
