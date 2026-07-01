@@ -13,8 +13,8 @@ registry before letting the install through:
 
 Same ask/deny split as prod_guard.py (ADR-012):
 
-- ``ask``   in interactive sessions — a human confirms or rejects;
-- ``block`` in fully autonomous sessions — there is no human to ask.
+- ``ask``  in interactive sessions — a human confirms or rejects;
+- ``deny`` in fully autonomous sessions — there is no human to ask.
 
 The popular-package lists below are a small curated subset per ecosystem,
 not a literal top-1000 — good enough to catch the common typosquat targets
@@ -96,6 +96,7 @@ _VALUE_TAKING_FLAGS: dict[str, set[str]] = {
         "--group", "-g", "--extra", "--optional", "--index", "--index-url", "-i",
         "--extra-index-url", "--find-links", "-f", "--target", "--prefix",
         "--constraint", "-c", "--requirement", "-r", "--python", "--python-version",
+        "--script", "--package",
     },
     "npm": {"--registry", "--tag", "--save-prefix"},
     "crates": {"--features", "-F", "--rename", "--target", "--registry"},

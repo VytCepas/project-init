@@ -463,3 +463,30 @@ class TestCLINonInteractiveCommandVariables:
         config = (target / ".claude" / "config.yaml").read_text()
         assert 'lint_command: "golangci-lint run"' in config
         assert 'test_command: "go test ./..."' in config
+
+    def test_rust_cli_writes_cargo_commands(self, tmp_path: Path):
+        from project_init.__main__ import main
+
+        target = tmp_path / "p"
+        rc = main(
+            [
+                str(target),
+                "--non-interactive",
+                "--preset",
+                "obsidian-only",
+                "--name",
+                "rust-cli",
+                "--description",
+                "test",
+                "--language",
+                "rust",
+            ]
+        )
+        assert rc == 0
+        config = (target / ".claude" / "config.yaml").read_text()
+        assert 'lint_command: "cargo clippy -- -D warnings -D clippy::pedantic"' in config
+        assert 'test_command: "cargo test"' in config
+        # Review finding: format_command must be the mutating command (matches
+        # ruff format / biome --write / golangci-lint fmt) — `cargo fmt --check`
+        # only verifies and must not be recorded as *the* format command.
+        assert 'format_command: "cargo fmt"' in config

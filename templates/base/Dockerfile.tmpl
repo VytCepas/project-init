@@ -58,13 +58,16 @@ FROM rust:1-slim-bookworm AS build
 WORKDIR /src
 COPY Cargo.toml Cargo.lock* ./
 COPY . .
-RUN cargo build --release
+# Renamed to a fixed path here (not in the COPY --from below, which can't do
+# shell substitution) so the build works out of the box regardless of the
+# crate's actual [package] name in Cargo.toml.
+RUN cargo build --release && \
+    cp "target/release/$(grep -m1 '^name' Cargo.toml | sed -E 's/name *= *"(.*)"/\1/')" /src/server
 
 # --- runtime stage: slim base (dynamically-linked glibc binary) ---
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
-# TODO: replace <crate-name> with your Cargo.toml package name
-COPY --from=build /src/target/release/<crate-name> /app/server
+COPY --from=build /src/server /app/server
 ENV PORT=8080
 EXPOSE 8080
 # TODO: ensure your server reads $PORT and listens on 0.0.0.0

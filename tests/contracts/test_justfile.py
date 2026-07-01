@@ -26,7 +26,7 @@ _COMMANDS = {
     "go": ("golangci-lint run", "golangci-lint fmt", "go test ./..."),
     "rust": (
         "cargo clippy -- -D warnings -D clippy::pedantic",
-        "cargo fmt --check",
+        "cargo fmt",
         "cargo test",
     ),
 }

@@ -145,6 +145,20 @@ class TestVerdicts:
         handler.known = set()
         assert _run_hook(_payload("uv add --index-url=https://example.com requests"), port) is None
 
+    def test_script_flag_value_not_treated_as_package(self, mock_registry):
+        """`uv add --script foo.py requests` — "foo.py" is the PEP 723 script
+        path, not a package (Codex review finding)."""
+        port, handler = mock_registry
+        handler.known = set()
+        assert _run_hook(_payload("uv add --script xqz_no_such_script.py requests"), port) is None
+
+    def test_package_flag_value_not_treated_as_package(self, mock_registry):
+        """`uv add --package api requests` — "api" is a workspace member
+        name, not a package (Codex review finding)."""
+        port, handler = mock_registry
+        handler.known = set()
+        assert _run_hook(_payload("uv add --package api requests"), port) is None
+
     def test_local_path_and_vcs_url_not_checked(self, mock_registry):
         """Paths/VCS specs aren't registry packages — must not trigger a
         (mocked-404) flag."""
