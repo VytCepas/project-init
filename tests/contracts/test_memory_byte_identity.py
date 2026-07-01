@@ -83,6 +83,10 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #   • mypy.ini / justfile / post_edit_lint.sh / python.md — mypy --strict gate:
 #     new config file, `typecheck` recipe wired into the Python `ci` recipe,
 #     mypy wired into the edit-time lint hook, rule file updated (#558)
+#   • every shipped .sh script — reformatted with `shfmt -w -i 2` so the new
+#     shellcheck+shfmt scaffold gate (#562) doesn't fail against its own
+#     output on a fresh scaffold; a one-time whole-fleet reformat, not a
+#     memory-move content change
 _ADDED_SINCE_BASELINE = {
     ".gitleaks.toml",
     ".github/workflows/ci.yml",
@@ -96,6 +100,14 @@ _ADDED_SINCE_BASELINE = {
     ".claude/rules/python.md",
     ".claude/rules/go.md",
     ".claude/hooks/session_setup.sh",
+    ".claude/hooks/_py.sh",
+    ".claude/scripts/gh_host.sh",
+    ".claude/scripts/lint_memory.sh",
+    ".claude/scripts/monitor_pr.sh",
+    ".claude/scripts/start_issue.sh",
+    ".claude/hooks/github_command_guard.sh",
+    ".claude/hooks/pre_commit_gate.sh",
+    ".claude/hooks/workflow_state_reminder.sh",
 }
 
 

@@ -29,11 +29,14 @@ GLOBAL_CONFIG="$GLOBAL_DIR/config.json"
 
 # --- tiny output helpers ------------------------------------------------------
 info() { printf '\033[0;36m›\033[0m %s\n' "$*"; }
-ok()   { printf '\033[0;32m✓\033[0m %s\n' "$*"; }
+ok() { printf '\033[0;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '\033[0;33m!\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[0;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
+die() {
+  printf '\033[0;31m✗ %s\033[0m\n' "$*" >&2
+  exit 1
+}
 have() { command -v "$1" >/dev/null 2>&1; }
-ask()  { # ask "prompt" -> 0 if yes; auto-no when non-interactive
+ask() { # ask "prompt" -> 0 if yes; auto-no when non-interactive
   [ -t 0 ] || return 1
   local reply=""
   read -r -p "$1 [y/N] " reply || true
@@ -58,10 +61,16 @@ install_ccr() {
 
 # --- 2. ensure Claude Code is present -----------------------------------------
 ensure_claude() {
-  if have claude; then ok "Claude Code present."; return; fi
-  if have bun; then bun add -g "$CLAUDE_PKG" && ok "Claude Code installed."
-  elif have npm; then npm install -g "$CLAUDE_PKG" && ok "Claude Code installed."
-  else warn "Claude Code not found and no bun/npm to install it — install it manually."
+  if have claude; then
+    ok "Claude Code present."
+    return
+  fi
+  if have bun; then
+    bun add -g "$CLAUDE_PKG" && ok "Claude Code installed."
+  elif have npm; then
+    npm install -g "$CLAUDE_PKG" && ok "Claude Code installed."
+  else
+    warn "Claude Code not found and no bun/npm to install it — install it manually."
   fi
 }
 
@@ -95,12 +104,15 @@ seed_config() {
   if [ -f "$ENV_FILE" ]; then
     local line key val
     while IFS= read -r line || [ -n "$line" ]; do
-      case "$line" in ''|'#'*) continue ;; esac
+      case "$line" in '' | '#'*) continue ;; esac
       [[ "$line" == *=* ]] || continue
       key=${line%%=*}
       val=${line#*=}
       [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-      val=${val%\"}; val=${val#\"}; val=${val%\'}; val=${val#\'}  # strip wrapping quotes
+      val=${val%\"}
+      val=${val#\"}
+      val=${val%\'}
+      val=${val#\'} # strip wrapping quotes
       export "$key=$val"
     done <"$ENV_FILE"
   fi
@@ -110,13 +122,12 @@ seed_config() {
   local tmp="$GLOBAL_CONFIG.tmp.$$"
   # Let _py.sh decide whether a usable Python 3 exists (it rejects Python 2 and
   # only uses uv when present); fall back to envsubst, then a literal copy.
-  if "$PY" - "$TEMPLATE_CONFIG" >"$tmp" 2>/dev/null <<'PY'
+  if "$PY" - "$TEMPLATE_CONFIG" >"$tmp" 2>/dev/null <<'PY'; then
 import os, re, sys
 text = open(sys.argv[1], encoding="utf-8").read()
 sys.stdout.write(re.sub(r"\$([A-Z_][A-Z0-9_]*)",
                         lambda m: os.environ.get(m.group(1)) or m.group(0), text))
 PY
-  then
     : # rendered via Python
   elif have envsubst; then
     envsubst <"$TEMPLATE_CONFIG" >"$tmp"
@@ -142,7 +153,7 @@ setup_ollama() {
   if [ -r /proc/meminfo ]; then
     ram_gb=$(awk '/MemTotal/ {printf "%d", $2/1024/1024}' /proc/meminfo)
   elif have sysctl; then
-    ram_gb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824 ))
+    ram_gb=$(($(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1073741824))
   fi
   info "Detected ~${ram_gb}GB RAM. Curated local models that fit (Q4_K_M):"
 
@@ -162,7 +173,10 @@ setup_ollama() {
       printf '   %-18s ~%sGB  %s\n' "$name" "$min" "$why"
     fi
   done
-  [ "${#fits[@]}" -gt 0 ] || { warn "No curated model fits ~${ram_gb}GB — see the guide for tiny-hardware options."; return; }
+  [ "${#fits[@]}" -gt 0 ] || {
+    warn "No curated model fits ~${ram_gb}GB — see the guide for tiny-hardware options."
+    return
+  }
 
   if ! ask "Pull a local model now?"; then
     info "Skip — pull later with: ollama pull <model>  (then /model ollama,<model>)."
@@ -170,7 +184,10 @@ setup_ollama() {
   fi
   local choice=""
   read -r -p "Model to pull (e.g. ${fits[0]}): " choice || true
-  [ -n "$choice" ] || { info "Nothing entered — skipping."; return; }
+  [ -n "$choice" ] || {
+    info "Nothing entered — skipping."
+    return
+  }
   info "Pulling $choice…"
   ollama pull "$choice" && ok "Pulled $choice. Switch to it with: /model ollama,$choice"
 }
@@ -180,9 +197,9 @@ wire_shell() {
   local marker="# >>> project-init multi-model (CCR) >>>"
   local rc=""
   case "${SHELL:-}" in
-    *zsh)  rc="$HOME/.zshrc" ;;
-    *bash) rc="$HOME/.bashrc" ;;
-    *)     rc="$HOME/.profile" ;;
+  *zsh) rc="$HOME/.zshrc" ;;
+  *bash) rc="$HOME/.bashrc" ;;
+  *) rc="$HOME/.profile" ;;
   esac
   if [ -f "$rc" ] && grep -qF "$marker" "$rc"; then
     ok "Shell already wired for CCR ($rc)."

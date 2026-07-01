@@ -112,6 +112,12 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v4
 
+      # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      - name: Install shfmt
+        run: |
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o /usr/local/bin/shfmt
+          chmod +x /usr/local/bin/shfmt
+
       - name: Sync dev dependencies
         run: just setup
 
@@ -146,6 +152,12 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v4
 
+      # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      - name: Install shfmt
+        run: |
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o /usr/local/bin/shfmt
+          chmod +x /usr/local/bin/shfmt
+
       # Fresh scaffolds have no lockfile yet — fall back to a plain install.
       - name: Install dependencies
         run: |
@@ -171,6 +183,19 @@ jobs:
       # runs the same `golangci-lint run` against the same .golangci.yml.
       - name: Lint (golangci-lint)
         uses: golangci/golangci-lint-action@v6
+
+      # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      - name: Install shfmt
+        run: |
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o /usr/local/bin/shfmt
+          chmod +x /usr/local/bin/shfmt
+
+      # golangci-lint-action above doesn't run justfile recipes, so the .claude/
+      # shell-script gate (part of `just lint` for python/node) is explicit here.
+      - name: Lint (shell scripts under .claude/)
+        run: |
+          find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+          find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
       # Tests run via the justfile recipe agents and humans use (PI-139);
       # lint stays on the action above, which installs and caches the binary.

@@ -225,6 +225,32 @@ class TestCiQualityGates:
                 assert line.lstrip().startswith("#"), f"mutmut must stay commented: {line!r}"
 
 
+class TestBashLintGate:
+    """PI-562: shellcheck + shfmt gate .claude/**/*.sh regardless of language —
+    bash agent infra always ships, so the gate isn't tied to any one language."""
+
+    @pytest.mark.parametrize("language", ["python", "node", "go"])
+    def test_lint_recipe_runs_shellcheck_and_shfmt(self, tmp_target: Path, language):
+        target = _scaffold_language(tmp_target, language)
+        justfile = (target / "justfile").read_text()
+        assert "shellcheck -S error -x" in justfile
+        assert "shfmt -d -i 2" in justfile
+
+    @pytest.mark.parametrize("language", ["python", "node", "go"])
+    def test_ci_installs_shfmt(self, tmp_target: Path, language):
+        target = _scaffold_language(tmp_target, language)
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "Install shfmt" in ci
+
+    def test_go_ci_runs_shell_gate_explicitly(self, tmp_target: Path):
+        """Go's CI lint step calls the golangci-lint action directly (not `just
+        lint`), so the shell gate needs its own explicit step."""
+        target = _scaffold_language(tmp_target, "go")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "shellcheck -S error -x" in ci
+        assert "shfmt -d -i 2" in ci
+
+
 class TestQualityPlugins:
     def test_pr_review_toolkit_enabled(self, tmp_target: Path):
         target = _scaffold_language(tmp_target, "python")

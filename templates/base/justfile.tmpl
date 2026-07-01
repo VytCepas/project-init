@@ -9,6 +9,8 @@ setup:
 # lint project code (docstring + complexity gates per ruff.toml)
 lint:
     uv run ruff check .
+    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
 # static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
 typecheck:
@@ -51,6 +53,8 @@ setup:
 # lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs)
 lint:
     bunx eslint .
+    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
 # auto-format project code (Biome is the formatter; eslint owns the gates)
 format:
@@ -81,6 +85,8 @@ setup:
 # lint project code (revive/godoclint/gocognit/cyclop/dupl/errcheck/govet/staticcheck gates per .golangci.yml)
 lint:
     golangci-lint run
+    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
 # auto-format project code (gofumpt is stricter than gofmt — same ruleset plus extra style checks)
 format:

@@ -13,7 +13,7 @@ PY="$(dirname "$0")/_py.sh"
 # Self-log this firing (dormant unless the observability overlay is installed;
 # reads no stdin, so the payload below is untouched).
 # shellcheck source=/dev/null
-. "$(dirname "$0")/_usage_log.sh" 2>/dev/null && \
+. "$(dirname "$0")/_usage_log.sh" 2>/dev/null &&
   usage_log post_edit_lint PostToolUse "$ROOT" </dev/null || true
 
 INPUT=$(cat)
@@ -34,43 +34,52 @@ print(ti.get('file_path') or ti.get('filePath') or '')
 ERRORS=""
 
 case "$FILE" in
-    *.py)
-        # Prefer 'uv run ruff' inside a uv-managed project so the hook uses
-        # the same ruff the project itself uses; fall back to a system ruff.
-        if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
-            uv run ruff check --fix --quiet "$FILE" >/dev/null 2>&1 || true
-            uv run ruff format --quiet "$FILE" >/dev/null 2>&1 || true
-            ERRORS=$(uv run ruff check --quiet "$FILE" 2>&1 || true)
-        elif command -v ruff &>/dev/null; then
-            ruff check --fix --quiet "$FILE" >/dev/null 2>&1 || true
-            ruff format --quiet "$FILE" >/dev/null 2>&1 || true
-            ERRORS=$(ruff check --quiet "$FILE" 2>&1 || true)
-        fi
-        # mypy has no --fix; it only surfaces errors (strict mode, per mypy.ini).
-        # Scoped to src/ — matches the `just typecheck` recipe's scope.
-        IN_SRC=false
-        case "$FILE" in
-            "$ROOT"/src/*) IN_SRC=true ;;
-        esac
-        if [ -z "$ERRORS" ] && [ -f "$ROOT/mypy.ini" ] && [ "$IN_SRC" = true ]; then
-            if command -v uv &>/dev/null; then
-                ERRORS=$(uv run --with mypy mypy --quiet "$FILE" 2>&1 || true)
-            elif command -v mypy &>/dev/null; then
-                ERRORS=$(mypy --quiet "$FILE" 2>&1 || true)
-            fi
-        fi
-        ;;
-    *.js|*.ts|*.jsx|*.tsx)
-        # Use bunx (bun's package runner) — consistent with project convention (PI-15).
-        if command -v bunx &>/dev/null; then
-            bunx eslint --fix --quiet "$FILE" 2>/dev/null || true
-            ERRORS=$(bunx eslint --quiet "$FILE" 2>&1 || true)
-        fi
-        ;;
+*.py)
+  # Prefer 'uv run ruff' inside a uv-managed project so the hook uses
+  # the same ruff the project itself uses; fall back to a system ruff.
+  if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
+    uv run ruff check --fix --quiet "$FILE" >/dev/null 2>&1 || true
+    uv run ruff format --quiet "$FILE" >/dev/null 2>&1 || true
+    ERRORS=$(uv run ruff check --quiet "$FILE" 2>&1 || true)
+  elif command -v ruff &>/dev/null; then
+    ruff check --fix --quiet "$FILE" >/dev/null 2>&1 || true
+    ruff format --quiet "$FILE" >/dev/null 2>&1 || true
+    ERRORS=$(ruff check --quiet "$FILE" 2>&1 || true)
+  fi
+  # mypy has no --fix; it only surfaces errors (strict mode, per mypy.ini).
+  # Scoped to src/ — matches the `just typecheck` recipe's scope.
+  IN_SRC=false
+  case "$FILE" in
+  "$ROOT"/src/*) IN_SRC=true ;;
+  esac
+  if [ -z "$ERRORS" ] && [ -f "$ROOT/mypy.ini" ] && [ "$IN_SRC" = true ]; then
+    if command -v uv &>/dev/null; then
+      ERRORS=$(uv run --with mypy mypy --quiet "$FILE" 2>&1 || true)
+    elif command -v mypy &>/dev/null; then
+      ERRORS=$(mypy --quiet "$FILE" 2>&1 || true)
+    fi
+  fi
+  ;;
+*.js | *.ts | *.jsx | *.tsx)
+  # Use bunx (bun's package runner) — consistent with project convention (PI-15).
+  if command -v bunx &>/dev/null; then
+    bunx eslint --fix --quiet "$FILE" 2>/dev/null || true
+    ERRORS=$(bunx eslint --quiet "$FILE" 2>&1 || true)
+  fi
+  ;;
+*.sh)
+  # shfmt auto-fixes (like ruff format); shellcheck only surfaces errors.
+  if command -v shfmt &>/dev/null; then
+    shfmt -w -i 2 "$FILE" 2>/dev/null || true
+  fi
+  if command -v shellcheck &>/dev/null; then
+    ERRORS=$(shellcheck -S error -x "$FILE" 2>&1 || true)
+  fi
+  ;;
 esac
 
 if [ -n "$ERRORS" ]; then
-    "$PY" -c "
+  "$PY" -c "
 import json, sys
 file, errors = sys.argv[1], sys.argv[2]
 ctx = f'Lint errors in {file} (after auto-fix attempt) — please fix before continuing:\n{errors}'

@@ -29,7 +29,10 @@
 set -euo pipefail
 
 # This script hard-requires the GitHub CLI (PI-362).
-command -v gh >/dev/null 2>&1 || { echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2; exit 1; }
+command -v gh >/dev/null 2>&1 || {
+  echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2
+  exit 1
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null
@@ -56,14 +59,26 @@ fi
 
 # Parse remaining flags (order-independent after position 2).
 # Shift past <pr-number> and optional --merge; remaining args are flags.
-shift 1  # drop PR_NUMBER
-[ "$MODE" = "--merge" ] && shift 1  # drop --merge if present
+shift 1                            # drop PR_NUMBER
+[ "$MODE" = "--merge" ] && shift 1 # drop --merge if present
 while [ $# -gt 0 ]; do
   case "$1" in
-    --review-cycle)   REVIEW_CYCLE="${2:-0}"; shift 2 ;;
-    --review-cycle=*) REVIEW_CYCLE="${1#*=}"; shift ;;
-    --no-review)      NO_REVIEW=1; shift ;;
-    *) echo "Unknown option: $1" >&2; exit 2 ;;
+  --review-cycle)
+    REVIEW_CYCLE="${2:-0}"
+    shift 2
+    ;;
+  --review-cycle=*)
+    REVIEW_CYCLE="${1#*=}"
+    shift
+    ;;
+  --no-review)
+    NO_REVIEW=1
+    shift
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    exit 2
+    ;;
   esac
 done
 
@@ -206,7 +221,8 @@ fi
 # Use only for solo-dev PRs where no reviewer will ever respond.
 if [ "$NO_REVIEW" -eq 1 ] && [ "$MODE" = "--merge" ]; then
   echo "PR #$PR_NUMBER: CI passed. --no-review specified — skipping review gate."
-  _admin_merge; exit 0
+  _admin_merge
+  exit 0
 fi
 
 # --- Wait up to 6 min for a reviewer to act ---
@@ -217,7 +233,8 @@ REVIEW_ELAPSED=0
 REVIEW_DECISION=$(_get_review_decision)
 if [ "$MODE" = "--merge" ] && [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ] && [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
   echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — skipping reviewer wait and force-merging with admin override."
-  _admin_merge; exit 0
+  _admin_merge
+  exit 0
 fi
 
 if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UNKNOWN" ]; then
@@ -249,7 +266,8 @@ if [ "$REVIEW_DECISION" = "CHANGES_REQUESTED" ]; then
   if [ "$MODE" = "--merge" ]; then
     if [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ]; then
       echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — force-merging with admin override."
-      _admin_merge; exit 0
+      _admin_merge
+      exit 0
     else
       NEXT=$((REVIEW_CYCLE + 1))
       echo "Address the comments above, push your changes, then re-run:"
@@ -267,7 +285,8 @@ if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
   if [ "$MODE" = "--merge" ]; then
     if [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ]; then
       echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — force-merging with admin override."
-      _admin_merge; exit 0
+      _admin_merge
+      exit 0
     else
       NEXT=$((REVIEW_CYCLE + 1))
       echo "Request a review or wait for a reviewer, then re-run:"

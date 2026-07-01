@@ -23,30 +23,30 @@ open_after=""
 args=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --open) open_after=1 ;;
-    *) args+=("$1") ;;
+  --open) open_after=1 ;;
+  *) args+=("$1") ;;
   esac
   shift
 done
 
 case "$cmd" in
-  report)
-    # ${args[@]+...} guards the empty-array case under `set -u` on bash 3.2.
-    "$PY" "$REPORT" --project-dir "$ROOT" ${args[@]+"${args[@]}"}
-    if [ -n "$open_after" ]; then
-      html="$ROOT/.claude/observability/dashboard.html"
-      # Best-effort, fail-open: never let opening the report fail the run.
-      if command -v xdg-open >/dev/null 2>&1; then
-        xdg-open "$html" >/dev/null 2>&1 || true
-      elif command -v open >/dev/null 2>&1; then
-        open "$html" >/dev/null 2>&1 || true
-      elif command -v explorer.exe >/dev/null 2>&1; then
-        explorer.exe "$(wslpath -w "$html" 2>/dev/null || echo "$html")" >/dev/null 2>&1 || true
-      fi
+report)
+  # ${args[@]+...} guards the empty-array case under `set -u` on bash 3.2.
+  "$PY" "$REPORT" --project-dir "$ROOT" ${args[@]+"${args[@]}"}
+  if [ -n "$open_after" ]; then
+    html="$ROOT/.claude/observability/dashboard.html"
+    # Best-effort, fail-open: never let opening the report fail the run.
+    if command -v xdg-open >/dev/null 2>&1; then
+      xdg-open "$html" >/dev/null 2>&1 || true
+    elif command -v open >/dev/null 2>&1; then
+      open "$html" >/dev/null 2>&1 || true
+    elif command -v explorer.exe >/dev/null 2>&1; then
+      explorer.exe "$(wslpath -w "$html" 2>/dev/null || echo "$html")" >/dev/null 2>&1 || true
     fi
-    ;;
-  *)
-    echo "usage: observability.sh report [--open] [--transcript <path>] [--session-id <id>]" >&2
-    exit 2
-    ;;
+  fi
+  ;;
+*)
+  echo "usage: observability.sh report [--open] [--transcript <path>] [--session-id <id>]" >&2
+  exit 2
+  ;;
 esac
