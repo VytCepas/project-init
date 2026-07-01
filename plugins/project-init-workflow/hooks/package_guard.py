@@ -87,6 +87,20 @@ _POPULAR: dict[str, set[str]] = {
     },
 }
 
+# Flags that consume the NEXT token as a value, not a package name (e.g.
+# `uv add --group dev requests` — "dev" is a PEP 735 group name, not a
+# package). Not exhaustive — a missed flag just means one extra registry
+# lookup, which is harmless.
+_VALUE_TAKING_FLAGS: dict[str, set[str]] = {
+    "pypi": {
+        "--group", "-g", "--extra", "--optional", "--index", "--index-url", "-i",
+        "--extra-index-url", "--find-links", "-f", "--target", "--prefix",
+        "--constraint", "-c", "--requirement", "-r", "--python", "--python-version",
+    },
+    "npm": {"--registry", "--tag", "--save-prefix"},
+    "crates": {"--features", "-F", "--rename", "--target", "--registry"},
+}
+
 # Fully autonomous mode: no human is watching the prompt, so "ask" is
 # meaningless — block outright. Other modes still surface an interactive
 # permission prompt for Bash.
@@ -96,18 +110,30 @@ _AUTONOMOUS_MODES = {"bypassPermissions", "dangerouslySkipPermissions"}
 def _extract_packages(remainder: str, ecosystem: str) -> list[str]:
     """Pull candidate package names out of the args after the install verb.
 
-    Best-effort tokenizer, not a full CLI-argument parser: flags are
-    skipped, but a flag's *value* token isn't paired off, so it can slip
-    through as a "package" — harmless, just an extra registry lookup.
+    Best-effort tokenizer, not a full CLI-argument parser, but flags that
+    take a value (e.g. `--group dev`, `-F derive`) have that value skipped
+    too — otherwise `uv add --group dev requests` would check "dev" against
+    PyPI and false-positive-flag an extremely common, entirely legitimate
+    command. `--flag=value` inline form carries its own value already, so
+    only the separate `--flag value` form needs the lookahead skip.
     Local paths and VCS URLs are skipped outright (not registry packages).
     """
     try:
         tokens = shlex.split(remainder)
     except ValueError:
         return []
+    value_flags = _VALUE_TAKING_FLAGS.get(ecosystem, set())
     packages: list[str] = []
+    skip_next = False
     for tok in tokens:
-        if not tok or tok.startswith("-"):
+        if skip_next:
+            skip_next = False
+            continue
+        if not tok:
+            continue
+        if tok.startswith("-"):
+            if "=" not in tok and tok in value_flags:
+                skip_next = True
             continue
         if tok.startswith(("git+", "http://", "https://", "git@", ".", "/")):
             continue

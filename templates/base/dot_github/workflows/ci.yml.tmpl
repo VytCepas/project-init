@@ -119,8 +119,10 @@ jobs:
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
         run: |
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o /usr/local/bin/shfmt
-          chmod +x /usr/local/bin/shfmt
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
+          chmod +x "$HOME/.local/bin/shfmt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Sync dev dependencies
         run: just setup
@@ -159,8 +161,10 @@ jobs:
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
         run: |
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o /usr/local/bin/shfmt
-          chmod +x /usr/local/bin/shfmt
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
+          chmod +x "$HOME/.local/bin/shfmt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # Fresh scaffolds have no lockfile yet — fall back to a plain install.
       - name: Install dependencies
@@ -194,8 +198,10 @@ jobs:
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
         run: |
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o /usr/local/bin/shfmt
-          chmod +x /usr/local/bin/shfmt
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
+          chmod +x "$HOME/.local/bin/shfmt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # golangci-lint-action above doesn't run justfile recipes, so the .claude/
       # shell-script gate (part of `just lint` for python/node) is explicit here.
@@ -222,8 +228,10 @@ jobs:
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
         run: |
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o /usr/local/bin/shfmt
-          chmod +x /usr/local/bin/shfmt
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
+          chmod +x "$HOME/.local/bin/shfmt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install just
         uses: extractions/setup-just@v4

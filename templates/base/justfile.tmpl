@@ -15,7 +15,7 @@ lint:
 # static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
 # no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path
 typecheck:
-    if [ -d src ]; then uv run --with mypy mypy src/; else echo "No src/ directory yet — nothing to type-check."; fi
+    if [ -d src ]; then uv run --with "mypy>=1.10" mypy src/; else echo "No src/ directory yet — nothing to type-check."; fi
 
 # auto-format project code
 format:
@@ -100,9 +100,10 @@ lint:
     find .claude -name '*.sh' -exec shellcheck -S error -x {} +
     find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
-# auto-format project code (gofumpt is stricter than gofmt — same ruleset plus extra style checks)
+# auto-format project code (gofumpt via golangci-lint fmt — no separate binary
+# to provision; golangci-lint is already required for `just lint`)
 format:
-    gofumpt -w .
+    golangci-lint fmt
 
 # run the test suite
 test:

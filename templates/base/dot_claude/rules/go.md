@@ -10,5 +10,5 @@ alwaysApply: false
 go build ./...
 go test ./... -count=1
 golangci-lint run   # revive, godoclint, gocognit, cyclop, dupl, errcheck, govet, staticcheck — see .golangci.yml
-gofumpt -w .        # stricter than gofmt — same rules plus extra style checks
+golangci-lint fmt   # gofumpt (stricter than gofmt) — no separate binary needed
 ```

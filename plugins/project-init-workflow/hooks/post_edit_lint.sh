@@ -47,16 +47,20 @@ case "$FILE" in
     ERRORS=$(ruff check --quiet "$FILE" 2>&1 || true)
   fi
   # mypy has no --fix; it only surfaces errors (strict mode, per mypy.ini).
-  # Scoped to src/ — matches the `just typecheck` recipe's scope.
+  # Scoped to src/ — matches the `just typecheck` recipe's scope. FILE may
+  # arrive absolute (rooted at $ROOT) or repo-relative ("src/foo.py"),
+  # depending on the caller's tool payload — match both forms.
   IN_SRC=false
   case "$FILE" in
-  "$ROOT"/src/*) IN_SRC=true ;;
+  "$ROOT"/src/* | src/*) IN_SRC=true ;;
   esac
   if [ -z "$ERRORS" ] && [ -f "$ROOT/mypy.ini" ] && [ "$IN_SRC" = true ]; then
+    # --config-file is explicit (not cwd-relative discovery) so $ROOT/mypy.ini
+    # loads correctly even if the hook fires from a subdirectory.
     if command -v uv &>/dev/null; then
-      ERRORS=$(uv run --with mypy mypy --quiet "$FILE" 2>&1 || true)
+      ERRORS=$(uv run --with "mypy>=1.10" mypy --config-file "$ROOT/mypy.ini" "$FILE" 2>&1 || true)
     elif command -v mypy &>/dev/null; then
-      ERRORS=$(mypy --quiet "$FILE" 2>&1 || true)
+      ERRORS=$(mypy --config-file "$ROOT/mypy.ini" "$FILE" 2>&1 || true)
     fi
   fi
   ;;

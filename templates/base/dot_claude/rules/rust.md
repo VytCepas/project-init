@@ -9,8 +9,8 @@ alwaysApply: false
 ```bash
 cargo build
 cargo test
-cargo clippy -- -D warnings -D clippy::pedantic   # revive/complexity gates per clippy.toml
-cargo fmt --check                                 # cargo fmt -- writes; --check only verifies
+cargo clippy -- -D warnings -D clippy::pedantic   # pedantic + cognitive-complexity gate per clippy.toml
+cargo fmt --check                                 # verifies only; `cargo fmt` (no flag) writes changes
 ```
 
 The compiler is the type checker — no separate strict-mode gate needed.

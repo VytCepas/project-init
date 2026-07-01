@@ -1498,7 +1498,7 @@ _LANGUAGE_COMMANDS: dict[str, tuple[str, str, str]] = {
     # node recipes call the tools directly (PI-180): a freshly scaffolded
     # project has no package.json scripts to back `bun run lint`/`format`.
     "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
-    "go": ("golangci-lint run", "gofumpt -w .", "go test ./..."),
+    "go": ("golangci-lint run", "golangci-lint fmt", "go test ./..."),
     "rust": ("cargo clippy -- -D warnings -D clippy::pedantic", "cargo fmt --check", "cargo test"),
 }
 

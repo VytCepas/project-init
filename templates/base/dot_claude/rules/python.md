@@ -13,7 +13,7 @@ uv sync                           # install deps
 uv run <command>                  # run in the project venv
 uv run ruff check .               # lint
 uv run ruff format .              # format
-uv run mypy src/                  # type check (strict mode, per mypy.ini)
+uv run --with "mypy>=1.10" mypy src/  # type check (strict mode, per mypy.ini)
 uv run pytest -n auto -q          # tests (parallel mode, requires pytest-xdist)
 uv run pytest -q --tb=short       # tests (single-threaded fallback)
 ```

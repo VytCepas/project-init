@@ -23,7 +23,7 @@ _RECIPES = ("setup", "lint", "format", "test", "docs", "ci", "scan")
 _COMMANDS = {
     "python": ("uv run ruff check .", "uv run ruff format .", "uv run pytest"),
     "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
-    "go": ("golangci-lint run", "gofumpt -w .", "go test ./..."),
+    "go": ("golangci-lint run", "golangci-lint fmt", "go test ./..."),
     "rust": (
         "cargo clippy -- -D warnings -D clippy::pedantic",
         "cargo fmt --check",

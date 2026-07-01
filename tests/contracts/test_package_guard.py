@@ -132,6 +132,19 @@ class TestVerdicts:
         handler.known = {"@babel/core"}
         assert _run_hook(_payload("bun add @babel/core@7.20.0"), port) is None
 
+    def test_value_taking_flag_value_not_treated_as_package(self, mock_registry):
+        """`uv add --group dev requests` must not check "dev" against PyPI —
+        it's a PEP 735 group name, not a package (review finding: a common,
+        entirely legitimate command was false-flagged before this fix)."""
+        port, handler = mock_registry
+        handler.known = set()  # "dev" would 404 if it were (wrongly) checked
+        assert _run_hook(_payload("uv add --group dev requests"), port) is None
+
+    def test_inline_flag_equals_value_not_treated_as_package(self, mock_registry):
+        port, handler = mock_registry
+        handler.known = set()
+        assert _run_hook(_payload("uv add --index-url=https://example.com requests"), port) is None
+
     def test_local_path_and_vcs_url_not_checked(self, mock_registry):
         """Paths/VCS specs aren't registry packages — must not trigger a
         (mocked-404) flag."""
