@@ -78,13 +78,13 @@ ci: lint test
 setup:
     go mod download
 
-# lint project code (revive/godoclint/gocognit gates per .golangci.yml)
+# lint project code (revive/godoclint/gocognit/cyclop/dupl/errcheck/govet/staticcheck gates per .golangci.yml)
 lint:
     golangci-lint run
 
-# auto-format project code
+# auto-format project code (gofumpt is stricter than gofmt — same ruleset plus extra style checks)
 format:
-    gofmt -w .
+    gofumpt -w .
 
 # run the test suite
 test:

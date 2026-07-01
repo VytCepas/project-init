@@ -117,8 +117,22 @@ class TestGoToolchain:
     def test_golangci_config_rendered(self):
         content = (self.target / ".golangci.yml").read_text()
         assert 'version: "2"' in content
-        for linter in ("revive", "godoclint", "gocognit"):
+        for linter in (
+            "revive",
+            "godoclint",
+            "gocognit",
+            "cyclop",
+            "dupl",
+            "errcheck",
+            "govet",
+            "staticcheck",
+        ):
             assert linter in content, f"{linter} missing from .golangci.yml"
+        assert "gofumpt" in content
+
+    def test_golangci_complexity_cap_mirrors_ruff(self):
+        content = (self.target / ".golangci.yml").read_text()
+        assert "max-complexity: 10" in content, "cyclop cap must mirror ruff's mccabe max-complexity = 10"
 
     def test_no_docs_workflow(self):
         """Go needs no docs site — pkg.go.dev renders doc comments."""

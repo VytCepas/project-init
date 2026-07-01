@@ -89,6 +89,7 @@ _ADDED_SINCE_BASELINE = {
     "justfile",
     ".claude/hooks/post_edit_lint.sh",
     ".claude/rules/python.md",
+    ".claude/rules/go.md",
 }
 
 

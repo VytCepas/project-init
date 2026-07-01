@@ -23,7 +23,7 @@ _RECIPES = ("setup", "lint", "format", "test", "docs", "ci", "scan")
 _COMMANDS = {
     "python": ("uv run ruff check .", "uv run ruff format .", "uv run pytest"),
     "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
-    "go": ("golangci-lint run", "gofmt -w .", "go test ./..."),
+    "go": ("golangci-lint run", "gofumpt -w .", "go test ./..."),
 }
 
 
