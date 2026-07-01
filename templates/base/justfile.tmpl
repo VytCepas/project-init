@@ -28,6 +28,13 @@ test:
 test-cov:
     uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov --cov-fail-under=70
 
+# mutation testing on core logic (slow; requires [tool.mutmut] source_paths
+# in your own pyproject.toml, scoped to deterministic pure-logic modules —
+# skip I/O-heavy code, hooks, template renderers). CI runs this nightly.
+test-mutation:
+    uv run --with mutmut mutmut run
+    uv run --with mutmut mutmut export-cicd-stats
+
 # serve the docs site locally
 docs:
     uv run --with mkdocs-material --with "mkdocstrings[python]" mkdocs serve

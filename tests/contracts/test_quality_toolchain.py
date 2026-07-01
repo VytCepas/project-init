@@ -218,11 +218,30 @@ class TestCiQualityGates:
         assert "--cov-fail-under" in self.ci
         assert "pytest_cov" in self.ci, "gate must activate only when pytest-cov is installed"
 
-    def test_mutmut_job_present_but_commented(self):
-        assert "mutmut" in self.ci
-        for line in self.ci.splitlines():
-            if "mutmut" in line:
-                assert line.lstrip().startswith("#"), f"mutmut must stay commented: {line!r}"
+    def test_mutmut_job_active_and_non_blocking(self):
+        """PI-563: mutmut graduated from a commented placeholder to a real,
+        active job — but it must stay non-blocking (schedule-only, excluded
+        from ci-gate's needs) until a baseline mutation score is established."""
+        assert "mutation-tests:" in self.ci
+        assert "mutmut run" in self.ci
+        assert "export-cicd-stats" in self.ci
+        assert "if: github.event_name == 'schedule'" in self.ci
+
+        gate_start = self.ci.index("ci-gate:")
+        gate_needs_line = next(
+            line for line in self.ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
+        )
+        assert "mutation-tests" not in gate_needs_line, "mutation-tests must stay non-blocking"
+
+    def test_mutmut_schedule_present_for_python(self):
+        assert "cron:" in self.ci
+
+    @pytest.mark.parametrize("language", ["node", "go"])
+    def test_mutmut_schedule_absent_for_other_languages(self, tmp_target: Path, language):
+        target = _scaffold_language(tmp_target, language)
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "cron:" not in ci, f"schedule trigger must not render for {language}"
+        assert "mutation-tests:" not in ci
 
 
 class TestBashLintGate:
