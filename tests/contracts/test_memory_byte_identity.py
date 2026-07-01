@@ -86,6 +86,9 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #   • every shipped .sh script — reformatted with `shfmt -w -i 2` so the new
 #     shellcheck+shfmt scaffold gate (#562) doesn't fail against its own
 #     output on a fresh scaffold; a one-time whole-fleet reformat, not a
+#   • package_guard.py / settings.json / AGENTS.md — new supply-chain install
+#     guard hook (uv add/bun add/pip install/npm install/cargo add checked
+#     against PyPI/npm/crates.io), wired into settings.json and documented (#564)
 #     memory-move content change
 _ADDED_SINCE_BASELINE = {
     ".gitleaks.toml",
@@ -108,6 +111,9 @@ _ADDED_SINCE_BASELINE = {
     ".claude/hooks/github_command_guard.sh",
     ".claude/hooks/pre_commit_gate.sh",
     ".claude/hooks/workflow_state_reminder.sh",
+    ".claude/hooks/package_guard.py",
+    ".claude/settings.json",
+    "AGENTS.md",
 }
 
 

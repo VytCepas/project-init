@@ -56,6 +56,12 @@
             "shell": "bash",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/prod_guard.py",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/package_guard.py",
+            "timeout": 15
           }
         ]
       }
