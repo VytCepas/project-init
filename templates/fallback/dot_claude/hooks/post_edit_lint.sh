@@ -46,6 +46,19 @@ case "$FILE" in
             ruff format --quiet "$FILE" >/dev/null 2>&1 || true
             ERRORS=$(ruff check --quiet "$FILE" 2>&1 || true)
         fi
+        # mypy has no --fix; it only surfaces errors (strict mode, per mypy.ini).
+        # Scoped to src/ — matches the `just typecheck` recipe's scope.
+        IN_SRC=false
+        case "$FILE" in
+            "$ROOT"/src/*) IN_SRC=true ;;
+        esac
+        if [ -z "$ERRORS" ] && [ -f "$ROOT/mypy.ini" ] && [ "$IN_SRC" = true ]; then
+            if command -v uv &>/dev/null; then
+                ERRORS=$(uv run --with mypy mypy --quiet "$FILE" 2>&1 || true)
+            elif command -v mypy &>/dev/null; then
+                ERRORS=$(mypy --quiet "$FILE" 2>&1 || true)
+            fi
+        fi
         ;;
     *.js|*.ts|*.jsx|*.tsx)
         # Use bunx (bun's package runner) — consistent with project convention (PI-15).

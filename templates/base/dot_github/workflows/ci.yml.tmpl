@@ -118,6 +118,9 @@ jobs:
       - name: Lint
         run: just lint
 
+      - name: Typecheck
+        run: just typecheck
+
       # Coverage gate (PI-138): activates automatically once pytest-cov is in
       # dev dependencies; runs plain tests until then. Tune --cov-fail-under
       # in the justfile's test-cov recipe to your project's baseline.

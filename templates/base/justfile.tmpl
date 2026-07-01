@@ -10,6 +10,10 @@ setup:
 lint:
     uv run ruff check .
 
+# static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
+typecheck:
+    uv run --with mypy mypy src/
+
 # auto-format project code
 format:
     uv run ruff format .
@@ -31,7 +35,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test
+ci: lint typecheck test
 
 # regenerate .claude/docs/CODE_MAP.md (low-token "what does what" map; read before grepping)
 code-map:

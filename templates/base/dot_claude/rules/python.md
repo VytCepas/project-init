@@ -13,9 +13,13 @@ uv sync                           # install deps
 uv run <command>                  # run in the project venv
 uv run ruff check .               # lint
 uv run ruff format .              # format
+uv run mypy src/                  # type check (strict mode, per mypy.ini)
 uv run pytest -n auto -q          # tests (parallel mode, requires pytest-xdist)
 uv run pytest -q --tb=short       # tests (single-threaded fallback)
 ```
+
+ruff lints; it does not type-check. `just typecheck` (mypy, strict) is a separate
+gate — type errors do not surface as ruff findings.
 
 **Test Optimization**: Use `pytest -n auto` in CI to parallelize tests across CPU cores (30-50% faster). Requires `pytest-xdist` in dev dependencies. See `ci.yml.tmpl` for a full optimized CI config.
 

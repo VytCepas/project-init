@@ -43,6 +43,23 @@ class TestPythonToolchain:
         assert "D" in ignores["tests/**"]
         assert "C901" in ignores[".claude/**"]
 
+    def test_mypy_config_rendered_and_parseable(self):
+        import configparser
+
+        config = configparser.ConfigParser()
+        config.read_string((self.target / "mypy.ini").read_text())
+        assert config.getboolean("mypy", "strict") is True
+        assert config["mypy"]["python_version"] == "3.11"
+
+    def test_typecheck_recipe_and_ci_wired(self):
+        justfile = (self.target / "justfile").read_text()
+        assert "typecheck:" in justfile
+        assert "mypy" in justfile
+        assert "ci: lint typecheck test" in justfile
+
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just typecheck" in ci
+
     def test_mkdocs_config_rendered(self):
         content = (self.target / "mkdocs.yml").read_text()
         assert "name: material" in content
@@ -89,6 +106,7 @@ class TestNodeToolchain:
         assert not (self.target / "ruff.toml").exists()
         assert not (self.target / "mkdocs.yml").exists()
         assert not (self.target / ".golangci.yml").exists()
+        assert not (self.target / "mypy.ini").exists()
 
 
 class TestGoToolchain:
@@ -110,6 +128,7 @@ class TestGoToolchain:
         assert not (self.target / "ruff.toml").exists()
         assert not (self.target / "eslint.config.mjs").exists()
         assert not (self.target / "typedoc.json").exists()
+        assert not (self.target / "mypy.ini").exists()
 
 
 class TestNoLanguage:
@@ -123,6 +142,7 @@ class TestNoLanguage:
             ".golangci.yml",
             "mkdocs.yml",
             "typedoc.json",
+            "mypy.ini",
             ".github/workflows/docs.yml",
         ):
             assert not (target / name).exists(), f"{name} must not render for language=none"

@@ -74,6 +74,9 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #   • setup_github.sh — bare required-check contexts + board SSOT (#555/#556)
 #   • create_issue.sh / board-automation.yml / config.yaml — board-number SSOT (#556)
 #   • session_setup.sh — `uv sync --group dev`, no silent-failure masking (#552/#553)
+#   • mypy.ini / justfile / post_edit_lint.sh / python.md — mypy --strict gate:
+#     new config file, `typecheck` recipe wired into the Python `ci` recipe,
+#     mypy wired into the edit-time lint hook, rule file updated (#558)
 _ADDED_SINCE_BASELINE = {
     ".gitleaks.toml",
     ".github/workflows/ci.yml",
@@ -82,6 +85,10 @@ _ADDED_SINCE_BASELINE = {
     ".github/workflows/board-automation.yml",
     ".claude/config.yaml",
     ".claude/hooks/session_setup.sh",
+    "mypy.ini",
+    "justfile",
+    ".claude/hooks/post_edit_lint.sh",
+    ".claude/rules/python.md",
 }
 
 

@@ -62,10 +62,10 @@ class TestJustfilePerLanguage:
         assert "gitleaks git --pre-commit" in _recipe_body(text, "scan")
 
     def test_ci_recipe_is_pure_dependency(self, tmp_path: Path):
-        """`ci: lint test` — recipes referencing recipes, no duplicated commands."""
+        """`ci: lint typecheck test` — recipes referencing recipes, no duplicated commands."""
         target = _scaffold_language(tmp_path / "p", "python")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint test\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: lint typecheck test\s*$", text, re.MULTILINE)
 
     def test_python_coverage_recipe(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")
