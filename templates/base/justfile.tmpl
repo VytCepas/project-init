@@ -13,8 +13,9 @@ lint:
     find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
 # static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
+# no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path
 typecheck:
-    uv run --with mypy mypy src/
+    if [ -d src ]; then uv run --with mypy mypy src/; else echo "No src/ directory yet — nothing to type-check."; fi
 
 # auto-format project code
 format:

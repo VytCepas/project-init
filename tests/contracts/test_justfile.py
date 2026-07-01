@@ -81,6 +81,15 @@ class TestJustfilePerLanguage:
         assert re.search(r"^ci: lint typecheck test\s*$", text, re.MULTILINE)
         assert "tsc --noEmit" in _recipe_body(text, "typecheck")
 
+    def test_python_typecheck_tolerates_missing_src(self, tmp_path: Path):
+        """A fresh scaffold has no src/ yet — `mypy src/` errors on a missing
+        path (not a "0 files, pass" no-op), so `just typecheck`/`ci` would
+        fail on day one unless the recipe guards for it."""
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "typecheck")
+        assert "if [ -d src ]" in body
+        assert "mypy src/" in body
+
     def test_python_coverage_recipe(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")
         text = (target / "justfile").read_text()
