@@ -2,9 +2,16 @@
 // Install the toolchain once:
 //   bun add -d eslint typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc
 // Biome stays formatter-only — it lacks gate-grade complexity/doc rules.
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import tseslint from "typescript-eslint";
 import jsdoc from "eslint-plugin-jsdoc";
 import tsdoc from "eslint-plugin-tsdoc";
+
+// fileURLToPath(import.meta.url), not import.meta.dirname: this config can
+// run under plain Node (npx eslint, CI, editor integrations), not just Bun —
+// import.meta.dirname needs Node 20.11+ and isn't worth the floor bump.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
   // Type-aware linting (PI-570): strictTypeChecked/stylisticTypeChecked catch
@@ -22,7 +29,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         project: "./tsconfig.json",
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: __dirname,
       },
     },
     plugins: { tsdoc },
