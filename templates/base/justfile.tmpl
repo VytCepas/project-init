@@ -280,8 +280,9 @@ ci: lint test-cov audit
 up:
     docker compose up --build
 
-# build the image only
-build:
+# build the container image only (named `image` so it never collides with a
+# language `build` recipe in a rust/go/node+service scaffold — 2026-07 review)
+image:
     docker compose build
 
 # stop and remove the local stack

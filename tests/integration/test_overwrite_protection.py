@@ -253,3 +253,127 @@ class TestStrictModeProtection:
 
         assert "user owned" not in (target / "CLAUDE.md").read_text()
         assert not (target / "CLAUDE.md.new").exists()
+
+
+class TestFileDirCollision:
+    """2026-07 review (Copilot): a directory sitting where a template renders a
+    file must be parked as a `.new` sibling, not crash with IsADirectoryError."""
+
+    def test_non_strict_directory_collision_parks_sibling(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        target.mkdir()
+        # A directory where CLAUDE.md (a rendered file) will land.
+        (target / "CLAUDE.md").mkdir()
+        conflicts: list[tuple[Path, Path]] = []
+
+        scaffold(target, fallback_preset(), fallback_variables(), conflicts=conflicts)
+
+        assert (target / "CLAUDE.md").is_dir()  # user's directory untouched
+        assert (target / "CLAUDE.md.new").is_file()  # render parked beside it
+        assert (Path("CLAUDE.md"), Path("CLAUDE.md.new")) in conflicts
+
+    def test_strict_directory_collision_parks_sibling(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        target.mkdir()
+        (target / "CLAUDE.md").mkdir()
+        conflicts: list[tuple[Path, Path]] = []
+
+        scaffold(
+            target, fallback_preset(), fallback_variables(), strict=True, conflicts=conflicts
+        )
+
+        assert (target / "CLAUDE.md").is_dir()
+        assert (target / "CLAUDE.md.new").is_file()
+
+
+class TestReScaffoldProtectsEditedFiles:
+    """2026-07 review (C1): a re-run over a recorded project must not clobber
+    managed files the user edited since the last scaffold. The recorded manifest
+    hashes tell an edited file apart from a pristine one, so protection engages
+    for exactly the edited set."""
+
+    def test_edited_managed_file_gets_new_sibling_on_rerun(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        assert _run(target) == 0
+        managed = target / "CLAUDE.md"
+        managed.write_text("# MY POST-SCAFFOLD EDIT - DO NOT LOSE\n")
+
+        assert _run(target) == 0
+
+        assert managed.read_text() == "# MY POST-SCAFFOLD EDIT - DO NOT LOSE\n"
+        sibling = target / "CLAUDE.md.new"
+        assert sibling.is_file()
+        assert "DO NOT LOSE" not in sibling.read_text()
+
+    def test_edited_file_survives_strict_rerun(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        assert _run(target) == 0
+        managed = target / ".claude" / "settings.json"
+        managed.write_text('{"my": "custom hooks"}\n')
+
+        assert _run(target, "--strict") == 0
+
+        assert managed.read_text() == '{"my": "custom hooks"}\n'
+        assert (target / ".claude" / "settings.json.new").is_file()
+
+    def test_rerun_record_keeps_kept_file_out_of_manifest(self, tmp_path: Path):
+        """The refreshed record must not hash the user's kept bytes as if they
+        were the managed baseline — the protected file drops out of the manifest
+        so a later upgrade treats it conservatively instead of 'unedited'."""
+        target = tmp_path / "proj"
+        assert _run(target) == 0
+        (target / "CLAUDE.md").write_text("# edited\n")
+        assert _run(target) == 0
+
+        from project_init.upgrade import read_recorded_manifest
+
+        assert "CLAUDE.md" not in read_recorded_manifest(target)
+
+    def test_pristine_rerun_still_creates_no_siblings(self, tmp_path: Path):
+        """Control: with no edits, manifest hashes match and a re-run refreshes
+        everything with zero conflicts — protection must not false-positive."""
+        target = tmp_path / "proj"
+        assert _run(target) == 0
+        assert _run(target) == 0
+        assert not list(target.rglob("*.new"))
+
+
+class TestPreserveGlobParsing:
+    """2026-07 review: the preserve: parser must survive trailing comments that
+    end in ']' (previously it silently dropped every glob), and an explicit user
+    glob must outrank the always-refresh README rule."""
+
+    @staticmethod
+    def _prepend_preserve_line(target: Path, line: str) -> None:
+        config = target / ".claude" / "config.yaml"
+        config.write_text(line + "\n" + config.read_text())
+
+    def test_trailing_comment_ending_in_bracket_keeps_globs(self, tmp_path: Path):
+        from project_init.scaffold import read_preserve_globs
+
+        target = tmp_path / "proj"
+        assert _run(target) == 0
+        self._prepend_preserve_line(target, 'preserve: ["justfile"] # keep [ci]')
+
+        assert read_preserve_globs(target) == ["justfile"]
+
+    def test_character_class_glob_still_parses(self, tmp_path: Path):
+        from project_init.scaffold import read_preserve_globs
+
+        target = tmp_path / "proj"
+        assert _run(target) == 0
+        self._prepend_preserve_line(target, 'preserve: ["file[0-9].txt"]')
+
+        assert read_preserve_globs(target) == ["file[0-9].txt"]
+
+    def test_user_glob_outranks_readme_refresh(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        assert _run(target) == 0
+        readme = target / ".claude" / "docs" / "README.md"
+        assert readme.is_file()
+        self._prepend_preserve_line(target, 'preserve: ["README.md"]')
+        readme.write_text("# my customized readme\n")
+
+        assert _run(target) == 0
+
+        assert readme.read_text() == "# my customized readme\n"

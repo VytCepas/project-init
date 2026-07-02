@@ -107,3 +107,19 @@ def test_apply_bumps_manifest_and_used_in(tmp_path, monkeypatch):
 def test_apply_unknown_tool_raises():
     with pytest.raises(KeyError):
         mod.apply("nope", "1.0.0")
+
+
+def test_cli_runs_under_optimized_mode():
+    """`python -OO` strips docstrings (__doc__ is None); the CLI must still build
+    its argparse description instead of crashing (2026-07 review, Copilot)."""
+    import subprocess
+    import sys
+
+    for script in ("tools/check_third_party_updates.py", "tools/sync_plugin.py"):
+        proc = subprocess.run(
+            [sys.executable, "-OO", str(REPO_ROOT / script), "--help"],
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0, f"{script} --help failed under -OO: {proc.stderr}"
+        assert "usage:" in proc.stdout

@@ -75,13 +75,19 @@ else
     name="$(basename "$file")"
     is_skipped "$name" && continue
 
-    if ! grep -q "$name" "$INDEX"; then
+    # -F: the filename is a literal, not a regex (2026-07 review).
+    if ! grep -Fq "$name" "$INDEX"; then
       error "$name: not listed in MEMORY.md index"
     fi
   done
 
-  # Check every file referenced in index actually exists
+  # Check every LOCAL file referenced in index actually exists. External links
+  # (https://…, mailto:) and in-page anchors (#section) are not repo files, so
+  # they must be skipped rather than reported as missing (2026-07 review).
   while read -r ref; do
+    case "$ref" in
+    *://* | mailto:* | \#*) continue ;;
+    esac
     if [ ! -f "$MEMORY_DIR/$ref" ]; then
       error "MEMORY.md references '$ref' but file does not exist"
     fi

@@ -4,7 +4,7 @@
 # Requires: gh, a Python 3 (resolved via ../hooks/_py.sh; stdlib only — no jq).
 #
 # Usage:
-#   .claude/scripts/monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review]
+#   .claude/scripts/monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review] [--admin]
 #
 # --merge: squash-merge and delete branch automatically when all checks pass.
 # --review-cycle N: current review fix cycle count (0-based, default 0).
@@ -13,6 +13,10 @@
 # --no-review: skip all review waiting and admin-merge after CI passes.
 #   Use ONLY for solo-dev PRs where no human reviewer will ever respond.
 #   Do NOT use to avoid addressing legitimate review feedback.
+# --admin: allow an admin override when the PR is BLOCKED by branch protection
+#   AFTER the review gate passed (e.g. an unresolved conversation). Without it,
+#   a post-review BLOCKED state fails with guidance instead of silently
+#   overriding the protection setup_github.sh provisioned (2026-07 review).
 #
 # Full lifecycle for agents:
 #   1. .claude/scripts/monitor_pr.sh <n> --merge
@@ -46,9 +50,10 @@ MODE="${2:-}"
 REVIEW_CYCLE=0
 MAX_REVIEW_CYCLES=2
 NO_REVIEW=0
+ALLOW_ADMIN=0
 
 if [ -z "$PR_NUMBER" ]; then
-  echo "Usage: monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review]" >&2
+  echo "Usage: monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review] [--admin]" >&2
   exit 1
 fi
 
@@ -73,6 +78,10 @@ while [ $# -gt 0 ]; do
     ;;
   --no-review)
     NO_REVIEW=1
+    shift
+    ;;
+  --admin)
+    ALLOW_ADMIN=1
     shift
     ;;
   *)
@@ -311,8 +320,22 @@ if [ "$MODE" = "--merge" ]; then
       exit 1
     fi
   elif [ "$MERGE_STATE" = "BLOCKED" ]; then
-    echo "PR is blocked by review protection — merging with admin override."
-    _admin_merge
+    # The review gate already passed to reach here, so BLOCKED means a DIFFERENT
+    # branch-protection rule is unmet — most often an unresolved review thread
+    # (required_conversation_resolution, which setup_github.sh --protect itself
+    # provisions). Auto-admin-merging past it on cycle 0 silently defeats the
+    # protection this very tool set up, so it now requires an explicit --admin
+    # opt-in (2026-07 review).
+    if [ "$ALLOW_ADMIN" -eq 1 ]; then
+      echo "PR is blocked by branch protection — merging with admin override (--admin)."
+      _admin_merge
+    else
+      echo "ERROR: PR #$PR_NUMBER is BLOCKED by branch protection after the review gate" >&2
+      echo "  passed — typically an unresolved review conversation, or a required" >&2
+      echo "  check that has not reported. Resolve the blocker, or re-run with --admin" >&2
+      echo "  to override (refused under the org profile, #251)." >&2
+      exit 1
+    fi
   else
     if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
       if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --auto; then

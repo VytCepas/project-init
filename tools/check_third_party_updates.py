@@ -127,30 +127,32 @@ def apply(tool_id: str, version: str, *, manifest_path: Path = MANIFEST) -> list
     if tool_id not in manifest:
         raise KeyError(f"unknown tool: {tool_id!r}")
     tool = manifest[tool_id]
-    changed: list[Path] = []
 
-    manifest_path.write_text(
-        _replace_in_toml(manifest_path.read_text(encoding="utf-8"), tool_id, version),
-        encoding="utf-8",
-    )
-    changed.append(manifest_path)
-
+    # Compute and validate EVERY replacement before writing anything, so a
+    # missing version_var fails fast and never leaves a half-applied lockstep
+    # bump on disk (2026-07 review).
+    pending: list[tuple[Path, str]] = [
+        (manifest_path, _replace_in_toml(manifest_path.read_text(encoding="utf-8"), tool_id, version))
+    ]
     var = tool.get("version_var")
-    for rel in tool.get("used_in", []):
-        if not var:
-            break
-        path = REPO_ROOT / rel
-        new_text, n = _replace_version_var(path.read_text(encoding="utf-8"), var, version)
-        if n == 0:
-            raise ValueError(f"{var} not found in {rel} — cannot bump in lockstep")
-        path.write_text(new_text, encoding="utf-8")
-        changed.append(path)
-    return changed
+    if var:
+        for rel in tool.get("used_in", []):
+            path = REPO_ROOT / rel
+            new_text, n = _replace_version_var(path.read_text(encoding="utf-8"), var, version)
+            if n == 0:
+                raise ValueError(f"{var} not found in {rel} — cannot bump in lockstep")
+            pending.append((path, new_text))
+
+    for path, text in pending:
+        path.write_text(text, encoding="utf-8")
+    return [path for path, _ in pending]
 
 
 def main(argv: list[str] | None = None) -> int:
     """CLI: ``check [--json]`` to report updates, ``apply <tool> <version>`` to bump."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    # __doc__ is None under `python -OO`; fall back rather than crash (Copilot).
+    description = (__doc__ or "Check/apply pinned third-party tool updates.").splitlines()[0]
+    parser = argparse.ArgumentParser(description=description)
     sub = parser.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("check", help="report tools with a newer upstream release")
     c.add_argument("--json", action="store_true", help="emit JSON (for the workflow)")

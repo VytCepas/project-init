@@ -91,7 +91,11 @@ CONCERNS = ("memory", *_BOOL_CONCERNS)
 def _mutate(variables: dict, concern: str, *, enable: bool, value: str | None) -> None:
     """Apply the concern toggle to *variables* in place."""
     if concern == "memory":
-        # `add memory <stack>` needs a stack; `remove memory` → none.
+        # `add memory <stack>` needs a stack; `remove memory` → none. A value
+        # passed to `remove memory` is meaningless and must not be silently
+        # dropped — reject it like the bool concerns do (2026-07 review).
+        if not enable and value is not None:
+            raise ConcernError("`remove memory` takes no stack argument")
         stack = value if enable else "none"
         if stack is None:
             raise ConcernError(

@@ -16,13 +16,23 @@ Before doing any GitHub issue, branch, push, PR, review, CI, or merge work, read
 ├── pyproject.toml          # uv-managed; core dep = rich; dev = ruff + pytest
 ├── install.sh              # user-facing bootstrap (curl | bash)
 ├── src/project_init/       # wizard CLI + scaffold engine
+├── plugins/                # synced plugin payloads (tools/sync_plugin.py; ADR-010)
+├── tools/                  # sync_plugin.py, third-party update checker, benchmark
 ├── templates/
 │   ├── base/               # always copied into target projects
+│   ├── auto/               # always-on emitted artifacts (agent memory files)
 │   ├── fallback/           # shared hooks/skills — rendered only with --no-plugin (ADR-010)
-│   ├── obsidian/           # overlay for both Obsidian-* presets
-│   ├── graphify/           # overlay for Obsidian+Graphify preset
+│   ├── lifecycle/          # GitHub lifecycle enforcement (default; --lifecycle none opts out)
+│   ├── lifecycle_fallback/ # lifecycle guard hooks + skills for --no-plugin
+│   ├── obsidian/           # vault overlay for both Obsidian-* presets
+│   ├── graphify/           # Graphify overlay (implies obsidian)
+│   ├── rag/                # tier-3 RAG memory overlay
+│   ├── multi_model/        # CCR model-switching overlay (--multi-model)
+│   ├── governance/         # AI governance overlay (--governance)
+│   ├── observability/      # transcript metrics overlay (--observability)
+│   ├── codex/ antigravity/ amp/ junie/  # per-surface wiring overlays (--agents)
 │   └── presets/            # toml preset definitions
-└── tests/                  # focused pytest modules by behavior area
+└── tests/                  # focused pytest modules by behavior area (unit/contract/integration/smoke)
 ```
 
 Template naming convention: directories stored as `dot_claude/`, `dot_gitignore` etc. The scaffolder renames them to `.claude/`, `.gitignore` on copy. This keeps templates visible in GitHub and avoids this repo being auto-loaded as a Claude Code config for itself.

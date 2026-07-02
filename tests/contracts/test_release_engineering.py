@@ -25,7 +25,10 @@ class TestReleaseWorkflow:
     def test_builds_artifacts_and_publishes_release(self):
         content = self._workflow()
         assert "uv build" in content
-        assert "softprops/action-gh-release@v3" in content
+        # Actions are SHA-pinned with the version in a trailing comment (2026-07
+        # review), so assert the action + its pinned-version marker, not @vN.
+        assert "softprops/action-gh-release@" in content
+        assert "# v3" in content
         # Upload only the build artifacts. A bare `dist/*` also globs the tracked
         # dist/.gitignore and attaches it as a stray asset (PI-183). Guard against
         # any `dist/*` that is not a specific artifact, regardless of trailing
@@ -37,7 +40,8 @@ class TestReleaseWorkflow:
 
     def test_changelog_generated_from_latest_tag(self):
         content = self._workflow()
-        assert "orhun/git-cliff-action@v4" in content
+        assert "orhun/git-cliff-action@" in content  # SHA-pinned (2026-07 review)
+        assert "# v4" in content
         assert "--latest" in content
         assert "fetch-depth: 0" in content, "git-cliff needs full history for prior tags"
 
