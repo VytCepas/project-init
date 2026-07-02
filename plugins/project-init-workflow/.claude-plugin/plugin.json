@@ -1,7 +1,7 @@
 {
   "name": "project-init-workflow",
   "displayName": "project-init Workflow",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Forge-agnostic quality and safety hooks plus general skills from project-init: commit gating, lint-on-edit, prod-safety guard, and session bootstrap. The always-on core payload; GitHub lifecycle automation lives in the separate project-init-lifecycle plugin.",
   "author": {
     "name": "Vytautas Čepas",
