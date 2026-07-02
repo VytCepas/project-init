@@ -562,6 +562,31 @@ jobs:
       - name: License scan (cargo-deny)
         run: just license
 {{/if rust}}
+{{#if go}}
+  # Go native fuzzing (#580): go test -fuzz is built into the toolchain (1.18+),
+  # no third-party dependency. This job replays the fuzz-test SEED CORPORA
+  # deterministically — a short, CI-safe mode (no unbounded input generation).
+  # Non-blocking (NOT in ci-gate's needs): fuzzing is a pattern to surface edge
+  # cases, not a uniform gate like ruff/coverage that applies to every project.
+  # Promote it — or add a scheduled active `-fuzztime` run — once you have fuzz
+  # targets worth gating on.
+  fuzz:
+    name: Go fuzz (seed corpus replay)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install just
+        uses: extractions/setup-just@v4
+
+      - name: Replay fuzz seed corpora
+        run: just fuzz
+{{/if go}}
 
   # OpenSSF Scorecard (#576): standardized security-posture scoring (branch
   # protection, dependency pinning, SAST presence, token permissions, ...).
