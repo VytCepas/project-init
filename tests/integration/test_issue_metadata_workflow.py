@@ -54,6 +54,25 @@ class TestIssueMetadataScaffold:
         assert "Confidence" in content
         assert "gh label create \"status:needs-info\"" in content
 
+    def test_issue_validation_auto_ensures_type_label_from_body(self):
+        """A missing type label is derived from the body '- Type:' (or '### Type'),
+        created if absent, and applied — so MCP/API-created issues (which can't set
+        Project fields or create labels) still get a valid type label."""
+        content = (
+            self.target / ".github" / "workflows" / "issue-validation.yml"
+        ).read_text()
+        assert "map_type_label" in content
+        assert "parse_type_from_body" in content
+        # Derives from either body shape.
+        assert "Type:" in content
+        assert "### Type" in content
+        # Maps the create_issue.sh type keywords to canonical labels.
+        assert "feat | feature)" in content
+        assert "fix | bug)" in content
+        # Creates the label if missing and applies it (job already has issues: write).
+        assert 'gh label create "$label"' in content
+        assert '--add-label "$label"' in content
+
     def test_board_automation_syncs_metadata_fields(self):
         content = (
             self.target / ".github" / "workflows" / "board-automation.yml"
@@ -70,9 +89,24 @@ class TestIssueMetadataScaffold:
         assert "parse_body_field" in content
         assert "Skipping missing project field" in content
         assert "organization(login: $owner)" in content
-        assert "parse_area()" in content
         assert "metadata" in content
         assert "(.items.nodes // [])[]" in content
+
+    def test_board_automation_parses_both_body_formats(self):
+        """Board fields populate whether the body uses issue-form '### Heading'
+        blocks or create_issue.sh / MCP-API '- Field: value' bullets. A single
+        dual-format parse_body_field handles all fields (incl. Area)."""
+        content = (
+            self.target / ".github" / "workflows" / "board-automation.yml"
+        ).read_text()
+        # Bullet form: "- Field: value" (case-insensitive sed).
+        assert "-[[:space:]]*${heading}:" in content
+        # Heading form: "### Field".
+        assert '"^[[:space:]]*###[[:space:]]+" h' in content
+        # Area is routed through the unified parser too (dropping parse_area).
+        assert 'AREA=$(parse_body_field "Area" "$BODY")' in content
+        for field in ("Priority", "Size", "Agent ready", "Confidence", "Area"):
+            assert f'parse_body_field "{field}"' in content
 
     def test_validate_pr_checks_issue_readiness(self):
         content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()

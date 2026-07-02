@@ -97,12 +97,21 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #     guard hook (uv add/bun add/pip install/npm install/cargo add checked
 #     against PyPI/npm/crates.io), wired into settings.json and documented (#564)
 #     memory-move content change
+#   • issue-validation.yml — self-populating board metadata: auto-ensures the
+#     type label from the body "- Type:" for MCP/API-created issues
+#   • report_upstream_issue skill (SKILL.md + INDEX/README/project-init.md rows)
+#     — new default-on skill routing tooling bugs upstream to project-init
 _ADDED_SINCE_BASELINE = {
     ".gitleaks.toml",
     ".github/workflows/ci.yml",
     ".claude/scripts/setup_github.sh",
     ".claude/scripts/create_issue.sh",
     ".github/workflows/board-automation.yml",
+    ".github/workflows/issue-validation.yml",
+    ".claude/skills/report_upstream_issue/SKILL.md",
+    ".claude/skills/INDEX.md",
+    ".claude/skills/README.md",
+    ".claude/project-init.md",
     ".claude/config.yaml",
     "mypy.ini",
     "justfile",
