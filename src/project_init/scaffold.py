@@ -476,8 +476,14 @@ def _edited_since_record(dest: Path, rel_path: Path, manifest: dict[str, str]) -
     An empty/legacy manifest therefore conservatively protects every existing
     file (2026-07 review, C1).
     """
-    if not dest.is_file():
+    if not dest.exists():
         return False
+    if not dest.is_file():
+        # A directory (or other non-file) sits where the template renders a
+        # file. It is not our pristine managed file, so it is "owned" — the
+        # caller then parks the render as a `.new` sibling instead of crashing
+        # on IsADirectoryError (2026-07 review, Copilot).
+        return True
     recorded = manifest.get(rel_path.as_posix())
     return recorded is None or hash_bytes(dest.read_bytes()) != recorded
 
@@ -556,7 +562,12 @@ def _protected_as_sibling(
     if not owned or not dest.exists():
         return None
     content = _rendered_bytes(src, variables, is_template)
-    if content is None or dest.read_bytes() == content:
+    if content is None:
+        return None
+    # A directory sits where the template renders a file: we can neither read it
+    # as bytes nor overwrite it, so always park the render as a `.new` sibling
+    # rather than crashing on IsADirectoryError (2026-07 review, Copilot).
+    if dest.is_file() and dest.read_bytes() == content:
         return None
     sibling = _new_sibling(dest, content)
     _write_bytes(sibling, content, src)
@@ -718,7 +729,11 @@ def _commit_staged(
         protect = conflicts is not None and (
             first or _has_pending_sibling(dest) or _edited_since_record(dest, rel_path, manifest)
         )
-        if protect and dest.exists() and dest.read_bytes() != src.read_bytes():
+        # A directory sitting where a file belongs can't be read or overwritten;
+        # under protection it becomes a `.new` sibling, matching the non-strict
+        # path rather than crashing on IsADirectoryError (2026-07 review, Copilot).
+        collision = dest.exists() and not dest.is_file()
+        if protect and dest.exists() and (collision or dest.read_bytes() != src.read_bytes()):
             sibling = _new_sibling(dest, src.read_bytes())
             shutil.copy2(src, sibling)
             conflicts.append((rel_path, sibling.relative_to(target)))

@@ -150,7 +150,9 @@ def apply(tool_id: str, version: str, *, manifest_path: Path = MANIFEST) -> list
 
 def main(argv: list[str] | None = None) -> int:
     """CLI: ``check [--json]`` to report updates, ``apply <tool> <version>`` to bump."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    # __doc__ is None under `python -OO`; fall back rather than crash (Copilot).
+    description = (__doc__ or "Check/apply pinned third-party tool updates.").splitlines()[0]
+    parser = argparse.ArgumentParser(description=description)
     sub = parser.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("check", help="report tools with a newer upstream release")
     c.add_argument("--json", action="store_true", help="emit JSON (for the workflow)")

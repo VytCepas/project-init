@@ -267,7 +267,10 @@ def _check() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """Sync the plugin/overlay payloads, or `--check` for drift (CI-friendly)."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    # __doc__ is None under `python -OO` (docstrings stripped), so fall back
+    # rather than crashing on .splitlines() (Copilot review).
+    description = (__doc__ or "Sync plugin/overlay payloads from templates.").splitlines()[0]
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "--check", action="store_true", help="report drift and exit 1 without writing (for CI)"
     )

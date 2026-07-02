@@ -255,6 +255,37 @@ class TestStrictModeProtection:
         assert not (target / "CLAUDE.md.new").exists()
 
 
+class TestFileDirCollision:
+    """2026-07 review (Copilot): a directory sitting where a template renders a
+    file must be parked as a `.new` sibling, not crash with IsADirectoryError."""
+
+    def test_non_strict_directory_collision_parks_sibling(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        target.mkdir()
+        # A directory where CLAUDE.md (a rendered file) will land.
+        (target / "CLAUDE.md").mkdir()
+        conflicts: list[tuple[Path, Path]] = []
+
+        scaffold(target, fallback_preset(), fallback_variables(), conflicts=conflicts)
+
+        assert (target / "CLAUDE.md").is_dir()  # user's directory untouched
+        assert (target / "CLAUDE.md.new").is_file()  # render parked beside it
+        assert (Path("CLAUDE.md"), Path("CLAUDE.md.new")) in conflicts
+
+    def test_strict_directory_collision_parks_sibling(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        target.mkdir()
+        (target / "CLAUDE.md").mkdir()
+        conflicts: list[tuple[Path, Path]] = []
+
+        scaffold(
+            target, fallback_preset(), fallback_variables(), strict=True, conflicts=conflicts
+        )
+
+        assert (target / "CLAUDE.md").is_dir()
+        assert (target / "CLAUDE.md.new").is_file()
+
+
 class TestReScaffoldProtectsEditedFiles:
     """2026-07 review (C1): a re-run over a recorded project must not clobber
     managed files the user edited since the last scaffold. The recorded manifest
