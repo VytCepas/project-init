@@ -10,7 +10,7 @@ migration step.
 
 from __future__ import annotations
 
-import re
+from project_init.scaffold import parse_version as _parse  # canonical (2026-07 review)
 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
@@ -59,12 +59,6 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
         "action_required": None,
     },
 }
-
-
-def _parse(value: str | None) -> tuple[int, int, int] | None:
-    """Parse a leading ``X.Y.Z`` (optional ``v`` prefix) into a tuple, or None."""
-    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", value or "")
-    return (int(m[1]), int(m[2]), int(m[3])) if m else None
 
 
 def notes_for_span(prev: str | None, current: str | None) -> list[tuple[str, dict]]:

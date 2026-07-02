@@ -77,9 +77,19 @@ def list_presets() -> list[dict]:
     return results
 
 
-def _version_tuple(value: str) -> tuple[int, int, int]:
+def parse_version(value: str | None) -> tuple[int, int, int] | None:
+    """Parse a leading ``X.Y.Z`` (optional ``v`` prefix) into a tuple, or None.
+
+    Canonical version parser shared by the upgrade engine and migration notes
+    (2026-07 review — was triplicated).
+    """
     m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", str(value or ""))
-    return (int(m[1]), int(m[2]), int(m[3])) if m else (0, 0, 0)
+    return (int(m[1]), int(m[2]), int(m[3])) if m else None
+
+
+def _version_tuple(value: str) -> tuple[int, int, int]:
+    """Compat variant: an unparseable version sorts lowest ``(0, 0, 0)``."""
+    return parse_version(value) or (0, 0, 0)
 
 
 def _merge_deps(parent: dict, child: dict) -> dict:
@@ -333,7 +343,10 @@ def marketplace_source_vars(repo_url: str) -> dict[str, str]:
     slug = re.sub(r"\.git$", "", repo_url.rstrip("/"))
     slug = re.sub(r"^.*[/:]([^/]+/[^/]+)$", r"\1", slug)
     is_github = host == "github.com"
-    url = repo_url if repo_url.endswith(".git") else f"{repo_url}.git"
+    # rstrip("/") first so a trailing-slash input doesn't yield "…/repo/.git"
+    # (2026-07 review).
+    clean = repo_url.rstrip("/")
+    url = clean if clean.endswith(".git") else f"{clean}.git"
     return {
         "project_init_repo": slug,  # owner/repo — github source + display
         "project_init_repo_url": url,  # full clone URL — git source (non-github hosts)

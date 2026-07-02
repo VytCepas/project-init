@@ -46,9 +46,11 @@ class TestCLI:
         assert rc == 0
         assert (tmp_target / ".claude" / "scripts" / "setup_graphify.sh").is_file()
 
-    def test_interactive_abort_at_prompt_leaves_no_dir(self, tmp_path: Path, monkeypatch):
-        """PI-199: a Ctrl-C (or error) at an interactive prompt must not leave
-        an empty target dir behind — input is gathered before the dir exists."""
+    def test_interactive_abort_at_prompt_leaves_no_dir(self, tmp_path: Path, monkeypatch, capsys):
+        """PI-199: a Ctrl-C (or error) at an interactive prompt must not leave an
+        empty target dir behind — input is gathered before the dir exists. The
+        top-level handler now turns it into a clean exit 130, not a traceback
+        (2026-07 review)."""
         from project_init import __main__
 
         target = tmp_path / "aborted-proj"
@@ -57,9 +59,10 @@ class TestCLI:
             raise KeyboardInterrupt
 
         monkeypatch.setattr(__main__, "_gather_inputs_interactive", boom)
-        with pytest.raises(KeyboardInterrupt):
-            # Interactive (no --non-interactive); --preset skips the preset prompt.
-            __main__.main([str(target), "--preset", "obsidian-only"])
+        # Interactive (no --non-interactive); --preset skips the preset prompt.
+        rc = __main__.main([str(target), "--preset", "obsidian-only"])
+        assert rc == 130
+        assert "aborted" in capsys.readouterr().err
         assert not target.exists()
 
     def test_non_interactive_requires_flags(self):

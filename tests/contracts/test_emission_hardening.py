@@ -5,7 +5,6 @@ emission layer. Edge cases surfaced by an external review pass.
 from __future__ import annotations
 
 import json
-import warnings
 from pathlib import Path
 
 import pytest
@@ -200,22 +199,22 @@ def test_full_scaffold_into_dir_with_pre_existing_capabilities(tmp_path: Path):
 # --- canonical_hooks surfaces a broken settings.json instead of going empty (A3)
 
 
-def test_canonical_hooks_warns_on_invalid_json(monkeypatch):
+def test_canonical_hooks_warns_on_invalid_json(monkeypatch, capsys):
     """Invalid rendered settings.json means broken wiring, not zero hooks — it
-    must warn rather than silently return an empty inventory."""
+    must warn on stderr (visible in CLI use, unlike warnings.warn) rather than
+    silently return an empty inventory (2026-07 review)."""
     monkeypatch.setattr(
         "project_init.scaffold._render", lambda *a, **k: "{ not valid json,"
     )
-    with pytest.warns(UserWarning, match="invalid JSON"):
-        hooks = capabilities.canonical_hooks(make_variables())
+    hooks = capabilities.canonical_hooks(make_variables())
     assert hooks == []
+    assert "invalid JSON" in capsys.readouterr().err
 
 
-def test_canonical_hooks_normal_render_is_silent(recwarn):
+def test_canonical_hooks_normal_render_is_silent(capsys):
     """The happy path must not warn (guards against a noisy false positive)."""
-    warnings.simplefilter("always")
     capabilities.canonical_hooks(make_variables())
-    assert not [w for w in recwarn if "invalid JSON" in str(w.message)]
+    assert "invalid JSON" not in capsys.readouterr().err
 
 
 # --- difflib 3-way fallback agrees with git merge-file on clean merges (C4) -----

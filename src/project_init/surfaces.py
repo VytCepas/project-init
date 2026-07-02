@@ -219,15 +219,6 @@ SURFACES: dict[str, dict] = {
     },
 }
 
-# MCP-only targets: surfaces whose hooks/skills are native but whose MCP config
-# must be emitted in their own schema when the user selected MCP servers.
-# (Claude shareable project scope = root .mcp.json; VS Code = .vscode/mcp.json.)
-MCP_ONLY_TARGETS: dict[str, tuple[str, str]] = {
-    ".mcp.json": ("json", "mcpServers"),
-    ".vscode/mcp.json": ("json", "servers"),
-}
-
-
 def render_mcp_for(kind_key: tuple, servers: dict[str, dict]) -> str:
     """Render MCP config for a ``(format, key[, drop_type])`` spec."""
     fmt, key, *rest = kind_key

@@ -25,8 +25,10 @@ compared against the project:
 
 ``memory/`` and ``vault/`` are never compared or touched, matching the
 scaffolder's preservation rules. ``.claude/config.yaml`` is owned by the
-user (project_key etc.) and is only updated in two targeted ways on apply:
-the ``project_init_version`` value and the scaffold record block.
+user (project_key etc.); on apply only the tool-managed parts are refreshed —
+the ``project_init_version`` value, the visible project fields, the memory
+descriptor block, the updates/declined-additions block, and the scaffold
+record block — while hand-edited fields are preserved.
 """
 
 from __future__ import annotations
@@ -53,6 +55,7 @@ from project_init.scaffold import (
     marketplace_source_vars,
     memory_tier,
     overlay_layers,
+    parse_version,
     read_preserve_globs,
     scaffold,
 )
@@ -317,9 +320,27 @@ def _difflib_three_way(base: str, ours: str, theirs: str) -> tuple[str, bool]:
     return "".join(out), clean
 
 
+def _dominant_newline(text: str) -> str:
+    r"""Return the user file's prevailing line ending (``\r\n`` or ``\n``)."""
+    crlf = text.count("\r\n")
+    return "\r\n" if crlf and crlf >= (text.count("\n") - crlf) else "\n"
+
+
 def _three_way_merge(base: str, ours: str, theirs: str) -> tuple[str, bool]:
-    """3-way merge via git, falling back to a pure-Python line merge."""
-    return _git_three_way(base, ours, theirs) or _difflib_three_way(base, ours, theirs)
+    """3-way merge via git, falling back to a pure-Python line merge.
+
+    The merge runs on LF-normalized inputs, then the result is restored to the
+    user file's dominant line ending — otherwise a clean merge into a CRLF file
+    silently rewrites the whole file to LF (git merge-file captured with
+    ``text=True`` normalizes newlines), showing up as a full-file diff for
+    Windows users (2026-07 review).
+    """
+    newline = _dominant_newline(ours)
+    nb, no, nt = (s.replace("\r\n", "\n") for s in (base, ours, theirs))
+    merged, clean = _git_three_way(nb, no, nt) or _difflib_three_way(nb, no, nt)
+    if newline == "\r\n":
+        merged = merged.replace("\n", "\r\n")
+    return merged, clean
 
 
 def _is_preserved(rel: Path, preserve_globs: list[str] | None = None) -> bool:
@@ -653,7 +674,13 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
             "project-init (or the record was deleted)."
         )
         raise UpgradeError(msg)
-    text = config_path.read_text(encoding="utf-8")
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        # A non-UTF-8 config.yaml would otherwise surface as a raw traceback,
+        # since run_upgrade only catches UpgradeError (2026-07 review).
+        msg = f"{config_path} is not valid UTF-8 — cannot read the scaffold record ({exc})."
+        raise UpgradeError(msg) from exc
     parsed = _parse_record_block(text)
     if parsed is not None:
         preset_name, variables, manifest = parsed
@@ -756,6 +783,14 @@ def compute_drift(
         dest = target / rel
         if not dest.exists():
             report.new.append(rel)
+            continue
+        if dest.is_dir():
+            # A directory sits where the template renders a file (a file/dir
+            # type collision): reading it would raise IsADirectoryError. Report
+            # it as a conflict the user must resolve, rather than crashing the
+            # whole upgrade (2026-07 review).
+            report.conflicts.append(rel)
+            report.diffs[rel] = f"(cannot upgrade {rel}: a directory exists at this path)\n"
             continue
         current = dest.read_bytes()
         if current == new_bytes:
@@ -1188,10 +1223,8 @@ def _print_addition_gate(groups: dict, undecided: set) -> None:
     )
 
 
-def _parse_version(value: str | None) -> tuple[int, int, int] | None:
-    """Parse a leading ``X.Y.Z`` (optional ``v`` prefix) into a tuple."""
-    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", value or "")
-    return (int(m[1]), int(m[2]), int(m[3])) if m else None
+# Canonical parser lives in scaffold.py (2026-07 review — de-triplicated).
+_parse_version = parse_version
 
 
 def _describe_version_span(prev: str | None, current: str | None) -> str:

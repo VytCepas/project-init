@@ -6,6 +6,8 @@ PI-15 (replace npx with bun) is satisfied by construction here.
 
 from __future__ import annotations
 
+import sys
+
 # Core MCPs always offered as a multi-select in the wizard.
 # Absent intentionally (PI-25 / PI-26):
 #   linear     — gh CLI + GitHub Issues covers all needs (~15 tools saved)
@@ -59,10 +61,20 @@ def servers_for_ids(ids: list[str]) -> dict[str, dict]:
     by_id: dict[str, dict] = {m["id"]: m for m in MCP_CATALOG}
     by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
     out: dict[str, dict] = {}
+    unknown: list[str] = []
     for i in ids:
         entry = by_id.get(i)
         if entry and entry.get("server"):
             out[i] = dict(entry["server"])
+        elif i not in by_id:
+            # A typo'd or renamed catalog id would otherwise vanish silently from
+            # every surface's MCP config; surface it (2026-07 review).
+            unknown.append(i)
+    if unknown:
+        sys.stderr.write(
+            f"warning: unknown MCP id(s) ignored: {', '.join(unknown)} "
+            f"(known: {', '.join(sorted(by_id))})\n"
+        )
     return out
 
 

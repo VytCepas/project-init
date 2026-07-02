@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import re
-import warnings
+import sys
 from pathlib import Path
 
 from project_init.mcps import servers_for_ids
@@ -96,10 +96,11 @@ def canonical_hooks(variables: dict[str, str]) -> list[tuple[str, str]]:
         # invalid JSON here means the wired hooks are broken, not that there are
         # none. Surface it instead of silently reporting an empty hook inventory
         # (PI-535) — e.g. a custom preset with an unescaped quote in a command.
-        warnings.warn(
-            f"settings.json.tmpl rendered invalid JSON ({e}); CAPABILITIES.md will "
-            "list no wired hooks. Check the preset's command values for unescaped quotes.",
-            stacklevel=2,
+        # stderr, not warnings.warn, so it is actually visible in CLI use
+        # (warning filters/dedup can swallow it) (2026-07 review).
+        sys.stderr.write(
+            f"warning: settings.json.tmpl rendered invalid JSON ({e}); CAPABILITIES.md "
+            "will list no wired hooks. Check the preset's command values for unescaped quotes.\n"
         )
         return []
     out: list[tuple[str, str]] = []
@@ -167,7 +168,10 @@ def _memory_descriptor(variables: dict[str, str]) -> list[tuple[str, str]]:
     Anchors are invariant across tiers; higher tiers only add retrieval surfaces.
     Derived from ``memory_stack`` exactly as the config record / gate vars are.
     """
-    stack = variables.get("memory_stack", "none") or "none"
+    # A legacy record with no memory_stack backfills to obsidian-only (the
+    # pre-#466 default, matching upgrade.py's backfill and _chosen_options — the
+    # two defaults disagreed before, 2026-07 review).
+    stack = variables.get("memory_stack", "obsidian-only") or "obsidian-only"
     if stack == "none":
         return [("Tier", "— (no memory backend)")]
     rows = [

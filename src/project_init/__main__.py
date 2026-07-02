@@ -2020,8 +2020,21 @@ def _ensure_target_dir(target: Path, parser: argparse.ArgumentParser) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the scaffolding CLI; return the process exit code."""
-    argv = list(sys.argv[1:]) if argv is None else list(argv)
+    """Run the scaffolding CLI; return the process exit code.
+
+    A single top-level handler turns an EOF (non-TTY / piped stdin) or Ctrl-C at
+    any interactive prompt — in the wizard or in `upgrade --apply -i` — into a
+    clean exit 130 instead of a raw traceback (2026-07 review).
+    """
+    try:
+        return _cli(list(sys.argv[1:]) if argv is None else list(argv))
+    except (EOFError, KeyboardInterrupt):
+        sys.stderr.write("\naborted\n")
+        return 130
+
+
+def _cli(argv: list[str]) -> int:
+    """Dispatch a fully-formed argv to the scaffold CLI or a subcommand."""
     _subcommands = {
         "upgrade": lambda a: _upgrade_main(a),
         "add": lambda a: _concern_main(a, enable=True),
