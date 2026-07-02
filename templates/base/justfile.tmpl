@@ -41,8 +41,15 @@ test-mutation:
     uv run --with mutmut mutmut run
     uv run --with mutmut mutmut export-cicd-stats
 
+# dependency vulnerability scan against known CVEs/advisories (PI-568).
+# complements package_guard.py, which only blocks installing a package that
+# doesn't exist or looks typosquatted — this catches a real, correctly-
+# spelled dependency with a known vulnerability already in the lockfile.
+audit:
+    uv run --with pip-audit pip-audit
+
 # what CI runs
-ci: lint typecheck test-cov
+ci: lint typecheck test-cov audit
 
 # serve the docs site locally
 docs:
@@ -85,12 +92,16 @@ test:
 docs:
     bunx typedoc
 
+# dependency vulnerability scan against known CVEs/advisories (PI-568)
+audit:
+    bun audit
+
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint typecheck test
+ci: lint typecheck test audit
 {{/if node}}{{#if go}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
@@ -124,12 +135,18 @@ test-cov:
 docs:
     @echo "pkg.go.dev renders Go doc comments — nothing to build locally"
 
+# dependency vulnerability scan against known CVEs/advisories (PI-568).
+# requires govulncheck: `go install golang.org/x/vuln/cmd/govulncheck@latest`
+# once, on your machine (CI installs it per-run).
+audit:
+    govulncheck ./...
+
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test-cov
+ci: lint test-cov audit
 {{/if go}}{{#if rust}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
@@ -167,12 +184,18 @@ test-cov:
 docs:
     @echo "docs.rs renders published crate docs — nothing to build locally"
 
+# dependency vulnerability scan against known CVEs/advisories (PI-568).
+# requires cargo-audit: `cargo install cargo-audit` once, on your machine
+# (CI installs it per-run as a prebuilt binary).
+audit:
+    cargo audit
+
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test-cov
+ci: lint test-cov audit
 {{/if rust}}{{#if delivery_service}}
 # --- container parity (delivery=service): same image local and in cloud ---
 

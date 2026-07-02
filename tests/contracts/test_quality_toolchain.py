@@ -389,6 +389,58 @@ class TestCiQualityGates:
         assert "mutation-tests:" not in ci
 
 
+class TestVulnerabilityScanGate:
+    """PI-568: dependency vulnerability (CVE/advisory) scan per language,
+    blocking — part of the single `lint-and-test` job so ci-gate's existing
+    `needs: [lint-and-test, ...]` covers it with no gate-list change needed."""
+
+    def test_python_audit_wired(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "python")
+        justfile = (target / "justfile").read_text()
+        assert "audit:" in justfile
+        assert "pip-audit" in justfile
+        assert "ci: lint typecheck test-cov audit" in justfile
+
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just audit" in ci
+
+    def test_node_audit_wired(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "node")
+        justfile = (target / "justfile").read_text()
+        assert "audit:" in justfile
+        assert "bun audit" in justfile
+        assert "ci: lint typecheck test audit" in justfile
+
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just audit" in ci
+
+    def test_go_audit_wired(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "go")
+        justfile = (target / "justfile").read_text()
+        assert "audit:" in justfile
+        assert "govulncheck ./..." in justfile
+        assert "ci: lint test-cov audit" in justfile
+
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just audit" in ci
+        assert "golang.org/x/vuln/cmd/govulncheck" in ci
+
+    def test_rust_audit_wired(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "rust")
+        justfile = (target / "justfile").read_text()
+        assert "audit:" in justfile
+        assert "cargo audit" in justfile
+        assert "ci: lint test-cov audit" in justfile
+
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just audit" in ci
+        assert "cargo-audit" in ci
+
+    def test_audit_absent_for_no_language(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "none")
+        assert not (target / "justfile").exists()
+
+
 class TestBashLintGate:
     """PI-562: shellcheck + shfmt gate .claude/**/*.sh regardless of language —
     bash agent infra always ships, so the gate isn't tied to any one language."""

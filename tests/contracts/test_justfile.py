@@ -68,18 +68,20 @@ class TestJustfilePerLanguage:
         assert "gitleaks git --pre-commit" in _recipe_body(text, "scan")
 
     def test_ci_recipe_is_pure_dependency(self, tmp_path: Path):
-        """`ci: lint typecheck test-cov` — recipes referencing recipes, no
-        duplicated commands. `test-cov`, not `test` (PI-569): CI must always
-        run the coverage-gated variant."""
+        """`ci: lint typecheck test-cov audit` — recipes referencing recipes,
+        no duplicated commands. `test-cov`, not `test` (PI-569): CI must
+        always run the coverage-gated variant. `audit` (PI-568): CI must
+        always run the dependency vulnerability scan too."""
         target = _scaffold_language(tmp_path / "p", "python")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint typecheck test-cov\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: lint typecheck test-cov audit\s*$", text, re.MULTILINE)
 
     def test_node_ci_recipe_includes_typecheck(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "node")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint typecheck test\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: lint typecheck test audit\s*$", text, re.MULTILINE)
         assert "tsc --noEmit" in _recipe_body(text, "typecheck")
+        assert "bun audit" in _recipe_body(text, "audit")
 
     def test_python_typecheck_tolerates_missing_src(self, tmp_path: Path):
         """A fresh scaffold has no src/ yet — `mypy src/` errors on a missing
@@ -98,14 +100,16 @@ class TestJustfilePerLanguage:
     def test_go_ci_recipe_uses_coverage_variant(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "g", "go")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint test-cov\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: lint test-cov audit\s*$", text, re.MULTILINE)
         assert "go tool cover -func" in _recipe_body(text, "test-cov")
+        assert "govulncheck ./..." in _recipe_body(text, "audit")
 
     def test_rust_ci_recipe_uses_coverage_variant(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "r", "rust")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint test-cov\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: lint test-cov audit\s*$", text, re.MULTILINE)
         assert "cargo llvm-cov --fail-under-lines" in _recipe_body(text, "test-cov")
+        assert "cargo audit" in _recipe_body(text, "audit")
 
     def test_python_test_recipe_is_self_contained(self, tmp_path: Path):
         """PI-180: `-n auto` needs pytest-xdist; pull it in on demand so a
