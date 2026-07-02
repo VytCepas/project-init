@@ -15,6 +15,28 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "0.6.0": {
+        "summary": (
+            "Robustness + hardening pass (2026-07 review). Re-running the "
+            "scaffolder over a recorded project no longer clobbers files you "
+            "edited after scaffolding — edited/unrecorded managed files are "
+            "parked as `<file>.new` siblings using the recorded content hashes. "
+            "The GitHub lifecycle command-guard closes bypasses (git global "
+            "options, GraphQL merge mutations, interpreter heredocs). Scaffolded "
+            "fixes: the rust/go/node + service justfile no longer defines `build` "
+            "twice (the container recipe is now `image`), `.gitignore` stops "
+            "ignoring committed `.codex/` wiring, monitor_pr.sh requires an "
+            "explicit --admin to override a BLOCKED merge, and several hooks/"
+            "scripts are more portable. CI SHA-pins its Actions and verifies the "
+            "shfmt download against published checksums."
+        ),
+        "action_required": (
+            "No action required for normal use. If you rely on `just build` in a "
+            "service-delivery project, note the container build recipe is now "
+            "`just image` (`just build` is the language build). Re-run "
+            "`project-init upgrade` to pick up the guard/template fixes."
+        ),
+    },
     "0.5.0": {
         "summary": (
             "Base is now à-la-carte and self-explaining (ADR-023, epic #470): a "

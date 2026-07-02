@@ -450,7 +450,7 @@ project-init/
 
 ## Status
 
-Actively developed and published to [PyPI](https://pypi.org/project/project-init/) (current release: v0.5.1). Contributions welcome — track and propose work in [GitHub Issues](https://github.com/VytCepas/project-init/issues), and use [GitHub Discussions](https://github.com/VytCepas/project-init/discussions) for questions, ideas, and feedback. Forks and pull requests are encouraged.
+Actively developed and published to [PyPI](https://pypi.org/project/project-init/) (current release: v0.6.0). Contributions welcome — track and propose work in [GitHub Issues](https://github.com/VytCepas/project-init/issues), and use [GitHub Discussions](https://github.com/VytCepas/project-init/discussions) for questions, ideas, and feedback. Forks and pull requests are encouraged.
 
 ## License
 
