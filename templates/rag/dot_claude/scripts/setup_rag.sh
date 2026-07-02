@@ -39,7 +39,7 @@ RAG_TOOL_SPEC="${RAG_TOOL_SPEC:-cocoindex-code[full]==0.2.37}"
 # TODO(project-init #515): re-check the larger models as cocoindex-code upgrades
 # transformers — if one then loads keyless AND beats CodeRankEmbed, wire it in here.
 RAG_EMBED_MODEL="${RAG_EMBED_MODEL:-nomic-ai/CodeRankEmbed}"
-RAG_EMBED_DEVICE="${RAG_EMBED_DEVICE:-cpu}"   # cpu | cuda | mps
+RAG_EMBED_DEVICE="${RAG_EMBED_DEVICE:-cpu}" # cpu | cuda | mps
 # ----------------------------------------------------------------------------
 
 if ! command -v uv >/dev/null 2>&1; then
@@ -70,7 +70,7 @@ if [ -f "$GLOBAL_CFG" ] && ! head -n1 "$GLOBAL_CFG" | grep -qF "$SENTINEL"; then
   cp "$GLOBAL_CFG" "${GLOBAL_CFG}.bak.$$"
   echo "WARNING: backed up your existing ${GLOBAL_CFG} to ${GLOBAL_CFG}.bak.$$ before overwriting." >&2
 fi
-cat > "$GLOBAL_CFG" <<EOF
+cat >"$GLOBAL_CFG" <<EOF
 ${SENTINEL} — keyless, on-device embeddings.
 embedding:
   provider: sentence-transformers

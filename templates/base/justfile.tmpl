@@ -9,6 +9,13 @@ setup:
 # lint project code (docstring + complexity gates per ruff.toml)
 lint:
     uv run ruff check .
+    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+
+# static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
+# no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path
+typecheck:
+    if [ -d src ]; then uv run --with "mypy>=1.10" mypy src/; else echo "No src/ directory yet — nothing to type-check."; fi
 
 # auto-format project code
 format:
@@ -22,6 +29,13 @@ test:
 test-cov:
     uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov --cov-fail-under=70
 
+# mutation testing on core logic (slow; requires [tool.mutmut] source_paths
+# in your own pyproject.toml, scoped to deterministic pure-logic modules —
+# skip I/O-heavy code, hooks, template renderers). CI runs this nightly.
+test-mutation:
+    uv run --with mutmut mutmut run
+    uv run --with mutmut mutmut export-cicd-stats
+
 # serve the docs site locally
 docs:
     uv run --with mkdocs-material --with "mkdocstrings[python]" mkdocs serve
@@ -31,7 +45,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test
+ci: lint typecheck test
 
 # regenerate .claude/docs/CODE_MAP.md (low-token "what does what" map; read before grepping)
 code-map:
@@ -42,11 +56,17 @@ code-map:
 
 # install the lint/format gate toolchain (eslint.config.mjs imports these)
 setup:
-    bun add -d eslint typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc @biomejs/biome
+    bun add -d eslint typescript typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc @biomejs/biome
 
 # lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs)
 lint:
     bunx eslint .
+    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+
+# static type check (strict mode per tsconfig.base.json)
+typecheck:
+    bunx tsc --noEmit
 
 # auto-format project code (Biome is the formatter; eslint owns the gates)
 format:
@@ -65,7 +85,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test
+ci: lint typecheck test
 {{/if node}}{{#if go}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
@@ -74,13 +94,16 @@ ci: lint test
 setup:
     go mod download
 
-# lint project code (revive/godoclint/gocognit gates per .golangci.yml)
+# lint project code (revive/godoclint/gocognit/cyclop/dupl/errcheck/govet/staticcheck gates per .golangci.yml)
 lint:
     golangci-lint run
+    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
-# auto-format project code
+# auto-format project code (gofumpt via golangci-lint fmt — no separate binary
+# to provision; golangci-lint is already required for `just lint`)
 format:
-    gofmt -w .
+    golangci-lint fmt
 
 # run the test suite
 test:
@@ -96,7 +119,43 @@ scan:
 
 # what CI runs
 ci: lint test
-{{/if go}}{{#if delivery_service}}
+{{/if go}}{{#if rust}}# justfile — the canonical command interface (scaffolded by project-init).
+# `just --list` shows every recipe. Recipes are thin wrappers — logic lives
+# in the tools and their configs, never in this file.
+
+# fetch dependencies
+setup:
+    cargo fetch
+
+# build the project
+build:
+    cargo build
+
+# lint project code (clippy pedantic + cognitive-complexity gate per clippy.toml)
+lint:
+    cargo clippy -- -D warnings -D clippy::pedantic
+    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+
+# auto-format project code
+format:
+    cargo fmt
+
+# run the test suite
+test:
+    cargo test
+
+# docs: nothing to build locally — docs.rs renders published crate docs
+docs:
+    @echo "docs.rs renders published crate docs — nothing to build locally"
+
+# scan staged changes for secrets (same scan as the pre-commit git hook)
+scan:
+    gitleaks git --pre-commit --staged --redact --no-banner --verbose
+
+# what CI runs
+ci: lint test
+{{/if rust}}{{#if delivery_service}}
 # --- container parity (delivery=service): same image local and in cloud ---
 
 # build + run the app (and any backing services) locally

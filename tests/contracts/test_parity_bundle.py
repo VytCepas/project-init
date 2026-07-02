@@ -16,9 +16,9 @@ def _scaffold(target: Path, **overrides: str) -> Path:
 
 
 def _service(target: Path, language: str = "python") -> Path:
-    # make_variables sets the python/node/go flags independently of `language`,
-    # so set them explicitly to match the requested runtime.
-    flags = {"python": "", "node": "", "go": ""}
+    # make_variables sets the python/node/go/rust flags independently of
+    # `language`, so set them explicitly to match the requested runtime.
+    flags = {"python": "", "node": "", "go": "", "rust": ""}
     flags[language] = "true"
     return _scaffold(
         target,
@@ -42,6 +42,8 @@ class TestParityBundlePresent:
         assert "python:3.13-slim" in (py / "Dockerfile").read_text()
         go = _service(tmp_path / "go", "go")
         assert "golang:1.23" in (go / "Dockerfile").read_text()
+        rust = _service(tmp_path / "rust", "rust")
+        assert "rust:1-slim-bookworm" in (rust / "Dockerfile").read_text()
 
     def test_compose_has_app_service_and_no_uncommented_db(self, tmp_path: Path):
         compose = (_service(tmp_path / "svc") / "compose.yaml").read_text()

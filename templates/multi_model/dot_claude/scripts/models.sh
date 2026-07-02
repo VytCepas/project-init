@@ -15,11 +15,19 @@ CONFIG="${CCR_CONFIG:-$HOME/.claude-code-router/config.json}"
 OLLAMA_BASE_URL="http://localhost:11434/v1/chat/completions"
 
 info() { printf '\033[0;36m›\033[0m %s\n' "$*"; }
-ok()   { printf '\033[0;32m✓\033[0m %s\n' "$*"; }
+ok() { printf '\033[0;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '\033[0;33m!\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[0;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
+die() {
+  printf '\033[0;31m✗ %s\033[0m\n' "$*" >&2
+  exit 1
+}
 have() { command -v "$1" >/dev/null 2>&1; }
-ask()  { [ -t 0 ] || return 1; local r=""; read -r -p "$1 [y/N] " r || true; [[ "$r" =~ ^[Yy]$ ]]; }
+ask() {
+  [ -t 0 ] || return 1
+  local r=""
+  read -r -p "$1 [y/N] " r || true
+  [[ "$r" =~ ^[Yy]$ ]]
+}
 
 have jq || die "jq is required. Install jq (https://jqlang.github.io/jq/) and re-run."
 [ -f "$CONFIG" ] || die "no CCR config at $CONFIG — run setup_models.sh first."
@@ -63,7 +71,7 @@ _provider_exists() { jq -e --arg p "$1" '.Providers[]? | select(.name==$p)' "$CO
 _guard_small() {
   local model="$1" size
   size=$(printf '%s' "$model" | grep -oiE '[0-9]+(\.[0-9]+)?b' | head -1 | sed 's/[bB]//') || true
-  [ -n "$size" ] || return 0  # no size in the name — can't tell, allow
+  [ -n "$size" ] || return 0 # no size in the name — can't tell, allow
   # integer compare on the whole-billions part
   if [ "${size%%.*}" -lt 7 ] 2>/dev/null; then
     warn "$model looks <7B. Models below ~7B loop on 'Invalid tool parameters' in agent use."
@@ -78,13 +86,18 @@ cmd_list() {
   info "Router:"
   jq -r '.Router // {} | to_entries[] | select(.value|type=="string") | "  \(.key): \(.value)"' "$CONFIG"
   if have ollama; then
-    echo; info "Pulled Ollama models:"; ollama list 2>/dev/null | tail -n +2 | awk '{print "  "$1}' || true
+    echo
+    info "Pulled Ollama models:"
+    ollama list 2>/dev/null | tail -n +2 | awk '{print "  "$1}' || true
   fi
 }
 
 cmd_add() {
   local provider="${1:-}" model="${2:-}"
-  [ -n "$provider" ] && [ -n "$model" ] || { usage; die "add needs <provider> <model>."; }
+  [ -n "$provider" ] && [ -n "$model" ] || {
+    usage
+    die "add needs <provider> <model>."
+  }
   if [ "$provider" = "ollama" ]; then
     _guard_small "$model"
     if ! _provider_exists ollama; then
@@ -92,7 +105,10 @@ cmd_add() {
       _jq_write --arg url "$OLLAMA_BASE_URL" \
         '.Providers += [{"name":"ollama","api_base_url":$url,"api_key":"ollama","models":[]}]'
     fi
-    if have ollama; then info "Pulling $model…"; ollama pull "$model"; else warn "ollama not installed — registering anyway."; fi
+    if have ollama; then
+      info "Pulling $model…"
+      ollama pull "$model"
+    else warn "ollama not installed — registering anyway."; fi
   else
     _provider_exists "$provider" || die "provider '$provider' not in config. Add it via 'models ui' / config.json first."
   fi
@@ -103,7 +119,10 @@ cmd_add() {
 
 cmd_rm() {
   local provider="${1:-}" model="${2:-}"
-  [ -n "$provider" ] && [ -n "$model" ] || { usage; die "rm needs <provider> <model>."; }
+  [ -n "$provider" ] && [ -n "$model" ] || {
+    usage
+    die "rm needs <provider> <model>."
+  }
   _provider_exists "$provider" || die "provider '$provider' not in config."
   if jq -e --arg m "$model" '.Router // {} | to_entries[] | select(.value==($m|tostring) or (.value|type=="string" and endswith(","+$m)))' "$CONFIG" >/dev/null 2>&1; then
     warn "$model is still referenced in Router — update routing ('models ui') or it will fail when hit."
@@ -111,16 +130,26 @@ cmd_rm() {
   _jq_write --arg p "$provider" --arg m "$model" \
     '(.Providers[] | select(.name==$p) | .models) |= ((. // []) - [$m])'
   if [ "$provider" = "ollama" ] && have ollama; then
-    info "Removing local model $model…"; ollama rm "$model" 2>/dev/null || warn "ollama rm $model failed (not pulled?)."
+    info "Removing local model $model…"
+    ollama rm "$model" 2>/dev/null || warn "ollama rm $model failed (not pulled?)."
   fi
   ok "Unregistered $model from $provider."
 }
 
 case "${1:-}" in
-  list|ls|"")     cmd_list ;;
-  add)            shift; cmd_add "$@" ;;
-  rm|remove)      shift; cmd_rm "$@" ;;
-  ui)             have ccr && exec ccr ui || die "ccr not found." ;;
-  -h|--help|help) usage ;;
-  *)              usage; die "unknown command: $1" ;;
+list | ls | "") cmd_list ;;
+add)
+  shift
+  cmd_add "$@"
+  ;;
+rm | remove)
+  shift
+  cmd_rm "$@"
+  ;;
+ui) have ccr && exec ccr ui || die "ccr not found." ;;
+-h | --help | help) usage ;;
+*)
+  usage
+  die "unknown command: $1"
+  ;;
 esac

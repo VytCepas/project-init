@@ -29,7 +29,11 @@ npm-debug.log*
 *.out
 vendor/
 
-{{/if go}}{{#if graphify}}# Graphify (derived graph artifacts; keep GRAPH_REPORT.md tracked)
+{{/if go}}{{#if rust}}# Rust
+/target/
+**/*.rs.bk
+
+{{/if rust}}{{#if graphify}}# Graphify (derived graph artifacts; keep GRAPH_REPORT.md tracked)
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md
 

@@ -70,8 +70,9 @@ def all_skill_dirs() -> list[Path]:
 def core_hook_scripts() -> list[Path]:
     """CORE plugin hook scripts.
 
-    The fallback quality/safety hooks plus the base _py.sh resolver (PI-361) and
-    prod_guard.py safety hook (PI-394).
+    The fallback quality/safety hooks plus the base _py.sh resolver (PI-361),
+    prod_guard.py safety hook (PI-394), and package_guard.py supply-chain
+    guard (PI-564).
     """
     scripts = [
         p
@@ -80,6 +81,7 @@ def core_hook_scripts() -> list[Path]:
     ]
     scripts.append(TEMPLATE_CLAUDE / "hooks" / "_py.sh")
     scripts.append(TEMPLATE_CLAUDE / "hooks" / "prod_guard.py")
+    scripts.append(TEMPLATE_CLAUDE / "hooks" / "package_guard.py")
     return sorted(scripts)
 
 

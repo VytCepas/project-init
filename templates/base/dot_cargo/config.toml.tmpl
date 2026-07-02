@@ -1,0 +1,7 @@
+{{#if rust}}# .cargo/config.toml — quality gates for project code (scaffolded by project-init).
+# -D warnings is the Rust analog to `mypy --strict` / tsconfig "strict": true —
+# fail the build on any compiler warning, not just clippy lints.
+
+[build]
+rustflags = ["-D", "warnings"]
+{{/if rust}}

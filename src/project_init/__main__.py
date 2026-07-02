@@ -113,7 +113,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--description", help="One-line project description")
     p.add_argument(
         "--language",
-        choices=["python", "node", "go", "none"],
+        choices=["python", "node", "go", "rust", "none"],
         help="Primary language/runtime",
     )
     p.add_argument(
@@ -1175,8 +1175,8 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
     project_name = _prompt("Project name", default=default_name)
     project_description = _prompt("Description", default="")
-    language = _prompt("Language (python/node/go/none)", default="none")
-    if language not in {"python", "node", "go", "none"}:
+    language = _prompt("Language (python/node/go/rust/none)", default="none")
+    if language not in {"python", "node", "go", "rust", "none"}:
         language = "none"
     (
         delivery_flag,
@@ -1303,7 +1303,7 @@ def resolve_delivery(raw: str | None, language: str) -> str:
     if value == "service" and language == "none":
         raise ValueError(
             "delivery 'service' needs a language toolchain — pass "
-            "--language python/node/go, or choose 'prototype'"
+            "--language python/node/go/rust, or choose 'prototype'"
         )
     return value
 
@@ -1498,7 +1498,8 @@ _LANGUAGE_COMMANDS: dict[str, tuple[str, str, str]] = {
     # node recipes call the tools directly (PI-180): a freshly scaffolded
     # project has no package.json scripts to back `bun run lint`/`format`.
     "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
-    "go": ("golangci-lint run", "gofmt -w .", "go test ./..."),
+    "go": ("golangci-lint run", "golangci-lint fmt", "go test ./..."),
+    "rust": ("cargo clippy -- -D warnings -D clippy::pedantic", "cargo fmt", "cargo test"),
 }
 
 
@@ -1779,6 +1780,7 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "python": "true" if language == "python" else "",
         "node": "true" if language == "node" else "",
         "go": "true" if language == "go" else "",
+        "rust": "true" if language == "rust" else "",
         "justfile": "true" if language != "none" else "",
         "devcontainer": "true" if devcontainer else "",
         # A service delivery (ADR-015) gets a devcontainer automatically; the

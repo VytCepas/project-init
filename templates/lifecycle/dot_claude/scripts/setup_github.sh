@@ -11,7 +11,10 @@
 set -euo pipefail
 
 # This script hard-requires the GitHub CLI (PI-362).
-command -v gh >/dev/null 2>&1 || { echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2; exit 1; }
+command -v gh >/dev/null 2>&1 || {
+  echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2
+  exit 1
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null
@@ -21,9 +24,12 @@ BRANCH="main"
 PROTECT=0
 for arg in "$@"; do
   case "$arg" in
-    --protect) PROTECT=1 ;;
-    --*) echo "Unknown option: $arg" >&2; exit 1 ;;
-    *) BRANCH="$arg" ;;
+  --protect) PROTECT=1 ;;
+  --*)
+    echo "Unknown option: $arg" >&2
+    exit 1
+    ;;
+  *) BRANCH="$arg" ;;
   esac
 done
 
@@ -42,31 +48,31 @@ echo "Configuring GitHub governance for $REPO ($BRANCH)"
 # Default endpoint: repos/$OWNER/$NAME/branches/main/protection
 
 if [ "$PROTECT" = 1 ]; then
-# Repo merge policy: squash-only + delete-branch-on-merge. Squash keeps history
-# linear (one commit per PR) and reuses the PR title (ADR-006); deleting the head
-# branch on merge keeps the branch list clean.
-if gh api "repos/$OWNER/$NAME" -X PATCH \
-     -F allow_squash_merge=true -F allow_merge_commit=false \
-     -F allow_rebase_merge=false -F delete_branch_on_merge=true >/dev/null 2>&1; then
-  echo "Repo merge policy: squash-only + delete-branch-on-merge"
-else
-  echo "WARNING: could not set repo merge policy (admin permission?)." >&2
-fi
+  # Repo merge policy: squash-only + delete-branch-on-merge. Squash keeps history
+  # linear (one commit per PR) and reuses the PR title (ADR-006); deleting the head
+  # branch on merge keeps the branch list clean.
+  if gh api "repos/$OWNER/$NAME" -X PATCH \
+    -F allow_squash_merge=true -F allow_merge_commit=false \
+    -F allow_rebase_merge=false -F delete_branch_on_merge=true >/dev/null 2>&1; then
+    echo "Repo merge policy: squash-only + delete-branch-on-merge"
+  else
+    echo "WARNING: could not set repo merge policy (admin permission?)." >&2
+  fi
 
-PROTECTION=$(mktemp)
-trap 'rm -f "$PROTECTION"' EXIT
+  PROTECTION=$(mktemp)
+  trap 'rm -f "$PROTECTION"' EXIT
 
-# Contexts must match the bare check-run names GitHub reports — NOT
-# "<workflow> / <job name>" (PI #555). Two traps avoided here:
-#   1. CI's lint job is a matrix, so its check-runs are "Lint and test (3.11)"…
-#      not "Lint and test"; requiring the un-expanded/prefixed name never matches
-#      and leaves the branch permanently `blocked`. Instead require the single
-#      "CI gate" job (ci.yml), which `needs:` the whole matrix + secret scan —
-#      robust to matrix changes and language-agnostic.
-#   2. review/decision is a derived status only posted on review events and is
-#      unsatisfiable for a solo owner (you can't approve your own PR), so it is
-#      NOT required here — it stays the advisory signal monitor_pr.sh treats it as.
-cat > "$PROTECTION" <<'JSON'
+  # Contexts must match the bare check-run names GitHub reports — NOT
+  # "<workflow> / <job name>" (PI #555). Two traps avoided here:
+  #   1. CI's lint job is a matrix, so its check-runs are "Lint and test (3.11)"…
+  #      not "Lint and test"; requiring the un-expanded/prefixed name never matches
+  #      and leaves the branch permanently `blocked`. Instead require the single
+  #      "CI gate" job (ci.yml), which `needs:` the whole matrix + secret scan —
+  #      robust to matrix changes and language-agnostic.
+  #   2. review/decision is a derived status only posted on review events and is
+  #      unsatisfiable for a solo owner (you can't approve your own PR), so it is
+  #      NOT required here — it stays the advisory signal monitor_pr.sh treats it as.
+  cat >"$PROTECTION" <<'JSON'
 {
   "required_status_checks": {
     "strict": true,
@@ -89,25 +95,25 @@ cat > "$PROTECTION" <<'JSON'
 }
 JSON
 
-if gh api "repos/$OWNER/$NAME/branches/$BRANCH/protection" -X PUT --input "$PROTECTION" >/dev/null; then
-  echo "Branch protection applied to $BRANCH"
-else
-  echo "WARNING: could not apply branch protection. Check admin permissions and repository plan." >&2
-fi
+  if gh api "repos/$OWNER/$NAME/branches/$BRANCH/protection" -X PUT --input "$PROTECTION" >/dev/null; then
+    echo "Branch protection applied to $BRANCH"
+  else
+    echo "WARNING: could not apply branch protection. Check admin permissions and repository plan." >&2
+  fi
 
-# Repository ruleset (#251): the org profile's "hard" enforcement layer. A
-# ruleset with an empty bypass_actors binds *everyone* (owners/admins included),
-# so it cannot be admin-bypassed — unlike classic branch protection
-# (enforce_admins=false above). Applied ONLY under the org profile;
-# individual/standalone keep advisory branch protection (admin escape hatch
-# intact), per ADR-013. Forks do NOT inherit branch/tag rulesets, so the org
-# applies it directly. Feature-probe first and warn (never fail) without rulesets.
-if [ "$(gh_profile)" != "org" ]; then
-  echo "Profile is not 'org' — keeping advisory branch protection only (no owner-binding ruleset)."
-elif gh api "repos/$OWNER/$NAME/rulesets" >/dev/null 2>&1; then
-  RULESET=$(mktemp)
-  trap 'rm -f "$PROTECTION" "$RULESET"' EXIT
-  cat > "$RULESET" <<'RULESET_JSON'
+  # Repository ruleset (#251): the org profile's "hard" enforcement layer. A
+  # ruleset with an empty bypass_actors binds *everyone* (owners/admins included),
+  # so it cannot be admin-bypassed — unlike classic branch protection
+  # (enforce_admins=false above). Applied ONLY under the org profile;
+  # individual/standalone keep advisory branch protection (admin escape hatch
+  # intact), per ADR-013. Forks do NOT inherit branch/tag rulesets, so the org
+  # applies it directly. Feature-probe first and warn (never fail) without rulesets.
+  if [ "$(gh_profile)" != "org" ]; then
+    echo "Profile is not 'org' — keeping advisory branch protection only (no owner-binding ruleset)."
+  elif gh api "repos/$OWNER/$NAME/rulesets" >/dev/null 2>&1; then
+    RULESET=$(mktemp)
+    trap 'rm -f "$PROTECTION" "$RULESET"' EXIT
+    cat >"$RULESET" <<'RULESET_JSON'
 {
   "name": "project-init-baseline",
   "target": "branch",
@@ -131,14 +137,14 @@ elif gh api "repos/$OWNER/$NAME/rulesets" >/dev/null 2>&1; then
   "bypass_actors": []
 }
 RULESET_JSON
-  if gh api "repos/$OWNER/$NAME/rulesets" -X POST --input "$RULESET" >/dev/null 2>&1; then
-    echo "Repository ruleset 'project-init-baseline' applied (binds everyone — empty bypass)"
+    if gh api "repos/$OWNER/$NAME/rulesets" -X POST --input "$RULESET" >/dev/null 2>&1; then
+      echo "Repository ruleset 'project-init-baseline' applied (binds everyone — empty bypass)"
+    else
+      echo "WARNING: could not create the repository ruleset (it may already exist, or the plan/permission is insufficient)." >&2
+    fi
   else
-    echo "WARNING: could not create the repository ruleset (it may already exist, or the plan/permission is insufficient)." >&2
+    echo "Rulesets API unavailable on this host/plan — relying on branch protection only." >&2
   fi
-else
-  echo "Rulesets API unavailable on this host/plan — relying on branch protection only." >&2
-fi
 else
   echo "Skipping branch protection (pass --protect to apply: require CI green, require review, block force-push)"
 fi
@@ -163,8 +169,8 @@ echo "Provisioning GitHub Project board fields..."
 # numbering means a real board is rarely #1, so all three consumers must agree or
 # board state silently splits across projects.
 if [ -z "${PROJECT_NUMBER:-}" ]; then
-  PROJECT_NUMBER=$(grep -E '^[[:space:]]*github_project_number:' "$SCRIPT_DIR/../config.yaml" 2>/dev/null \
-    | head -n1 | sed 's/#.*$//' | grep -oE '[0-9]+' | head -n1 || true)
+  PROJECT_NUMBER=$(grep -E '^[[:space:]]*github_project_number:' "$SCRIPT_DIR/../config.yaml" 2>/dev/null |
+    head -n1 | sed 's/#.*$//' | grep -oE '[0-9]+' | head -n1 || true)
 fi
 PROJECT_NUMBER="${PROJECT_NUMBER:-1}"
 
@@ -309,4 +315,3 @@ else
       }) { projectV2Field { ... on ProjectV2SingleSelectField { id } } }
     }'
 fi
-

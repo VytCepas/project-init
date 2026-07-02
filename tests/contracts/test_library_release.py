@@ -16,7 +16,7 @@ def _scaffold(target: Path, **overrides: str) -> Path:
 
 
 def _library(target: Path, language: str = "python") -> Path:
-    flags = {"python": "", "node": "", "go": ""}
+    flags = {"python": "", "node": "", "go": "", "rust": ""}
     flags[language] = "true"
     return _scaffold(
         target, delivery="library", delivery_library="true", language=language, **flags
@@ -48,6 +48,11 @@ class TestLibraryRelease:
         text = _release(_library(tmp_path / "lib", "python")).read_text()
         assert "pypa/gh-action-pypi-publish" in text
         assert "id-token: write" in text
+
+    def test_rust_library_publishes_to_crates_io(self, tmp_path: Path):
+        text = _release(_library(tmp_path / "lib", "rust")).read_text()
+        assert "cargo publish" in text
+        assert "CARGO_REGISTRY_TOKEN" in text
 
     def test_absent_for_service_and_prototype(self, tmp_path: Path):
         svc = _scaffold(tmp_path / "svc", delivery="service", delivery_service="true")

@@ -58,7 +58,13 @@ jobs:
 
       - name: Build
         run: go build ./...
-{{/if go}}
+{{/if go}}{{#if rust}}
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Build
+        run: cargo build --release
+{{/if rust}}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -128,5 +134,17 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-{{/if go}}
+{{/if go}}{{#if rust}}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      # Requires a crates.io API token in CARGO_REGISTRY_TOKEN (repo secrets).
+      - name: Publish to crates.io
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+{{/if rust}}
 {{/if delivery_library}}

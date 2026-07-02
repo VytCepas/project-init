@@ -7,7 +7,9 @@ import jsdoc from "eslint-plugin-jsdoc";
 import tsdoc from "eslint-plugin-tsdoc";
 
 export default tseslint.config(
-  ...tseslint.configs.recommended,
+  // strict (not strictTypeChecked): catches no-explicit-any and friends
+  // without requiring parserOptions.project type-aware linting wiring.
+  ...tseslint.configs.strict,
   // Enforced JSDoc on exported/public symbols (TypeScript-aware preset).
   jsdoc.configs["flat/recommended-typescript"],
   {

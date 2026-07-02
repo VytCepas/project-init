@@ -5,6 +5,10 @@ on:
     branches: [{{base_branch}}]
   pull_request:
     branches: [{{base_branch}}]
+{{#if python}}
+  schedule:
+    - cron: "0 3 * * *"  # nightly mutation-testing run (PI-138/#563)
+{{/if python}}
   # Optimization: Only run CI when relevant files change
   # Uncomment and adjust paths as needed for your project
 
@@ -112,11 +116,22 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v4
 
+      # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      - name: Install shfmt
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
+          chmod +x "$HOME/.local/bin/shfmt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Sync dev dependencies
         run: just setup
 
       - name: Lint
         run: just lint
+
+      - name: Typecheck
+        run: just typecheck
 
       # Coverage gate (PI-138): activates automatically once pytest-cov is in
       # dev dependencies; runs plain tests until then. Tune --cov-fail-under
@@ -143,6 +158,14 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v4
 
+      # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      - name: Install shfmt
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
+          chmod +x "$HOME/.local/bin/shfmt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       # Fresh scaffolds have no lockfile yet — fall back to a plain install.
       - name: Install dependencies
         run: |
@@ -154,6 +177,9 @@ jobs:
 
       - name: Lint
         run: just lint
+
+      - name: Typecheck
+        run: just typecheck
 
       - name: Tests
         run: just test
@@ -169,6 +195,21 @@ jobs:
       - name: Lint (golangci-lint)
         uses: golangci/golangci-lint-action@v6
 
+      # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      - name: Install shfmt
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
+          chmod +x "$HOME/.local/bin/shfmt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # golangci-lint-action above doesn't run justfile recipes, so the .claude/
+      # shell-script gate (part of `just lint` for python/node) is explicit here.
+      - name: Lint (shell scripts under .claude/)
+        run: |
+          find .claude -name '*.sh' -exec shellcheck -S error -x {} +
+          find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+
       # Tests run via the justfile recipe agents and humans use (PI-139);
       # lint stays on the action above, which installs and caches the binary.
       - name: Install just
@@ -177,6 +218,30 @@ jobs:
       - name: Tests
         run: just test
 {{/if go}}
+{{#if rust}}
+      # Bundles Swatinem/rust-cache internally — no separate cache step needed.
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
+
+      # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      - name: Install shfmt
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
+          chmod +x "$HOME/.local/bin/shfmt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install just
+        uses: extractions/setup-just@v4
+
+      - name: Lint
+        run: just lint
+
+      - name: Tests
+        run: just test
+{{/if rust}}
 
       - name: Post failure summary
         if: failure() && github.event_name == 'pull_request'
@@ -236,23 +301,43 @@ jobs:
             echo "Create tests/integration/ when you have integration tests to run"
           fi
 
-  # Test-quality verification via mutation testing (PI-138). Mutmut is slow,
-  # so it runs nightly, not per-PR. Uncomment to enable; requires mutmut in
-  # dev dependencies and a [tool.mutmut] section in pyproject.toml.
-  # mutation-tests:
-  #   name: Mutation tests (mutmut)
-  #   runs-on: ubuntu-24.04
-  #   if: github.event_name == 'schedule'
-  #   steps:
-  #     - uses: actions/checkout@v6
-  #     - uses: astral-sh/setup-uv@v8.1.0
-  #       with:
-  #         version: "0.11.7"
-  #     - run: uv sync --group dev
-  #     - run: uv run mutmut run
-  # (also add to the top-level `on:` block:)
-  #   schedule:
-  #     - cron: "0 3 * * *"
+  # Test-quality verification via mutation testing (PI-138/#563). Mutmut is
+  # slow, so it runs nightly (see the top-level `on: schedule` block), not
+  # per-PR — non-blocking: not in ci-gate's `needs`, so a bad score never
+  # blocks a merge. Promote it there once a real baseline is established.
+  # `mutmut run` always exits 0 regardless of survivors; export-cicd-stats +
+  # the score-gate step below turn the result into an actual pass/fail signal.
+  # Requires a [tool.mutmut] section (source_paths = [...], scoped to
+  # deterministic pure-logic modules — skip I/O-heavy code, hooks, template
+  # renderers) in your own pyproject.toml; mutmut reads config from there,
+  # not a standalone file like ruff.toml/mypy.ini.
+  mutation-tests:
+    name: Mutation tests (mutmut)
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+      - run: uv sync --group dev
+      - run: uv run --with mutmut mutmut run
+      - run: uv run --with mutmut mutmut export-cicd-stats
+      - name: Enforce mutation score gate (>= 80% killed)
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+
+          with open("mutants/mutmut-cicd-stats.json", encoding="utf-8") as f:
+              stats = json.load(f)
+          total = stats["total"]
+          killed = stats["killed"]
+          score = (killed / total * 100) if total else 100.0
+          print(f"Mutation score: {score:.1f}% ({killed}/{total} killed)")
+          if score < 80:
+              sys.exit(f"Mutation score {score:.1f}% is below the 80% gate")
+          PY
 {{/if python}}
 
   {{#if delivery_service}}
@@ -304,9 +389,40 @@ jobs:
           # (free key from gitleaks.io). Personal accounts need no license.
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
+  # Semgrep: semantic/AST security backstop. gitleaks (above) is string-
+  # pattern secret scanning; semgrep catches unsafe subprocess calls, SQL
+  # injection, and other OWASP Top 10 shapes gitleaks can't see. Explicit
+  # rulesets (not --config=auto) for reproducibility. Not in ci-gate's
+  # needs — a finding never blocks a merge while the false-positive rate is
+  # calibrated, but --error still fails this job's own step so findings are
+  # visible. Promote to ci-gate's needs once calibrated.
+  semgrep:
+    name: Semgrep (semantic security scan)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history: --baseline-commit (PR-only, below) needs the base
+          # commit reachable, not just the latest diff.
+          fetch-depth: 0
+
+      - name: Run Semgrep
+        env:
+          SEMGREP_ENABLE_VERSION_CHECK: "0"
+        run: |
+          pip install --quiet semgrep==1.168.0
+          RULESETS="--config p/secrets --config p/owasp-top-ten{{#if python}} --config p/python{{/if python}}{{#if node}} --config p/typescript{{/if node}}{{#if go}} --config p/golang{{/if go}}{{#if rust}} --config p/rust{{/if rust}}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Scan only the diff against the PR's base commit.
+            semgrep scan --error --metrics=off $RULESETS \
+              --baseline-commit "${{ github.event.pull_request.base.sha }}"
+          else
+            semgrep scan --error --metrics=off $RULESETS
+          fi
+
   # All-green gate (PI #555): the SINGLE required status check for branch
   # protection. Branch protection requires only "CI gate", so the required
-  # context is robust to matrix changes — adding/removing a {{#if python}}Python version{{/if python}}{{#if node}}runtime{{/if node}}{{#if go}}runtime{{/if go}}
+  # context is robust to matrix changes — adding/removing a {{#if python}}Python version{{/if python}}{{#if node}}runtime{{/if node}}{{#if go}}runtime{{/if go}}{{#if rust}}runtime{{/if rust}}
   # never renames the required check, and there is no un-expanded matrix name
   # (e.g. "Lint and test (3.11)") for GitHub to fail to match against, which is
   # what left main permanently `blocked` before. `if: always()` so the gate runs

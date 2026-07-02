@@ -23,12 +23,19 @@ _RECIPES = ("setup", "lint", "format", "test", "docs", "ci", "scan")
 _COMMANDS = {
     "python": ("uv run ruff check .", "uv run ruff format .", "uv run pytest"),
     "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
-    "go": ("golangci-lint run", "gofmt -w .", "go test ./..."),
+    "go": ("golangci-lint run", "golangci-lint fmt", "go test ./..."),
+    "rust": (
+        "cargo clippy -- -D warnings -D clippy::pedantic",
+        "cargo fmt",
+        "cargo test",
+    ),
 }
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
-    flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go")}
+    flags = {
+        lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")
+    }
     lint, fmt, test = _COMMANDS.get(language, ("", "", ""))
     variables = fallback_variables(
         language=language, lint_command=lint, format_command=fmt, test_command=test, **flags
@@ -50,6 +57,7 @@ class TestJustfilePerLanguage:
             ("python", "uv run ruff check .", "pytest -n auto"),
             ("node", "bunx eslint .", "bun test"),
             ("go", "golangci-lint run", "go test ./..."),
+            ("rust", "cargo clippy", "cargo test"),
         ],
     )
     def test_recipes_match_toolchain(self, tmp_path: Path, language, lint_cmd, test_cmd):
@@ -62,10 +70,25 @@ class TestJustfilePerLanguage:
         assert "gitleaks git --pre-commit" in _recipe_body(text, "scan")
 
     def test_ci_recipe_is_pure_dependency(self, tmp_path: Path):
-        """`ci: lint test` — recipes referencing recipes, no duplicated commands."""
+        """`ci: lint typecheck test` — recipes referencing recipes, no duplicated commands."""
         target = _scaffold_language(tmp_path / "p", "python")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint test\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: lint typecheck test\s*$", text, re.MULTILINE)
+
+    def test_node_ci_recipe_includes_typecheck(self, tmp_path: Path):
+        target = _scaffold_language(tmp_path / "n", "node")
+        text = (target / "justfile").read_text()
+        assert re.search(r"^ci: lint typecheck test\s*$", text, re.MULTILINE)
+        assert "tsc --noEmit" in _recipe_body(text, "typecheck")
+
+    def test_python_typecheck_tolerates_missing_src(self, tmp_path: Path):
+        """A fresh scaffold has no src/ yet — `mypy src/` errors on a missing
+        path (not a "0 files, pass" no-op), so `just typecheck`/`ci` would
+        fail on day one unless the recipe guards for it."""
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "typecheck")
+        assert "if [ -d src ]" in body
+        assert "mypy src/" in body
 
     def test_python_coverage_recipe(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")
@@ -105,7 +128,7 @@ class TestJustfilePerLanguage:
         target = _scaffold_language(tmp_path / "n", "node")
         body = _recipe_body((target / "justfile").read_text(), "setup")
         assert "bun add" in body
-        for pkg in ("eslint", "typescript-eslint", "@biomejs/biome"):
+        for pkg in ("eslint", "typescript", "typescript-eslint", "@biomejs/biome"):
             assert pkg in body, f"setup must install {pkg}"
 
     def test_no_justfile_for_language_none(self, tmp_path: Path):
@@ -129,6 +152,12 @@ class TestRecipesAreTheSingleCallsite:
 
     def test_node_ci_calls_just(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "node")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just lint" in ci
+        assert "just test" in ci
+
+    def test_rust_ci_calls_just(self, tmp_path: Path):
+        target = _scaffold_language(tmp_path / "r", "rust")
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just lint" in ci
         assert "just test" in ci

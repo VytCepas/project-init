@@ -19,7 +19,9 @@ from tests.helpers import fallback_preset, fallback_variables
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
-    flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go")}
+    flags = {
+        lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")
+    }
     scaffold(target, fallback_preset(), fallback_variables(language=language, **flags))
     return target
 
@@ -43,6 +45,23 @@ class TestPythonToolchain:
         assert "D" in ignores["tests/**"]
         assert "C901" in ignores[".claude/**"]
 
+    def test_mypy_config_rendered_and_parseable(self):
+        import configparser
+
+        config = configparser.ConfigParser()
+        config.read_string((self.target / "mypy.ini").read_text())
+        assert config.getboolean("mypy", "strict") is True
+        assert config["mypy"]["python_version"] == "3.11"
+
+    def test_typecheck_recipe_and_ci_wired(self):
+        justfile = (self.target / "justfile").read_text()
+        assert "typecheck:" in justfile
+        assert "mypy" in justfile
+        assert "ci: lint typecheck test" in justfile
+
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just typecheck" in ci
+
     def test_mkdocs_config_rendered(self):
         content = (self.target / "mkdocs.yml").read_text()
         assert "name: material" in content
@@ -59,6 +78,8 @@ class TestPythonToolchain:
         assert not (self.target / "eslint.config.mjs").exists()
         assert not (self.target / ".golangci.yml").exists()
         assert not (self.target / "typedoc.json").exists()
+        assert not (self.target / "clippy.toml").exists()
+        assert not (self.target / "tsconfig.base.json").exists()
 
 
 class TestNodeToolchain:
@@ -72,6 +93,27 @@ class TestNodeToolchain:
         assert "eslint-plugin-jsdoc" in content
         assert "eslint-plugin-tsdoc" in content
         assert 'complexity: ["error", 10]' in content
+        assert "tseslint.configs.strict" in content
+
+    def test_tsconfig_base_rendered_and_parseable(self):
+        config = json.loads((self.target / "tsconfig.base.json").read_text())
+        options = config["compilerOptions"]
+        assert options["strict"] is True
+        assert options["noUncheckedIndexedAccess"] is True
+        assert options["exactOptionalPropertyTypes"] is True
+
+    def test_tsconfig_extends_base(self):
+        config = json.loads((self.target / "tsconfig.json").read_text())
+        assert config["extends"] == "./tsconfig.base.json"
+
+    def test_typecheck_recipe_and_ci_wired(self):
+        justfile = (self.target / "justfile").read_text()
+        assert "typecheck:" in justfile
+        assert "tsc --noEmit" in justfile
+        assert "ci: lint typecheck test" in justfile
+
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just typecheck" in ci
 
     def test_typedoc_config_rendered_and_parseable(self):
         raw = (self.target / "typedoc.json").read_text()
@@ -89,6 +131,8 @@ class TestNodeToolchain:
         assert not (self.target / "ruff.toml").exists()
         assert not (self.target / "mkdocs.yml").exists()
         assert not (self.target / ".golangci.yml").exists()
+        assert not (self.target / "mypy.ini").exists()
+        assert not (self.target / "clippy.toml").exists()
 
 
 class TestGoToolchain:
@@ -99,8 +143,22 @@ class TestGoToolchain:
     def test_golangci_config_rendered(self):
         content = (self.target / ".golangci.yml").read_text()
         assert 'version: "2"' in content
-        for linter in ("revive", "godoclint", "gocognit"):
+        for linter in (
+            "revive",
+            "godoclint",
+            "gocognit",
+            "cyclop",
+            "dupl",
+            "errcheck",
+            "govet",
+            "staticcheck",
+        ):
             assert linter in content, f"{linter} missing from .golangci.yml"
+        assert "gofumpt" in content
+
+    def test_golangci_complexity_cap_mirrors_ruff(self):
+        content = (self.target / ".golangci.yml").read_text()
+        assert "max-complexity: 10" in content, "cyclop cap must mirror ruff's mccabe max-complexity = 10"
 
     def test_no_docs_workflow(self):
         """Go needs no docs site — pkg.go.dev renders doc comments."""
@@ -110,6 +168,39 @@ class TestGoToolchain:
         assert not (self.target / "ruff.toml").exists()
         assert not (self.target / "eslint.config.mjs").exists()
         assert not (self.target / "typedoc.json").exists()
+        assert not (self.target / "mypy.ini").exists()
+        assert not (self.target / "clippy.toml").exists()
+        assert not (self.target / "tsconfig.base.json").exists()
+
+
+class TestRustToolchain:
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = _scaffold_language(tmp_target, "rust")
+
+    def test_cargo_config_rendered(self):
+        config = tomllib.loads((self.target / ".cargo" / "config.toml").read_text())
+        assert config["build"]["rustflags"] == ["-D", "warnings"]
+
+    def test_clippy_config_rendered(self):
+        config = tomllib.loads((self.target / "clippy.toml").read_text())
+        assert config["cognitive-complexity-threshold"] == 10
+
+    def test_rustfmt_config_rendered(self):
+        content = (self.target / "rustfmt.toml").read_text()
+        assert "edition" in content
+
+    def test_no_docs_workflow(self):
+        """Rust needs no docs site — docs.rs renders published crate docs."""
+        assert not (self.target / ".github" / "workflows" / "docs.yml").exists()
+
+    def test_no_other_language_configs(self):
+        assert not (self.target / "ruff.toml").exists()
+        assert not (self.target / "eslint.config.mjs").exists()
+        assert not (self.target / "typedoc.json").exists()
+        assert not (self.target / "mypy.ini").exists()
+        assert not (self.target / ".golangci.yml").exists()
+        assert not (self.target / "tsconfig.base.json").exists()
 
 
 class TestNoLanguage:
@@ -123,13 +214,19 @@ class TestNoLanguage:
             ".golangci.yml",
             "mkdocs.yml",
             "typedoc.json",
+            "mypy.ini",
+            "clippy.toml",
+            "rustfmt.toml",
+            ".cargo/config.toml",
+            "tsconfig.base.json",
+            "tsconfig.json",
             ".github/workflows/docs.yml",
         ):
             assert not (target / name).exists(), f"{name} must not render for language=none"
 
     def test_strict_mode_skips_empty_renders(self, tmp_target: Path):
         """Strict mode must not trip over language-gated files rendering empty."""
-        flags = {lang: "" for lang in ("python", "node", "go")}
+        flags = {lang: "" for lang in ("python", "node", "go", "rust")}
         created = scaffold(
             tmp_target,
             fallback_preset(),
@@ -184,11 +281,104 @@ class TestCiQualityGates:
         assert "--cov-fail-under" in self.ci
         assert "pytest_cov" in self.ci, "gate must activate only when pytest-cov is installed"
 
-    def test_mutmut_job_present_but_commented(self):
-        assert "mutmut" in self.ci
-        for line in self.ci.splitlines():
-            if "mutmut" in line:
-                assert line.lstrip().startswith("#"), f"mutmut must stay commented: {line!r}"
+    def test_mutmut_job_active_and_non_blocking(self):
+        """PI-563: mutmut graduated from a commented placeholder to a real,
+        active job — but it must stay non-blocking (schedule-only, excluded
+        from ci-gate's needs) until a baseline mutation score is established."""
+        assert "mutation-tests:" in self.ci
+        assert "mutmut run" in self.ci
+        assert "export-cicd-stats" in self.ci
+        assert "if: github.event_name == 'schedule'" in self.ci
+
+        gate_start = self.ci.index("ci-gate:")
+        gate_needs_line = next(
+            line for line in self.ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
+        )
+        assert "mutation-tests" not in gate_needs_line, "mutation-tests must stay non-blocking"
+
+    def test_mutmut_schedule_present_for_python(self):
+        assert "cron:" in self.ci
+
+    @pytest.mark.parametrize("language", ["node", "go", "rust"])
+    def test_mutmut_schedule_absent_for_other_languages(self, tmp_target: Path, language):
+        target = _scaffold_language(tmp_target, language)
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "cron:" not in ci, f"schedule trigger must not render for {language}"
+        assert "mutation-tests:" not in ci
+
+
+class TestBashLintGate:
+    """PI-562: shellcheck + shfmt gate .claude/**/*.sh regardless of language —
+    bash agent infra always ships, so the gate isn't tied to any one language."""
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_lint_recipe_runs_shellcheck_and_shfmt(self, tmp_target: Path, language):
+        target = _scaffold_language(tmp_target, language)
+        justfile = (target / "justfile").read_text()
+        assert "shellcheck -S error -x" in justfile
+        assert "shfmt -d -i 2" in justfile
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_ci_installs_shfmt(self, tmp_target: Path, language):
+        target = _scaffold_language(tmp_target, language)
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "Install shfmt" in ci
+
+    def test_go_ci_runs_shell_gate_explicitly(self, tmp_target: Path):
+        """Go's CI lint step calls the golangci-lint action directly (not `just
+        lint`), so the shell gate needs its own explicit step."""
+        target = _scaffold_language(tmp_target, "go")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "shellcheck -S error -x" in ci
+        assert "shfmt -d -i 2" in ci
+
+
+class TestSemgrepGate:
+    """PI-565: semantic security backstop, always-on (like secret-scan), with
+    a per-language ruleset and no-language still getting secrets/OWASP."""
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "none"])
+    def test_semgrep_job_present_and_non_blocking(self, tmp_target: Path, language):
+        target = _scaffold_language(tmp_target, language)
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "semgrep:" in ci
+        assert "p/secrets" in ci
+        assert "p/owasp-top-ten" in ci
+        assert "--baseline-commit" in ci
+
+        gate_start = ci.index("ci-gate:")
+        gate_needs_line = next(
+            line for line in ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
+        )
+        assert "semgrep" not in gate_needs_line, "semgrep must stay non-blocking initially"
+
+    def test_python_ruleset_selected(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "python")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "p/python" in ci
+        assert "p/typescript" not in ci
+        assert "p/golang" not in ci
+
+    def test_node_ruleset_selected(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "node")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "p/typescript" in ci
+        assert "p/python" not in ci
+        assert "p/golang" not in ci
+
+    def test_go_ruleset_selected(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "go")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "p/golang" in ci
+        assert "p/python" not in ci
+        assert "p/typescript" not in ci
+
+    def test_rust_ruleset_selected(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "rust")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "p/rust" in ci
+        assert "p/python" not in ci
+        assert "p/golang" not in ci
 
 
 class TestQualityPlugins:

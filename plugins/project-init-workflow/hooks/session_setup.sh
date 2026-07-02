@@ -14,7 +14,7 @@ mkdir -p .claude/logs
 # Self-log this firing (dormant unless the observability overlay is installed;
 # reads no stdin, so the SessionStart payload is untouched).
 # shellcheck source=/dev/null
-. "$(dirname "$0")/_usage_log.sh" 2>/dev/null && \
+. "$(dirname "$0")/_usage_log.sh" 2>/dev/null &&
   usage_log session_setup SessionStart "$ROOT" </dev/null || true
 
 # macOS BSD coreutils ship `shasum`, not GNU `sha256sum`. Pick whichever the
@@ -31,15 +31,15 @@ else
 fi
 
 fingerprint() {
-  cat pyproject.toml uv.lock package.json bun.lock bun.lockb go.mod go.sum 2>/dev/null \
-    | _sha256 | cut -d' ' -f1
+  cat pyproject.toml uv.lock package.json bun.lock bun.lockb go.mod go.sum 2>/dev/null |
+    _sha256 | cut -d' ' -f1
 }
 
 # The stamp alone is not enough: an ephemeral container can restore the repo
 # (stamp included) without the synced environment, so check for it too.
 env_present() {
-  { [ ! -f pyproject.toml ] || [ -d .venv ]; } \
-    && { [ ! -f package.json ] || [ -d node_modules ]; }
+  { [ ! -f pyproject.toml ] || [ -d .venv ]; } &&
+    { [ ! -f package.json ] || [ -d node_modules ]; }
 }
 
 CURRENT="$(fingerprint)"
@@ -49,8 +49,8 @@ fi
 
 bootstrap() {
   # Prefer the justfile setup recipe — the canonical bootstrap entry point.
-  if command -v just >/dev/null 2>&1 && [ -f justfile ] \
-    && just --show setup >/dev/null 2>&1; then
+  if command -v just >/dev/null 2>&1 && [ -f justfile ] &&
+    just --show setup >/dev/null 2>&1; then
     just setup
   elif [ -f pyproject.toml ] && command -v uv >/dev/null 2>&1; then
     # PEP 735: project-init scaffolds `dev` as a [dependency-groups] table, so

@@ -80,6 +80,16 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #   • setup_github.sh — bare required-check contexts + board SSOT (#555/#556)
 #   • create_issue.sh / board-automation.yml / config.yaml — board-number SSOT (#556)
 #   • session_setup.sh — `uv sync --group dev`, no silent-failure masking (#552/#553)
+#   • mypy.ini / justfile / post_edit_lint.sh / python.md — mypy --strict gate:
+#     new config file, `typecheck` recipe wired into the Python `ci` recipe,
+#     mypy wired into the edit-time lint hook, rule file updated (#558)
+#   • every shipped .sh script — reformatted with `shfmt -w -i 2` so the new
+#     shellcheck+shfmt scaffold gate (#562) doesn't fail against its own
+#     output on a fresh scaffold; a one-time whole-fleet reformat, not a
+#   • package_guard.py / settings.json / AGENTS.md — new supply-chain install
+#     guard hook (uv add/bun add/pip install/npm install/cargo add checked
+#     against PyPI/npm/crates.io), wired into settings.json and documented (#564)
+#     memory-move content change
 _ADDED_SINCE_BASELINE = {
     ".gitleaks.toml",
     ".github/workflows/ci.yml",
@@ -87,7 +97,25 @@ _ADDED_SINCE_BASELINE = {
     ".claude/scripts/create_issue.sh",
     ".github/workflows/board-automation.yml",
     ".claude/config.yaml",
+    "mypy.ini",
+    "justfile",
+    ".claude/hooks/post_edit_lint.sh",
+    ".claude/rules/python.md",
+    ".claude/rules/go.md",
     ".claude/hooks/session_setup.sh",
+    ".claude/hooks/_py.sh",
+    ".claude/scripts/gh_host.sh",
+    ".claude/scripts/lint_memory.sh",
+    ".claude/scripts/monitor_pr.sh",
+    ".claude/scripts/start_issue.sh",
+    ".claude/hooks/github_command_guard.sh",
+    ".claude/hooks/pre_commit_gate.sh",
+    ".claude/hooks/workflow_state_reminder.sh",
+    ".claude/hooks/package_guard.py",
+    ".claude/settings.json",
+    "AGENTS.md",
+    ".claude/rules/rust.md",
+    ".claude/rules/typescript.md",
 }
 
 

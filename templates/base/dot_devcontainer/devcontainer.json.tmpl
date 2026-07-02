@@ -4,7 +4,10 @@
 {{#if go}}  "features": {
     "ghcr.io/devcontainers/features/go:1": {}
   },
-{{/if go}}  "postCreateCommand": "bash .devcontainer/post-create.sh",
+{{/if go}}{{#if rust}}  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {}
+  },
+{{/if rust}}  "postCreateCommand": "bash .devcontainer/post-create.sh",
   "remoteEnv": {
     "PATH": "${containerEnv:HOME}/.local/bin:{{#if node}}${containerEnv:HOME}/.bun/bin:{{/if node}}${containerEnv:PATH}"
   },
