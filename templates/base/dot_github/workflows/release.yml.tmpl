@@ -56,6 +56,14 @@ jobs:
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: "dist/*.whl, dist/*.tar.gz"
+
+      # CycloneDX SBOM of the runtime dependency tree, attached to the Release
+      # below (#574). --no-dev so the SBOM reflects what ships, not dev tooling;
+      # uvx runs cyclonedx-py isolated so it doesn't pollute the scanned .venv.
+      - name: Generate CycloneDX SBOM
+        run: |
+          uv sync --no-dev
+          uvx --from cyclonedx-bom cyclonedx-py environment .venv -o sbom.cdx.json
 {{/if python}}{{#if node}}
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
@@ -71,6 +79,13 @@ jobs:
           else
             echo "no build script in package.json — skipping"
           fi
+
+      # CycloneDX SBOM via cdxgen (#574) — reads bun's lockfile (@cyclonedx/
+      # cyclonedx-npm shells out to npm and rejects bun, so cdxgen is used here).
+      - name: Generate CycloneDX SBOM
+        run: |
+          bun install --frozen-lockfile 2>/dev/null || bun install
+          bunx @cyclonedx/cdxgen -t bun -o sbom.cdx.json
 {{/if node}}{{#if go}}
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -79,20 +94,33 @@ jobs:
 
       - name: Build
         run: go build ./...
+
+      # CycloneDX SBOM via cyclonedx-gomod (#574).
+      - name: Generate CycloneDX SBOM
+        run: |
+          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+          "$(go env GOPATH)/bin/cyclonedx-gomod" mod -json -output sbom.cdx.json
 {{/if go}}{{#if rust}}
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Build
         run: cargo build --release
+
+      # CycloneDX SBOM via cargo-cyclonedx (#574) — emits <crate>.cdx.json.
+      - name: Generate CycloneDX SBOM
+        run: |
+          cargo install cargo-cyclonedx
+          cargo cyclonedx --format json --spec-version 1.5
 {{/if rust}}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-{{#if python}}          files: |
-            dist/*.whl
+          files: |
+{{#if python}}            dist/*.whl
             dist/*.tar.gz
-{{/if python}}          generate_release_notes: true
+{{/if python}}            *.cdx.json
+          generate_release_notes: true
 
   publish:
     name: Publish to registry

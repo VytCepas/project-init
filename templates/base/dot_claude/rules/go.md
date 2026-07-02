@@ -11,6 +11,7 @@ go build ./...
 go test ./... -count=1
 just test-cov       # tests + coverage gate (>= 70%, per justfile) — CI always runs this
 just audit          # dependency CVE/advisory scan (govulncheck) — CI always runs this
+just sbom           # CycloneDX SBOM via cyclonedx-gomod (#574) — release.yml attaches it to Releases
 golangci-lint run   # revive, godoclint, gocognit, cyclop, dupl, errcheck, govet, staticcheck, gosec — see .golangci.yml
 golangci-lint fmt   # gofumpt (stricter than gofmt) — no separate binary needed
 ```

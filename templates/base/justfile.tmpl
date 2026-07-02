@@ -48,6 +48,13 @@ test-mutation:
 audit:
     uv run --with pip-audit pip-audit
 
+# generate a CycloneDX SBOM of the runtime dependency tree (#574). release.yml
+# attaches this to GitHub Releases; run locally on demand. --no-dev so it
+# reflects what ships; uvx keeps cyclonedx-py out of the scanned .venv.
+sbom:
+    uv sync --no-dev
+    uvx --from cyclonedx-bom cyclonedx-py environment .venv -o sbom.cdx.json
+
 # what CI runs
 ci: lint typecheck test-cov audit
 
@@ -96,6 +103,11 @@ docs:
 audit:
     bun audit
 
+# generate a CycloneDX SBOM of the dependency tree (#574). release.yml attaches
+# this to GitHub Releases. cdxgen reads bun's lockfile (cyclonedx-npm rejects bun).
+sbom:
+    bunx @cyclonedx/cdxgen -t bun -o sbom.cdx.json
+
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
@@ -140,6 +152,12 @@ docs:
 # once, on your machine (CI installs it per-run).
 audit:
     govulncheck ./...
+
+# generate a CycloneDX SBOM of the module dependency tree (#574). release.yml
+# attaches this to GitHub Releases.
+# requires cyclonedx-gomod: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+sbom:
+    cyclonedx-gomod mod -json -output sbom.cdx.json
 
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
@@ -189,6 +207,12 @@ docs:
 # (CI installs it per-run as a prebuilt binary).
 audit:
     cargo audit
+
+# generate a CycloneDX SBOM of the crate dependency tree (#574). release.yml
+# attaches this (<crate>.cdx.json) to GitHub Releases.
+# requires cargo-cyclonedx: cargo install cargo-cyclonedx
+sbom:
+    cargo cyclonedx --format json --spec-version 1.5
 
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
