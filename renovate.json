@@ -14,9 +14,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Action refs in scaffolded workflow templates: the github-actions manager cannot parse them ({{#if}} blocks break YAML), so match uses: lines directly. Keeps the scaffolder from shipping stale action pins.",
+      "description": "Action refs in scaffolded workflow templates: the github-actions manager cannot parse them ({{#if}} blocks break YAML), so match uses: lines directly. Keeps the scaffolder from shipping stale action pins. The optional subpath group captures owner/repo as depName for subdirectory actions like github/codeql-action/upload-sarif (#576).",
       "managerFilePatterns": ["/^templates/.*\\.ya?ml\\.tmpl$/"],
-      "matchStrings": ["uses: (?<depName>[^/\\s]+/[^@/\\s]+)@(?<currentValue>v[\\d.]+)"],
+      "matchStrings": ["uses: (?<depName>[^/\\s]+/[^@/\\s]+)(?:/[^@\\s]+)?@(?<currentValue>v[\\d.]+)"],
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "semver-coerced"
     }

@@ -5,9 +5,13 @@ on:
     branches: [{{base_branch}}]
   pull_request:
     branches: [{{base_branch}}]
-{{#if python}}
   schedule:
-    - cron: "0 3 * * *"  # nightly mutation-testing run (PI-138/#563)
+    # Weekly OpenSSF Scorecard security-posture run (#576). The scorecard job
+    # below is schedule-gated, so it never runs — or blocks — on a PR.
+    - cron: "0 4 * * 1"
+{{#if python}}
+    # Nightly mutation-testing run (PI-138/#563).
+    - cron: "0 3 * * *"
 {{/if python}}
   # Optimization: Only run CI when relevant files change
   # Uncomment and adjust paths as needed for your project
@@ -453,6 +457,47 @@ jobs:
           else
             semgrep scan --error --metrics=off $RULESETS
           fi
+
+  # OpenSSF Scorecard (#576): standardized security-posture scoring (branch
+  # protection, dependency pinning, SAST presence, token permissions, ...).
+  # Schedule-only + non-blocking (NOT in ci-gate's needs) — a score is
+  # informational, mirroring how semgrep/mutmut were introduced. It surfaces the
+  # signal that most of the gates already shipped here would score well against.
+  #
+  # publish_results is FALSE by default: turning a scaffolded project's score
+  # into a PUBLIC entry on the scorecard.dev dashboard is an explicit opt-in the
+  # project owner must choose, never something the scaffolder silently enables.
+  # To opt in, flip publish_results to true below (id-token: write is already
+  # granted so the OIDC upload to the public dashboard works).
+  scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'schedule'
+    permissions:
+      security-events: write   # upload the SARIF result to code scanning
+      id-token: write          # only needed if publish_results is turned on
+      contents: read
+      actions: read            # Scorecard reads workflow/branch-protection state
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # PUBLIC-dashboard publishing stays OFF by default (#576) — flip to
+          # true only to deliberately publish this repo's score to scorecard.dev.
+          publish_results: false
+
+      # In-repo visibility: the score shows up under the Security → Code scanning
+      # tab without ever leaving the repository.
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
 
   # All-green gate (PI #555): the SINGLE required status check for branch
   # protection. Branch protection requires only "CI gate", so the required
