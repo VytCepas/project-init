@@ -389,7 +389,8 @@ jobs:
     needs: lint-and-test
     permissions:
       contents: read
-      actions: write   # required to save the type=gha build cache
+      actions: write          # required to save the type=gha build cache
+      security-events: write  # upload the Trivy SARIF to code scanning (#577)
     steps:
       - uses: actions/checkout@v6
 
@@ -399,14 +400,40 @@ jobs:
       # Static lowercase tag — ${{ github.repository }} may contain uppercase
       # (invalid in a Docker ref). The real registry name is set by the deploy
       # overlay; here the tag only needs to be valid and SHA-pinned.
+      # load: true puts the image in the local daemon so Trivy scans the exact
+      # bytes just built (not a re-pull) before anything is promoted.
       - name: Build the image (SHA-pinned, cached)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
+          load: true
           tags: app:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Scan the SAME image this job built (#577). The repo already uses Trivy
+      # for Terraform IaC misconfig (infra/.pre-commit-config); this is the same
+      # tool aimed at container-image CVEs instead. Fail on CRITICAL/HIGH so a
+      # vulnerable base image can't be promoted dev → staging → prod.
+      # ignore-unfixed: don't block on advisories with no upstream fix yet.
+      - name: Scan image for CRITICAL/HIGH vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: app:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      # Upload even when the scan step failed on a finding, so the CVEs surface
+      # under Security → Code scanning, not only in the failed job log.
+      - name: Upload Trivy SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
 {{/if delivery_service}}
 
   # ADR-007: agent-agnostic secret-scanning backstop. The pre-commit git hook
