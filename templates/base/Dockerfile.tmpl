@@ -4,6 +4,9 @@
 # The app must listen on $PORT (default 8080) and 0.0.0.0.
 {{#if python}}# --- build stage: resolve deps with uv into a venv ---
 FROM python:3.13-slim AS build
+# uv is a build-stage-only tool binary (it never ships in the runtime image),
+# so pulling the latest uv here is intentional and safe.
+# hadolint ignore=DL3007
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
@@ -61,6 +64,9 @@ COPY . .
 # Renamed to a fixed path here (not in the COPY --from below, which can't do
 # shell substitution) so the build works out of the box regardless of the
 # crate's actual [package] name in Cargo.toml.
+# The pipe lives inside a command substitution over the crate's own [package]
+# name (always present), so a pipefail SHELL adds no safety.
+# hadolint ignore=DL4006
 RUN cargo build --release && \
     cp "target/release/$(grep -m1 '^name' Cargo.toml | sed -E 's/name *= *"(.*)"/\1/')" /src/server
 

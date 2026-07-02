@@ -435,6 +435,22 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 {{/if delivery_service}}
+{{#if delivery_service}}
+  # Dockerfile lint (#578): hadolint catches missing base-image pins, running as
+  # root, missing cache cleanup, and other anti-patterns. Its own lightweight job
+  # — it needs only the Dockerfile, not the (slower) image build, so it runs in
+  # parallel with build-image instead of gating on it. delivery_service only —
+  # no Dockerfile is scaffolded for other delivery modes.
+  dockerfile-lint:
+    name: Lint Dockerfile (hadolint)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Lint Dockerfile (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+{{/if delivery_service}}
 
   # ADR-007: agent-agnostic secret-scanning backstop. The pre-commit git hook
   # gives fast local feedback but is fail-open; this job is the hard gate.

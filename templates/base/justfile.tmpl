@@ -210,4 +210,9 @@ build:
 # stop and remove the local stack
 down:
     docker compose down
+
+# lint the Dockerfile (the same hadolint check CI runs — #578).
+# install once: https://github.com/hadolint/hadolint#install
+lint-docker:
+    hadolint Dockerfile
 {{/if delivery_service}}
