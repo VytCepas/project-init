@@ -91,12 +91,26 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #     guard hook (uv add/bun add/pip install/npm install/cargo add checked
 #     against PyPI/npm/crates.io), wired into settings.json and documented (#564)
 #     lifecycle-move content change
+#   • board-automation.yml / issue-validation.yml — self-populating board
+#     metadata: dual-format ("### Heading" + "- Field: value") body parsing so
+#     issues created outside the web form still populate all board fields, plus
+#     auto-ensuring the type label from the body "- Type:" for MCP/API issues
+#   • skills/report_upstream_issue/SKILL.md + skills/INDEX.md — new default-on
+#     skill that routes tooling/scaffolding bugs upstream to project-init; only
+#     the --no-plugin combos copy the skill in (plugin mode ships it via the
+#     workflow plugin), and the INDEX gains its row
 _ADDED_SINCE_BASELINE = {
+    ".claude/skills/report_upstream_issue/SKILL.md",
+    ".claude/skills/INDEX.md",
+    # ... and its discoverability rows in the surface-independent skill tables.
+    ".claude/project-init.md",
+    ".claude/skills/README.md",
     ".gitleaks.toml",
     ".github/workflows/ci.yml",
     ".claude/scripts/setup_github.sh",
     ".claude/scripts/create_issue.sh",
     ".github/workflows/board-automation.yml",
+    ".github/workflows/issue-validation.yml",
     ".claude/config.yaml",
     ".claude/hooks/session_setup.sh",
     "mypy.ini",

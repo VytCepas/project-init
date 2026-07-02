@@ -176,14 +176,33 @@ jobs:
           fi
 
           ISSUE_DATA=$(gh issue view "$ISSUE_NUM" -R "$OWNER/$REPO_NAME" --json labels,body)
+          # Dual-format body parser (PI board self-population): issues reach the
+          # board from three sources with two body shapes. Issue *forms* render
+          # "### Heading\n\nvalue" blocks; create_issue.sh (and MCP/API-created
+          # issues that mirror it) write "- Field: value" bullets. Parse BOTH so
+          # Priority/Size/Agent-ready/Confidence/Area populate regardless of how
+          # the issue was created (bullets take precedence, then the heading block).
           parse_body_field() {
             local heading="$1"
             local body="$2"
+            local val
+
+            # Bullet form: "- Field: value" (case-insensitive, tolerant of leading
+            # indentation), trimming trailing whitespace/CR.
+            val=$(printf '%s\n' "$body" \
+              | sed -n "s/^[[:space:]]*-[[:space:]]*${heading}:[[:space:]]*//Ip" \
+              | head -1 | sed 's/[[:space:]]*$//')
+            if [ -n "$val" ]; then
+              printf '%s\n' "$val"
+              return 0
+            fi
+
+            # Heading form: "### Field" followed by the value on the next non-blank line.
             printf '%s\n' "$body" | awk -v h="$heading" '
               BEGIN { in_section = 0 }
               $0 ~ "^[[:space:]]*###[[:space:]]+" h "[[:space:]]*$" { in_section = 1; next }
               in_section && /^[[:space:]]*$/ { next }
-              in_section { print; exit }
+              in_section { sub(/[[:space:]]*$/, ""); print; exit }
             '
           }
           BODY=$(echo "$ISSUE_DATA" | jq -r '.body')
@@ -191,31 +210,8 @@ jobs:
           SIZE=$(parse_body_field "Size" "$BODY")
           AGENT_READY=$(parse_body_field "Agent ready" "$BODY")
           CONFIDENCE=$(parse_body_field "Confidence" "$BODY")
+          AREA=$(parse_body_field "Area" "$BODY")
           TYPE_LABEL=$(echo "$ISSUE_DATA" | jq -r '[.labels[].name | select(. == "feature" or . == "bug" or . == "chore" or . == "documentation" or . == "test")][0] // empty')
-          parse_area() {
-            local body="$1"
-            local area
-
-            area=$(printf '%s\n' "$body" | sed -n 's/^- Area: //Ip' | head -1)
-            if [ -n "$area" ]; then
-              printf '%s\n' "$area"
-              return 0
-            fi
-
-            printf '%s\n' "$body" | awk '
-              BEGIN { in_area = 0 }
-              /^[[:space:]]*###[[:space:]]+Area[[:space:]]*$/ {
-                in_area = 1
-                next
-              }
-              in_area && /^[[:space:]]*$/ { next }
-              in_area {
-                print
-                exit
-              }
-            '
-          }
-          AREA=$(parse_area "$(echo "$ISSUE_DATA" | jq -r '.body')")
 
           update_single_select() {
             local field_name="$1"
