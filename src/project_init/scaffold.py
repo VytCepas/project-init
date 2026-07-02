@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
 import re
 import shutil
 import tomllib
+from dataclasses import dataclass, field
 from pathlib import Path
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
@@ -385,13 +387,16 @@ def read_preserve_globs(target: Path) -> list[str]:
         text = config.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return []
-    # Greedy capture to the last ``]`` so globs with fnmatch character classes
-    # (e.g. ``file[0-9].txt``) are not truncated at an inner ``]`` (PR #295 review).
-    m = re.search(r"^[ \t]*preserve:[ \t]*(\[.*\])[ \t]*(?:#.*)?$", text, re.MULTILINE)
+    # raw_decode parses the first complete JSON array and ignores whatever
+    # follows, so globs with fnmatch character classes (``file[0-9].txt``,
+    # PR #295 review) survive, and a trailing comment that itself ends in
+    # ``]`` no longer breaks the parse and silently drops every glob
+    # (2026-07 review).
+    m = re.search(r"^[ \t]*preserve:[ \t]*(\[.*)$", text, re.MULTILINE)
     if not m:
         return []
     try:
-        value = json.loads(m.group(1))
+        value, _ = json.JSONDecoder().raw_decode(m.group(1))
     except json.JSONDecodeError:
         return []
     return [str(p) for p in value] if isinstance(value, list) else []
@@ -420,11 +425,16 @@ def _should_preserve(rel_path: Path, target: Path, preserve_globs: list[str] | N
     """Return True if this file should be skipped on re-run.
 
     Built-in ``memory``/``vault`` dirs plus any user-declared *preserve_globs*
-    (#243) are protected; READMEs are always refreshed.
+    (#243) are protected; READMEs are refreshed unless explicitly preserved.
+    An explicit user glob outranks the README refresh rule — otherwise
+    ``preserve: ["README.md"]`` would be silently ineffective while ``upgrade``
+    honors the same glob (2026-07 review).
     """
     dest = target / rel_path
     if not dest.exists():
         return False
+    if _matches_preserve_glob(rel_path, preserve_globs or []):
+        return True
     if rel_path.name in _ALWAYS_OVERWRITE:
         return False
     if rel_path.as_posix() in _GOVERNANCE_USER_FILES:
@@ -434,9 +444,38 @@ def _should_preserve(rel_path: Path, target: Path, preserve_globs: list[str] | N
     # block in place afterwards. A first scaffold (no record) still renders it.
     if rel_path == _CONFIG_REL and _has_scaffold_record(dest):
         return True
-    if any(part in _PRESERVE_DIRS for part in rel_path.parts):
-        return True
-    return _matches_preserve_glob(rel_path, preserve_globs or [])
+    return any(part in _PRESERVE_DIRS for part in rel_path.parts)
+
+
+def hash_bytes(data: bytes) -> str:
+    """Content hash used by the scaffold-record manifest (shared with upgrade)."""
+    return hashlib.sha256(data).hexdigest()
+
+
+def _edited_since_record(dest: Path, rel_path: Path, manifest: dict[str, str]) -> bool:
+    """True when *dest* exists but is not the unedited content this tool recorded.
+
+    On a re-run over a recorded project the manifest hash is the only way to
+    tell a still-pristine managed file from one the user edited (or created
+    themselves): a missing entry means the file is not ours, a hash mismatch
+    means it was edited. Either way overwriting would destroy user work, so
+    ``.new``-sibling protection must engage exactly as on a first scaffold.
+    An empty/legacy manifest therefore conservatively protects every existing
+    file (2026-07 review, C1).
+    """
+    if not dest.is_file():
+        return False
+    recorded = manifest.get(rel_path.as_posix())
+    return recorded is None or hash_bytes(dest.read_bytes()) != recorded
+
+
+def _recorded_manifest(target: Path) -> dict[str, str]:
+    """Recorded content hashes for *target*, ``{}`` when absent or unreadable."""
+    # Lazy import: upgrade imports scaffold at module level, so the reverse
+    # dependency must stay function-local to avoid a cycle.
+    from project_init.upgrade import read_recorded_manifest
+
+    return read_recorded_manifest(target)
 
 
 def _rendered_bytes(src: Path, variables: dict[str, str], is_template: bool) -> bytes | None:
@@ -483,23 +522,25 @@ def _has_pending_sibling(dest: Path) -> bool:
     has not merged it yet, so a re-run must keep protecting it (PI-179).
     """
     base = dest.name + ".new"
-    return (dest.parent / base).exists() or any(
-        p.name.startswith(base + ".") for p in dest.parent.glob(dest.name + ".new.*")
-    )
+    if (dest.parent / base).exists():
+        return True
+    # Only numeric suffixes are ours (`.new.1`, `.new.2`, … from _new_sibling);
+    # a user's `foo.new.backup` must not permanently re-engage protection.
+    return any(p.name[len(base) + 1 :].isdigit() for p in dest.parent.glob(base + ".*"))
 
 
 def _protected_as_sibling(
-    src: Path, dest: Path, variables: dict[str, str], is_template: bool, *, first: bool
+    src: Path, dest: Path, variables: dict[str, str], is_template: bool, *, owned: bool
 ) -> Path | None:
     """Write the fresh render beside *dest* instead of overwriting it (PI-179).
 
     Returns the ``.new`` sibling path written when *dest* is a user-owned file
-    that must be protected — i.e. it exists with content differing from the
-    render, and either this is the *first* scaffold or an unresolved sibling
-    from an earlier run is still pending (so a re-run does not clobber a file
-    the user has not merged). Returns None when the normal write should proceed.
+    that must be protected — it exists with content differing from the render
+    and the caller determined ownership (first scaffold, a pending unresolved
+    sibling, or a manifest-hash mismatch on a re-run). Returns None when the
+    normal write should proceed.
     """
-    if not dest.exists() or not (first or _has_pending_sibling(dest)):
+    if not owned or not dest.exists():
         return None
     content = _rendered_bytes(src, variables, is_template)
     if content is None or dest.read_bytes() == content:
@@ -507,6 +548,52 @@ def _protected_as_sibling(
     sibling = _new_sibling(dest, content)
     _write_bytes(sibling, content, src)
     return sibling
+
+
+@dataclass
+class _ProtectionGuard:
+    """Per-run overwrite-protection state for the non-strict scaffold loop.
+
+    Decides, per file, whether the loop must skip it: preservation checks
+    against the actual target (strict mode writes to temp and gates at commit
+    time in _commit_staged instead), and overwrite protection (PI-179) never
+    clobbers a user-owned file — the render is parked as a ``.new`` sibling.
+    A file is user-owned on the first scaffold, while an unresolved sibling is
+    pending, or when a re-run finds it edited/unrecorded per the manifest
+    hashes (2026-07 review, C1). A path an earlier layer of THIS run already
+    wrote or parked never re-fires: later layers legitimately overwrite
+    earlier ones, and byte-identical cross-layer copies (.agents/skills/*)
+    must not emit duplicate conflict entries per layer.
+    """
+
+    target: Path
+    variables: dict[str, str]
+    preserve_globs: list[str]
+    first_scaffold: bool
+    manifest: dict[str, str]
+    conflicts: list[tuple[Path, Path]] | None
+    written: set[Path]
+    protected: set[Path] = field(default_factory=set)
+
+    def preserved_or_parked(self, src: Path, dest: Path, rel_path: Path, is_template: bool) -> bool:
+        """True when the loop must skip this file (preserved or parked)."""
+        if _should_preserve(rel_path, self.target, self.preserve_globs):
+            return True
+        if self.conflicts is None or rel_path in self.written:
+            return False
+        if rel_path in self.protected:
+            return True
+        owned = (
+            self.first_scaffold
+            or _has_pending_sibling(dest)
+            or _edited_since_record(dest, rel_path, self.manifest)
+        )
+        sibling = _protected_as_sibling(src, dest, self.variables, is_template, owned=owned)
+        if sibling is None:
+            return False
+        self.conflicts.append((rel_path, rel_path.parent / sibling.name))
+        self.protected.add(rel_path)
+        return True
 
 
 def _output_rel_path(src: Path, layer_dir: Path) -> tuple[Path, bool]:
@@ -600,20 +687,24 @@ def _commit_staged(
     Honors rerun idempotency: user-owned memory/vault files are not overwritten.
     When a *conflicts* list is passed (protection, PI-179), a user-owned file
     with different content is kept and the fresh render lands as a ``.new``
-    sibling. A file is user-owned on the *first* scaffold, or on any run while an
-    unresolved sibling from an earlier run is still pending. Each protected file
-    is recorded as ``(original_rel, sibling_rel)``.
+    sibling. A file is user-owned on the *first* scaffold, on any run while an
+    unresolved sibling from an earlier run is still pending, or when a re-run
+    finds it edited/unrecorded per the manifest hashes (2026-07 review, C1).
+    Each protected file is recorded as ``(original_rel, sibling_rel)``.
     """
     created: list[Path] = []
     target.mkdir(parents=True, exist_ok=True)
     preserve_globs = read_preserve_globs(target)
+    manifest = {} if first else _recorded_manifest(target)
     for rel_path in staged:
         if _should_preserve(rel_path, target, preserve_globs):
             continue
         src = work_dir / rel_path
         dest = target / rel_path
         dest.parent.mkdir(parents=True, exist_ok=True)
-        protect = conflicts is not None and (first or _has_pending_sibling(dest))
+        protect = conflicts is not None and (
+            first or _has_pending_sibling(dest) or _edited_since_record(dest, rel_path, manifest)
+        )
         if protect and dest.exists() and dest.read_bytes() != src.read_bytes():
             sibling = _new_sibling(dest, src.read_bytes())
             shutil.copy2(src, sibling)
@@ -663,10 +754,12 @@ def scaffold(
     user-owned file whose content differs from the fresh render is never
     overwritten — the render is written as a ``<file>.new`` sibling and the pair
     ``(original_rel, sibling_rel)`` is appended to *conflicts*. A file counts as
-    user-owned on the first scaffold (no recorded ``config.yaml``) or, on any
-    later run, while an unresolved sibling from an earlier run is still pending —
-    so a re-run never clobbers a file the user has not merged yet. memory/vault
-    preservation is unchanged either way.
+    user-owned on the first scaffold (no recorded ``config.yaml``); on any later
+    run while an unresolved sibling from an earlier run is still pending; or on
+    a re-run when the recorded manifest hash shows it was edited (or never
+    recorded) since the last scaffold (2026-07 review, C1) — so neither a first
+    run nor a re-run clobbers a file the user owns. memory/vault preservation is
+    unchanged either way.
     """
     import uuid
 
@@ -677,6 +770,10 @@ def scaffold(
     _config_file = target / ".claude" / "config.yaml"
     first_scaffold = not _has_scaffold_record(_config_file)
     preserve_globs = read_preserve_globs(target)
+    # On a re-run the recorded manifest hashes tell user-edited files apart from
+    # pristine managed ones, so protection can engage for exactly the edited
+    # set instead of silently clobbering it (2026-07 review, C1).
+    manifest = {} if first_scaffold else _recorded_manifest(target)
 
     layers: list[str] = preset["layers"]
     created: list[Path] = []
@@ -695,33 +792,22 @@ def scaffold(
         work_dir = target
     work_dir.mkdir(parents=True, exist_ok=True)
 
+    guard = _ProtectionGuard(
+        target=target,
+        variables=variables,
+        preserve_globs=preserve_globs,
+        first_scaffold=first_scaffold,
+        manifest=manifest,
+        conflicts=conflicts,
+        written=written,
+    )
+
     try:
         for src, layer_dir in _iter_layer_files(layers):
             rel_path, is_template = _output_rel_path(src, layer_dir)
 
-            # For non-strict mode, check preservation against the actual target.
-            # For strict mode, we're writing to temp, so skip preservation check.
-            if not strict and _should_preserve(rel_path, target, preserve_globs):
-                continue
-
-            # Overwrite protection (non-strict; strict handles it at commit time
-            # in _commit_staged): never clobber a user-owned file — write the
-            # render as a `.new` sibling instead (PI-179). Skip when an earlier
-            # layer of THIS run already wrote the path: later layers legitimately
-            # overwrite earlier ones, that is not a user file. work_dir == target
-            # in non-strict mode, so dest is the real file.
-            if (
-                not strict
-                and conflicts is not None
-                and rel_path not in written
-                and (
-                    sibling := _protected_as_sibling(
-                        src, work_dir / rel_path, variables, is_template, first=first_scaffold
-                    )
-                )
-                is not None
-            ):
-                conflicts.append((rel_path, rel_path.parent / sibling.name))
+            # work_dir == target in non-strict mode, so dest is the real file.
+            if not strict and guard.preserved_or_parked(src, work_dir / rel_path, rel_path, is_template):
                 continue
 
             rendered = _emit_file(src, work_dir / rel_path, variables, is_template)
@@ -729,8 +815,10 @@ def scaffold(
                 continue
             if is_template and strict:
                 rendered_files.append((rel_path, rendered))
-            (staged if strict else created).append(rel_path)
-            written.add(rel_path)
+            # Later layers legitimately re-write the same path; report it once.
+            if rel_path not in written:
+                (staged if strict else created).append(rel_path)
+                written.add(rel_path)
 
         if strict:
             _validate_no_placeholders(rendered_files)

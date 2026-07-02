@@ -2122,9 +2122,10 @@ def main(argv: list[str] | None = None) -> int:
     variables = _build_variables(preset, inputs)
 
     # Overwrite protection (PI-179): scaffold() decides per file whether it is
-    # user-owned (first scaffold, or an unresolved `.new` sibling still pending)
-    # and writes a `.new` sibling rather than clobbering it. Always pass the list
-    # so a re-run before the user merges a prior conflict stays protected too.
+    # user-owned (first scaffold, an unresolved `.new` sibling still pending, or
+    # a manifest-hash mismatch showing the user edited it since the last run —
+    # 2026-07 review, C1) and writes a `.new` sibling rather than clobbering it.
+    # Always pass the list so a re-run stays protected too.
     conflicts: list[tuple[Path, Path]] = []
     from project_init.upgrade import write_scaffold_record
 

@@ -48,6 +48,7 @@ from project_init.scaffold import (
     CONTRACT_VERSION,
     _matches_preserve_glob,
     _new_sibling,
+    hash_bytes,
     load_preset,
     marketplace_source_vars,
     memory_tier,
@@ -168,8 +169,9 @@ class DriftReport:
         return bool(self.new or self.changed or self.conflicts or self.merged or self.removed)
 
 
-def _hash_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+# Canonical implementation lives in scaffold.py (shared with the re-scaffold
+# protection path, 2026-07 review C1); keep the local name for existing callers.
+_hash_bytes = hash_bytes
 
 
 # --- 3-way merge base store (#240) -----------------------------------------
@@ -658,6 +660,22 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
         return preset_name, _migrate_agents(_backfill_variables(variables)), manifest, False
     preset_name, variables, manifest = _migrate_semantic_config(text.splitlines())
     return preset_name, _migrate_agents(_backfill_variables(variables)), manifest, True
+
+
+def read_recorded_manifest(target: Path) -> dict[str, str]:
+    """Recorded content hashes for *target*, ``{}`` when absent or unreadable.
+
+    A tolerant sibling of :func:`read_scaffold_record` for callers (the
+    re-scaffold protection path, 2026-07 review C1) that need the manifest as a
+    best-effort signal rather than a hard precondition.
+    """
+    config_path = target / _CONFIG_REL
+    try:
+        text = config_path.read_text(encoding="utf-8", errors="ignore")
+        parsed = _parse_record_block(text)
+    except (OSError, UpgradeError):
+        return {}
+    return (parsed[2] or {}) if parsed else {}
 
 
 def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:
