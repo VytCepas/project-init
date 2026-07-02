@@ -17,6 +17,13 @@ jobs:
   publish:
     name: Build + push image to GHCR
     runs-on: ubuntu-24.04
+    # Job-level perms override the workflow block; id-token + attestations back
+    # the SLSA provenance attestation (#575).
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v6
 
@@ -36,6 +43,7 @@ jobs:
         run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push (SHA-pinned, by digest)
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -43,4 +51,14 @@ jobs:
           tags: ${{ steps.meta.outputs.image }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Attest provenance for the published image digest (SLSA Build L3, #575).
+      # push-to-registry stores it in GHCR so `gh attestation verify
+      # oci://<image>@<digest>` works for any puller.
+      - name: Attest build provenance (container image)
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ steps.meta.outputs.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
 {{/if deploy_registry}}
