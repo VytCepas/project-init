@@ -31,7 +31,11 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "shfmt download against published checksums."
         ),
         "action_required": (
-            "No action required for normal use. If you rely on `just build` in a "
+            "Python projects: `just ci` now includes a blocking strict-mypy "
+            "`typecheck` gate (new in 0.6.0). Pre-existing untyped code can turn "
+            "CI red on upgrade — either fix the reported errors, or soften "
+            "mypy.ini (`strict = False`) / drop `typecheck` from the `ci:` "
+            "recipe while you migrate. If you rely on `just build` in a "
             "service-delivery project, note the container build recipe is now "
             "`just image` (`just build` is the language build). Re-run "
             "`project-init upgrade` to pick up the guard/template fixes."

@@ -90,7 +90,19 @@ class TestJustfilePerLanguage:
         target = _scaffold_language(tmp_path / "p", "python")
         body = _recipe_body((target / "justfile").read_text(), "typecheck")
         assert "if [ -d src ]" in body
-        assert "mypy src/" in body
+        assert "mypy" in body and "src/" in body
+
+    def test_python_typecheck_installs_dependency_stubs(self, tmp_path: Path):
+        """#592: `uv run --with mypy` supplies runtime deps but not their stub
+        packages, so any untyped dep (PyYAML → types-PyYAML) fails the strict
+        gate with import-untyped on a fresh scaffold. The recipe must let mypy
+        fetch stubs itself — and must pull in pip, which mypy's
+        --install-types shells out to but uv-managed environments omit."""
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "typecheck")
+        assert "--install-types" in body
+        assert "--non-interactive" in body
+        assert "--with pip" in body, "mypy --install-types needs pip in the uv environment"
 
     def test_python_coverage_recipe(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")

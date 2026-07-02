@@ -13,9 +13,12 @@ lint:
     find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
 # static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
-# no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path
+# no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path.
+# --install-types fetches missing dependency stubs (types-PyYAML etc.) so
+# untyped deps don't fail the strict gate with import-untyped (#592); it
+# shells out to pip, which uv-managed environments omit — hence --with pip.
 typecheck:
-    if [ -d src ]; then uv run --with "mypy>=1.10" mypy src/; else echo "No src/ directory yet — nothing to type-check."; fi
+    if [ -d src ]; then uv run --with "mypy>=1.10" --with pip mypy --install-types --non-interactive src/; else echo "No src/ directory yet — nothing to type-check."; fi
 
 # auto-format project code
 format:
