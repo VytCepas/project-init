@@ -104,6 +104,33 @@ class TestJustfilePerLanguage:
         assert "--non-interactive" in body
         assert "--with pip" in body, "mypy --install-types needs pip in the uv environment"
 
+    def test_node_typecheck_tolerates_missing_sources(self, tmp_path: Path):
+        """The #592-adjacent day-one gap: `tsc --noEmit` fails with TS18003
+        ("No inputs were found"), not a pass, when no .ts sources exist yet."""
+        target = _scaffold_language(tmp_path / "n", "node")
+        body = _recipe_body((target / "justfile").read_text(), "typecheck")
+        assert "tsc --noEmit" in body
+        assert "No TypeScript sources yet" in body
+
+    def test_python_setup_tolerates_missing_pyproject(self, tmp_path: Path):
+        """`uv sync --group dev` hard-fails with no pyproject.toml (fresh
+        scaffold) or no [dependency-groups] table — CI's first step must not
+        die before the day-one guards in typecheck/test-cov can run."""
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "setup")
+        assert "pyproject.toml" in body
+        assert "uv sync --group dev" in body
+
+    def test_go_test_cov_guards_fresh_module_and_fails_closed(self, tmp_path: Path):
+        """`go test ./...` errors on a module with no .go files (like the
+        guarded license/fuzz recipes), and the coverage gate must be
+        fail-closed: zero awk input (cover tool failed) fails the recipe
+        instead of returning awk's 0."""
+        target = _scaffold_language(tmp_path / "g", "go")
+        body = _recipe_body((target / "justfile").read_text(), "test-cov")
+        assert "No Go sources yet" in body
+        assert "NR == 0" in body, "coverage gate must fail on empty cover output"
+
     def test_python_coverage_recipe(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")
         text = (target / "justfile").read_text()

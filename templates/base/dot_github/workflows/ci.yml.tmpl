@@ -185,13 +185,19 @@ jobs:
           mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # Fresh scaffolds have no lockfile yet — fall back to a plain install.
+      # Fresh scaffolds have no lockfile — or even a package.json (`bun
+      # install` errors without one). Fall back to a plain install, or to
+      # `just setup`, which seeds package.json with the lint toolchain that
+      # eslint.config.mjs imports, so the Lint step below works on the very
+      # first CI run.
       - name: Install dependencies
         run: |
           if [ -f bun.lock ] || [ -f bun.lockb ]; then
             bun install --frozen-lockfile
-          else
+          elif [ -f package.json ]; then
             bun install
+          else
+            just setup
           fi
 
       - name: Lint
@@ -215,8 +221,10 @@ jobs:
 
       # The action installs + caches golangci-lint on CI; locally `just lint`
       # runs the same `golangci-lint run` against the same .golangci.yml.
+      # v8+ of the action is required for golangci-lint v2 — v6 caps the tool
+      # at v1.64.8, which rejects the scaffolded `version: "2"` config.
       - name: Lint (golangci-lint)
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
@@ -330,7 +338,9 @@ jobs:
 {{#if python}}
   # Optimization #2: Split heavyweight tests into separate job
   # Only run integration/smoke tests after fast lint+unit tests pass
-  # Adjust this job based on your actual integration test needs
+  # Adjust this job based on your actual integration test needs.
+  # Non-blocking (NOT in ci-gate's needs) — add it there once your
+  # integration suite is stable enough to gate merges.
   integration-tests:
     name: Integration tests
     runs-on: ubuntu-24.04
@@ -407,6 +417,9 @@ jobs:
   # for the SAME image the deploy overlay promotes. Tests are pinned HOST-based
   # above (the language matrix). This job only builds (push: false) — the deploy
   # overlay (#323) builds and pushes the real digest to a registry.
+  # Non-blocking (NOT in ci-gate's needs): the Trivy scan informs; deploy.yml's
+  # build-push does not depend on it, so gate on it deliberately if you want a
+  # vulnerable image to block merges.
   build-image:
     name: Build image (build-once)
     runs-on: ubuntu-24.04
@@ -637,8 +650,10 @@ jobs:
         with:
           persist-credentials: false
 
+      # Full version pin: ossf/scorecard-action publishes no floating `v2`
+      # major tag (only exact vX.Y.Z tags), so `@v2` fails to resolve.
       - name: Run Scorecard analysis
-        uses: ossf/scorecard-action@v2
+        uses: ossf/scorecard-action@v2.4.3
         with:
           results_file: results.sarif
           results_format: sarif
@@ -661,10 +676,13 @@ jobs:
   # what left main permanently `blocked` before. `if: always()` so the gate runs
   # even when an upstream job fails, then fails itself unless every dependency
   # succeeded.
+  # The governance job (when the overlay is on) is in the gate's needs: its
+  # comment calls it "the enforcement boundary", which is only true if a
+  # failing gate actually blocks the merge.
   ci-gate:
     name: CI gate
     runs-on: ubuntu-24.04
-    needs: [lint-and-test, secret-scan]
+    needs: [lint-and-test, secret-scan{{#if governance}}, governance{{/if governance}}]
     if: always()
     steps:
       - name: Require all upstream jobs to succeed
