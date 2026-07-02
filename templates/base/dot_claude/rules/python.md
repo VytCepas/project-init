@@ -18,6 +18,7 @@ uv run pytest -n auto -q          # tests (parallel mode, requires pytest-xdist)
 uv run pytest -q --tb=short       # tests (single-threaded fallback)
 just test-cov                     # tests + coverage gate (>= 70%, per justfile) — CI always runs this
 just audit                        # dependency CVE/advisory scan (pip-audit) — CI always runs this
+just sbom                         # CycloneDX SBOM of runtime deps (#574) — release.yml attaches it to Releases
 ```
 
 ruff lints; it does not type-check. `just typecheck` (mypy, strict) is a separate

@@ -103,6 +103,9 @@ _ADDED_SINCE_BASELINE = {
     "justfile",
     ".claude/hooks/post_edit_lint.sh",
     ".claude/rules/python.md",
+    # node.md gained the `just sbom` (#574) / `just license` (#579) reference
+    # lines — a deliberate content edit, like the other rules files here.
+    ".claude/rules/node.md",
     ".claude/rules/go.md",
     ".claude/hooks/_py.sh",
     ".claude/scripts/gh_host.sh",

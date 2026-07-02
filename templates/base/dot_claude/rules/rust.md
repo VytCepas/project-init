@@ -11,6 +11,7 @@ cargo build
 cargo test
 cargo llvm-cov --fail-under-lines 70              # tests + coverage gate — CI always runs this (`just test-cov`)
 cargo audit                                       # dependency CVE/advisory scan (`just audit`) — CI always runs this
+cargo cyclonedx --format json                     # CycloneDX SBOM (`just sbom`, #574) — release.yml attaches it to Releases
 cargo clippy -- -D warnings -D clippy::pedantic   # pedantic + cognitive-complexity gate per clippy.toml
 cargo fmt --check                                 # verifies only; `cargo fmt` (no flag) writes changes
 ```
