@@ -5,6 +5,12 @@
 #
 # python_version pins the typeshed/syntax baseline mypy checks against; keep it
 # aligned with your pyproject.toml's requires-python floor.
+#
+# Deliberately NOT enabled: disallow_any_explicit / disallow_any_decorated.
+# Verified against real code (PI-570) — both fire on legitimate, idiomatic
+# `Any` (a JSON-parsing return type, `Callable[..., Any]` wrappers), not just
+# lazy typing. `strict = True` already covers the flags with a good
+# signal-to-noise ratio; these two are a net loss.
 
 [mypy]
 python_version = 3.11

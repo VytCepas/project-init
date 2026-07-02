@@ -8,13 +8,20 @@ alwaysApply: false
 
 ```bash
 bunx tsc --noEmit   # type check (strict mode, per tsconfig.base.json)
-bunx eslint .        # lint (no-explicit-any + friends, per eslint.config.mjs)
+bunx eslint .        # lint (type-aware: no-floating-promises, no-unsafe-*, per eslint.config.mjs)
 ```
 
 `tsconfig.base.json` is a direct structural analog to `mypy --strict` /
-`.golangci.yml`'s strict linters — `strict`, `noUncheckedIndexedAccess`, and
-`exactOptionalPropertyTypes` all on. `tsconfig.json` extends it; keep your
-own paths/target edits there, not in the base file.
+`.golangci.yml`'s strict linters — `strict`, `noUncheckedIndexedAccess`,
+`exactOptionalPropertyTypes`, `noImplicitOverride`,
+`noPropertyAccessFromIndexSignature`, `noFallthroughCasesInSwitch`,
+`noImplicitReturns`, and `allowUnreachableCode: false` all on. `tsconfig.json`
+extends it; keep your own paths/target edits there, not in the base file.
+
+`eslint.config.mjs` uses `strictTypeChecked` + `stylisticTypeChecked`
+(type-aware linting, wired via `tsconfig.json`) — this is the layer that
+catches an un-awaited `Promise` in an async function or an `any` value's
+unsafety propagating through a return, neither of which `tsc` alone flags.
 
 Use [Zod](https://zod.dev/) for runtime boundary validation (parsing
 untyped `JSON.parse`/API-response data into a typed shape) — the

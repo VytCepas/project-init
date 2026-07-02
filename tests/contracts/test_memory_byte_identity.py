@@ -40,6 +40,13 @@ command-guard no longer false-positives on blocked-command phrases inside
 free-text flag values. A deliberate guard fix, not move-drift. Only the
 `.claude/hooks/dag_workflow.py` hash was re-pinned across all four combos, after
 verifying every other file still matched.
+
+Exception (PI-570): `ruff.toml` gained the RUF/PERF/PTH/RET/ARG/A/S/BLE rule
+groups (per-language quality-gate strictness pass) — a deliberate content
+change, not move-drift. `.claude/hooks/package_guard.py` also picked up
+`# noqa: S310` placement fixes for the new `S` rule group; it was already
+excluded above. Only `ruff.toml` is newly excluded here, after verifying
+every other file still matched.
 """
 
 from __future__ import annotations
@@ -116,6 +123,7 @@ _ADDED_SINCE_BASELINE = {
     "AGENTS.md",
     ".claude/rules/rust.md",
     ".claude/rules/typescript.md",
+    "ruff.toml",
 }
 
 

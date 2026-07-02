@@ -21,6 +21,13 @@ uv run pytest -q --tb=short       # tests (single-threaded fallback)
 ruff lints; it does not type-check. `just typecheck` (mypy, strict) is a separate
 gate — type errors do not surface as ruff findings.
 
+ruff's `select` also covers `RUF`/`PERF`/`PTH`/`RET`/`ARG`/`A`/`S` — Ruff-native
+rules, perf anti-patterns, pathlib-over-os.path, return-statement clarity,
+unused arguments, builtin shadowing, and bandit-derived security checks
+(cheap and instant; complements Semgrep's CI-only SAST rather than
+duplicating it). `S` is exempted under `tests/**` — plain `assert` is the
+point of a test, not a vulnerability.
+
 **Test Optimization**: Use `pytest -n auto` in CI to parallelize tests across CPU cores (30-50% faster). Requires `pytest-xdist` in dev dependencies. See `ci.yml.tmpl` for a full optimized CI config.
 
 ## Test conventions

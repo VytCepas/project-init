@@ -20,6 +20,9 @@ linters:
     - errcheck
     - govet
     - staticcheck
+    # Security linter — Go's analog to ruff's S/bandit rules (PI-570).
+    # Verified against a real weak-crypto (md5) violation.
+    - gosec
   settings:
     revive:
       rules:
