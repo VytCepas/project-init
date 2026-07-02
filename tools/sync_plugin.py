@@ -31,8 +31,11 @@ when copies drift, so edits to template skills/hooks must re-run this.
 
 from __future__ import annotations
 
+import argparse
+import filecmp
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +49,8 @@ CODEX_SKILLS = REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
 ANTIGRAVITY_SKILLS = REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills"
 AMP_SKILLS = REPO_ROOT / "templates" / "amp" / "dot_agents" / "skills"
 JUNIE_SKILLS = REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
+# Every payload root the sync (re)writes — snapshotted by `--check`.
+_AGENT_SKILL_DESTS = [CODEX_SKILLS, ANTIGRAVITY_SKILLS, AMP_SKILLS, JUNIE_SKILLS]
 
 
 def _skill_dirs(skills_root: Path) -> list[Path]:
@@ -217,6 +222,62 @@ def sync() -> list[str]:
     return synced
 
 
-if __name__ == "__main__":
+def _dirs_equal(a: Path, b: Path) -> bool:
+    """Recursively compare two directory trees by content."""
+    if not a.exists() or not b.exists():
+        return a.exists() == b.exists()
+    cmp = filecmp.dircmp(a, b)
+    if cmp.left_only or cmp.right_only or cmp.diff_files or cmp.funny_files:
+        return False
+    return all(_dirs_equal(a / sub, b / sub) for sub in cmp.common_dirs)
+
+
+def _check() -> int:
+    """Report whether any synced path would change, without writing (for CI).
+
+    Snapshots the payload roots, runs the sync, diffs, then restores the
+    snapshot so `--check` never mutates the tree. Exit 1 (listing drifted
+    paths) when a template edit hasn't been re-synced (2026-07 review).
+    """
+    roots = [WORKFLOW_PLUGIN, LIFECYCLE_PLUGIN, *_AGENT_SKILL_DESTS]
+    with tempfile.TemporaryDirectory(prefix="sync-check-") as d:
+        snapshot = Path(d)
+        for i, root in enumerate(roots):
+            if root.exists():
+                shutil.copytree(root, snapshot / str(i))
+        sync()
+        drifted = [
+            str(root.relative_to(REPO_ROOT))
+            for i, root in enumerate(roots)
+            if not _dirs_equal(snapshot / str(i), root)
+        ]
+        for i, root in enumerate(roots):  # restore — --check is non-mutating
+            if root.exists():
+                shutil.rmtree(root)
+            if (snapshot / str(i)).exists():
+                shutil.copytree(snapshot / str(i), root)
+    if drifted:
+        sys.stderr.write(
+            "plugin payload is out of sync — run `just sync-plugin`:\n  " + "\n  ".join(drifted) + "\n"
+        )
+        return 1
+    sys.stdout.write("plugin payload is in sync\n")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Sync the plugin/overlay payloads, or `--check` for drift (CI-friendly)."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--check", action="store_true", help="report drift and exit 1 without writing (for CI)"
+    )
+    args = parser.parse_args(argv)
+    if args.check:
+        return _check()
     for rel in sync():
         sys.stdout.write(f"synced {rel}\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

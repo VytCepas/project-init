@@ -14,10 +14,10 @@ jobs:
     name: Lint and test
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: "0.11.7"
           enable-cache: true
@@ -31,18 +31,26 @@ jobs:
         run: uv run ruff check .
 
       - name: Tests (pytest) — parallel mode
-        # Falls back to single-threaded if xdist not available
-        run: uv run pytest -n auto --tb=short -q 2>/dev/null || uv run pytest --tb=short -q
+        # Use xdist when importable, else single-threaded — decided by an
+        # explicit capability check, not `|| retry`, so a genuinely failing
+        # suite is not run twice with its first-pass stderr hidden (2026-07
+        # review).
+        run: |
+          if uv run python -c "import xdist" 2>/dev/null; then
+            uv run pytest -n auto --tb=short -q
+          else
+            uv run pytest --tb=short -q
+          fi
 
   wheel-smoke:
     name: Wheel smoke test
     runs-on: ubuntu-24.04
     needs: lint-and-test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: "0.11.7"
           enable-cache: true
@@ -89,12 +97,12 @@ jobs:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
         with:
           # Full history so leaked commits are caught, not just the latest diff
           fetch-depth: 0
 
-      - uses: gitleaks/gitleaks-action@v3
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
@@ -104,10 +112,10 @@ jobs:
     name: ShellCheck (scaffolded scripts)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: "0.11.7"
           enable-cache: true
@@ -146,8 +154,8 @@ jobs:
     outputs:
       shell: ${{ steps.filter.outputs.shell }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590  # v3
         id: filter
         with:
           filters: |
@@ -170,10 +178,10 @@ jobs:
     if: needs.changes.outputs.shell == 'true'
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: "0.11.7"
           python-version: "3.12"
@@ -228,10 +236,10 @@ jobs:
       run:
         shell: bash  # GitHub's "bash" on Windows is Git Bash — the supported path
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           version: "0.11.7"
           python-version: "3.12"

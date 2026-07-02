@@ -31,6 +31,10 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
           REPO: ${{ github.repository }}
+          # Route the event value through env, not inline ${{ }} in the script —
+          # keeps the whole workflow to one untrusted-input discipline (2026-07
+          # review). GitHub-generated URL, so risk is low; consistency matters.
+          REVIEW_URL: ${{ github.event.review.html_url }}
         run: |
           DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json reviewDecision -q '.reviewDecision // ""')
           case "$DECISION" in
@@ -45,4 +49,4 @@ jobs:
             --field state="$STATE" \
             --field description="$DESCRIPTION" \
             --field context="review/decision" \
-            --field target_url="${{ github.event.review.html_url }}"
+            --field target_url="$REVIEW_URL"

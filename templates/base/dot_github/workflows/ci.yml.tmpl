@@ -124,8 +124,14 @@ jobs:
       - name: Install shfmt
         run: |
           mkdir -p "$HOME/.local/bin"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
-          chmod +x "$HOME/.local/bin/shfmt"
+          tmp="$(mktemp -d)"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
+          # Verify the binary against the release's published checksums before
+          # trusting it — no unverified curl|install of an executable.
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
+          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
+          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
+          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Sync dev dependencies
@@ -169,8 +175,14 @@ jobs:
       - name: Install shfmt
         run: |
           mkdir -p "$HOME/.local/bin"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
-          chmod +x "$HOME/.local/bin/shfmt"
+          tmp="$(mktemp -d)"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
+          # Verify the binary against the release's published checksums before
+          # trusting it — no unverified curl|install of an executable.
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
+          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
+          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
+          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # Fresh scaffolds have no lockfile yet — fall back to a plain install.
@@ -210,8 +222,14 @@ jobs:
       - name: Install shfmt
         run: |
           mkdir -p "$HOME/.local/bin"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
-          chmod +x "$HOME/.local/bin/shfmt"
+          tmp="$(mktemp -d)"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
+          # Verify the binary against the release's published checksums before
+          # trusting it — no unverified curl|install of an executable.
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
+          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
+          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
+          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # golangci-lint-action above doesn't run justfile recipes, so the .claude/
@@ -254,8 +272,14 @@ jobs:
       - name: Install shfmt
         run: |
           mkdir -p "$HOME/.local/bin"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$HOME/.local/bin/shfmt"
-          chmod +x "$HOME/.local/bin/shfmt"
+          tmp="$(mktemp -d)"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
+          # Verify the binary against the release's published checksums before
+          # trusting it — no unverified curl|install of an executable.
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
+          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
+          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
+          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install just
