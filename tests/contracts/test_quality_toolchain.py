@@ -169,6 +169,9 @@ class TestNodeToolchain:
         config = tomllib.loads((self.target / "bunfig.toml").read_text())
         assert config["test"]["coverage"] is True
         assert config["test"]["coverageThreshold"] == 0.7
+        # PI-569 review fix: explicit, not relying on bun's current default —
+        # a *.test.ts file must never count toward the application-code gate.
+        assert config["test"]["coverageSkipTestFiles"] is True
 
 
 class TestGoToolchain:

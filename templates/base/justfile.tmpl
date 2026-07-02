@@ -26,10 +26,13 @@ test:
     uv run --with pytest-xdist pytest -n auto --tb=short -q
 
 # tests with the coverage gate (CI always runs this, not `test` — PI-569).
-# no-op on a fresh scaffold with no src/ yet, same guard as `typecheck`:
-# 0% coverage on zero code would trip --cov-fail-under before any code exists.
+# without src/ yet, still run the plain test suite (tests/ may exist before
+# src/ does) — only the coverage instrumentation/threshold is skipped, since
+# 0% coverage on zero application code would trip --cov-fail-under before any
+# code exists. Silently skipping pytest entirely here would let a real test
+# failure through `just ci` unnoticed.
 test-cov:
-    if [ -d src ]; then uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov=src --cov-fail-under=70; else echo "No src/ directory yet — nothing to measure coverage on."; fi
+    if [ -d src ]; then uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov=src --cov-fail-under=70; else uv run --with pytest-xdist pytest -n auto --tb=short -q; fi
 
 # mutation testing on core logic (slow; requires [tool.mutmut] source_paths
 # in your own pyproject.toml, scoped to deterministic pure-logic modules —

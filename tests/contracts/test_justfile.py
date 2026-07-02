@@ -117,6 +117,17 @@ class TestJustfilePerLanguage:
             assert "-n auto" in body
             assert "--with pytest-xdist" in body, f"{recipe} must not require a declared xdist"
 
+    def test_python_coverage_recipe_still_runs_tests_without_src(self, tmp_path: Path):
+        """PI-569 review fix: a project can have tests/ before src/ exists —
+        the missing-src/ guard must drop only the coverage flags, not skip
+        pytest entirely (that would let a real test failure through `just
+        ci`/`test-cov` silently)."""
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "test-cov")
+        assert "if [ -d src ]" in body
+        else_branch = body.split("else", 1)[1]
+        assert "pytest" in else_branch, "the no-src/ branch must still invoke pytest"
+
     def test_python_setup_uses_dependency_group(self, tmp_path: Path):
         """PI-209: dev deps live in [dependency-groups] (what `uv add --dev`
         writes), so `setup` must `uv sync --group dev`, not `--extra dev`."""
