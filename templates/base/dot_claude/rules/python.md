@@ -38,3 +38,20 @@ point of a test, not a vulnerability.
 
 - One assertion per test; name: `test_<unit>_<scenario>`
 - External services (DB, API) use a real instance, not a mock
+
+## Property-based testing (Hypothesis, #580)
+
+Opt-in per file, run with `just fuzz` (which provides Hypothesis). It generates
+edge-case inputs a hand-written test wouldn't think to try:
+
+```python
+from hypothesis import given, strategies as st
+
+@given(st.integers(min_value=-1000, max_value=0), st.integers(min_value=1, max_value=1000), st.integers())
+def test_clamp_stays_within_bounds(lo, hi, x):
+    assert lo <= clamp(x, lo, hi) <= hi   # a true invariant; Hypothesis probes x < lo
+```
+
+Pattern/tooling, **not** a blocking gate — property tests live alongside unit
+tests and complement mutation testing (which checks existing tests) and the
+coverage floor (which checks how much is exercised).

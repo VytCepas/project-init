@@ -61,6 +61,12 @@ sbom:
 license:
     uv run --with pip-licenses pip-licenses --from=mixed --fail-on "GPL;AGPL" --partial-match
 
+# property-based tests with Hypothesis (#580). Property tests are opt-in per file
+# (import hypothesis); this recipe makes Hypothesis available without adding it as
+# a permanent dependency. Pattern/tooling, NOT a blocking gate.
+fuzz:
+    uv run --with hypothesis --with pytest-xdist pytest -n auto --tb=short -q
+
 # what CI runs
 ci: lint typecheck test-cov audit
 
@@ -120,6 +126,12 @@ sbom:
 license:
     bunx license-checker --production --failOn "GPL-1.0;GPL-1.0+;GPL-2.0;GPL-2.0-only;GPL-2.0-or-later;GPL-3.0;GPL-3.0-only;GPL-3.0-or-later;AGPL-1.0;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later"
 
+# property-based tests with fast-check (#580). Add the dep once: bun add -d
+# fast-check. Property tests are opt-in per file and run under `bun test`.
+# Pattern/tooling, NOT a blocking gate.
+fuzz:
+    bun test
+
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
@@ -177,6 +189,14 @@ sbom:
 # requires go-licenses: go install github.com/google/go-licenses@latest
 license:
     sh -c 'if find . -name "*.go" | grep -q .; then go-licenses check ./... --disallowed_types=forbidden,restricted; else echo "No Go sources yet — skipping license scan."; fi'
+
+# native Go fuzzing (#580) — replay fuzz-test SEED CORPORA deterministically
+# (short, CI-safe; no unbounded input generation). For active fuzzing that
+# generates new inputs, target one function:
+#   go test -run='^$' -fuzz=FuzzMyTarget -fuzztime=30s ./...
+# Built into the toolchain (go 1.18+). Pattern/tooling, NOT a blocking gate.
+fuzz:
+    sh -c 'if find . -name "*.go" | grep -q .; then go test -run="Fuzz" ./...; else echo "No Go sources yet — nothing to fuzz."; fi'
 
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
@@ -240,6 +260,12 @@ sbom:
 # requires cargo-deny: cargo install cargo-deny
 license:
     cargo deny check licenses
+
+# property-based tests with proptest (#580). Add the dep once: cargo add --dev
+# proptest. Property tests are opt-in per file (proptest! macro) and run under
+# `cargo test`. Pattern/tooling, NOT a blocking gate.
+fuzz:
+    cargo test
 
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
