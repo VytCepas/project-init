@@ -126,6 +126,31 @@ class TestAIBOM:
         target = _scaffold(tmp_path / "p", governance=False)
         assert not (target / _GOV / "ai-bom.generated.md").exists()
 
+    def test_upgrade_detects_routes_from_project_not_staging(self, tmp_path: Path):
+        # Upgrade re-renders into a staging dir whose CCR config.json is the
+        # pristine template copy. Route detection must read the *project's*
+        # live config — detecting against staging would make `upgrade --apply`
+        # overwrite the AIBOM's real routes with template defaults.
+        from project_init.__main__ import main
+        from project_init.upgrade import write_scaffold_record
+
+        target = tmp_path / "p"
+        preset = load_preset("obsidian-only")
+        extra = overlay_layers("claude", no_plugin=False, multi_model=True, governance=True)
+        preset = {**preset, "layers": list(preset["layers"]) + extra}
+        variables = make_variables(governance="true", multi_model="true")
+        created = scaffold(target, preset, variables, strict=True)
+        write_scaffold_record(target, "obsidian-only", variables, created)
+
+        ccr = target / ".claude" / "multi-model" / "config.json"
+        data = json.loads(ccr.read_text(encoding="utf-8"))
+        data["Router"]["think"] = "myprov,my-custom-model"
+        ccr.write_text(json.dumps(data), encoding="utf-8")
+
+        assert main(["upgrade", str(target), "--apply", "--accept-new", "all"]) == 0
+        aibom = (target / _GOV / "ai-bom.generated.md").read_text(encoding="utf-8")
+        assert "my-custom-model" in aibom
+
 
 # --------------------------------------------------------------------------- #
 # Declarations lifecycle (seed-once + preserve)

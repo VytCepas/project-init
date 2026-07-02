@@ -216,6 +216,28 @@ class TestPurgeExport:
         assert rc == 1
         assert "apply to `remove`" in capsys.readouterr().err
 
+    def test_purge_is_scoped_to_the_toggled_concern(self, tmp_path: Path, capsys):
+        # `remove docs --purge` must not sweep vault/memory notes — they belong
+        # to the memory concern, not docs. An unscoped orphan sweep deleted the
+        # user's entire vault on any remove+purge. docs owns no preserved source
+        # data at all, so the flags are rejected before anything is touched.
+        target = tmp_path / "p"
+        note = self._mem_project(target, content="irreplaceable")
+        rc = apply_concern(target, "docs", enable=False, apply=True, purge=True)
+        assert rc == 1
+        assert "owns no preserved source data" in capsys.readouterr().err
+        assert note.is_file()
+        assert note.read_text() == "irreplaceable"
+
+    def test_purge_memory_leaves_governance_source_data(self, tmp_path: Path):
+        # Purging one source-owning concern must not cross into another's data.
+        target = _scaffold(tmp_path / "p", memory_stack="obsidian-only", governance=True)
+        gov_file = target / ".claude/governance/ai-declarations.md"
+        assert gov_file.is_file()
+        apply_concern(target, "memory", enable=False, apply=True, purge=True)
+        assert not (target / ".claude/vault").exists()
+        assert gov_file.is_file()
+
     def test_purge_cleans_leftovers_after_plain_remove(self, tmp_path: Path):
         # A preserved governance user file survives a plain remove; a later --purge
         # must still clean it even though the concern flag is already off (no change).

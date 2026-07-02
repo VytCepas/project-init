@@ -73,8 +73,15 @@ def extract_ccr_routes(config_path: Path) -> dict[str, list]:
     return {"routes": routes, "providers": providers}
 
 
-def render_aibom(target: Path, variables: dict[str, str]) -> str:
-    """Build the AIBOM markdown from the recorded selection + emitted overlays."""
+def render_aibom(detect_root: Path, variables: dict[str, str]) -> str:
+    """Build the AIBOM markdown from the recorded selection + emitted overlays.
+
+    *detect_root* is the project root whose live CCR config is inspected. On a
+    plain scaffold that is the scaffold target; on upgrade/add/remove it must be
+    the real project, NOT the staging render — staging holds the pristine
+    template ``config.json``, so detecting there would report template-default
+    routes and clobber the user's actual ones on ``--apply``.
+    """
     by_id = {m["id"]: m for m in MCP_CATALOG}
     by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
     servers = servers_for_ids(_mcp_ids(variables))
@@ -101,7 +108,7 @@ def render_aibom(target: Path, variables: dict[str, str]) -> str:
     lines += ["", "## Detected CCR routes", ""]
 
     if variables.get("multi_model"):
-        ccr = extract_ccr_routes(target / _CCR_CONFIG_REL)
+        ccr = extract_ccr_routes(detect_root / _CCR_CONFIG_REL)
         if ccr["routes"]:
             lines += ["| Role | Provider | Model |", "|---|---|---|"]
             for role, provider, model in ccr["routes"]:
@@ -124,6 +131,7 @@ def emit(
     *,
     first_scaffold: bool = True,
     conflicts: list[tuple[Path, Path]] | None = None,
+    detect_root: Path | None = None,
 ) -> list[Path]:
     """Write ``.claude/governance/ai-bom.generated.md``.
 
@@ -131,12 +139,14 @@ def emit(
     pre-existing user file at this path is preserved as a ``.new`` sibling (never
     clobbered) on the *first* scaffold, or on a later run while an unmerged ``.new``
     sibling from an earlier run is still pending (PI-535).
+
+    *detect_root* — see :func:`render_aibom`; defaults to *target*.
     """
     from project_init.scaffold import _emit_generated
 
     return _emit_generated(
         target / _OUTPUT_REL,
-        render_aibom(target, variables),
+        render_aibom(detect_root or target, variables),
         first_scaffold=first_scaffold,
         conflicts=conflicts,
         rel=_OUTPUT_REL,
