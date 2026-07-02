@@ -1,0 +1,40 @@
+{{#if rust}}# deny.toml — cargo-deny config for dependency license compliance (#579,
+# scaffolded by project-init). Run via `just license` (cargo deny check licenses).
+#
+# Current cargo-deny (the `deny = [...]` key was removed) uses an ALLOW-list
+# model: a crate's license must appear in `allow` below, otherwise it is denied.
+# So strong copyleft (GPL/AGPL) — and any license not listed — fails the check.
+# This is stricter than a pure GPL/AGPL deny-list but is cargo-deny's idiomatic
+# model and also catches unknown/unlicensed crates. Widen `allow` to accept more.
+#
+# cargo-deny can ALSO check advisories (`cargo deny check advisories`), which
+# would subsume `cargo audit` (#568). We keep `cargo audit` as the dedicated CVE
+# gate for now; run `cargo deny check` (all checks) if you prefer to consolidate.
+[licenses]
+version = 2
+# Permissive + weak-copyleft-with-linking-exception licenses accepted by default.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "MPL-2.0",
+    "CC0-1.0",
+    "Unlicense",
+    "BSL-1.0",
+]
+# Don't error just because an allowed license isn't used by any current crate —
+# the list above is a policy, not an inventory.
+unused-allowed-license = "allow"
+confidence-threshold = 0.8
+
+# Ignore the workspace's own unpublished crates (they need no third-party
+# license clearance).
+[licenses.private]
+ignore = true
+{{/if rust}}

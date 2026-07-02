@@ -55,6 +55,12 @@ sbom:
     uv sync --no-dev
     uvx --from cyclonedx-bom cyclonedx-py environment .venv -o sbom.cdx.json
 
+# dependency license compliance scan (#579) — fail on copyleft (GPL/AGPL; also
+# LGPL, since --partial-match is substring-based). Tune the --fail-on deny-list
+# to your policy. Non-blocking in CI initially (see ci.yml's license-scan job).
+license:
+    uv run --with pip-licenses pip-licenses --from=mixed --fail-on "GPL;AGPL" --partial-match
+
 # what CI runs
 ci: lint typecheck test-cov audit
 
@@ -108,6 +114,12 @@ audit:
 sbom:
     bunx @cyclonedx/cdxgen -t bun -o sbom.cdx.json
 
+# dependency license compliance scan (#579) — fail on GPL/AGPL (SPDX ids). Tune
+# the --failOn deny-list to your policy. Non-blocking in CI initially (see
+# ci.yml's license-scan job).
+license:
+    bunx license-checker --production --failOn "GPL-1.0;GPL-1.0+;GPL-2.0;GPL-2.0-only;GPL-2.0-or-later;GPL-3.0;GPL-3.0-only;GPL-3.0-or-later;AGPL-1.0;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later"
+
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
@@ -158,6 +170,13 @@ audit:
 # requires cyclonedx-gomod: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
 sbom:
     cyclonedx-gomod mod -json -output sbom.cdx.json
+
+# dependency license compliance scan (#579) — fail on forbidden/restricted
+# (copyleft: GPL/LGPL/AGPL) per go-licenses' classification. Tune
+# --disallowed_types to your policy. Skips cleanly before any Go source exists.
+# requires go-licenses: go install github.com/google/go-licenses@latest
+license:
+    sh -c 'if find . -name "*.go" | grep -q .; then go-licenses check ./... --disallowed_types=forbidden,restricted; else echo "No Go sources yet — skipping license scan."; fi'
 
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
@@ -213,6 +232,14 @@ audit:
 # requires cargo-cyclonedx: cargo install cargo-cyclonedx
 sbom:
     cargo cyclonedx --format json --spec-version 1.5
+
+# dependency license compliance scan (#579) — cargo-deny checks licenses against
+# deny.toml (deny GPL/AGPL by default; everything else allowed). cargo-deny can
+# ALSO check advisories, subsuming `cargo audit` (#568); we keep `cargo audit`
+# as the dedicated CVE gate for now — run `cargo deny check` (all) to consolidate.
+# requires cargo-deny: cargo install cargo-deny
+license:
+    cargo deny check licenses
 
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:

@@ -501,6 +501,68 @@ jobs:
             semgrep scan --error --metrics=off $RULESETS
           fi
 
+  # Dependency license compliance (#579): flag copyleft (GPL/AGPL) dependencies
+  # pulled in transitively — a permissive-licensed project (MIT/Apache-2.0)
+  # usually must not ship them. Free/OSS tooling per language, no paid service,
+  # runs entirely in CI. Non-blocking initially (NOT in ci-gate's needs) while
+  # the deny-list is calibrated — the same rollout semgrep/scorecard used;
+  # promote it into ci-gate once your license policy is settled. The deny-list
+  # lives in the justfile's `license` recipe (or deny.toml for Rust).
+  license-scan:
+    name: Dependency license scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install just
+        uses: extractions/setup-just@v4
+{{#if python}}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.7"
+
+      - name: License scan (pip-licenses)
+        run: just license
+{{/if python}}{{#if node}}
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # license-checker reads node_modules, so install deps first.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile 2>/dev/null || bun install
+
+      - name: License scan (license-checker)
+        run: just license
+{{/if node}}{{#if go}}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install go-licenses
+        run: |
+          go install github.com/google/go-licenses@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: License scan (go-licenses)
+        run: just license
+{{/if go}}{{#if rust}}
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      # Prebuilt binary — avoids a multi-minute cargo install compile per run.
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      - name: License scan (cargo-deny)
+        run: just license
+{{/if rust}}
+
   # OpenSSF Scorecard (#576): standardized security-posture scoring (branch
   # protection, dependency pinning, SAST presence, token permissions, ...).
   # Schedule-only + non-blocking (NOT in ci-gate's needs) — a score is
