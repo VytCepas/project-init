@@ -141,6 +141,13 @@ jobs:
       # no src/ yet (same guard as typecheck).
       - name: Tests — parallel, coverage-gated
         run: just test-cov
+
+      # Dependency vulnerability scan (PI-568). Complements package_guard.py,
+      # which only blocks installing a package that doesn't exist or looks
+      # typosquatted — this catches a real, correctly-spelled dependency
+      # already in the lockfile with a known CVE/advisory.
+      - name: Dependency vulnerability scan (pip-audit)
+        run: just audit
 {{/if python}}
 {{#if node}}
       - name: Install Bun
@@ -179,6 +186,10 @@ jobs:
 
       - name: Tests
         run: just test
+
+      # Dependency vulnerability scan (PI-568).
+      - name: Dependency vulnerability scan (bun audit)
+        run: just audit
 {{/if node}}
 {{#if go}}
       - name: Set up Go
@@ -215,6 +226,17 @@ jobs:
       # the setup-go action just installed, nothing extra to provision.
       - name: Tests — coverage-gated
         run: just test-cov
+
+      # Dependency vulnerability scan (PI-568). govulncheck is the official
+      # Go team tool — only reports vulnerabilities actually reachable from
+      # your code, not every advisory touching a transitive dependency.
+      - name: Install govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Dependency vulnerability scan (govulncheck)
+        run: just audit
 {{/if go}}
 {{#if rust}}
       # Bundles Swatinem/rust-cache internally — no separate cache step needed.
@@ -235,11 +257,12 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v4
 
-      # Prebuilt binary — avoids a ~1min `cargo install` compile per run.
-      - name: Install cargo-llvm-cov
+      # Prebuilt binaries — avoids a multi-minute `cargo install` compile per
+      # run for either tool.
+      - name: Install cargo-llvm-cov + cargo-audit
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-llvm-cov
+          tool: cargo-llvm-cov,cargo-audit
 
       - name: Lint
         run: just lint
@@ -247,6 +270,11 @@ jobs:
       # Coverage-gated (PI-569).
       - name: Tests — coverage-gated
         run: just test-cov
+
+      # Dependency vulnerability scan against the RustSec advisory database
+      # (PI-568).
+      - name: Dependency vulnerability scan (cargo audit)
+        run: just audit
 {{/if rust}}
 
       - name: Post failure summary
