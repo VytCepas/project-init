@@ -13,10 +13,16 @@
 
 set -euo pipefail
 
-# This script hard-requires the GitHub CLI (PI-362).
-command -v gh >/dev/null 2>&1 || {
-  echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2
-  exit 1
+# This script hard-requires the GitHub CLI for the actual issue creation, but
+# `--help` and argument validation must work without it — otherwise you cannot
+# discover the flags on a machine that has not installed gh yet (PI-362,
+# 2026-07 review). require_gh is therefore called after validation, just before
+# the first real gh invocation.
+require_gh() {
+  command -v gh >/dev/null 2>&1 || {
+    echo "error: GitHub CLI (gh) not found — install: https://cli.github.com" >&2
+    exit 1
+  }
 }
 
 # Resolve the Python interpreter through the canonical helper (PI-361).
@@ -247,6 +253,9 @@ if [ -n "$BODY_FILE" ] && [ ! -f "$BODY_FILE" ]; then
   echo "ERROR: body file not found: $BODY_FILE" >&2
   exit 1
 fi
+
+# Arguments are valid; everything below talks to GitHub, so gh is required now.
+require_gh
 
 # ---------------------------------------------------------------------------
 # Parse --parent reference into owner / repo / number.

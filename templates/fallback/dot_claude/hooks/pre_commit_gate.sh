@@ -32,6 +32,11 @@ case "$CMD" in
 esac
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# `git diff --cached --name-only` yields repo-root-relative paths, so the
+# linters must run from the repo root — otherwise a session launched in a
+# subdirectory lints paths that don't resolve and the tool error is captured as
+# a bogus commit-blocking reason (2026-07 review). Fail open if the cd fails.
+cd "$ROOT" 2>/dev/null || exit 0
 ERRORS=""
 
 # Lint and auto-fix staged Python files. Prefer 'uv run ruff' inside a

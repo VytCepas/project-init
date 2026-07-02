@@ -32,6 +32,12 @@ DESTRUCTIVE = [
     "mysql -e 'drop table users'",
     "rm -rf /var/lib/data",
     "rm -rf ~/projects",
+    # Split recursive/force flags in any order + long forms must also be caught
+    # (2026-07 review) — the old single-token pattern only matched -rf/-fr.
+    "rm -r -f /var/lib/data",
+    "rm -f -r /etc",
+    "rm --recursive --force /var",
+    "rm --force --recursive ~/data",
     "gh repo delete VytCepas/project-init",
     "docker system prune -af",
     # Global flags before the destructive verb (PR #174 review, P1).

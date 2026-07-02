@@ -20,7 +20,15 @@ PY="$(dirname "$0")/_py.sh"
 # Failures are non-fatal — the static rules are always injected.
 DAG_STATE=$("$PY" "$(dirname "$0")/dag_workflow.py" nodes 2>/dev/null || true)
 
-printf '%s' "$INPUT" | DAG_STATE="$DAG_STATE" "$PY" -c '
+# The issue key is project-specific (start_issue.sh derives it from config.yaml's
+# project_key / the repo name), so the naming rules must NOT hardcode `PI`
+# (2026-07 review). Read it from config.yaml relative to this hook's own
+# location; fall back to a generic placeholder when absent.
+PROJECT_KEY=$(grep '^[[:space:]]*project_key:' "$(dirname "$0")/../config.yaml" 2>/dev/null |
+  head -n1 | sed 's/#.*$//' | cut -d: -f2 | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+[ -z "$PROJECT_KEY" ] && PROJECT_KEY="<KEY>"
+
+printf '%s' "$INPUT" | DAG_STATE="$DAG_STATE" PROJECT_KEY="$PROJECT_KEY" "$PY" -c '
 import json
 import os
 import re
@@ -49,6 +57,7 @@ if not trigger:
 
 dag_state = os.environ.get("DAG_STATE", "").strip()
 state_block = f"\n\nCurrent DAG nodes:\n{dag_state}\n" if dag_state else ""
+key = os.environ.get("PROJECT_KEY", "").strip() or "<KEY>"
 
 context = (
     "GitHub workflow rules (enforced by the dag_workflow.py guard hook):\n"
@@ -67,8 +76,8 @@ context = (
     "  - .claude/scripts/monitor_pr.sh <pr> --merge   (not: gh pr merge / gh api .../merge / gh pr checks --watch)\n"
     "\n"
     "Naming:\n"
-    "  branch:     <type>/PI-<n>-<kebab-slug>     e.g. feat/PI-98-dag-workflow\n"
-    "  PR title:   type(PI-N): description        e.g. feat(PI-98): Add DAG enforcement\n"
+    f"  branch:     <type>/{key}-<n>-<kebab-slug>     e.g. feat/{key}-98-dag-workflow\n"
+    f"  PR title:   type({key}-N): description        e.g. feat({key}-98): Add DAG enforcement\n"
     "              (no scope = no linked issue, e.g. fix: Correct typo) — ADR-006\n"
     "  PR body:    must include `Closes #N`\n"
     "\n"

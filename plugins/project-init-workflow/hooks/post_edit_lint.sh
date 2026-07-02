@@ -29,6 +29,13 @@ print(ti.get('file_path') or ti.get('filePath') or '')
 " 2>/dev/null || true)
 
 [ -z "$FILE" ] && exit 0
+# A repo-relative file_path (e.g. "src/foo.py") must be anchored at the repo
+# root, or a hook firing from a subdirectory fails to find it and silently skips
+# linting (2026-07 review). An absolute path is used as-is.
+case "$FILE" in
+/*) ;;
+*) FILE="$ROOT/$FILE" ;;
+esac
 [ ! -f "$FILE" ] && exit 0
 
 ERRORS=""

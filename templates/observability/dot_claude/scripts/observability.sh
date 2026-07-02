@@ -16,8 +16,16 @@ REPORT="$HERE/../observability/usage_report.py"
 # scaffolded project, not wherever the user happened to invoke from.
 ROOT="$(git -C "$HERE" rev-parse --show-toplevel 2>/dev/null || (cd "$HERE/../.." && pwd))"
 
-cmd="${1:-report}"
-[ "$#" -gt 0 ] && shift || true
+# A leading flag (e.g. `observability.sh --open`) means "no subcommand" —
+# default to `report` and leave the flag for the parser below, rather than
+# mistaking the flag for the subcommand and dying on a usage error (2026-07
+# review).
+if [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; then
+  cmd="$1"
+  shift
+else
+  cmd="report"
+fi
 
 open_after=""
 args=()

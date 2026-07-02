@@ -47,6 +47,12 @@ change, not move-drift. `.claude/hooks/package_guard.py` also picked up
 `# noqa: S310` placement fixes for the new `S` rule group; it was already
 excluded above. Only `ruff.toml` is newly excluded here, after verifying
 every other file still matched.
+
+Exception (2026-07 review): deliberate content fixes re-pinned after verifying
+no other file drifted — `dag_workflow.py` (command-guard bypass fixes),
+`.gitignore` (no longer ignoring the committed `.codex/` wiring), `prod_guard.py`
+(rm split-flag detection), `commit-msg` (install comment), and the fallback
+hooks `pre_commit_gate.sh` / `post_edit_lint.sh` (cd to repo root).
 """
 
 from __future__ import annotations
