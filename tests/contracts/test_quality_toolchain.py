@@ -19,9 +19,7 @@ from tests.helpers import fallback_preset, fallback_variables
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
-    flags = {
-        lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")
-    }
+    flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
     scaffold(target, fallback_preset(), fallback_variables(language=language, **flags))
     return target
 
@@ -34,7 +32,21 @@ class TestPythonToolchain:
     def test_ruff_config_rendered_and_parseable(self):
         config = tomllib.loads((self.target / "ruff.toml").read_text())
         select = config["lint"]["select"]
-        for rule in ("D", "C901", "PLR0912", "PLR0913", "PLR0915"):
+        for rule in (
+            "D",
+            "C901",
+            "PLR0912",
+            "PLR0913",
+            "PLR0915",
+            "RUF",
+            "PERF",
+            "PTH",
+            "RET",
+            "ARG",
+            "A",
+            "S",
+            "BLE",
+        ):
             assert rule in select, f"{rule} missing from scaffolded ruff select"
         assert config["lint"]["pydocstyle"]["convention"] == "google"
         assert config["lint"]["mccabe"]["max-complexity"] == 10
@@ -43,6 +55,7 @@ class TestPythonToolchain:
         config = tomllib.loads((self.target / "ruff.toml").read_text())
         ignores = config["lint"]["per-file-ignores"]
         assert "D" in ignores["tests/**"]
+        assert "S" in ignores["tests/**"], "plain assert must not be flagged as insecure"
         assert "C901" in ignores[".claude/**"]
 
     def test_mypy_config_rendered_and_parseable(self):
@@ -52,6 +65,9 @@ class TestPythonToolchain:
         config.read_string((self.target / "mypy.ini").read_text())
         assert config.getboolean("mypy", "strict") is True
         assert config["mypy"]["python_version"] == "3.11"
+        # Deliberately excluded (PI-570): verified noisy against legitimate
+        # `Any` usage (JSON parsing, generic callable wrappers).
+        assert "disallow_any_explicit" not in config["mypy"]
 
     def test_typecheck_recipe_and_ci_wired(self):
         justfile = (self.target / "justfile").read_text()
@@ -93,7 +109,14 @@ class TestNodeToolchain:
         assert "eslint-plugin-jsdoc" in content
         assert "eslint-plugin-tsdoc" in content
         assert 'complexity: ["error", 10]' in content
-        assert "tseslint.configs.strict" in content
+        assert "tseslint.configs.strictTypeChecked" in content
+        assert "tseslint.configs.stylisticTypeChecked" in content
+
+    def test_eslint_wires_type_aware_linting(self):
+        """PI-570: strictTypeChecked needs parserOptions.project — verify it
+        points at the scaffolded tsconfig.json, not left dangling."""
+        content = (self.target / "eslint.config.mjs").read_text()
+        assert 'project: "./tsconfig.json"' in content
 
     def test_tsconfig_base_rendered_and_parseable(self):
         config = json.loads((self.target / "tsconfig.base.json").read_text())
@@ -101,6 +124,11 @@ class TestNodeToolchain:
         assert options["strict"] is True
         assert options["noUncheckedIndexedAccess"] is True
         assert options["exactOptionalPropertyTypes"] is True
+        assert options["noImplicitOverride"] is True
+        assert options["noPropertyAccessFromIndexSignature"] is True
+        assert options["noFallthroughCasesInSwitch"] is True
+        assert options["noImplicitReturns"] is True
+        assert options["allowUnreachableCode"] is False
 
     def test_tsconfig_extends_base(self):
         config = json.loads((self.target / "tsconfig.json").read_text())
@@ -152,13 +180,16 @@ class TestGoToolchain:
             "errcheck",
             "govet",
             "staticcheck",
+            "gosec",
         ):
             assert linter in content, f"{linter} missing from .golangci.yml"
         assert "gofumpt" in content
 
     def test_golangci_complexity_cap_mirrors_ruff(self):
         content = (self.target / ".golangci.yml").read_text()
-        assert "max-complexity: 10" in content, "cyclop cap must mirror ruff's mccabe max-complexity = 10"
+        assert "max-complexity: 10" in content, (
+            "cyclop cap must mirror ruff's mccabe max-complexity = 10"
+        )
 
     def test_no_docs_workflow(self):
         """Go needs no docs site — pkg.go.dev renders doc comments."""
@@ -260,7 +291,12 @@ class TestAdrToolchain:
 
     def test_madr_template_scaffolded(self):
         content = (self.target / ".claude" / "docs" / "adr" / "adr-template.md").read_text()
-        for section in ("Context and Problem Statement", "Considered Options", "Decision Outcome", "Consequences"):
+        for section in (
+            "Context and Problem Statement",
+            "Considered Options",
+            "Decision Outcome",
+            "Consequences",
+        ):
             assert section in content
 
     def test_add_adr_skill_scaffolded_and_indexed(self):

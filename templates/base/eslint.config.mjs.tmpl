@@ -2,17 +2,36 @@
 // Install the toolchain once:
 //   bun add -d eslint typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc
 // Biome stays formatter-only — it lacks gate-grade complexity/doc rules.
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import tseslint from "typescript-eslint";
 import jsdoc from "eslint-plugin-jsdoc";
 import tsdoc from "eslint-plugin-tsdoc";
 
+// fileURLToPath(import.meta.url), not import.meta.dirname: this config can
+// run under plain Node (npx eslint, CI, editor integrations), not just Bun —
+// import.meta.dirname needs Node 20.11+ and isn't worth the floor bump.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 export default tseslint.config(
-  // strict (not strictTypeChecked): catches no-explicit-any and friends
-  // without requiring parserOptions.project type-aware linting wiring.
-  ...tseslint.configs.strict,
+  // Type-aware linting (PI-570): strictTypeChecked/stylisticTypeChecked catch
+  // bugs `strict` alone misses — verified against real code: a floating
+  // `Promise` in an async function (no-floating-promises/require-await) and
+  // unsafe `any` propagation through a return value (no-unsafe-return/
+  // no-unsafe-member-access). This needs parserOptions.project, which
+  // tsconfig.json (PI-560) already provides — no longer the blocker the
+  // previous `strict`-only choice was working around.
+  ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked,
   // Enforced JSDoc on exported/public symbols (TypeScript-aware preset).
   jsdoc.configs["flat/recommended-typescript"],
   {
+    languageOptions: {
+      parserOptions: {
+        project: "./tsconfig.json",
+        tsconfigRootDir: __dirname,
+      },
+    },
     plugins: { tsdoc },
     rules: {
       // Mechanical guards against noodly generated code — mirror the
@@ -24,7 +43,9 @@ export default tseslint.config(
     },
   },
   {
-    // Agent infrastructure and build output are not project code.
+    // Agent infrastructure and build output are not project code — also not
+    // covered by tsconfig.json's `include`, so type-aware linting can't
+    // parse them anyway.
     ignores: [".claude/**", "node_modules/**", "dist/**", "_site/**"],
   },
 );
