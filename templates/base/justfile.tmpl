@@ -115,7 +115,7 @@ test:
 # tune the "70" threshold to your project's baseline.
 test-cov:
     go test -coverprofile=coverage.out ./...
-    go tool cover -func=coverage.out | tail -1 | awk '{ pct = $3; sub("%", "", pct); if (pct + 0 < 70) { print "Coverage " pct "% is below the 70% gate"; exit 1 } else { print "Coverage " pct "% meets the 70% gate" } }'
+    go tool cover -func=coverage.out | tail -n 1 | awk '{ pct = $3; sub("%", "", pct); if (pct + 0 < 70) { print "Coverage " pct "% is below the 70% gate"; exit 1 } else { print "Coverage " pct "% meets the 70% gate" } }'
 
 # docs: nothing to build — pkg.go.dev renders doc comments
 docs:
