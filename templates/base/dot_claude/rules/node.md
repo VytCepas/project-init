@@ -15,4 +15,5 @@ bunx <package>    # run a binary (replaces npx)
 bun run lint      # lint
 bun test          # tests
 just sbom         # CycloneDX SBOM via cdxgen (#574) — release.yml attaches it to Releases
+just license      # dependency license scan (#579) — deny GPL/AGPL; tune the recipe's --failOn list
 ```

@@ -19,6 +19,7 @@ uv run pytest -q --tb=short       # tests (single-threaded fallback)
 just test-cov                     # tests + coverage gate (>= 70%, per justfile) — CI always runs this
 just audit                        # dependency CVE/advisory scan (pip-audit) — CI always runs this
 just sbom                         # CycloneDX SBOM of runtime deps (#574) — release.yml attaches it to Releases
+just license                      # dependency license scan (#579) — deny GPL/AGPL; tune the recipe's --fail-on list
 ```
 
 ruff lints; it does not type-check. `just typecheck` (mypy, strict) is a separate
