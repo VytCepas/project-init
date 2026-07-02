@@ -9,9 +9,14 @@ alwaysApply: false
 ```bash
 cargo build
 cargo test
+cargo llvm-cov --fail-under-lines 70              # tests + coverage gate — CI always runs this (`just test-cov`)
 cargo clippy -- -D warnings -D clippy::pedantic   # pedantic + cognitive-complexity gate per clippy.toml
 cargo fmt --check                                 # verifies only; `cargo fmt` (no flag) writes changes
 ```
+
+`cargo llvm-cov` needs `cargo install cargo-llvm-cov` + `rustup component add
+llvm-tools-preview` once locally; CI installs both per-run (a prebuilt binary,
+not a source compile).
 
 The compiler is the type checker — no separate strict-mode gate needed.
 `-D warnings` (`.cargo/config.toml`) is the Rust analog to `mypy --strict` /

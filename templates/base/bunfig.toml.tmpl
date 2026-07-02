@@ -1,0 +1,14 @@
+{{#if node}}# bunfig.toml — quality gates for project code (scaffolded by project-init).
+# `bun test` picks this up automatically, so the coverage gate needs no extra
+# CLI flag anywhere (justfile, CI, or a developer's terminal) — PI-569.
+
+[test]
+coverage = true
+# Tune to your project's baseline, same as ruff/mypy/golangci's thresholds.
+coverageThreshold = 0.7
+# Explicit, not relying on the current default (verified byte-identical
+# report either way on bun 1.3.11 — set anyway so a future bun version
+# changing that default can't silently start counting *.test.ts lines
+# toward the gate).
+coverageSkipTestFiles = true
+{{/if node}}

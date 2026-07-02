@@ -133,18 +133,14 @@ jobs:
       - name: Typecheck
         run: just typecheck
 
-      # Coverage gate (PI-138): activates automatically once pytest-cov is in
-      # dev dependencies; runs plain tests until then. Tune --cov-fail-under
-      # in the justfile's test-cov recipe to your project's baseline.
+      # Coverage gate (PI-138/PI-569): always on, not conditional — pytest-cov
+      # is pulled in ephemerally via `uv run --with`, the same pattern mypy
+      # (PI-558) and mutmut (PI-563) use, so there's no dev-dependency to
+      # forget to add. Tune --cov-fail-under in the justfile's test-cov
+      # recipe to your project's baseline; it no-ops on a fresh scaffold with
+      # no src/ yet (same guard as typecheck).
       - name: Tests — parallel, coverage-gated
-        run: |
-          if uv run python -c "import pytest_cov" 2>/dev/null; then
-            just test-cov
-          else
-            echo "pytest-cov not installed — running without the coverage gate."
-            echo "Add pytest-cov to dev dependencies to enable it."
-            just test
-          fi
+        run: just test-cov
 {{/if python}}
 {{#if node}}
       - name: Install Bun
@@ -215,15 +211,18 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v4
 
-      - name: Tests
-        run: just test
+      # Coverage-gated (PI-569) — go tool cover ships with the Go toolchain
+      # the setup-go action just installed, nothing extra to provision.
+      - name: Tests — coverage-gated
+        run: just test-cov
 {{/if go}}
 {{#if rust}}
       # Bundles Swatinem/rust-cache internally — no separate cache step needed.
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          components: clippy, rustfmt
+          # llvm-tools-preview: required by cargo-llvm-cov (PI-569).
+          components: clippy, rustfmt, llvm-tools-preview
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
@@ -236,11 +235,18 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v4
 
+      # Prebuilt binary — avoids a ~1min `cargo install` compile per run.
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
       - name: Lint
         run: just lint
 
-      - name: Tests
-        run: just test
+      # Coverage-gated (PI-569).
+      - name: Tests — coverage-gated
+        run: just test-cov
 {{/if rust}}
 
       - name: Post failure summary
