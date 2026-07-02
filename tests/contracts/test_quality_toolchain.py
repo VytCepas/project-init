@@ -385,7 +385,10 @@ class TestCiQualityGates:
     def test_mutmut_schedule_absent_for_other_languages(self, tmp_target: Path, language):
         target = _scaffold_language(tmp_target, language)
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
-        assert "cron:" not in ci, f"schedule trigger must not render for {language}"
+        # The nightly mutation cron is Python-only; the weekly Scorecard cron
+        # (#576) is language-agnostic, so assert on the mutation-specific pieces
+        # rather than the presence of any cron at all.
+        assert "0 3 * * *" not in ci, f"nightly mutation cron must not render for {language}"
         assert "mutation-tests:" not in ci
 
 
