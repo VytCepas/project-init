@@ -288,6 +288,64 @@ class TestGuardSteering:
     @pytest.mark.parametrize(
         "cmd",
         [
+            "git -C /tmp/x push origin main",
+            "git -c core.pager=cat push origin main",
+            "git --git-dir=/tmp/x/.git push origin main",
+            "git --work-tree=/tmp/x -C /tmp/x push origin main",
+            "git -p push origin main",
+        ],
+    )
+    def test_blocks_push_to_main_through_git_global_options(self, cmd: str, tmp_path: Path):
+        """2026-07 review: interposed git global options (-C, -c, --git-dir, …)
+        between `git` and `push` must not smuggle a push-to-main past the block."""
+        out = _run_guard({"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert _denied(out)
+        assert "main/master" in _deny_reason(out)
+
+    def test_blocks_graphql_merge_mutation(self, tmp_path: Path):
+        """2026-07 review: a `gh api graphql` mergePullRequest mutation bypasses
+        the REST `/pulls/N/merge` rule and must be blocked in its own right."""
+        hook = _project_with_hook(tmp_path)
+        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
+        (tmp_path / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        cmd = 'gh api graphql -f query="mutation { mergePullRequest(input:{pullRequestId:1}){x} }"'
+        out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert _denied(out)
+        assert "monitor_pr.sh" in _deny_reason(out)
+
+    def test_blocks_guarded_command_in_interpreter_heredoc(self, tmp_path: Path):
+        """2026-07 review: a heredoc fed to an interpreter executes its body, so
+        a push-to-main hidden in `bash <<'EOF' … EOF` must still be caught."""
+        cmd = "bash <<'EOF'\ngit push origin main\nEOF\n"
+        out = _run_guard({"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert _denied(out)
+        assert "main/master" in _deny_reason(out)
+
+    def test_blocks_guarded_command_in_piped_interpreter_heredoc(self, tmp_path: Path):
+        cmd = "cat <<'EOF' | bash\ngit push origin main\nEOF\n"
+        out = _run_guard({"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert _denied(out)
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            # A heredoc NOT fed to an interpreter is data, not execution — prose
+            # mentioning a blocked command must still pass (2026-07 review).
+            "cat > notes.txt <<EOF\ngit push origin main\nEOF\n",
+            "gh pr comment 5 --body-file - <<EOF\nremember git push origin main\nEOF\n",
+        ],
+    )
+    def test_allows_guarded_phrase_in_non_executing_heredoc(self, cmd: str, tmp_path: Path):
+        out = _run_guard({"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert out is None
+
+    def test_no_cache_path_constant(self, dag):
+        """2026-07 review: CACHE_PATH was dead code (never read or written)."""
+        assert not hasattr(dag, "CACHE_PATH")
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
             # #550: a blocked-command phrase living inside a free-text flag value
             # is prose, not an invocation, and must not trip the guard.
             'gh issue comment 5 --body "see the blocked git push main screenshot"',
