@@ -46,7 +46,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 PY="$SCRIPT_DIR/../hooks/_py.sh"
 
 PR_NUMBER="${1:-}"
-MODE="${2:-}"
+MODE=""
 REVIEW_CYCLE=0
 MAX_REVIEW_CYCLES=2
 NO_REVIEW=0
@@ -57,17 +57,16 @@ if [ -z "$PR_NUMBER" ]; then
   exit 1
 fi
 
-if [ -n "$MODE" ] && [ "$MODE" != "--merge" ]; then
-  echo "Unknown option: $MODE" >&2
-  exit 2
-fi
-
-# Parse remaining flags (order-independent after position 2).
-# Shift past <pr-number> and optional --merge; remaining args are flags.
-shift 1                            # drop PR_NUMBER
-[ "$MODE" = "--merge" ] && shift 1 # drop --merge if present
+# Parse flags (order-independent). --merge is just another flag: the usage
+# line presents every flag as independent, so `monitor_pr.sh 12 --no-review`
+# must not be rejected for lacking --merge in position 2.
+shift 1 # drop PR_NUMBER
 while [ $# -gt 0 ]; do
   case "$1" in
+  --merge)
+    MODE="--merge"
+    shift
+    ;;
   --review-cycle)
     REVIEW_CYCLE="${2:-0}"
     shift 2
