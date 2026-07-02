@@ -25,9 +25,11 @@ format:
 test:
     uv run --with pytest-xdist pytest -n auto --tb=short -q
 
-# tests with the coverage gate (CI runs this when pytest-cov is installed)
+# tests with the coverage gate (CI always runs this, not `test` — PI-569).
+# no-op on a fresh scaffold with no src/ yet, same guard as `typecheck`:
+# 0% coverage on zero code would trip --cov-fail-under before any code exists.
 test-cov:
-    uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov --cov-fail-under=70
+    if [ -d src ]; then uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov=src --cov-fail-under=70; else echo "No src/ directory yet — nothing to measure coverage on."; fi
 
 # mutation testing on core logic (slow; requires [tool.mutmut] source_paths
 # in your own pyproject.toml, scoped to deterministic pure-logic modules —
@@ -36,6 +38,9 @@ test-mutation:
     uv run --with mutmut mutmut run
     uv run --with mutmut mutmut export-cicd-stats
 
+# what CI runs
+ci: lint typecheck test-cov
+
 # serve the docs site locally
 docs:
     uv run --with mkdocs-material --with "mkdocstrings[python]" mkdocs serve
@@ -43,9 +48,6 @@ docs:
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
-
-# what CI runs
-ci: lint typecheck test
 
 # regenerate .claude/docs/CODE_MAP.md (low-token "what does what" map; read before grepping)
 code-map:
@@ -72,7 +74,7 @@ typecheck:
 format:
     bunx @biomejs/biome format --write .
 
-# run the test suite
+# run the test suite (coverage-gated per bunfig.toml — PI-569)
 test:
     bun test
 
@@ -109,6 +111,12 @@ format:
 test:
     go test ./...
 
+# tests with the coverage gate (CI always runs this, not `test` — PI-569).
+# tune the "70" threshold to your project's baseline.
+test-cov:
+    go test -coverprofile=coverage.out ./...
+    go tool cover -func=coverage.out | tail -1 | awk '{ pct = $3; sub("%", "", pct); if (pct + 0 < 70) { print "Coverage " pct "% is below the 70% gate"; exit 1 } else { print "Coverage " pct "% meets the 70% gate" } }'
+
 # docs: nothing to build — pkg.go.dev renders doc comments
 docs:
     @echo "pkg.go.dev renders Go doc comments — nothing to build locally"
@@ -118,7 +126,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test
+ci: lint test-cov
 {{/if go}}{{#if rust}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
@@ -145,6 +153,13 @@ format:
 test:
     cargo test
 
+# tests with the coverage gate (CI always runs this, not `test` — PI-569).
+# requires cargo-llvm-cov: `cargo install cargo-llvm-cov` + `rustup component
+# add llvm-tools-preview`, once, on your machine (CI installs it per-run).
+# tune the "70" threshold to your project's baseline.
+test-cov:
+    cargo llvm-cov --fail-under-lines 70
+
 # docs: nothing to build locally — docs.rs renders published crate docs
 docs:
     @echo "docs.rs renders published crate docs — nothing to build locally"
@@ -154,7 +169,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test
+ci: lint test-cov
 {{/if rust}}{{#if delivery_service}}
 # --- container parity (delivery=service): same image local and in cloud ---
 

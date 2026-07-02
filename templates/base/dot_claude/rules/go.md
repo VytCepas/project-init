@@ -9,6 +9,7 @@ alwaysApply: false
 ```bash
 go build ./...
 go test ./... -count=1
+just test-cov       # tests + coverage gate (>= 70%, per justfile) — CI always runs this
 golangci-lint run   # revive, godoclint, gocognit, cyclop, dupl, errcheck, govet, staticcheck, gosec — see .golangci.yml
 golangci-lint fmt   # gofumpt (stricter than gofmt) — no separate binary needed
 ```

@@ -9,6 +9,7 @@ alwaysApply: false
 ```bash
 bunx tsc --noEmit   # type check (strict mode, per tsconfig.base.json)
 bunx eslint .        # lint (type-aware: no-floating-promises, no-unsafe-*, per eslint.config.mjs)
+bun test             # tests + coverage gate (>= 70%, per bunfig.toml) — always on, no extra flag needed
 ```
 
 `tsconfig.base.json` is a direct structural analog to `mypy --strict` /

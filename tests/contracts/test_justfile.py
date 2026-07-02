@@ -33,9 +33,7 @@ _COMMANDS = {
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
-    flags = {
-        lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")
-    }
+    flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
     lint, fmt, test = _COMMANDS.get(language, ("", "", ""))
     variables = fallback_variables(
         language=language, lint_command=lint, format_command=fmt, test_command=test, **flags
@@ -70,10 +68,12 @@ class TestJustfilePerLanguage:
         assert "gitleaks git --pre-commit" in _recipe_body(text, "scan")
 
     def test_ci_recipe_is_pure_dependency(self, tmp_path: Path):
-        """`ci: lint typecheck test` — recipes referencing recipes, no duplicated commands."""
+        """`ci: lint typecheck test-cov` — recipes referencing recipes, no
+        duplicated commands. `test-cov`, not `test` (PI-569): CI must always
+        run the coverage-gated variant."""
         target = _scaffold_language(tmp_path / "p", "python")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint typecheck test\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: lint typecheck test-cov\s*$", text, re.MULTILINE)
 
     def test_node_ci_recipe_includes_typecheck(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "node")
@@ -94,6 +94,18 @@ class TestJustfilePerLanguage:
         target = _scaffold_language(tmp_path / "p", "python")
         text = (target / "justfile").read_text()
         assert "--cov-fail-under" in _recipe_body(text, "test-cov")
+
+    def test_go_ci_recipe_uses_coverage_variant(self, tmp_path: Path):
+        target = _scaffold_language(tmp_path / "g", "go")
+        text = (target / "justfile").read_text()
+        assert re.search(r"^ci: lint test-cov\s*$", text, re.MULTILINE)
+        assert "go tool cover -func" in _recipe_body(text, "test-cov")
+
+    def test_rust_ci_recipe_uses_coverage_variant(self, tmp_path: Path):
+        target = _scaffold_language(tmp_path / "r", "rust")
+        text = (target / "justfile").read_text()
+        assert re.search(r"^ci: lint test-cov\s*$", text, re.MULTILINE)
+        assert "cargo llvm-cov --fail-under-lines" in _recipe_body(text, "test-cov")
 
     def test_python_test_recipe_is_self_contained(self, tmp_path: Path):
         """PI-180: `-n auto` needs pytest-xdist; pull it in on demand so a

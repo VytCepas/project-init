@@ -96,6 +96,7 @@ class TestPythonToolchain:
         assert not (self.target / "typedoc.json").exists()
         assert not (self.target / "clippy.toml").exists()
         assert not (self.target / "tsconfig.base.json").exists()
+        assert not (self.target / "bunfig.toml").exists()
 
 
 class TestNodeToolchain:
@@ -162,6 +163,13 @@ class TestNodeToolchain:
         assert not (self.target / "mypy.ini").exists()
         assert not (self.target / "clippy.toml").exists()
 
+    def test_bunfig_coverage_gate_rendered(self):
+        """PI-569: `bun test` picks up bunfig.toml automatically — no extra
+        CLI flag needed anywhere (justfile, CI, or a developer's terminal)."""
+        config = tomllib.loads((self.target / "bunfig.toml").read_text())
+        assert config["test"]["coverage"] is True
+        assert config["test"]["coverageThreshold"] == 0.7
+
 
 class TestGoToolchain:
     @pytest.fixture(autouse=True)
@@ -202,6 +210,18 @@ class TestGoToolchain:
         assert not (self.target / "mypy.ini").exists()
         assert not (self.target / "clippy.toml").exists()
         assert not (self.target / "tsconfig.base.json").exists()
+        assert not (self.target / "bunfig.toml").exists()
+
+    def test_coverage_gate_wired(self):
+        """PI-569: blocking, not conditional — go tool cover ships with the
+        Go toolchain, nothing extra to provision."""
+        justfile = (self.target / "justfile").read_text()
+        assert "test-cov:" in justfile
+        assert "go tool cover -func" in justfile
+        assert "ci: lint test-cov" in justfile
+
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just test-cov" in ci
 
 
 class TestRustToolchain:
@@ -232,6 +252,21 @@ class TestRustToolchain:
         assert not (self.target / "mypy.ini").exists()
         assert not (self.target / ".golangci.yml").exists()
         assert not (self.target / "tsconfig.base.json").exists()
+        assert not (self.target / "bunfig.toml").exists()
+
+    def test_coverage_gate_wired(self):
+        """PI-569: blocking, not conditional — CI installs cargo-llvm-cov as
+        a prebuilt binary (taiki-e/install-action), no source compile."""
+        justfile = (self.target / "justfile").read_text()
+        assert "test-cov:" in justfile
+        assert "cargo llvm-cov --fail-under-lines" in justfile
+        assert "ci: lint test-cov" in justfile
+
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just test-cov" in ci
+        assert "taiki-e/install-action" in ci
+        assert "cargo-llvm-cov" in ci
+        assert "llvm-tools-preview" in ci
 
 
 class TestNoLanguage:
@@ -251,6 +286,7 @@ class TestNoLanguage:
             ".cargo/config.toml",
             "tsconfig.base.json",
             "tsconfig.json",
+            "bunfig.toml",
             ".github/workflows/docs.yml",
         ):
             assert not (target / name).exists(), f"{name} must not render for language=none"
@@ -314,8 +350,15 @@ class TestCiQualityGates:
         self.ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
 
     def test_coverage_gate_present(self):
-        assert "--cov-fail-under" in self.ci
-        assert "pytest_cov" in self.ci, "gate must activate only when pytest-cov is installed"
+        """PI-569: unconditional, not gated on pytest-cov happening to be a
+        persisted dev dependency — `--with pytest-cov` ephemeral-installs it
+        the same way mypy/mutmut are ephemeral-installed."""
+        assert "just test-cov" in self.ci
+        assert "if uv run python -c" not in self.ci, "coverage gate must not be conditional"
+
+        justfile = (self.target / "justfile").read_text()
+        assert "--cov-fail-under" in justfile
+        assert "--cov=src" in justfile
 
     def test_mutmut_job_active_and_non_blocking(self):
         """PI-563: mutmut graduated from a commented placeholder to a real,
