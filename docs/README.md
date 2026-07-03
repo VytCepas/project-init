@@ -7,9 +7,9 @@ Architecture decisions, development guides, and references for contributors and 
 | Path | Purpose |
 |---|---|
 | [`positioning.md`](positioning.md) | Where project-init sits in the ecosystem — comparison table + moat |
-| [`adr/`](adr/) | Architecture Decision Records — why decisions were made |
-| [`development/`](development/) | Standards, testing, template system |
-| [`guides/`](guides/) | How-to guides for users and contributors |
+| [`adr/`](adr/adr-001-scaffolder-design.md) | Architecture Decision Records — why decisions were made |
+| [`development/`](development/contributing.md) | Standards, testing, template system |
+| [`guides/`](guides/using-project-init.md) | How-to guides for users and contributors |
 
 ## Agent instruction
 
