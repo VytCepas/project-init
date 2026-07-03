@@ -222,6 +222,36 @@ class TestLintMemoryScript:
         assert result.returncode == 1
         assert "user_role.md" in result.stderr
 
+    def test_orphan_check_matches_wikilinks_exactly(self):
+        """The orphan-note report must match note names to wikilink targets as
+        exact fixed strings, not unanchored regexes: a metacharacter name must
+        not misfire, and a name that is a substring of another's link must not
+        count as linked."""
+        subprocess.run(["git", "init", str(self.target)], capture_output=True, check=True)
+        vault = self.target / ".claude" / "vault"
+        # Metachar name, linked by another note — a regex match would error or
+        # mismatch and wrongly flag it as an orphan.
+        (vault / "plan(v2).md").write_text("# plan v2\n")
+        (vault / "roadmap.md").write_text("See [[plan(v2)]].\n")
+        # Substring trap: nothing links to `foo`, but `[[foobar]]` exists — a
+        # substring match would wrongly treat `foo` as linked.
+        (vault / "foo.md").write_text("# foo\n")
+        (vault / "bar.md").write_text("Link to [[foobar]].\n")
+        (vault / "foobar.md").write_text("# foobar\n")
+
+        script = self.target / ".claude" / "scripts" / "lint_memory.sh"
+        result = subprocess.run(
+            ["bash", str(script)], cwd=str(self.target), capture_output=True, text=True
+        )
+        # Orphan reporting is warn-only — it never fails the lint.
+        assert result.returncode == 0, result.stderr
+        assert "plan(v2).md: no inbound wikilinks" not in result.stderr, (
+            "a metacharacter note name linked by another note is not an orphan"
+        )
+        assert "foo.md: no inbound wikilinks" in result.stderr, (
+            "`foo` is an orphan — being a substring of [[foobar]] must not count as a link"
+        )
+
     def test_lint_warns_on_dangling_path_reference(self):
         """A fact naming a `path/like.ext` that doesn't exist warns but does NOT
         fail (#497, ADR-024 staleness): deterministic, advisory."""

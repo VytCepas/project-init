@@ -144,6 +144,14 @@ class TestNodeToolchain:
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just typecheck" in ci
 
+    def test_ci_install_falls_back_to_just_setup(self):
+        """A fresh node scaffold has no package.json — `bun install` errors
+        without one. CI must fall back to `just setup`, which seeds the lint
+        toolchain eslint.config.mjs imports, so the first CI run passes."""
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "just setup" in ci, "node CI must fall back to just setup when no package.json"
+        assert "package.json" in ci
+
     def test_typedoc_config_rendered_and_parseable(self):
         raw = (self.target / "typedoc.json").read_text()
         uncommented = re.sub(r"^\s*//.*$", "", raw, flags=re.MULTILINE)
@@ -201,6 +209,14 @@ class TestGoToolchain:
         assert "max-complexity: 10" in content, (
             "cyclop cap must mirror ruff's mccabe max-complexity = 10"
         )
+
+    def test_ci_uses_golangci_action_v8_or_newer(self):
+        """golangci-lint-action must be v8+ to run the shipped v2 config —
+        v6 caps the tool at v1.64.8, which rejects `version: "2"`."""
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        m = re.search(r"golangci/golangci-lint-action@v(\d+)", ci)
+        assert m, "golangci-lint-action must be referenced in Go CI"
+        assert int(m.group(1)) >= 8, "must be v8+ for golangci-lint v2 config"
 
     def test_no_docs_workflow(self):
         """Go needs no docs site — pkg.go.dev renders doc comments."""

@@ -21,7 +21,7 @@ import tempfile
 from pathlib import Path
 
 from project_init import __version__
-from project_init.scaffold import memory_tier, read_preserve_globs
+from project_init.scaffold import _GOVERNANCE_USER_FILES, memory_tier, read_preserve_globs
 from project_init.upgrade import (
     UpgradeError,
     _hash_bytes,
@@ -130,8 +130,12 @@ def _delete_orphans(
 
     Returns ``(deleted, kept)``. A removed file whose current bytes differ from
     the recorded hash was edited by the user — it is kept and reported, never
-    deleted. ``removed`` already excludes preserved dirs (memory/vault) and the
-    config record (compute_drift skips them), so source data is safe here.
+    deleted. ``removed`` is drawn from the recorded manifest, which never holds
+    the user's own source data (their memory/vault notes are preserved and were
+    never recorded), so a concern's accumulated notes are safe here. Template-
+    owned files a concern uniquely ships *are* deleted — including a template
+    README inside a now-removed memory/vault dir (READMEs are managed, not
+    preserved; #592 review) — but only when byte-identical to the record.
     """
     deleted: list[Path] = []
     kept: list[Path] = []
@@ -178,15 +182,37 @@ def _seed_preserved(
     return seeded
 
 
-def _orphaned_preserved(target: Path, rendered: list[Path]) -> list[Path]:
-    """Preserved source files present on disk but no longer in the new render.
+# Preserved source data each concern owns: path prefixes (trailing "/") or
+# exact paths that --purge/--export on `remove <concern>` may touch. Concerns
+# absent here own no preserved source data, so purging them is meaningless.
+_CONCERN_SOURCE_SCOPE: dict[str, tuple[str, ...]] = {
+    "memory": (".claude/memory/", ".claude/vault/"),
+    "governance": tuple(sorted(_GOVERNANCE_USER_FILES)),
+}
+
+
+def _in_source_scope(rel: Path, scope: tuple[str, ...]) -> bool:
+    posix = rel.as_posix()
+    return any(posix == s or (s.endswith("/") and posix.startswith(s)) for s in scope)
+
+
+def _orphaned_preserved(target: Path, rendered: list[Path], concern: str) -> list[Path]:
+    """Preserved source files of *concern* on disk but not in the new render.
 
     Preserved files (``.claude/memory/``, ``.claude/vault/``, governance user
     files) are normally kept on every re-render. After a toggle that drops their
     concern, the new staging render no longer produces them — so a preserved file
     whose path is absent from *rendered* is orphaned source data, the target of
     ``--purge`` / ``--export``.
+
+    Scoped to the toggled concern's own source data (``_CONCERN_SOURCE_SCOPE``):
+    every user note under ``.claude/`` is preserved and absent from a fresh
+    render, so an unscoped sweep would let ``remove docs --purge`` delete the
+    user's entire vault — data the concern being removed never owned.
     """
+    scope = _CONCERN_SOURCE_SCOPE.get(concern, ())
+    if not scope:
+        return []
     preserve_globs = read_preserve_globs(target)
     rendered_set = {r.as_posix() for r in rendered}
     claude = target / ".claude"
@@ -197,7 +223,11 @@ def _orphaned_preserved(target: Path, rendered: list[Path]) -> list[Path]:
         if not p.is_file():
             continue
         rel = p.relative_to(target)
-        if _is_preserved(rel, preserve_globs) and rel.as_posix() not in rendered_set:
+        if (
+            _in_source_scope(rel, scope)
+            and _is_preserved(rel, preserve_globs)
+            and rel.as_posix() not in rendered_set
+        ):
             out.append(rel)
     return out
 
@@ -244,22 +274,29 @@ def _prune_empty_dirs(target: Path, deleted: list[Path]) -> None:
             d.rmdir()
 
 
-def _validate_flags(*, enable: bool, purge: bool, export_dir: Path | None) -> str | None:
+def _validate_flags(
+    *, concern: str, enable: bool, purge: bool, export_dir: Path | None
+) -> str | None:
     """Return an error message if the purge/export flags are misused, else None."""
     if (purge or export_dir is not None) and enable:
         return "--purge/--export apply to `remove`, not `add`"
     if purge and export_dir is not None:
         return "--purge and --export are mutually exclusive"
+    if (purge or export_dir is not None) and concern not in _CONCERN_SOURCE_SCOPE:
+        owners = ", ".join(sorted(_CONCERN_SOURCE_SCOPE))
+        return (
+            f"`{concern}` owns no preserved source data — --purge/--export only apply to: {owners}"
+        )
     return None
 
 
-def _apply_source(
-    target: Path, report, *, apply: bool, purge: bool, export_dir: Path | None
+def _apply_source(  # noqa: PLR0913 — mirrors apply_concern's flag surface
+    target: Path, report, concern: str, *, apply: bool, purge: bool, export_dir: Path | None
 ) -> list[Path]:
     """Compute orphaned preserved source data; delete/move it when *apply*."""
     if not (purge or export_dir is not None):
         return []
-    source = _orphaned_preserved(target, report.rendered)
+    source = _orphaned_preserved(target, report.rendered, concern)
     if apply:
         _purge_or_export(target, source, purge=purge, export_dir=export_dir)
     return source
@@ -283,12 +320,15 @@ def apply_concern(  # noqa: PLR0913 — flags map 1:1 to the add/remove CLI opti
     (remove, byte-unmodified only), and refreshes ``.claude/config.yaml``.
 
     *purge* / *export_dir* (remove only, mutually exclusive) act on **orphaned
-    preserved source data** — the user's ``.claude/memory/`` / ``.claude/vault/``
-    notes that ``remove`` keeps by default: *purge* deletes them, *export_dir*
-    moves them out first. Without either, source data is left in place.
+    preserved source data owned by the toggled concern** — the user's
+    ``.claude/memory/`` / ``.claude/vault/`` notes for ``memory``, the
+    governance user files for ``governance`` — that ``remove`` keeps by
+    default: *purge* deletes them, *export_dir* moves them out first. Without
+    either, source data is left in place. Concerns that own no source data
+    reject the flags outright.
     """
     verb = "add" if enable else "remove"
-    flag_error = _validate_flags(enable=enable, purge=purge, export_dir=export_dir)
+    flag_error = _validate_flags(concern=concern, enable=enable, purge=purge, export_dir=export_dir)
     if flag_error:
         sys.stderr.write(f"error: {flag_error}\n")
         return 1
@@ -318,7 +358,7 @@ def apply_concern(  # noqa: PLR0913 — flags map 1:1 to the add/remove CLI opti
     staging = staging_root / "render"
     try:
         try:
-            rendered = _render_staging(preset_name, new_vars, staging)
+            rendered = _render_staging(preset_name, new_vars, staging, detect_root=target)
         except Exception as e:  # noqa: BLE001 — any render failure is fatal here
             sys.stderr.write(f"error: re-render failed: {e}\n")
             return 1
@@ -329,7 +369,9 @@ def apply_concern(  # noqa: PLR0913 — flags map 1:1 to the add/remove CLI opti
         if apply:
             apply_drift(target, staging, report, preset_name, new_vars)
             deleted, kept = _delete_orphans(target, report.removed, manifest)
-        source = _apply_source(target, report, apply=apply, purge=purge, export_dir=export_dir)
+        source = _apply_source(
+            target, report, concern, apply=apply, purge=purge, export_dir=export_dir
+        )
         seeded = _seed_preserved(target, staging, report.rendered, write=apply)
 
         _print_summary(verb, concern, report, deleted, kept, seeded, applied=apply)

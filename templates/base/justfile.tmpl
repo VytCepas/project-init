@@ -2,9 +2,12 @@
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
 
-# install/sync dev dependencies (PEP 735 dependency-group; add tools with `uv add --dev`)
+# install/sync dev dependencies (PEP 735 dependency-group; add tools with `uv add --dev`).
+# A fresh scaffold has no pyproject.toml (or one without [dependency-groups])
+# yet — `uv sync --group dev` hard-fails on both, which would break CI's first
+# step before the day-one guards in typecheck/test-cov can even run.
 setup:
-    uv sync --group dev
+    sh -c 'if [ ! -f pyproject.toml ]; then echo "No pyproject.toml yet — nothing to sync."; elif grep -q "^\[dependency-groups\]" pyproject.toml; then uv sync --group dev; else uv sync; fi'
 
 # lint project code (docstring + complexity gates per ruff.toml)
 lint:
@@ -13,9 +16,12 @@ lint:
     find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
 # static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
-# no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path
+# no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path.
+# --install-types fetches missing dependency stubs (types-PyYAML etc.) so
+# untyped deps don't fail the strict gate with import-untyped (#592); it
+# shells out to pip, which uv-managed environments omit — hence --with pip.
 typecheck:
-    if [ -d src ]; then uv run --with "mypy>=1.10" mypy src/; else echo "No src/ directory yet — nothing to type-check."; fi
+    if [ -d src ]; then uv run --with "mypy>=1.10" --with pip mypy --install-types --non-interactive src/; else echo "No src/ directory yet — nothing to type-check."; fi
 
 # auto-format project code
 format:
@@ -96,8 +102,10 @@ lint:
     find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
 
 # static type check (strict mode per tsconfig.base.json)
+# no-op on a fresh scaffold with no .ts sources yet — tsc errors with TS18003
+# ("No inputs were found") instead of passing (the #592-adjacent day-one gap)
 typecheck:
-    bunx tsc --noEmit
+    sh -c 'if find . \( -name "*.ts" -o -name "*.tsx" \) -not -path "*/node_modules/*" | grep -q .; then bunx tsc --noEmit; else echo "No TypeScript sources yet — nothing to type-check."; fi'
 
 # auto-format project code (Biome is the formatter; eslint owns the gates)
 format:
@@ -162,10 +170,13 @@ test:
     go test ./...
 
 # tests with the coverage gate (CI always runs this, not `test` — PI-569).
-# tune the "70" threshold to your project's baseline.
+# tune the "70" threshold to your project's baseline. Skips cleanly before any
+# Go source exists (`go test ./...` errors on a fresh module, like license/
+# fuzz). The awk END gate is fail-closed: a missing/unreadable coverage.out
+# yields zero input lines and fails the recipe instead of silently passing
+# (a bare `... | awk '{...}'` returned awk's 0 exit when the cover tool failed).
 test-cov:
-    go test -coverprofile=coverage.out ./...
-    go tool cover -func=coverage.out | tail -n 1 | awk '{ pct = $3; sub("%", "", pct); if (pct + 0 < 70) { print "Coverage " pct "% is below the 70% gate"; exit 1 } else { print "Coverage " pct "% meets the 70% gate" } }'
+    sh -c 'set -e; if ! find . -name "*.go" | grep -q .; then echo "No Go sources yet — nothing to test."; exit 0; fi; go test -coverprofile=coverage.out ./...; go tool cover -func=coverage.out | awk '\''END { if (NR == 0 || $1 != "total:") { print "Coverage gate: could not read coverage totals"; exit 1 } pct = $3; sub("%", "", pct); if (pct + 0 < 70) { print "Coverage " pct "% is below the 70% gate"; exit 1 } else { print "Coverage " pct "% meets the 70% gate" } }'\'''
 
 # docs: nothing to build — pkg.go.dev renders doc comments
 docs:

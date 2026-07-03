@@ -41,12 +41,18 @@ EXPOSE 8080
 # TODO: replace with your app's start command (e.g. bun run start)
 CMD ["bun", "run", "start"]
 {{/if node}}{{#if go}}# --- build stage: compile a static binary ---
-FROM golang:1.23 AS build
+# Keep this Go version in step with mise.toml's `go` pin — a go.mod created
+# under a newer toolchain fails the build with "go.mod requires go >= X".
+FROM golang:1.24 AS build
 WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o /app/server ./...
+# Build the main package at the module root. `go build -o <file> ./...` breaks
+# as soon as a second package exists ("cannot write multiple packages to
+# non-directory") — point this at your entrypoint (e.g. ./cmd/server) if your
+# main package lives elsewhere.
+RUN CGO_ENABLED=0 go build -o /app/server .
 
 # --- runtime stage: distroless, no shell/toolchain ---
 FROM gcr.io/distroless/static-debian12 AS runtime

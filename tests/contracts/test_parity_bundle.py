@@ -41,7 +41,9 @@ class TestParityBundlePresent:
         py = _service(tmp_path / "py", "python")
         assert "python:3.13-slim" in (py / "Dockerfile").read_text()
         go = _service(tmp_path / "go", "go")
-        assert "golang:1.23" in (go / "Dockerfile").read_text()
+        # 1.24 to match mise.toml's `go` pin — a go.mod created under a newer
+        # toolchain than the build image fails with "go.mod requires go >= X".
+        assert "golang:1.24" in (go / "Dockerfile").read_text()
         rust = _service(tmp_path / "rust", "rust")
         assert "rust:1-slim-bookworm" in (rust / "Dockerfile").read_text()
 

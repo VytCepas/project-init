@@ -46,7 +46,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 PY="$SCRIPT_DIR/../hooks/_py.sh"
 
 PR_NUMBER="${1:-}"
-MODE="${2:-}"
+MODE=""
 REVIEW_CYCLE=0
 MAX_REVIEW_CYCLES=2
 NO_REVIEW=0
@@ -57,17 +57,16 @@ if [ -z "$PR_NUMBER" ]; then
   exit 1
 fi
 
-if [ -n "$MODE" ] && [ "$MODE" != "--merge" ]; then
-  echo "Unknown option: $MODE" >&2
-  exit 2
-fi
-
-# Parse remaining flags (order-independent after position 2).
-# Shift past <pr-number> and optional --merge; remaining args are flags.
-shift 1                            # drop PR_NUMBER
-[ "$MODE" = "--merge" ] && shift 1 # drop --merge if present
+# Parse flags (order-independent). --merge is just another flag: the usage
+# line presents every flag as independent, so `monitor_pr.sh 12 --no-review`
+# must not be rejected for lacking --merge in position 2.
+shift 1 # drop PR_NUMBER
 while [ $# -gt 0 ]; do
   case "$1" in
+  --merge)
+    MODE="--merge"
+    shift
+    ;;
   --review-cycle)
     REVIEW_CYCLE="${2:-0}"
     shift 2
@@ -90,6 +89,16 @@ while [ $# -gt 0 ]; do
     ;;
   esac
 done
+
+# --admin, --no-review and --review-cycle only take effect while merging. Warn
+# loudly if they were passed without --merge (e.g. `monitor_pr.sh 12 --admin`)
+# so the flag isn't silently a no-op — the script would otherwise just monitor
+# and exit 0, looking like a successful merge that never happened.
+if [ "$MODE" != "--merge" ]; then
+  if [ "$ALLOW_ADMIN" -eq 1 ] || [ "$NO_REVIEW" -eq 1 ] || [ "$REVIEW_CYCLE" -ne 0 ]; then
+    echo "WARNING: --admin/--no-review/--review-cycle only apply with --merge; ignoring (monitor-only run)." >&2
+  fi
+fi
 
 _count_pending() {
   echo "$1" | "$PY" -c "

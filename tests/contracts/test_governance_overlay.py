@@ -79,6 +79,26 @@ class TestGovernanceOn:
         assert "governance-as-code" in text
         assert "NIST AI RMF" in text
 
+    @staticmethod
+    def _gate_needs(target: Path) -> str:
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        gate_start = ci.index("ci-gate:")
+        return next(
+            line for line in ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
+        )
+
+    def test_governance_job_blocks_via_ci_gate(self, tmp_path: Path):
+        # The job's comment calls it "the enforcement boundary" — only true if
+        # ci-gate (the single required status check) actually needs it.
+        target = _scaffold(tmp_path / "p", governance=True)
+        assert "governance" in self._gate_needs(target)
+
+    def test_gate_needs_clean_without_governance(self, tmp_path: Path):
+        # With the overlay off there is no governance job — a leftover entry in
+        # ci-gate's needs would leave the gate permanently pending/failed.
+        target = _scaffold(tmp_path / "p", governance=False)
+        assert "governance" not in self._gate_needs(target)
+
 
 class TestUsageTrackDocs:
     """#411: the policy layer scaffolds with its load-bearing content."""

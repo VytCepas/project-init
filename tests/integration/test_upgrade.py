@@ -238,9 +238,13 @@ class TestScaffoldRecord:
         assert variables["language"] == "python"
         assert not migrated
         assert "justfile" in manifest
-        # The record never tracks user-owned paths.
+        # The record never tracks user-owned paths. (READMEs are template-owned
+        # — _ALWAYS_OVERWRITE — so they ARE tracked even inside preserved dirs.)
         assert _CONFIG_REL.as_posix() not in manifest
-        assert not any(k.startswith((".claude/memory", ".claude/vault")) for k in manifest)
+        assert not any(
+            k.startswith((".claude/memory", ".claude/vault")) and not k.endswith("README.md")
+            for k in manifest
+        )
 
     def test_missing_config_errors(self, tmp_path: Path, capsys):
         rc = main(["upgrade", str(tmp_path / "nope")])
@@ -338,6 +342,35 @@ class TestUpgradeApply:
         assert justfile.read_bytes() == rendered_now
         assert not (target / "justfile.new").exists()
 
+    def test_vault_readme_is_managed_and_refreshed(self, tmp_path: Path):
+        """READMEs are template-owned even inside preserved dirs (they are in
+        _ALWAYS_OVERWRITE): they must be recorded in the manifest and refreshed
+        like any managed file. Before, write_scaffold_record skipped everything
+        under memory/vault, so a re-run found no recorded hash, assumed the
+        user owned the README, and parked every template-side refresh as a
+        `.new` sibling plus a spurious conflict — the refresh rule was dead."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        rel = ".claude/vault/README.md"
+        readme = target / rel
+        assert readme.is_file()
+        _, _, manifest, _ = read_scaffold_record(target)
+        assert rel in manifest, "vault README must be a managed (recorded) file"
+
+        rendered_now = readme.read_bytes()
+        # Simulate an old render: different content, hash recorded as such.
+        old_render = b"# old vault readme\n"
+        readme.write_bytes(old_render)
+        _patch_manifest(
+            target,
+            lambda m: m.__setitem__(rel, hashlib.sha256(old_render).hexdigest()),
+        )
+
+        rc = main(["upgrade", str(target), "--apply"])
+        assert rc == 0
+        assert readme.read_bytes() == rendered_now, "stale README must refresh"
+        assert not (target / f"{rel}.new").exists()
+
     def test_user_edit_with_no_upstream_change_is_kept(self, tmp_path: Path):
         """User edited a file but upstream did not change it: the 3-way merge has
         nothing to apply, so the edit is kept in place with no .new sibling (#240
@@ -387,9 +420,12 @@ class TestUpgradeApply:
     def test_preserved_dirs_untouched(self, tmp_path: Path, capsys):
         target = tmp_path / "p"
         _scaffold(target)
-        memory_files = list((target / ".claude" / "memory").glob("*.md"))
-        assert memory_files, "fixture needs a scaffolded memory file"
-        probe = memory_files[0]
+        # A user-authored memory note — NOT README.md, which is template-owned
+        # (_ALWAYS_OVERWRITE) and refreshed even inside preserved dirs (see
+        # test_vault_readme_is_managed_and_refreshed). Globbing memory/*.md and
+        # taking [0] was order-dependent and could land on the now-managed
+        # README, so probe an explicit user file instead.
+        probe = target / ".claude" / "memory" / "my-note.md"
         probe.write_text("hand-written agent memory\n")
 
         rc = main(["upgrade", str(target), "--apply"])

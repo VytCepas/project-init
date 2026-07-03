@@ -130,6 +130,15 @@ def _check_preset_compat(preset: dict) -> None:
     minimum = preset.get("min_project_init_version")
     if not minimum:
         return
+    # A malformed marker (e.g. a hand-authored two-component "1.0") must be a
+    # hard error: _version_tuple would sort it lowest (0,0,0), silently
+    # disabling the compat gate the preset author asked for.
+    if parse_version(str(minimum)) is None:
+        msg = (
+            f"preset {preset.get('name')!r} has an unparseable "
+            f"min_project_init_version {minimum!r} — use X.Y.Z."
+        )
+        raise ValueError(msg)
     from project_init import __version__
 
     if _version_tuple(__version__) < _version_tuple(minimum):
@@ -442,6 +451,10 @@ def _should_preserve(rel_path: Path, target: Path, preserve_globs: list[str] | N
     An explicit user glob outranks the README refresh rule — otherwise
     ``preserve: ["README.md"]`` would be silently ineffective while ``upgrade``
     honors the same glob (2026-07 review).
+
+    KEEP IN SYNC with ``upgrade._is_preserved``, which encodes the same
+    governance/glob/README/preserve-dir policy at manifest-recording time. If
+    the two disagree about what is "managed", scaffold and upgrade drift apart.
     """
     dest = target / rel_path
     if not dest.exists():
@@ -758,15 +771,22 @@ def _has_scaffold_record(config_file: Path) -> bool:
         return False
 
 
-def scaffold(
+def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
     target: Path,
     preset: dict,
     variables: dict[str, str],
     *,
     strict: bool = False,
     conflicts: list[tuple[Path, Path]] | None = None,
+    detect_root: Path | None = None,
 ) -> list[Path]:
     """Copy + render template layers into *target*. Return created file paths.
+
+    *detect_root* is where generated inventories read the project's live state
+    (e.g. the AIBOM's CCR route detection); defaults to *target*. Upgrade/
+    add/remove render into a staging dir, whose freshly-copied template configs
+    would otherwise shadow the real project's — they pass the real project root
+    here.
 
     A .tmpl file whose rendered output is empty or whitespace-only is skipped
     entirely (see :func:`_emit_file`) — this is how language-specific config
@@ -865,7 +885,7 @@ def scaffold(
     # selected GUI surfaces from the canonical surface table + MCP catalog. Runs
     # against the committed target (after _commit_staged in strict mode).
     created += _emit_generated_files(
-        target, variables, conflicts, first_scaffold=first_scaffold
+        target, variables, conflicts, first_scaffold=first_scaffold, detect_root=detect_root
     )
 
     return created
@@ -877,6 +897,7 @@ def _emit_generated_files(
     conflicts: list[tuple[Path, Path]] | None,
     *,
     first_scaffold: bool = True,
+    detect_root: Path | None = None,
 ) -> list[Path]:
     """Post-copy generated files.
 
@@ -909,7 +930,11 @@ def _emit_generated_files(
         from project_init import governance
 
         created += governance.emit(
-            target, variables, first_scaffold=first_scaffold, conflicts=conflicts
+            target,
+            variables,
+            first_scaffold=first_scaffold,
+            conflicts=conflicts,
+            detect_root=detect_root,
         )
     return created
 

@@ -17,8 +17,14 @@ command -v gh >/dev/null 2>&1 || {
   exit 1
 }
 
+# Anchor sibling-script and config lookups on this script's location, not the
+# caller's cwd — invoked from a subdirectory, a cwd-relative path would derive
+# the wrong project key and then die at the push_branch.sh call, stranding the
+# repo on a fresh unpushed branch with no PR.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Resolve the base branch (ADR-014) from the promotion chain via gh_host.sh.
-source "$(dirname "$0")/gh_host.sh"
+source "$SCRIPT_DIR/gh_host.sh"
 
 VALID_TYPES="feat fix chore docs test"
 
@@ -61,7 +67,7 @@ derive_project_key() {
   fi
 
   local configured=""
-  configured=$(grep '^[[:space:]]*project_key:' .claude/config.yaml 2>/dev/null |
+  configured=$(grep '^[[:space:]]*project_key:' "$SCRIPT_DIR/../config.yaml" 2>/dev/null |
     head -n 1 |
     cut -d: -f2- |
     sed 's/#.*$//' |
@@ -159,7 +165,7 @@ if [ -z "$(git rev-list "${BASE_BRANCH}..HEAD" 2>/dev/null || true)" ]; then
 fi
 
 # --- Push and set upstream (retry + remote-SHA verification) ---
-.claude/scripts/push_branch.sh "$BRANCH"
+"$SCRIPT_DIR/push_branch.sh" "$BRANCH"
 
 # --- Open draft PR ---
 # Conventional Commits with issue key as scope (ADR-006)

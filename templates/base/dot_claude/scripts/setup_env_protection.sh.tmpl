@@ -80,7 +80,10 @@ if [ "$PROFILE" = "org" ]; then
       j=$(resolve_reviewer "$r") || true
       if [ -n "$j" ]; then parts+=("$j"); else echo "WARNING: could not resolve reviewer '$r' — skipping." >&2; fi
     done
-    reviewers_json="[$(IFS=,; echo "${parts[*]}")]"
+    # parts can be empty when every --reviewer failed to resolve; the ${arr[*]+}
+    # guard keeps that path on bash < 4.4 (macOS 3.2), where expanding an empty
+    # array under `set -u` is fatal, so it reaches the UNCHANGED warning below.
+    reviewers_json="[$(IFS=,; echo ${parts[*]+"${parts[*]}"})]"
   fi
   if [ "$reviewers_json" = "[]" ]; then
     # Do NOT PUT an empty-reviewers payload — that would WIPE any reviewers already

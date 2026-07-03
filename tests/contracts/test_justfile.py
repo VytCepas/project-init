@@ -90,7 +90,51 @@ class TestJustfilePerLanguage:
         target = _scaffold_language(tmp_path / "p", "python")
         body = _recipe_body((target / "justfile").read_text(), "typecheck")
         assert "if [ -d src ]" in body
-        assert "mypy src/" in body
+        assert "mypy" in body and "src/" in body
+
+    def test_python_typecheck_installs_dependency_stubs(self, tmp_path: Path):
+        """#592: `uv run --with mypy` supplies runtime deps but not their stub
+        packages, so any untyped dep (PyYAML → types-PyYAML) fails the strict
+        gate with import-untyped on a fresh scaffold. The recipe must let mypy
+        fetch stubs itself — and must pull in pip, which mypy's
+        --install-types shells out to but uv-managed environments omit."""
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "typecheck")
+        assert "--install-types" in body
+        assert "--non-interactive" in body
+        assert "--with pip" in body, "mypy --install-types needs pip in the uv environment"
+
+    def test_node_typecheck_tolerates_missing_sources(self, tmp_path: Path):
+        """The #592-adjacent day-one gap: `tsc --noEmit` fails with TS18003
+        ("No inputs were found"), not a pass, when no .ts sources exist yet."""
+        target = _scaffold_language(tmp_path / "n", "node")
+        body = _recipe_body((target / "justfile").read_text(), "typecheck")
+        assert "tsc --noEmit" in body
+        assert "No TypeScript sources yet" in body
+        # Prune node_modules at any depth (monorepos vendor .ts under nested
+        # node_modules) — a top-level-only "./node_modules/*" would falsely
+        # detect vendored sources and run tsc (PR #594 review).
+        assert "*/node_modules/*" in body
+        assert '"./node_modules/*"' not in body
+
+    def test_python_setup_tolerates_missing_pyproject(self, tmp_path: Path):
+        """`uv sync --group dev` hard-fails with no pyproject.toml (fresh
+        scaffold) or no [dependency-groups] table — CI's first step must not
+        die before the day-one guards in typecheck/test-cov can run."""
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "setup")
+        assert "pyproject.toml" in body
+        assert "uv sync --group dev" in body
+
+    def test_go_test_cov_guards_fresh_module_and_fails_closed(self, tmp_path: Path):
+        """`go test ./...` errors on a module with no .go files (like the
+        guarded license/fuzz recipes), and the coverage gate must be
+        fail-closed: zero awk input (cover tool failed) fails the recipe
+        instead of returning awk's 0."""
+        target = _scaffold_language(tmp_path / "g", "go")
+        body = _recipe_body((target / "justfile").read_text(), "test-cov")
+        assert "No Go sources yet" in body
+        assert "NR == 0" in body, "coverage gate must fail on empty cover output"
 
     def test_python_coverage_recipe(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")

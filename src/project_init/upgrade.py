@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from project_init.scaffold import (
+    _ALWAYS_OVERWRITE,
     _GOVERNANCE_USER_FILES,
     _PRESERVE_DIRS,
     _RECORD_MARKER,
@@ -344,11 +345,25 @@ def _three_way_merge(base: str, ours: str, theirs: str) -> tuple[str, bool]:
 
 
 def _is_preserved(rel: Path, preserve_globs: list[str] | None = None) -> bool:
-    if any(part in _PRESERVE_DIRS for part in rel.parts):
-        return True
+    # KEEP IN SYNC with scaffold._should_preserve: this is the manifest-time
+    # (path-only) view of the same governance/glob/README/preserve-dir policy
+    # that _should_preserve applies at render-time (plus its disk-state and
+    # config-record checks). If the two disagree about what is "managed", the
+    # scaffold that refreshes a file and the upgrade that records it drift apart
+    # — the exact README-parked-as-.new bug this classification fixes.
     if rel.as_posix() in _GOVERNANCE_USER_FILES:
         return True
-    return _matches_preserve_glob(rel, preserve_globs or [])
+    if _matches_preserve_glob(rel, preserve_globs or []):
+        return True
+    # Mirror scaffold._should_preserve: READMEs are template-owned and always
+    # refreshed, even inside memory/vault (unless a user glob catches them
+    # above). They must therefore be *managed* — recorded in the manifest and
+    # drift-tracked — or a re-run would find no recorded hash, assume the user
+    # owns them, and park every template-side README refresh as a `.new`
+    # sibling plus a spurious conflict (2026-07 review).
+    if rel.name in _ALWAYS_OVERWRITE:
+        return False
+    return any(part in _PRESERVE_DIRS for part in rel.parts)
 
 
 def _strip_record(text: str) -> str:
@@ -718,7 +733,9 @@ def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:
     )
 
 
-def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Path]:
+def _render_staging(
+    preset_name: str, variables: dict, staging: Path, detect_root: Path | None = None
+) -> list[Path]:
     preset = load_preset(preset_name)
     # Agent overlays (PI-137) are layers appended at scaffold time, not part of
     # the preset definition — re-derive them from the recorded agents via the
@@ -739,7 +756,10 @@ def _render_staging(preset_name: str, variables: dict, staging: Path) -> list[Pa
     )
     if extra:
         preset = {**preset, "layers": list(preset["layers"]) + extra}
-    return scaffold(staging, preset, variables, strict=True)
+    # detect_root: generated inventories (AIBOM CCR routes) must inspect the
+    # real project's config, not the pristine template copy in staging —
+    # otherwise --apply replaces detected routes with template defaults.
+    return scaffold(staging, preset, variables, strict=True, detect_root=detect_root)
 
 
 def _classify_conflict(
@@ -1515,7 +1535,7 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
     staging = staging_root / "render"
     try:
         try:
-            rendered = _render_staging(preset_name, variables, staging)
+            rendered = _render_staging(preset_name, variables, staging, detect_root=target)
         except Exception as e:  # noqa: BLE001 — any render failure is fatal here
             sys.stderr.write(f"error: re-render failed: {e}\n")
             return 1

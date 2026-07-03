@@ -160,7 +160,13 @@ class TestPreservedPathExclusion:
         target = tmp_path / "p"
         _scaffold(target, "--preset", "obsidian-only")
         _preset, _vars, manifest, _migrated = read_scaffold_record(target)
-        assert not any(k.startswith((".claude/memory", ".claude/vault")) for k in manifest)
+        # READMEs are the one exception: template-owned (_ALWAYS_OVERWRITE),
+        # so they are recorded/refreshed even inside preserved dirs.
+        assert not any(
+            k.startswith((".claude/memory", ".claude/vault")) and not k.endswith("README.md")
+            for k in manifest
+        )
+        assert ".claude/vault/README.md" in manifest
 
         # A user-authored vault note is never reported as drift or an addition.
         note = target / ".claude" / "vault" / "knowledge" / "my-note.md"

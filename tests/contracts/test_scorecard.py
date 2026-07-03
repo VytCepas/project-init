@@ -8,6 +8,7 @@ must upload SARIF to code scanning for in-repo visibility.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -31,7 +32,9 @@ class TestScorecardJob:
     def test_job_present_for_every_language(self, tmp_path: Path, language: str):
         ci = _ci(_scaffold_language(tmp_path / "p", language))
         assert "scorecard:" in ci
-        assert "ossf/scorecard-action" in ci
+        # Full X.Y.Z pin: ossf/scorecard-action publishes no floating `v2`
+        # major tag, so a bare `@v2` fails to resolve on every scheduled run.
+        assert re.search(r"ossf/scorecard-action@v\d+\.\d+\.\d+", ci)
 
     def test_scheduled_not_per_pr(self, tmp_path: Path):
         ci = _ci(_scaffold_language(tmp_path / "p", "python"))

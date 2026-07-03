@@ -89,6 +89,17 @@ class TestCompatMarker:
         )
         assert sc.load_preset("ok")["name"] == "ok"
 
+    def test_malformed_marker_raises(self, presets_dir: Path):
+        # A hand-authored two-component marker would otherwise parse as (0,0,0)
+        # and silently disable the compat gate the preset author asked for.
+        _write(
+            presets_dir,
+            "bad",
+            'name="bad"\ndescription="b"\nlayers=[]\nmin_project_init_version="99.0"\n',
+        )
+        with pytest.raises(ValueError, match="unparseable"):
+            sc.load_preset("bad")
+
 
 class TestGenerate:
     def test_generate_and_load(self, presets_dir: Path):
