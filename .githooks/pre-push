@@ -12,12 +12,22 @@
 set -euo pipefail
 
 if command -v just >/dev/null 2>&1; then
-  echo "pre-push: running 'just ci' (lint + tests)…"
-  if ! just ci; then
-    echo ""
-    echo "❌ pre-push: 'just ci' failed — fix the errors above before pushing."
-    echo "   (bypass in an emergency with: git push --no-verify)"
-    exit 1
+  # `just ci` tests the working tree, but the push ships the committed tree.
+  # Skip (fail-open) on a dirty worktree rather than test a tree that isn't what
+  # gets pushed — a WIP fix could mask a failure, or unrelated WIP fail a clean
+  # push. CI stays the backstop.
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    echo "pre-push: working tree is dirty — skipping the 'just ci' gate" >&2
+    echo "  (it would test the worktree, not the commit being pushed)." >&2
+    echo "  Commit or stash your changes to run the gate before pushing." >&2
+  else
+    echo "pre-push: running 'just ci' (lint + tests)…"
+    if ! just ci; then
+      echo ""
+      echo "❌ pre-push: 'just ci' failed — fix the errors above before pushing."
+      echo "   (bypass in an emergency with: git push --no-verify)"
+      exit 1
+    fi
   fi
 else
   echo "pre-push: 'just' not found — skipping local CI gate (CI still runs)." >&2

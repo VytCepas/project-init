@@ -66,12 +66,24 @@ if [[ "$PUSHING_BRANCH" == "1" ]]; then
   REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
   if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
     (cd "$REPO_ROOT" && just --show ci >/dev/null 2>&1); then
-    echo "pre-push: running 'just ci' (lint + tests) before push…"
-    if ! (cd "$REPO_ROOT" && just ci); then
-      echo ""
-      echo "❌ pre-push: 'just ci' failed — fix the errors above before pushing."
-      echo "   (bypass in an emergency with: git push --no-verify)"
-      exit 1
+    # `just ci` runs against the working tree, but the push ships the committed
+    # tree. If the worktree is dirty (uncommitted changes or untracked files),
+    # testing it would give a false result either way — a WIP fix could hide a
+    # failure in the pushed commit, or unrelated WIP could fail a clean push.
+    # So skip the gate (fail-open) with a clear nudge instead of testing a tree
+    # that isn't what's being pushed; CI stays the backstop.
+    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+      echo "pre-push: working tree is dirty — skipping the 'just ci' gate" >&2
+      echo "  (it would test the worktree, not the commit being pushed)." >&2
+      echo "  Commit or stash your changes to run the gate before pushing." >&2
+    else
+      echo "pre-push: running 'just ci' (lint + tests) before push…"
+      if ! (cd "$REPO_ROOT" && just ci); then
+        echo ""
+        echo "❌ pre-push: 'just ci' failed — fix the errors above before pushing."
+        echo "   (bypass in an emergency with: git push --no-verify)"
+        exit 1
+      fi
     fi
   fi
 fi

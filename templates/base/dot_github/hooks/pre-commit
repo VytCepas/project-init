@@ -17,12 +17,43 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 # 1. Lint gate — same command surface as CI and the agent commit gate (PI-139).
 if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
   (cd "$REPO_ROOT" && just --show lint >/dev/null 2>&1); then
+  # Lint exactly the STAGED snapshot, not the working tree: otherwise an unstaged
+  # fix could mask a staged lint error (or unstaged WIP could fail a clean
+  # commit). Temporarily strip unstaged tracked changes with a saved patch — NOT
+  # `git stash`, whose pop merges and leaves conflict markers when the same file
+  # is both staged and unstaged. A patch reverse/forward is conflict-free here
+  # because `just lint` is read-only. A trap always restores; if the tree can't
+  # be isolated safely (e.g. binary diffs, apply failure), fall back to linting
+  # the worktree rather than risk touching it. No unstaged changes → the worktree
+  # already equals the index, so skip the dance entirely.
+  _patch=""
+  _restore() {
+    if [ -n "$_patch" ]; then
+      git apply --whitespace=nowarn "$_patch" >/dev/null 2>&1 || true
+      rm -f "$_patch"
+      _patch=""
+    fi
+  }
+  if ! git diff --quiet 2>/dev/null; then
+    _p="$(mktemp)"
+    if git diff --binary --no-color >"$_p" 2>/dev/null &&
+      git apply -R --whitespace=nowarn "$_p" >/dev/null 2>&1; then
+      _patch="$_p"
+      trap _restore EXIT
+    else
+      rm -f "$_p"
+    fi
+  fi
   if ! (cd "$REPO_ROOT" && just lint); then
+    _restore
+    trap - EXIT
     echo "" >&2
     echo "❌ pre-commit: 'just lint' failed — fix the errors above before committing." >&2
     echo "   (bypass in an emergency with: git commit --no-verify)" >&2
     exit 1
   fi
+  _restore
+  trap - EXIT
 fi
 
 # 2. Secret scan.
