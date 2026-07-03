@@ -27,7 +27,11 @@ just --list         # see all recipes
 | `just format` | ruff format |
 | `just test` | full pytest suite (`pytest -n auto`) |
 | `just docs` | build the MkDocs site |
-| `just ci` | lint + test (run before pushing) |
+| `just ci` | lint + test (also enforced automatically on `git push`) |
+
+`just setup` points `core.hooksPath` at `.githooks/`, so the `pre-push` hook
+runs `just ci` before every push — nothing red reaches a PR. Bypass in an
+emergency with `git push --no-verify`.
 
 Tooling conventions: **uv** for everything (never `pip`/`venv`), **ruff** only
 (no black/isort/mypy), and keep dependencies minimal — `tomllib` + `argparse`

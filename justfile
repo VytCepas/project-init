@@ -2,9 +2,11 @@
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
 
-# install/sync dev dependencies
+# install/sync dev dependencies + enable the local pre-push CI gate (dogfood).
+# core.hooksPath points git at .githooks/, so `just ci` runs before every push.
 setup:
     uv sync --group dev
+    git config core.hooksPath .githooks
 
 # lint (docstring + complexity gates per pyproject.toml)
 lint:

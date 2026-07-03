@@ -142,6 +142,10 @@ _ADDED_SINCE_BASELINE = {
     ".claude/rules/rust.md",
     ".claude/rules/typescript.md",
     "ruff.toml",
+    # Shift-left commit hooks (see test_commit_hook_gates.py): git pre-commit
+    # gained a `just lint` gate; pre-push gained a `just ci` gate.
+    ".github/hooks/pre-commit",
+    ".github/hooks/pre-push",
 }
 
 

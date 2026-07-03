@@ -79,6 +79,35 @@ if [ "${#STAGED_JS[@]}" -gt 0 ] && command -v bunx &>/dev/null; then
   git add "${STAGED_JS[@]}" 2>/dev/null || true
 fi
 
+# Lint and auto-fix staged shell scripts. The `just lint` block below already
+# runs shfmt+shellcheck over .claude/**, but only when a justfile with a lint
+# recipe and `just` are present — so a project without `just`, or a staged .sh
+# outside .claude, would otherwise reach commit unchecked. shfmt -w auto-fixes
+# formatting and is re-staged; shellcheck errors can't be auto-fixed, so they
+# are reported. Fail open when a tool is absent (CI is the hard backstop) —
+# same posture as the ruff/eslint blocks above.
+STAGED_SH=()
+while IFS= read -r _f; do [ -n "$_f" ] && STAGED_SH+=("$_f"); done \
+  < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.sh$' || true)
+if [ "${#STAGED_SH[@]}" -gt 0 ]; then
+  if command -v shfmt >/dev/null 2>&1; then
+    # -w auto-formats in place. A NONZERO exit means shfmt could not parse a
+    # file (a real shell syntax error) and left it unchanged — record that as a
+    # blocking error instead of swallowing it, so a broken script can't slip
+    # through when shellcheck is unavailable.
+    if ! SHFMT_OUT=$(shfmt -w -i 2 "${STAGED_SH[@]}" 2>&1); then
+      ERRORS="${ERRORS}Shell format errors (shfmt):\n${SHFMT_OUT}\n"
+    fi
+    git add "${STAGED_SH[@]}" 2>/dev/null || true
+  fi
+  if command -v shellcheck >/dev/null 2>&1; then
+    SH_OUT=$(shellcheck -S error -x "${STAGED_SH[@]}" 2>&1 || true)
+    if [ -n "$SH_OUT" ]; then
+      ERRORS="${ERRORS}Shell lint errors (shellcheck):\n${SH_OUT}\n"
+    fi
+  fi
+fi
+
 # PI-139: when the project ships a justfile with a lint recipe and just is
 # installed, additionally gate on `just lint` — the same definition of "lint
 # passes" CI and every agent use. Per-file findings above are preserved: the
