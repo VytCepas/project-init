@@ -487,7 +487,10 @@ class TestCLINonInteractiveCommandVariables:
         )
         assert rc == 0
         config = (target / ".claude" / "config.yaml").read_text()
-        assert 'lint_command: "cargo clippy -- -D warnings -D clippy::pedantic"' in config
+        assert (
+            'lint_command: "cargo clippy -- -D warnings -D clippy::pedantic '
+            '-D clippy::cognitive_complexity -D missing_docs"' in config
+        )
         assert 'test_command: "cargo test"' in config
         # Review finding: format_command must be the mutating command (matches
         # ruff format / biome --write / golangci-lint fmt) — `cargo fmt --check`

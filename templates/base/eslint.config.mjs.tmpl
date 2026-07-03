@@ -14,18 +14,31 @@ import tsdoc from "eslint-plugin-tsdoc";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
-  // Type-aware linting (PI-570): strictTypeChecked/stylisticTypeChecked catch
-  // bugs `strict` alone misses — verified against real code: a floating
-  // `Promise` in an async function (no-floating-promises/require-await) and
-  // unsafe `any` propagation through a return value (no-unsafe-return/
-  // no-unsafe-member-access). This needs parserOptions.project, which
-  // tsconfig.json (PI-560) already provides — no longer the blocker the
-  // previous `strict`-only choice was working around.
+  {
+    // Global ignores (own object, no sibling keys — flat-config requirement).
+    // Agent infrastructure and build output are not project code and are not
+    // covered by tsconfig.json's `include`, so type-aware linting can't parse
+    // them anyway.
+    ignores: [".claude/**", "node_modules/**", "dist/**", "_site/**"],
+  },
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
   // Enforced JSDoc on exported/public symbols (TypeScript-aware preset).
   jsdoc.configs["flat/recommended-typescript"],
   {
+    // Type-aware linting (PI-570): strictTypeChecked/stylisticTypeChecked catch
+    // bugs `strict` alone misses — a floating `Promise` in an async function
+    // (no-floating-promises/require-await) and unsafe `any` propagation through
+    // a return value (no-unsafe-return/no-unsafe-member-access).
+    //
+    // Scope every type-aware setting to *.ts(x) — the only files tsconfig.json
+    // includes (PI-560). Without this `files` guard eslint points the type
+    // parser at this .mjs config (which is outside the project) and at an empty
+    // project before the first .ts source exists (TS18003) — either of which
+    // fails the whole lint run on a fresh scaffold. That day-one break is what
+    // let the fail-closed pre-commit gate block every commit before any code
+    // was written.
+    files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parserOptions: {
         project: "./tsconfig.json",
@@ -40,13 +53,35 @@ export default tseslint.config(
       "max-params": ["error", 5],
       "max-depth": ["error", 4],
       "tsdoc/syntax": "warn",
+      // Public-API docstrings at error level — parity with ruff's `D` gate
+      // (Python) and revive's `exported` (Go), which both block. `publicOnly`
+      // limits enforcement to exported symbols, so internal helpers stay
+      // undocumented without failing the build.
+      "jsdoc/require-jsdoc": [
+        "error",
+        {
+          publicOnly: true,
+          require: {
+            FunctionDeclaration: true,
+            MethodDefinition: true,
+            ClassDeclaration: true,
+          },
+          contexts: [
+            "TSInterfaceDeclaration",
+            "TSTypeAliasDeclaration",
+            "TSEnumDeclaration",
+          ],
+        },
+      ],
     },
   },
   {
-    // Agent infrastructure and build output are not project code — also not
-    // covered by tsconfig.json's `include`, so type-aware linting can't
-    // parse them anyway.
-    ignores: [".claude/**", "node_modules/**", "dist/**", "_site/**"],
+    // This eslint config and any other .mjs/.cjs/.js tooling files live outside
+    // tsconfig's `include`, so the type-checked rules can't run on them. Turn
+    // those rules off here (rather than ignoring the files) so they still get
+    // baseline linting without a parser error.
+    files: ["**/*.mjs", "**/*.cjs", "**/*.js"],
+    extends: [tseslint.configs.disableTypeChecked],
   },
 );
 {{/if node}}

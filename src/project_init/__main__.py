@@ -98,9 +98,17 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="project-init",
         description="Scaffold agentic-development infrastructure into a project.",
         epilog=(
-            "Subcommand: project-init upgrade [target] [--apply] — re-render "
-            "from the recorded config and report drift (PI-142)."
+            "Subcommands:\n"
+            "  project-init upgrade [target] [--apply]        re-render from the "
+            "recorded config and report drift (PI-142)\n"
+            "  project-init add|remove <concern> [target]     toggle an overlay "
+            "on an existing scaffold (#528)\n"
+            "  project-init preset new <name> --extends <base>  author a company "
+            "preset (#252)\n"
+            "To scaffold INTO a directory whose name matches a subcommand, pass a "
+            "path (e.g. ./upgrade), not the bare name."
         ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument(
         "target",
@@ -167,10 +175,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Scaffold the opt-in AI-governance overlay (ADR-018): governance-as-"
-            "code. Ships the policy layer today — an AI usage policy, approved-"
-            "tools / data-handling / code-provenance docs, and a NIST RMF "
-            "crosswalk — adopting NIST AI RMF / EU AI Act conventions. The system "
-            "card, AIBOM, and CI gate land in follow-ups. Off by default."
+            "code. Ships an AI usage policy, approved-tools / data-handling / "
+            "code-provenance docs, a NIST RMF crosswalk, a system-card template + "
+            "example, a generated AIBOM, and a presence-triggered CI gate "
+            "(governance_gate.py, wired into the merge gate) — adopting NIST AI "
+            "RMF / EU AI Act conventions. Off by default."
         ),
     )
     p.add_argument(
@@ -358,6 +367,24 @@ def _prompt(label: str, default: str = "") -> str:
     from rich.prompt import Prompt
 
     return Prompt.ask(label, default=default) or default
+
+
+def _prompt_validated(label: str, *, default: str, flag: str, allow_empty: bool = False) -> str:
+    """Prompt, re-asking until the value would not corrupt config.yaml.
+
+    Interactive counterpart to _validate_text_inputs: a bad character is caught
+    at the field so the user fixes it in place instead of completing the whole
+    wizard only to hit ``parser.error`` and lose every answer (PI review).
+    """
+    from rich.console import Console
+
+    console = Console()
+    while True:
+        value = _prompt(label, default=default)
+        err = _text_field_error(flag, value, allow_empty=allow_empty)
+        if err is None:
+            return value
+        console.print(f"[red]{err}[/red]")
 
 
 def _default_preset_index(presets: list[dict]) -> int:
@@ -736,11 +763,14 @@ def _choose_governance_interactive() -> bool:
         "  [dim]approved-tools.md[/dim]       [dim]# allow/deny models, endpoints, data[/dim]\n"
         "  [dim]data-handling.md[/dim]        [dim]# what data may reach AI tools[/dim]\n"
         "  [dim]ai-code-provenance.md[/dim]   [dim]# attribution + licence checks[/dim]\n"
-        "  [dim]NIST_RMF_CROSSWALK.md[/dim]   [dim]# maps to Govern/Map/Measure/Manage[/dim]\n\n"
+        "  [dim]NIST_RMF_CROSSWALK.md[/dim]   [dim]# maps to Govern/Map/Measure/Manage[/dim]\n"
+        "  [dim]examples/SYSTEM_CARD[/dim]    [dim]# system-card template + filled example[/dim]\n"
+        "  [dim]ai-bom.generated.md[/dim]     [dim]# AIBOM, regenerated each run[/dim]\n"
+        "  [dim]governance_gate.py[/dim]      [dim]# presence-triggered CI gate (in the merge gate)[/dim]\n\n"
         "[cyan]Adopts:[/cyan] NIST AI RMF, ISO/IEC 42001, EU AI Act, OWASP LLM/Agentic "
         "Top 10 — referenced, not re-authored.\n"
-        "[cyan]Coming:[/cyan] a system card + AIBOM and a presence-triggered CI gate "
-        "(failing check) in follow-up increments.\n"
+        "[cyan]Gate:[/cyan] validates every real SYSTEM_CARD.md and fails on missing/"
+        "placeholder fields — inert until you write a card.\n"
         "[cyan]Note:[/cyan] most projects are not AI products — keep this off unless "
         "yours calls an LLM API over data.\n"
         "Clean by default — decline and nothing is added."
@@ -840,6 +870,8 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
     console.print(Panel(body, title="Memory backend", border_style="cyan"))
     default_idx = _MEMORY_STACKS.index(default) + 1 if default in _MEMORY_STACKS else 3
     choice = IntPrompt.ask("Choose a memory backend", default=default_idx)
+    if not 1 <= choice <= len(_MEMORY_STACKS):
+        console.print(f"[red]Invalid choice. Using {_MEMORY_STACKS[default_idx - 1]}.[/red]")
     idx = choice - 1 if 1 <= choice <= len(_MEMORY_STACKS) else default_idx - 1
     return _MEMORY_STACKS[idx]
 
@@ -884,6 +916,8 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
     console.print(Panel(body, title="GitHub lifecycle (issue → PR → merge)", border_style="cyan"))
     default_idx = _LIFECYCLE_TIERS.index(default) + 1 if default in _LIFECYCLE_TIERS else 1
     choice = IntPrompt.ask("Ship the GitHub lifecycle?", default=default_idx)
+    if not 1 <= choice <= len(_LIFECYCLE_TIERS):
+        console.print(f"[red]Invalid choice. Using {_LIFECYCLE_TIERS[default_idx - 1]}.[/red]")
     idx = choice - 1 if 1 <= choice <= len(_LIFECYCLE_TIERS) else default_idx - 1
     return _LIFECYCLE_TIERS[idx]
 
@@ -1143,6 +1177,25 @@ def _resolve_overlays_interactive(
     return resolved_delivery, resolved_deploy, resolved_iac
 
 
+def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict]:
+    """Resolve MCPs for the wizard: honor --mcps/--browser, else prompt (PI review).
+
+    A bad ``--mcps`` id warns and falls back to the catalog rather than crashing
+    the wizard mid-run.
+    """
+    if cli_mcps.strip():
+        try:
+            return _resolve_mcps_non_interactive(cli_mcps, cli_browser)
+        except ValueError as e:
+            from rich.console import Console
+
+            Console().print(f"[red]{e}[/red] — choose from the catalog instead.")
+    selected = _choose_mcps_interactive(MCP_CATALOG)
+    if cli_browser or _choose_browser_interactive():
+        selected = selected + [PLAYWRIGHT_MCP]
+    return selected
+
+
 def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map to prompts
     default_name: str,
     *,
@@ -1163,6 +1216,16 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     preset_lifecycle: str = "github",
     no_docs: bool = False,
     no_renovate: bool = False,
+    cli_name: str | None = None,
+    cli_description: str | None = None,
+    cli_language: str | None = None,
+    cli_owner: str = "",
+    cli_license: str = "none",
+    cli_mcps: str = "",
+    cli_browser: bool = False,
+    cli_devcontainer: bool = False,
+    cli_mise: bool = False,
+    cli_vscode: bool = False,
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -1170,12 +1233,22 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     multi_model, governance, observability) from the CLI; the string slots may
     be None to prompt, and multi_model/governance/observability=True skip their
     prompts (ADR-016/ADR-018/ADR-019).
+
+    The ``cli_*`` params pre-seed the basic-field prompts from the CLI so a mixed
+    invocation like ``project-init --name x --mcps context7 --browser`` (without
+    ``--non-interactive``) honors those flags instead of silently dropping them
+    (PI review 2026-07): the string values become prompt defaults; ``--mcps``
+    resolves non-interactively (falling back to the catalog on a bad id); and the
+    store_true toggles (browser/devcontainer/mise/vscode) skip their prompt when
+    set.
     """
     resolved_profile = profile or _choose_profile_interactive()
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
-    project_name = _prompt("Project name", default=default_name)
-    project_description = _prompt("Description", default="")
-    language = _prompt("Language (python/node/go/rust/none)", default="none")
+    project_name = _prompt_validated("Project name", default=cli_name or default_name, flag="name")
+    project_description = _prompt_validated(
+        "Description", default=cli_description or "", flag="description"
+    )
+    language = _prompt("Language (python/node/go/rust/none)", default=cli_language or "none")
     if language not in {"python", "node", "go", "rust", "none"}:
         language = "none"
     (
@@ -1190,21 +1263,27 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         language, delivery_flag, deploy_flag, iac_flag
     )
 
-    # MCP selection — catalog multi-select + optional browser MCP.
-    selected_mcps = _choose_mcps_interactive(MCP_CATALOG)
-    if _choose_browser_interactive():
-        selected_mcps = selected_mcps + [PLAYWRIGHT_MCP]
+    # MCP selection — honor --mcps/--browser if given, else catalog multi-select.
+    selected_mcps = _gather_mcps_interactive(cli_mcps, cli_browser)
 
     # Governance (PI-145).
-    owner = _prompt("Owner/team for CODEOWNERS + LICENSE (e.g. @org/team)", default="")
-    license_choice = _prompt("License (mit/apache-2.0/proprietary/none)", default="none")
+    owner = _prompt_validated(
+        "Owner/team for CODEOWNERS + LICENSE (e.g. @org/team)",
+        default=cli_owner or "",
+        flag="owner",
+        allow_empty=True,
+    )
+    license_choice = _prompt(
+        "License (mit/apache-2.0/proprietary/none)", default=cli_license or "none"
+    )
     if license_choice not in {"mit", "apache-2.0", "proprietary", "none"}:
         license_choice = "none"
 
     # Toolchain toggles — each explains its value before asking (#472, ADR-023).
-    devcontainer = _choose_devcontainer_interactive()
-    mise = _choose_mise_interactive()
-    vscode = _choose_vscode_interactive()
+    # A store_true CLI flag pre-accepts the toggle and skips its prompt.
+    devcontainer = cli_devcontainer or _choose_devcontainer_interactive()
+    mise = cli_mise or _choose_mise_interactive()
+    vscode = cli_vscode or _choose_vscode_interactive()
     # Docs tooling axis (#477, ADR-022). The --no-docs flag wins (skip the
     # prompt); otherwise default ON and only ask for the languages whose docs
     # config ships (mkdocs→python, typedoc→node) — other languages get no docs
@@ -1499,7 +1578,12 @@ _LANGUAGE_COMMANDS: dict[str, tuple[str, str, str]] = {
     # project has no package.json scripts to back `bun run lint`/`format`.
     "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
     "go": ("golangci-lint run", "golangci-lint fmt", "go test ./..."),
-    "rust": ("cargo clippy -- -D warnings -D clippy::pedantic", "cargo fmt", "cargo test"),
+    "rust": (
+        "cargo clippy -- -D warnings -D clippy::pedantic "
+        "-D clippy::cognitive_complexity -D missing_docs",
+        "cargo fmt",
+        "cargo test",
+    ),
 }
 
 
@@ -1584,6 +1668,15 @@ def _upgrade_main(argv: list[str]) -> int:
     args = p.parse_args(argv)
     target = Path(args.target).resolve()
 
+    # -i/--interactive is meaningless without --apply (the per-file chooser only
+    # runs while applying). Silently ignoring it left users thinking they were
+    # driving an interactive apply when they got a read-only report — say so.
+    if args.interactive and not args.apply:
+        sys.stderr.write(
+            "note: -i/--interactive only takes effect with --apply; this is a "
+            "read-only drift report. Re-run with --apply -i to choose per file.\n"
+        )
+
     # Clean-tree guard (#242): refuse --apply on a dirty git work tree so the
     # upgrade lands as one revertible diff. A CLI-layer precondition — kept out
     # of run_upgrade so programmatic callers manage their own safety.
@@ -1633,9 +1726,7 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
         stacks = ", ".join(s for s in MEMORY_STACKS if s != "none")
         p.add_argument("value", nargs="?", help=f"for `add memory`: a stack ({stacks})")
     p.add_argument("--target", default=".", help="scaffolded project dir (default: .)")
-    p.add_argument(
-        "--apply", action="store_true", help="apply changes (default: dry-run report)"
-    )
+    p.add_argument("--apply", action="store_true", help="apply changes (default: dry-run report)")
     p.add_argument(
         "--allow-dirty",
         action="store_true",
@@ -1945,6 +2036,36 @@ def _preset_main(argv: list[str]) -> int:
     return 0
 
 
+def _text_field_error(flag: str, value: str, *, allow_empty: bool = False) -> str | None:
+    """Return why *value* would corrupt config.yaml, or None if it is clean.
+
+    Shared by the non-interactive gate (:func:`_validate_text_inputs`) and the
+    wizard's per-field re-prompt, so an interactive user is corrected at the
+    field instead of losing the whole wizard to ``parser.error`` at the end
+    (PI review 2026-07). The returned message names *flag* without a ``--`` so
+    each caller can prefix it as appropriate.
+    """
+    # name/description are required, single-line, human-facing fields: a value
+    # that is empty or only whitespace slips past the `if not args.name` check
+    # (a space is truthy) and renders literal blanks into pyproject.toml / docs.
+    if not allow_empty and not value.strip():
+        return f"{flag} must not be empty or whitespace-only"
+    if (
+        '"' in value
+        or "\\" in value
+        # 0x85 (NEL), 0x2028 (LINE SEPARATOR), 0x2029 (PARAGRAPH SEPARATOR) are
+        # > 0x20 so they slip past the C0 check, but Python's str.splitlines()
+        # treats them as line breaks — they'd split a single-line YAML value
+        # mid-parse on a later upgrade (PI-535).
+        or any(ord(ch) < 0x20 or ord(ch) in (0x7F, 0x85, 0x2028, 0x2029) for ch in value)
+    ):
+        return (
+            f"{flag} must not contain double-quotes, backslashes, newlines, or "
+            "control/line-separator characters (they corrupt the generated config.yaml)"
+        )
+    return None
+
+
 def _validate_text_inputs(inputs: ScaffoldInputs, parser: argparse.ArgumentParser) -> None:
     """Reject text fields that would corrupt the rendered config.yaml.
 
@@ -1955,33 +2076,14 @@ def _validate_text_inputs(inputs: ScaffoldInputs, parser: argparse.ArgumentParse
     short single-line fields, so a clean rejection beats silent corruption
     (e2e sweep; Codex/Copilot review).
     """
-    # name/description are required, single-line, human-facing fields: a value
-    # that is empty or only whitespace slips past the `if not args.name` check
-    # (a space is truthy) and renders literal blanks into pyproject.toml / docs.
-    for flag, value in (("name", inputs.project_name), ("description", inputs.project_description)):
-        if not value.strip():
-            parser.error(f"--{flag} must not be empty or whitespace-only")
-
-    for flag, value in (
-        ("name", inputs.project_name),
-        ("description", inputs.project_description),
-        ("owner", inputs.owner),
+    for flag, value, allow_empty in (
+        ("name", inputs.project_name, False),
+        ("description", inputs.project_description, False),
+        ("owner", inputs.owner, True),
     ):
-        if (
-            '"' in value
-            or "\\" in value
-            # 0x85 (NEL), 0x2028 (LINE SEPARATOR), 0x2029 (PARAGRAPH SEPARATOR)
-            # are > 0x20 so they slip past the C0 check, but Python's
-            # str.splitlines() treats them as line breaks — they'd split a
-            # single-line YAML value mid-parse on a later upgrade (PI-535).
-            or any(
-                ord(ch) < 0x20 or ord(ch) in (0x7F, 0x85, 0x2028, 0x2029) for ch in value
-            )
-        ):
-            parser.error(
-                f"--{flag} must not contain double-quotes, backslashes, newlines, "
-                "or control/line-separator characters (they corrupt the generated config.yaml)"
-            )
+        err = _text_field_error(flag, value, allow_empty=allow_empty)
+        if err:
+            parser.error(f"--{err}")
 
 
 def _validate_existing_config(target: Path, parser: argparse.ArgumentParser) -> None:
@@ -2033,6 +2135,24 @@ def main(argv: list[str] | None = None) -> int:
         return 130
 
 
+def _resolve_preset_memory(preset: dict, parser: argparse.ArgumentParser) -> str:
+    """Normalize + validate a preset's ``memory_stack`` (#466).
+
+    Normalizes the friendly ``obsidian`` alias and rejects a typo'd stack up
+    front — otherwise a bad preset memory_stack silently yields a ``memory=true``
+    config with no obsidian/graphify/rag gate set and zero memory files
+    (PI review 2026-07).
+    """
+    raw = preset.get("vars", {}).get("memory_stack", "obsidian-only")
+    resolved = _normalize_memory(raw) or "obsidian-only"
+    if resolved not in _MEMORY_STACKS:
+        parser.error(
+            f"preset {preset['name']!r} declares an invalid memory_stack "
+            f"{raw!r}; valid: {', '.join(_MEMORY_STACKS)}"
+        )
+    return resolved
+
+
 def _cli(argv: list[str]) -> int:
     """Dispatch a fully-formed argv to the scaffold CLI or a subcommand."""
     _subcommands = {
@@ -2060,7 +2180,9 @@ def _cli(argv: list[str]) -> int:
     # --json promises a single clean JSON stdout line; interactive prompts/panels
     # would pollute it, so a scaffold --json run must be non-interactive (#511).
     if args.json and not args.non_interactive:
-        parser.error("--json requires --non-interactive (interactive prompts would corrupt JSON stdout)")
+        parser.error(
+            "--json requires --non-interactive (interactive prompts would corrupt JSON stdout)"
+        )
 
     if args.non_interactive:
         _require_non_interactive_args(args, parser)
@@ -2072,7 +2194,7 @@ def _cli(argv: list[str]) -> int:
     preset = _select_preset(args, parser, presets)
     # Memory backend fallback when --memory is absent (#466): the preset's stack
     # (obsidian-only/obsidian-graphify/core's "none"), default obsidian-only.
-    preset_memory = preset.get("vars", {}).get("memory_stack", "obsidian-only")
+    preset_memory = _resolve_preset_memory(preset, parser)
     # Lifecycle-tier fallback when --lifecycle is absent (#476): the preset's
     # tier (a preset may set lifecycle = "none" to be minimal), default "github".
     preset_lifecycle = preset.get("vars", {}).get("lifecycle", "github")
@@ -2106,6 +2228,18 @@ def _cli(argv: list[str]) -> int:
             preset_lifecycle=preset_lifecycle,
             no_docs=args.no_docs,
             no_renovate=args.no_renovate,
+            # Pre-seed the basic-field prompts from the CLI so flags passed
+            # without --non-interactive are honored, not dropped (PI review).
+            cli_name=args.name,
+            cli_description=args.description,
+            cli_language=args.language,
+            cli_owner=args.owner,
+            cli_license=args.license,
+            cli_mcps=args.mcps,
+            cli_browser=args.browser,
+            cli_devcontainer=args.devcontainer,
+            cli_mise=args.mise,
+            cli_vscode=args.vscode,
         )
     _validate_text_inputs(inputs, parser)
     _validate_existing_config(target, parser)

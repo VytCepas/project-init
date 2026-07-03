@@ -1,5 +1,10 @@
 {{#if rust}}# clippy.toml — quality gates for project code (scaffolded by project-init).
 # Mirrors ruff.toml's [lint.mccabe] max-complexity = 10 — cognitive complexity
 # is clippy's closest analog to cyclomatic complexity.
+#
+# This threshold only takes effect because `just lint` passes
+# `-D clippy::cognitive_complexity`: that lint lives in clippy's `nursery`
+# group, which `-D clippy::pedantic` does NOT enable, so without the explicit
+# `-D` this setting would be silently inert.
 cognitive-complexity-threshold = 10
 {{/if rust}}

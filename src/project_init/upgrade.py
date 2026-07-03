@@ -71,6 +71,7 @@ def _is_sibling(rel: Path) -> bool:
     """True if *rel* is a `.new`/`.new.N` overwrite-protection sibling (PI-535)."""
     return bool(_SIBLING_RE.search(rel.name))
 
+
 # Variables that pre-record config files cannot recover; filled with the
 # scaffolder's defaults during migration (see read_scaffold_record).
 _MIGRATION_DEFAULTS = {
@@ -588,6 +589,27 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
     return preset_name, variables, {}
 
 
+def _memory_stack_from_flags(v: dict) -> str:
+    """Reconstruct the memory stack from recorded gate flags.
+
+    A record written before the ``memory_stack`` variable existed (pre-#466)
+    carries the individual gate flags but no stack name. The ladder is a strict
+    superset order (none < auto < obsidian-only < obsidian-graphify <
+    obsidian-graphify-rag), so the highest recorded gate names the stack.
+    Pre-#466 projects always shipped the obsidian-only vault, so that is the
+    floor when only the (pre-decomposition) vault is implied.
+    """
+    if v.get("rag"):
+        return "obsidian-graphify-rag"
+    if v.get("graphify"):
+        return "obsidian-graphify"
+    if v.get("obsidian"):
+        return "obsidian-only"
+    if v.get("memory"):
+        return "auto"
+    return "obsidian-only"
+
+
 def _backfill_variables(variables: dict) -> dict:
     """Fill variables introduced after *variables* were recorded.
 
@@ -599,7 +621,13 @@ def _backfill_variables(variables: dict) -> dict:
     """
     v = dict(variables)
     language = v.get("language", "none")
-    stack = v.get("memory_stack", "obsidian-only")
+    # memory_stack itself postdates the earliest records (#466). When it is
+    # absent, reconstruct it from the recorded gate flags rather than defaulting
+    # flat to obsidian-only — a pre-#466 graphify record has graphify="true" but
+    # no stack, and the flat default would drop its graphify overlay while the
+    # gate kept rendering graphify prose. It must also be backfilled (below), or
+    # config.yaml's `stack: {{memory_stack}}` survives strict re-render (#466).
+    stack = v.get("memory_stack") or _memory_stack_from_flags(v)
     # Lifecycle gate (#476): an existing record written before #476 has no
     # lifecycle field — it pre-dates the decomposition, when the GitHub
     # lifecycle was force-bundled — so it backfills ON (lifecycle is opt-OUT).
@@ -613,6 +641,9 @@ def _backfill_variables(variables: dict) -> dict:
         # the staging strict-render succeeds; a post-field record carries its own
         # value, which the setdefault below preserves.
         "project_init_contract_version": CONTRACT_VERSION,
+        # Backfill the stack name itself (#466) so config.yaml's
+        # `stack: {{memory_stack}}` renders; setdefault preserves a recorded one.
+        "memory_stack": stack,
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "rag": "true" if "rag" in stack else "",
@@ -629,7 +660,9 @@ def _backfill_variables(variables: dict) -> dict:
         "want_docs": "true",
         "renovate": "true",
         "justfile": "true" if language != "none" else "",
-        "license_holder": v.get("project_owner") or v.get("project_name", ""),
+        # Strip the CODEOWNERS "@" prefix, matching _build_variables — else a
+        # re-rendered LICENSE reads "Copyright … @acme/team" (PI-181).
+        "license_holder": (v.get("project_owner") or v.get("project_name", "")).removeprefix("@"),
         "created_year": v.get("created_date", "").split("-")[0],
         "vscode_off": "" if v.get("vscode") else "true",
         # Opt-in overlays + governance default off — they postdate the record;
@@ -1210,6 +1243,19 @@ def _resolve_addition_consent(
     unchanged; a materially changed group resurfaces as undecided (ADR-013).
     """
     recorded = _read_declined(target)
+    # Warn on a group id that matches no addition group (typo or stale name):
+    # silently dropping it (the `if g in groups` filter) left the gate re-blocking
+    # with no hint the flag value was wrong (PI review 2026-07). "all" is a valid
+    # wildcard, not a group id, so it never warns.
+    known = set(groups)
+    unknown = [g for g in (*accept_new, *decline_new) if g != "all" and g not in known]
+    if unknown:
+        import sys
+
+        valid = ", ".join(sorted(known)) or "(none)"
+        sys.stderr.write(
+            f"note: ignoring unknown addition group id(s): {', '.join(unknown)}. Valid: {valid}\n"
+        )
     accepted = set(groups) if "all" in accept_new else {g for g in accept_new if g in groups}
     declined_flag = set(groups) if "all" in decline_new else {g for g in decline_new if g in groups}
     still_declined = {gid for gid in groups if recorded.get(gid) == groups[gid]["hash"]}

@@ -214,8 +214,15 @@ def generate_preset(name: str, *, extends: str, description: str = "", version: 
     lines += [
         "",
         "[vars]",
-        "# Override or add template variables here (child wins over the parent).",
+        "# House defaults + custom template variables for this preset. A value",
+        "# here fills a variable the CLI left unset (e.g. project_owner,",
+        "# license_holder) and adds new ones your own layers reference; an",
+        "# explicit CLI flag always wins. Across an extends chain, this child's",
+        "# vars win over the parent's.",
         "",
+        "# Dependencies recorded and merged across the extends chain for external",
+        "# tooling to read. NOTE: project-init does not itself install these — it",
+        "# emits no pyproject.toml — so treat this as a manifest, not an installer.",
         "[scaffolded_project_dependencies.python]",
         "core = []",
         "dev = []",
@@ -771,6 +778,28 @@ def _has_scaffold_record(config_file: Path) -> bool:
         return False
 
 
+def _apply_preset_vars(variables: dict[str, str], preset: dict) -> dict[str, str]:
+    """Merge preset ``[vars]`` (#252) into the render variables.
+
+    The single chokepoint every engine (scaffold/upgrade/add/remove) funnels
+    through. A company preset uses ``[vars]`` for house defaults (project_owner,
+    license_holder, …) and to add custom template variables its own layers
+    reference. Each fills a variable the resolved inputs left empty and adds
+    preset-only keys; an explicit value (e.g. from ``--owner``) is non-empty and
+    always wins, so ``--owner`` overrides a preset's project_owner. Values are
+    coerced to str — ``[vars]`` feed ``{{...}}`` substitution and a hand-authored
+    preset may write a TOML number.
+    """
+    preset_vars = preset.get("vars") or {}
+    if not preset_vars:
+        return variables
+    merged = dict(variables)
+    for key, value in preset_vars.items():
+        if not merged.get(key):
+            merged[key] = str(value)
+    return merged
+
+
 def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
     target: Path,
     preset: dict,
@@ -824,6 +853,7 @@ def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
     manifest = {} if first_scaffold else _recorded_manifest(target)
 
     layers: list[str] = preset["layers"]
+    variables = _apply_preset_vars(variables, preset)
     created: list[Path] = []
     staged: list[Path] = []
     written: set[Path] = set()  # paths this run has emitted (later layers may overwrite)
@@ -855,7 +885,9 @@ def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
             rel_path, is_template = _output_rel_path(src, layer_dir)
 
             # work_dir == target in non-strict mode, so dest is the real file.
-            if not strict and guard.preserved_or_parked(src, work_dir / rel_path, rel_path, is_template):
+            if not strict and guard.preserved_or_parked(
+                src, work_dir / rel_path, rel_path, is_template
+            ):
                 continue
 
             rendered = _emit_file(src, work_dir / rel_path, variables, is_template)

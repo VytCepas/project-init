@@ -76,7 +76,7 @@ resolve_ref() {
     if [ -n "${tag:-}" ]; then
         printf '%s\n' "$tag"
     else
-        warn "could not resolve the latest release (none published yet?) — falling back to main"
+        warn "could not resolve the latest release (none published yet?) — falling back to the default branch"
         warn "pin explicitly with: PROJECT_INIT_REF=vX.Y.Z"
         printf 'main\n'
     fi
@@ -87,6 +87,13 @@ ensure_repo() {
     REF="$(resolve_ref)"
     if [ -d "$INSTALL_DIR/.git" ]; then
         say "updating existing clone at $INSTALL_DIR (ref: $REF)"
+        # If PROJECT_INIT_REPO changed since the clone, repoint origin — else we
+        # would silently keep updating from the old remote (PI review 2026-07).
+        current_url="$(git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null || true)"
+        if [ -n "$current_url" ] && [ "$current_url" != "$REPO_URL" ]; then
+            warn "origin changed ($current_url -> $REPO_URL) — updating remote"
+            git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL"
+        fi
         git -C "$INSTALL_DIR" fetch --tags --force origin
     else
         say "cloning $REPO_URL ($REF) -> $INSTALL_DIR"
@@ -94,8 +101,15 @@ ensure_repo() {
         git clone "$REPO_URL" "$INSTALL_DIR"
     fi
     if [ "$REF" = "main" ]; then
-        git -C "$INSTALL_DIR" checkout -q main
-        git -C "$INSTALL_DIR" pull --ff-only
+        # "main" is resolve_ref's fallback sentinel for "the repo's default
+        # branch". Resolve it for real — a fork or mirror may default to
+        # master/trunk, and a hard `checkout main` would die under `set -e`.
+        git -C "$INSTALL_DIR" remote set-head origin --auto >/dev/null 2>&1 || true
+        default_branch="$(git -C "$INSTALL_DIR" symbolic-ref --quiet --short \
+            refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
+        [ -n "$default_branch" ] || default_branch="main"
+        git -C "$INSTALL_DIR" checkout -q "$default_branch"
+        git -C "$INSTALL_DIR" pull --ff-only origin "$default_branch"
     else
         # Release tags check out detached — exactly what a pinned install wants.
         git -C "$INSTALL_DIR" checkout -q "$REF"

@@ -17,12 +17,24 @@ PY="$(dirname "$0")/_py.sh"
 INPUT=$(cat)
 
 CMD=$(printf '%s' "$INPUT" | "$PY" -c "
-import json, sys
+import json, re, sys
 try:
     d = json.load(sys.stdin)
 except Exception:
     sys.exit(0)
-print((d.get('tool_input', {}) or {}).get('command', '') or '')
+cmd = (d.get('tool_input', {}) or {}).get('command', '') or ''
+# Strip git global options (git -C PATH / -c K=V / --git-dir=… / --no-pager / …)
+# that sit BETWEEN 'git' and its subcommand, so a disguised 'git -C . commit'
+# still matches the 'git commit' check below instead of bypassing the gate
+# (PI review 2026-07).
+cmd = re.sub(
+    r'\bgit\s+(?:-C\s+\S+\s+|-c\s+\S+\s+|--git-dir=\S+\s+|--work-tree=\S+\s+'
+    r'|--namespace=\S+\s+|--exec-path=\S+\s+|-p\s+|--paginate\s+|--no-pager\s+'
+    r'|--bare\s+|--literal-pathspecs\s+)+',
+    'git ',
+    cmd,
+)
+print(cmd)
 " 2>/dev/null || true)
 
 # Only intercept git commit commands

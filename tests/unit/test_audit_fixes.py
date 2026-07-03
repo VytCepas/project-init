@@ -1,0 +1,86 @@
+"""Regression tests for the 2026-07 audit fixes.
+
+Covers the source-level fixes that don't fit an existing focused module:
+the pre-#466 memory_stack upgrade backfill, preset [vars] reaching the render
+context, and the wizard honoring --mcps.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from project_init import scaffold as sc
+from project_init.__main__ import _gather_mcps_interactive
+from project_init.upgrade import _backfill_variables, _memory_stack_from_flags
+
+
+class TestMemoryStackBackfill:
+    """A record written before memory_stack existed (#466) must reconstruct the
+    stack from its gate flags AND backfill the stack name itself — else
+    config.yaml's `stack: {{memory_stack}}` survives the strict re-render."""
+
+    @pytest.mark.parametrize(
+        ("flags", "expected"),
+        [
+            ({"rag": "true", "graphify": "true", "obsidian": "true"}, "obsidian-graphify-rag"),
+            ({"graphify": "true", "obsidian": "true"}, "obsidian-graphify"),
+            ({"obsidian": "true"}, "obsidian-only"),
+            ({"memory": "true"}, "auto"),
+            ({}, "obsidian-only"),  # bare pre-#466 record → obsidian floor
+        ],
+    )
+    def test_stack_from_flags(self, flags, expected):
+        assert _memory_stack_from_flags(flags) == expected
+
+    def test_backfill_sets_memory_stack_for_graphify_record(self):
+        # Pre-#466 obsidian-graphify record: graphify gate but no memory_stack.
+        out = _backfill_variables({"language": "python", "graphify": "true", "obsidian": "true"})
+        assert out["memory_stack"] == "obsidian-graphify"
+        assert out["memory_tier"] == "2"
+        assert out["graphify"] == "true"
+        assert out["rag"] == ""
+
+    def test_backfill_preserves_recorded_stack(self):
+        out = _backfill_variables({"language": "go", "memory_stack": "auto", "memory": "true"})
+        assert out["memory_stack"] == "auto"
+        assert out["obsidian"] == ""
+
+    def test_backfill_strips_owner_at_prefix_from_license_holder(self):
+        # PI-181 parity: the CODEOWNERS "@" must not leak into LICENSE copyright.
+        out = _backfill_variables({"project_owner": "@acme/team"})
+        assert out["license_holder"] == "acme/team"
+
+
+class TestPresetVarsReachRender:
+    """Preset [vars] (#252) must actually reach the render context (previously a
+    no-op): fill empty resolved values, add preset-only keys, coerce to str, and
+    never override an explicit (non-empty) value."""
+
+    def test_fills_empty_and_adds_keys(self):
+        preset = {"layers": ["base"], "vars": {"project_owner": "@acme", "custom": 7}}
+        merged = sc._apply_preset_vars({"project_owner": "", "project_name": "p"}, preset)
+        assert merged["project_owner"] == "@acme"  # filled empty
+        assert merged["custom"] == "7"  # added + coerced to str
+
+    def test_explicit_value_wins(self):
+        preset = {"layers": ["base"], "vars": {"project_owner": "@acme"}}
+        merged = sc._apply_preset_vars({"project_owner": "@explicit"}, preset)
+        assert merged["project_owner"] == "@explicit"
+
+    def test_no_vars_returns_input_unchanged(self):
+        variables = {"project_name": "p"}
+        assert sc._apply_preset_vars(variables, {"layers": ["base"]}) is variables
+
+
+class TestWizardHonorsMcpsFlag:
+    """--mcps passed without --non-interactive must be honored, not dropped."""
+
+    def test_cli_mcps_resolved_without_prompting(self):
+        selected = _gather_mcps_interactive("context7", False)
+        assert [m["id"] for m in selected] == ["context7"]
+
+    def test_cli_mcps_with_browser(self):
+        selected = _gather_mcps_interactive("context7", True)
+        ids = [m["id"] for m in selected]
+        assert "context7" in ids
+        assert "playwright" in ids

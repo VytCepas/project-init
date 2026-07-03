@@ -12,8 +12,8 @@ setup:
 # lint project code (docstring + complexity gates per ruff.toml)
 lint:
     uv run ruff check .
-    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
-    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+    sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .claude -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
+    sh -c 'if command -v shfmt >/dev/null 2>&1; then find .claude -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
 
 # static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
 # no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path.
@@ -98,8 +98,8 @@ setup:
 # lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs)
 lint:
     bunx eslint .
-    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
-    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+    sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .claude -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
+    sh -c 'if command -v shfmt >/dev/null 2>&1; then find .claude -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
 
 # static type check (strict mode per tsconfig.base.json)
 # no-op on a fresh scaffold with no .ts sources yet — tsc errors with TS18003
@@ -111,9 +111,12 @@ typecheck:
 format:
     bunx @biomejs/biome format --write .
 
-# run the test suite (coverage-gated per bunfig.toml — PI-569)
+# run the test suite (coverage-gated per bunfig.toml — PI-569).
+# `bun test` exits 1 when it finds zero test files, which would fail `just ci`
+# (and the pre-push gate) on a fresh scaffold before the first test exists — so
+# skip cleanly until a test file appears, like the go/rust day-one guards.
 test:
-    bun test
+    sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bun test; else echo "No test files yet — nothing to test."; fi'
 
 # build the API docs (TypeDoc)
 docs:
@@ -157,8 +160,8 @@ setup:
 # lint project code (revive/godoclint/gocognit/cyclop/dupl/errcheck/govet/staticcheck gates per .golangci.yml)
 lint:
     golangci-lint run
-    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
-    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+    sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .claude -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
+    sh -c 'if command -v shfmt >/dev/null 2>&1; then find .claude -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
 
 # auto-format project code (gofumpt via golangci-lint fmt — no separate binary
 # to provision; golangci-lint is already required for `just lint`)
@@ -227,11 +230,16 @@ setup:
 build:
     cargo build
 
-# lint project code (clippy pedantic + cognitive-complexity gate per clippy.toml)
+# lint project code (clippy pedantic + cognitive-complexity + public-API docs).
+# -D clippy::cognitive_complexity activates the threshold in clippy.toml — it's
+# a nursery lint that -D pedantic does NOT enable, so without this flag the
+# clippy.toml threshold is dead config. -D missing_docs enforces docs on public
+# items (parity with ruff's D gate and revive's `exported`); for a binary crate
+# with no pub items it only asks for a crate-level `//!` doc.
 lint:
-    cargo clippy -- -D warnings -D clippy::pedantic
-    find .claude -name '*.sh' -exec shellcheck -S error -x {} +
-    find .claude -name '*.sh' -exec shfmt -d -i 2 {} +
+    cargo clippy -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity -D missing_docs
+    sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .claude -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
+    sh -c 'if command -v shfmt >/dev/null 2>&1; then find .claude -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
 
 # auto-format project code
 format:
