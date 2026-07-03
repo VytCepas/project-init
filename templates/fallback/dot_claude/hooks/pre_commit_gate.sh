@@ -70,7 +70,12 @@ while IFS= read -r _f; do [ -n "$_f" ] && STAGED_PY+=("$_f"); done \
   < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
 if [ "${#STAGED_PY[@]}" -gt 0 ]; then
   LINT_OUT=""
-  if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
+  # The `uv run ruff --version` probe keeps this branch fail-open: in a uv
+  # project that doesn't ship ruff, `uv run ruff check` emits a "Failed to
+  # spawn" error that would otherwise be captured as bogus "Python lint
+  # errors" and block the commit. Probe first; fall through to system ruff.
+  if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null &&
+    uv run ruff --version >/dev/null 2>&1; then
     uv run ruff check --fix --quiet "${STAGED_PY[@]}" >/dev/null 2>&1 || true
     uv run ruff format --quiet "${STAGED_PY[@]}" >/dev/null 2>&1 || true
     LINT_OUT=$(uv run ruff check --quiet "${STAGED_PY[@]}" 2>&1 || true)

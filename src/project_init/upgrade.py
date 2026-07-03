@@ -927,6 +927,30 @@ def _memory_section(text: str) -> str:
     return m.group(0) if m else ""
 
 
+# The `rag_endpoint:` line inside the memory block: key, value (up to a
+# comment), optional trailing comment. The template always renders the value
+# EMPTY — setup_rag.sh instructs the user to hand-set it (ADR-026).
+_RAG_ENDPOINT_RE = re.compile(r"(?m)^(\s*rag_endpoint:)([^#\n]*)(#.*)?$")
+
+
+def _carry_rag_endpoint(old_mem: str, new_mem: str) -> str:
+    """Preserve a hand-set ``memory.rag_endpoint`` across the block splice.
+
+    The staged render always has an empty ``rag_endpoint:`` (it is not a
+    template variable), so splicing the block wholesale would silently reset
+    the endpoint the user recorded per setup_rag.sh — breaking the ADR-025
+    descriptor the field exists for (2026-07 review). Carry the old line over
+    when the user set a value and the fresh render left it empty.
+    """
+    old_m = _RAG_ENDPOINT_RE.search(old_mem)
+    new_m = _RAG_ENDPOINT_RE.search(new_mem)
+    if not old_m or not new_m:
+        return new_mem
+    if not old_m.group(2).strip() or new_m.group(2).strip():
+        return new_mem
+    return new_mem[: new_m.start()] + old_m.group(0) + new_mem[new_m.end() :]
+
+
 def _sync_memory_block(text: str, staging: Path) -> str:
     """Refresh the derived `memory:` descriptor from the freshly rendered config.
 
@@ -946,6 +970,10 @@ def _sync_memory_block(text: str, staging: Path) -> str:
     if old_mem == new_mem:
         return text
     if old_mem:  # change or remove (new_mem may be '')
+        if new_mem:
+            new_mem = _carry_rag_endpoint(old_mem, new_mem)
+            if old_mem == new_mem:
+                return text
         return text.replace(old_mem, new_mem, 1)
     # add: insert the block immediately before the `mcps:` key
     return re.sub(r"(?m)^mcps:", lambda _m: new_mem + "mcps:", text, count=1)
@@ -1579,7 +1607,12 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
     # re-render never crashes (configs predating #247/#248).
     variables.setdefault("profile", "individual")
     variables.setdefault("enforcement", "advisory")
-    variables.setdefault("project_init_plugin_version", __plugin_version__)
+    # The plugin payload tracks the running scaffolder (ADR-010): bump it
+    # unconditionally, like project_init_version above. A setdefault is dead
+    # here — _backfill_variables has already seeded the migration default
+    # ("0.1.0"), which would stamp a stale plugin version into the visible
+    # project fields on --apply (2026-07 review).
+    variables["project_init_plugin_version"] = __plugin_version__
 
     staging_root = Path(tempfile.mkdtemp(prefix="project-init-upgrade-"))
     staging = staging_root / "render"

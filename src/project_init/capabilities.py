@@ -245,8 +245,16 @@ def render(variables: dict[str, str]) -> str:
         ]
     lines += ["", f"## MCP servers ({len(servers)})", ""]
     if servers:
+        # HTTP-transport servers (e.g. context7-http) carry a url instead of
+        # command+args — surface it rather than an empty Invocation cell
+        # (mirrors governance._server_transport).
         rows = [
-            (name, " ".join([spec.get("command", "")] + spec.get("args", [])).strip())
+            (
+                name,
+                spec.get("url", "")
+                if spec.get("type") == "http" or spec.get("url")
+                else " ".join([spec.get("command", "")] + spec.get("args", [])).strip(),
+            )
             for name, spec in sorted(servers.items())
         ]
         lines += _table(("Server", "Invocation"), rows)

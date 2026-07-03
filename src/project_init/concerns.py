@@ -48,6 +48,10 @@ class ConcernError(Exception):
 
 
 def _set_memory(v: dict, stack: str) -> None:
+    # Accept the friendly `obsidian` alias the main CLI's --memory takes (#466)
+    # so `project-init add memory obsidian` matches the documented flag surface.
+    if stack == "obsidian":
+        stack = "obsidian-only"
     if stack not in MEMORY_STACKS:
         raise ConcernError(
             f"unknown memory stack {stack!r}; choose one of {', '.join(MEMORY_STACKS)}"

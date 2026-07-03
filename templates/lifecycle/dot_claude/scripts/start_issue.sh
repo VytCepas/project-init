@@ -104,7 +104,10 @@ if ! echo "$PROJECT_KEY" | grep -qE '^[A-Z][A-Z0-9]{1,9}$'; then
 fi
 
 # --- Fetch issue title ---
-ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title -q '.title' 2>/dev/null)
+# `|| true`: under set -e a nonexistent issue would kill the script at this
+# assignment with gh's stderr discarded — zero output, unreachable error
+# branch. Let the empty-check below report it instead.
+ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title -q '.title' 2>/dev/null || true)
 if [ -z "$ISSUE_TITLE" ]; then
   echo "ERROR: issue #$ISSUE_NUMBER not found" >&2
   exit 1

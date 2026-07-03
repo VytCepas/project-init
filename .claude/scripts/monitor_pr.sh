@@ -4,9 +4,13 @@
 # Requires: gh, python3 (stdlib only — no jq dependency).
 #
 # Usage:
-#   .claude/scripts/monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review]
+#   .claude/scripts/monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review] [--admin]
 #
 # --merge: squash-merge and delete branch automatically when all checks pass.
+# --admin: allow an admin override when the PR is BLOCKED by branch protection
+#   AFTER the review gate passed (e.g. an unresolved conversation). Without it,
+#   a post-review BLOCKED state fails with guidance instead of silently
+#   overriding the protection setup_github.sh provisioned (2026-07 review).
 # --review-cycle N: current review fix cycle count (0-based, default 0).
 #   When N >= MAX_REVIEW_CYCLES and review/decision is still failing or pending,
 #   force-merges with --admin.
@@ -29,33 +33,39 @@
 set -euo pipefail
 
 PR_NUMBER="${1:-}"
-MODE="${2:-}"
+MODE=""
 REVIEW_CYCLE=0
 MAX_REVIEW_CYCLES=2
 NO_REVIEW=0
+ALLOW_ADMIN=0
 
 if [ -z "$PR_NUMBER" ]; then
-  echo "Usage: monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review]" >&2
+  echo "Usage: monitor_pr.sh <pr-number> [--merge] [--review-cycle N] [--no-review] [--admin]" >&2
   exit 1
 fi
 
-if [ -n "$MODE" ] && [ "$MODE" != "--merge" ]; then
-  echo "Unknown option: $MODE" >&2
-  exit 2
-fi
-
-# Parse remaining flags (order-independent after position 2).
-# Shift past <pr-number> and optional --merge; remaining args are flags.
+# Parse flags (order-independent). --merge is just another flag: the usage
+# line presents every flag as independent, so `monitor_pr.sh 12 --no-review`
+# must not be rejected for lacking --merge in position 2.
 shift 1  # drop PR_NUMBER
-[ "$MODE" = "--merge" ] && shift 1  # drop --merge if present
 while [ $# -gt 0 ]; do
   case "$1" in
+    --merge)          MODE="--merge"; shift ;;
     --review-cycle)   REVIEW_CYCLE="${2:-0}"; shift 2 ;;
     --review-cycle=*) REVIEW_CYCLE="${1#*=}"; shift ;;
     --no-review)      NO_REVIEW=1; shift ;;
+    --admin)          ALLOW_ADMIN=1; shift ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
+
+# --admin, --no-review and --review-cycle only take effect while merging. Warn
+# loudly if they were passed without --merge so the flag isn't silently a no-op.
+if [ "$MODE" != "--merge" ]; then
+  if [ "$ALLOW_ADMIN" -eq 1 ] || [ "$NO_REVIEW" -eq 1 ] || [ "$REVIEW_CYCLE" -ne 0 ]; then
+    echo "WARNING: --admin/--no-review/--review-cycle only apply with --merge; ignoring (monitor-only run)." >&2
+  fi
+fi
 
 _count_pending() {
   echo "$1" | python3 -c "
@@ -212,6 +222,7 @@ while { [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UN
   # Bot reviewers like Codex post comments without changing reviewDecision.
   if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] && _has_review_activity; then
     echo "  Review comments detected — proceeding without waiting for formal approval."
+    REVIEW_ACTIVITY=1
     break
   fi
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
@@ -241,8 +252,15 @@ if [ "$REVIEW_DECISION" = "CHANGES_REQUESTED" ]; then
 fi
 
 if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
-  echo "PR #$PR_NUMBER: review/decision still pending after ${REVIEW_TIMEOUT}s — no reviewer has acted."
-  echo "  Full PR: $(gh pr view "$PR_NUMBER" --json url -q '.url' 2>/dev/null || true)"
+  if [ "${REVIEW_ACTIVITY:-0}" -eq 1 ]; then
+    # The wait loop broke early because reviews were posted (e.g. a bot's
+    # COMMENTED review) — surface them instead of claiming nobody acted.
+    echo "PR #$PR_NUMBER: review comments posted, but no formal approval yet:"
+    _print_review_comments
+  else
+    echo "PR #$PR_NUMBER: review/decision still pending after ${REVIEW_TIMEOUT}s — no reviewer has acted."
+    echo "  Full PR: $(gh pr view "$PR_NUMBER" --json url -q '.url' 2>/dev/null || true)"
+  fi
 
   if [ "$MODE" = "--merge" ]; then
     if [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ]; then
@@ -272,8 +290,21 @@ if [ "$MODE" = "--merge" ]; then
       exit 1
     fi
   elif [ "$MERGE_STATE" = "BLOCKED" ]; then
-    echo "PR is blocked by review protection — merging with admin override."
-    _admin_merge
+    # The review gate already passed to reach here, so BLOCKED means a DIFFERENT
+    # branch-protection rule is unmet — most often an unresolved review thread.
+    # Auto-admin-merging past it on cycle 0 silently defeats the protection this
+    # very tool set up, so it requires an explicit --admin opt-in (2026-07
+    # review; backported from the template copy).
+    if [ "$ALLOW_ADMIN" -eq 1 ]; then
+      echo "PR is blocked by branch protection — merging with admin override (--admin)."
+      _admin_merge
+    else
+      echo "ERROR: PR #$PR_NUMBER is BLOCKED by branch protection after the review gate" >&2
+      echo "  passed — typically an unresolved review conversation, or a required" >&2
+      echo "  check that has not reported. Resolve the blocker, or re-run with --admin" >&2
+      echo "  to override." >&2
+      exit 1
+    fi
   else
     if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
       if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --auto; then

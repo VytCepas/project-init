@@ -369,6 +369,22 @@ def _prompt(label: str, default: str = "") -> str:
     return Prompt.ask(label, default=default) or default
 
 
+def _prompt_choice(label: str, valid: tuple[str, ...], *, default: str) -> str:
+    """Prompt for one of *valid*, case-insensitively, re-asking on a bad answer.
+
+    Interactive counterpart to argparse ``choices``: typing ``Python`` or ``MIT``
+    must not silently coerce to ``none`` — normalize case and re-prompt with the
+    valid set instead (PI review 2026-07).
+    """
+    from rich.console import Console
+
+    while True:
+        value = _prompt(label, default=default).strip().lower()
+        if value in valid:
+            return value
+        Console().print(f"[red]Invalid choice {value!r}. Valid: {', '.join(valid)}[/red]")
+
+
 def _prompt_validated(label: str, *, default: str, flag: str, allow_empty: bool = False) -> str:
     """Prompt, re-asking until the value would not corrupt config.yaml.
 
@@ -1185,11 +1201,18 @@ def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict]:
     """
     if cli_mcps.strip():
         try:
-            return _resolve_mcps_non_interactive(cli_mcps, cli_browser)
+            selected = _resolve_mcps_non_interactive(cli_mcps, cli_browser)
         except ValueError as e:
             from rich.console import Console
 
             Console().print(f"[red]{e}[/red] — choose from the catalog instead.")
+        else:
+            # --mcps pins the catalog picks, but browser automation is its own
+            # concern (ADR-023) — still offer it when --browser was not given,
+            # matching how devcontainer/mise/vscode still prompt in the same run.
+            if not cli_browser and _choose_browser_interactive():
+                selected = selected + [PLAYWRIGHT_MCP]
+            return selected
     selected = _choose_mcps_interactive(MCP_CATALOG)
     if cli_browser or _choose_browser_interactive():
         selected = selected + [PLAYWRIGHT_MCP]
@@ -1226,6 +1249,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     cli_devcontainer: bool = False,
     cli_mise: bool = False,
     cli_vscode: bool = False,
+    cli_agents: str = "claude",
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -1248,9 +1272,11 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     project_description = _prompt_validated(
         "Description", default=cli_description or "", flag="description"
     )
-    language = _prompt("Language (python/node/go/rust/none)", default=cli_language or "none")
-    if language not in {"python", "node", "go", "rust", "none"}:
-        language = "none"
+    language = _prompt_choice(
+        "Language (python/node/go/rust/none)",
+        ("python", "node", "go", "rust", "none"),
+        default=cli_language or "none",
+    )
     (
         delivery_flag,
         deploy_flag,
@@ -1273,11 +1299,11 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         flag="owner",
         allow_empty=True,
     )
-    license_choice = _prompt(
-        "License (mit/apache-2.0/proprietary/none)", default=cli_license or "none"
+    license_choice = _prompt_choice(
+        "License (mit/apache-2.0/proprietary/none)",
+        ("mit", "apache-2.0", "proprietary", "none"),
+        default=cli_license or "none",
     )
-    if license_choice not in {"mit", "apache-2.0", "proprietary", "none"}:
-        license_choice = "none"
 
     # Toolchain toggles — each explains its value before asking (#472, ADR-023).
     # A store_true CLI flag pre-accepts the toggle and skips its prompt.
@@ -1314,7 +1340,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     while True:
         agents_raw = _prompt(
             "Agents/surfaces (claude always; add codex/ollama/cursor/antigravity/vscode, comma-separated)",
-            default="claude",
+            default=cli_agents or "claude",
         )
         try:
             agents = resolve_agents(agents_raw)
@@ -2153,6 +2179,24 @@ def _resolve_preset_memory(preset: dict, parser: argparse.ArgumentParser) -> str
     return resolved
 
 
+def _resolve_preset_lifecycle(preset: dict, parser: argparse.ArgumentParser) -> str:
+    """Validate a preset's ``lifecycle`` tier (#476).
+
+    Only the exact string ``"none"`` disables the lifecycle downstream
+    (``inputs.lifecycle != "none"``), so an off-meaning value — a TOML boolean
+    ``false``, ``"off"``, a typo'd ``"None"`` — would silently ship the full
+    lifecycle overlay, the opposite of the preset author's intent. Reject it up
+    front instead (mirrors _resolve_preset_memory).
+    """
+    raw = preset.get("vars", {}).get("lifecycle", "github")
+    if raw not in _LIFECYCLE_TIERS:
+        parser.error(
+            f"preset {preset['name']!r} declares an invalid lifecycle "
+            f"{raw!r}; valid: {', '.join(_LIFECYCLE_TIERS)}"
+        )
+    return raw
+
+
 def _cli(argv: list[str]) -> int:
     """Dispatch a fully-formed argv to the scaffold CLI or a subcommand."""
     _subcommands = {
@@ -2197,7 +2241,7 @@ def _cli(argv: list[str]) -> int:
     preset_memory = _resolve_preset_memory(preset, parser)
     # Lifecycle-tier fallback when --lifecycle is absent (#476): the preset's
     # tier (a preset may set lifecycle = "none" to be minimal), default "github".
-    preset_lifecycle = preset.get("vars", {}).get("lifecycle", "github")
+    preset_lifecycle = _resolve_preset_lifecycle(preset, parser)
 
     # Validate non-interactive args / gather interactive input BEFORE creating
     # the target directory (PI-20, PI-199: a bad flag OR a Ctrl-C at an
@@ -2240,6 +2284,7 @@ def _cli(argv: list[str]) -> int:
             cli_devcontainer=args.devcontainer,
             cli_mise=args.mise,
             cli_vscode=args.vscode,
+            cli_agents=args.agents,
         )
     _validate_text_inputs(inputs, parser)
     _validate_existing_config(target, parser)

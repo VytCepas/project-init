@@ -792,6 +792,11 @@ def _coerce_preset_var(value: object) -> str:
     return str(value)
 
 
+# Preset [vars] keys consumed by CLI/upgrade resolution (tier/flag selection),
+# not template variables — see the skip inside _apply_preset_vars.
+_PRESET_CONTROL_KEYS = frozenset({"memory_stack", "lifecycle", "governance"})
+
+
 def _apply_preset_vars(variables: dict[str, str], preset: dict) -> dict[str, str]:
     """Merge preset ``[vars]`` (#252) into the render variables.
 
@@ -814,6 +819,16 @@ def _apply_preset_vars(variables: dict[str, str], preset: dict) -> dict[str, str
     merged = dict(variables)
     owner_was_unset = not merged.get("project_owner")
     for key, value in preset_vars.items():
+        # Control keys (memory_stack/lifecycle/governance) configure the
+        # CLI/upgrade resolution itself and are already folded into the render
+        # variables upstream with the right precedence. Merging them here
+        # collides with the same-named gate variables: a `governed` preset's
+        # `governance = true` would refill the gate an explicit
+        # `remove governance` set to "" (never converging), and a preset's
+        # `lifecycle = "none"` — a tier name, not a gate — is a TRUTHY string
+        # that would turn every {{#if lifecycle}} block ON (2026-07 review).
+        if key in _PRESET_CONTROL_KEYS:
+            continue
         if not merged.get(key):
             merged[key] = _coerce_preset_var(value)
     # If the preset supplied the owner into an empty slot (no --owner) and did

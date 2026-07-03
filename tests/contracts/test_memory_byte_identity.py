@@ -53,6 +53,12 @@ no other file drifted — `dag_workflow.py` (command-guard bypass fixes),
 `.gitignore` (no longer ignoring the committed `.codex/` wiring), `prod_guard.py`
 (rm split-flag detection), `commit-msg` (install comment), and the fallback
 hooks `pre_commit_gate.sh` / `post_edit_lint.sh` (cd to repo root).
+
+Exception (2026-07 review, second pass): `dag_workflow.py` closed the
+quoted-global-option guard bypass, capped its per-subprocess timeout below the
+hook budget, and made the nojira "PR already exists" short-circuit check the PR
+is OPEN. Only the `.claude/hooks/dag_workflow.py` hash was re-pinned across all
+four combos, after verifying every other file still matched.
 """
 
 from __future__ import annotations
