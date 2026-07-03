@@ -105,7 +105,7 @@ lint:
 # no-op on a fresh scaffold with no .ts sources yet — tsc errors with TS18003
 # ("No inputs were found") instead of passing (the #592-adjacent day-one gap)
 typecheck:
-    sh -c 'if find . \( -name "*.ts" -o -name "*.tsx" \) -not -path "./node_modules/*" | grep -q .; then bunx tsc --noEmit; else echo "No TypeScript sources yet — nothing to type-check."; fi'
+    sh -c 'if find . \( -name "*.ts" -o -name "*.tsx" \) -not -path "*/node_modules/*" | grep -q .; then bunx tsc --noEmit; else echo "No TypeScript sources yet — nothing to type-check."; fi'
 
 # auto-format project code (Biome is the formatter; eslint owns the gates)
 format:

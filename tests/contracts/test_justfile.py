@@ -111,6 +111,11 @@ class TestJustfilePerLanguage:
         body = _recipe_body((target / "justfile").read_text(), "typecheck")
         assert "tsc --noEmit" in body
         assert "No TypeScript sources yet" in body
+        # Prune node_modules at any depth (monorepos vendor .ts under nested
+        # node_modules) — a top-level-only "./node_modules/*" would falsely
+        # detect vendored sources and run tsc (PR #594 review).
+        assert "*/node_modules/*" in body
+        assert '"./node_modules/*"' not in body
 
     def test_python_setup_tolerates_missing_pyproject(self, tmp_path: Path):
         """`uv sync --group dev` hard-fails with no pyproject.toml (fresh
