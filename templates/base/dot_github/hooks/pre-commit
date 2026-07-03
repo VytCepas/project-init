@@ -1,11 +1,31 @@
 #!/usr/bin/env bash
-# pre-commit hook: scan staged changes for secrets with gitleaks (ADR-007).
+# pre-commit hook (ADR-007). Two gates, fastest-feedback-first:
+#   1. Lint: run `just lint` so a human committing from a terminal/IDE is held
+#      to the SAME static gate CI runs (ruff + shfmt + shellcheck). The Claude
+#      pre_commit_gate.sh only fires for agent-driven commits; this catches
+#      everyone. Fail-CLOSED when the tooling is present (block the commit,
+#      bypassable with `git commit --no-verify`); fail-open when `just`/the
+#      recipe is absent so a fresh clone without the toolchain still commits.
+#   2. Secrets: scan staged changes with gitleaks. Fail-OPEN if gitleaks is
+#      missing — the CI secret-scan job is the hard backstop.
 # Install: .claude/scripts/install_hooks.sh
-#
-# Fail-open by design: if gitleaks is not installed the hook warns and lets
-# the commit through — the CI secret-scan job is the hard backstop that
-# scans full history and blocks the merge.
 
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+# 1. Lint gate — same command surface as CI and the agent commit gate (PI-139).
+if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
+  (cd "$REPO_ROOT" && just --show lint >/dev/null 2>&1); then
+  if ! (cd "$REPO_ROOT" && just lint); then
+    echo "" >&2
+    echo "❌ pre-commit: 'just lint' failed — fix the errors above before committing." >&2
+    echo "   (bypass in an emergency with: git commit --no-verify)" >&2
+    exit 1
+  fi
+fi
+
+# 2. Secret scan.
 if ! command -v gitleaks >/dev/null 2>&1; then
   echo "WARNING: gitleaks not installed — skipping local secret scan." >&2
   echo "  CI will still scan; install for fast local feedback:" >&2

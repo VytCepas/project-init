@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# pre-push gate for the project-init repo itself (dogfood).
+#
+# Runs the SAME `just ci` (lint + tests) that CI runs, before the push leaves
+# the machine — so nothing red reaches a PR and the push→CI-fail→fix→re-push
+# loop is caught locally. This is the local↔CI parity gate whose absence let a
+# fresh-scaffold lint failure ship (the scaffolder's CI caught it only after a
+# push, and even then incompletely).
+#
+# Enabled automatically by `just setup` (git config core.hooksPath .githooks).
+# Bypass in an emergency with: git push --no-verify
+set -euo pipefail
+
+if command -v just >/dev/null 2>&1; then
+  echo "pre-push: running 'just ci' (lint + tests)…"
+  if ! just ci; then
+    echo ""
+    echo "❌ pre-push: 'just ci' failed — fix the errors above before pushing."
+    echo "   (bypass in an emergency with: git push --no-verify)"
+    exit 1
+  fi
+else
+  echo "pre-push: 'just' not found — skipping local CI gate (CI still runs)." >&2
+fi

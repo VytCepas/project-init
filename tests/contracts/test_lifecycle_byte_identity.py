@@ -150,6 +150,12 @@ _ADDED_SINCE_BASELINE = {
     ".claude/rules/rust.md",
     ".claude/rules/typescript.md",
     "ruff.toml",
+    # Shift-left commit hooks: the git pre-commit gained a `just lint` gate (so
+    # human commits are held to the same static gate as CI, not only agent
+    # commits), and pre-push gained a `just ci` gate. Deliberate content edits,
+    # not lifecycle-move drift; their behavior is covered by test_commit_hook_gates.py.
+    ".github/hooks/pre-commit",
+    ".github/hooks/pre-push",
 }
 
 
