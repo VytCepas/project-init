@@ -78,15 +78,20 @@ resolve_ref() {
     else
         warn "could not resolve the latest release (none published yet?) — falling back to the default branch"
         warn "pin explicitly with: PROJECT_INIT_REF=vX.Y.Z"
-        printf 'main\n'
+        # Empty ref = "track the repo's default branch". A distinct sentinel (not
+        # the literal 'main') so an explicit PROJECT_INIT_REF=main is honored as a
+        # literal branch, not hijacked into default-branch resolution — REQUESTED_REF
+        # is guaranteed non-empty, so empty can only mean this fallback (PI review).
+        printf ''
     fi
 }
 
 # 3. repo
 ensure_repo() {
     REF="$(resolve_ref)"
+    ref_label="${REF:-<default branch>}"
     if [ -d "$INSTALL_DIR/.git" ]; then
-        say "updating existing clone at $INSTALL_DIR (ref: $REF)"
+        say "updating existing clone at $INSTALL_DIR (ref: $ref_label)"
         # If PROJECT_INIT_REPO changed since the clone, repoint origin — else we
         # would silently keep updating from the old remote (PI review 2026-07).
         current_url="$(git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null || true)"
@@ -96,12 +101,12 @@ ensure_repo() {
         fi
         git -C "$INSTALL_DIR" fetch --tags --force origin
     else
-        say "cloning $REPO_URL ($REF) -> $INSTALL_DIR"
+        say "cloning $REPO_URL ($ref_label) -> $INSTALL_DIR"
         mkdir -p "$(dirname "$INSTALL_DIR")"
         git clone "$REPO_URL" "$INSTALL_DIR"
     fi
-    if [ "$REF" = "main" ]; then
-        # "main" is resolve_ref's fallback sentinel for "the repo's default
+    if [ -z "$REF" ]; then
+        # Empty ref = resolve_ref's fallback sentinel for "the repo's default
         # branch". Resolve it for real — a fork or mirror may default to
         # master/trunk, and a hard `checkout main` would die under `set -e`.
         git -C "$INSTALL_DIR" remote set-head origin --auto >/dev/null 2>&1 || true
@@ -111,8 +116,14 @@ ensure_repo() {
         git -C "$INSTALL_DIR" checkout -q "$default_branch"
         git -C "$INSTALL_DIR" pull --ff-only origin "$default_branch"
     else
-        # Release tags check out detached — exactly what a pinned install wants.
+        # An explicit PROJECT_INIT_REF — a literal branch OR tag. Check it out;
+        # a tag lands detached (immutable, no pull), while a branch pin should
+        # fast-forward to its latest tip. symbolic-ref -q HEAD succeeds only when
+        # on a branch, so it distinguishes the two without guessing.
         git -C "$INSTALL_DIR" checkout -q "$REF"
+        if git -C "$INSTALL_DIR" symbolic-ref -q HEAD >/dev/null 2>&1; then
+            git -C "$INSTALL_DIR" pull --ff-only origin "$REF"
+        fi
     fi
     say "installed: $(git -C "$INSTALL_DIR" describe --tags --always)"
 }

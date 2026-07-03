@@ -245,6 +245,30 @@ class TestGate:
         assert r.returncode == 1
         assert "team/examples/SYSTEM_CARD.md" in r.stdout
 
+    def test_gate_root_is_cwd_independent(self, tmp_path: Path):
+        # The gate must resolve the project root from the SCRIPT's location, not
+        # the caller's CWD (git rev-parse --show-toplevel) — else running it from
+        # inside another repo would validate that repo and vacuously pass, hiding
+        # a real violation in the scaffolded project (PI review 2026-07).
+        target = _scaffold(tmp_path / "p")
+        deep = target / _GOV / "team" / "examples"
+        deep.mkdir(parents=True)
+        (deep / "SYSTEM_CARD.md").write_text("---\nrole: bogus\n---\n", encoding="utf-8")
+        # An unrelated directory that is its own git repo (the trap for a
+        # CWD/toplevel-based resolver — it has no governance card, so a
+        # cwd-based gate would find nothing and pass).
+        other = tmp_path / "other-repo"
+        other.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=str(other), check=True)
+        r = subprocess.run(
+            ["bash", str(target / _GOV.parent / "scripts" / "governance_gate.sh")],
+            cwd=str(other),
+            capture_output=True,
+            text=True,
+        )
+        assert r.returncode == 1, r.stdout + r.stderr
+        assert "team/examples/SYSTEM_CARD.md" in r.stdout
+
     def test_future_last_reviewed_fails(self, tmp_path: Path):
         # A future date must not bypass the staleness guard (Copilot review #416).
         target = _scaffold(tmp_path / "p")

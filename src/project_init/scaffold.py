@@ -778,6 +778,20 @@ def _has_scaffold_record(config_file: Path) -> bool:
         return False
 
 
+def _coerce_preset_var(value: object) -> str:
+    """Coerce a TOML ``[vars]`` value to the string convention templates expect.
+
+    Gate variables follow the ``"true"``/``""`` convention that ``{{#if x}}``
+    reads via a non-empty check, so a TOML boolean must map onto it: ``true`` →
+    ``"true"``, ``false`` → ``""`` (OFF). A naive ``str(False)`` yields the
+    non-empty ``"False"``, which reads as truthy and would ENABLE a gate a preset
+    set to false — the opposite of intent. Everything else stringifies directly.
+    """
+    if isinstance(value, bool):
+        return "true" if value else ""
+    return str(value)
+
+
 def _apply_preset_vars(variables: dict[str, str], preset: dict) -> dict[str, str]:
     """Merge preset ``[vars]`` (#252) into the render variables.
 
@@ -787,16 +801,26 @@ def _apply_preset_vars(variables: dict[str, str], preset: dict) -> dict[str, str
     reference. Each fills a variable the resolved inputs left empty and adds
     preset-only keys; an explicit value (e.g. from ``--owner``) is non-empty and
     always wins, so ``--owner`` overrides a preset's project_owner. Values are
-    coerced to str — ``[vars]`` feed ``{{...}}`` substitution and a hand-authored
-    preset may write a TOML number.
+    coerced to the template string convention (see :func:`_coerce_preset_var`).
+
+    ``license_holder`` is derived from the owner upstream, so it is non-empty
+    before this runs and the fill guard would leave it out of step with a
+    preset-supplied ``project_owner``; re-derive it here so CODEOWNERS and the
+    LICENSE copyright agree (PI review 2026-07).
     """
     preset_vars = preset.get("vars") or {}
     if not preset_vars:
         return variables
     merged = dict(variables)
+    owner_was_unset = not merged.get("project_owner")
     for key, value in preset_vars.items():
         if not merged.get(key):
-            merged[key] = str(value)
+            merged[key] = _coerce_preset_var(value)
+    # If the preset supplied the owner into an empty slot (no --owner) and did
+    # not itself pin license_holder, keep the LICENSE copyright in step with the
+    # now-set project_owner — matching _build_variables' derivation (strip "@").
+    if owner_was_unset and merged.get("project_owner") and "license_holder" not in preset_vars:
+        merged["license_holder"] = merged["project_owner"].removeprefix("@")
     return merged
 
 

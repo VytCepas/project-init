@@ -596,8 +596,6 @@ def _memory_stack_from_flags(v: dict) -> str:
     carries the individual gate flags but no stack name. The ladder is a strict
     superset order (none < auto < obsidian-only < obsidian-graphify <
     obsidian-graphify-rag), so the highest recorded gate names the stack.
-    Pre-#466 projects always shipped the obsidian-only vault, so that is the
-    floor when only the (pre-decomposition) vault is implied.
     """
     if v.get("rag"):
         return "obsidian-graphify-rag"
@@ -607,6 +605,12 @@ def _memory_stack_from_flags(v: dict) -> str:
         return "obsidian-only"
     if v.get("memory"):
         return "auto"
+    # A recorded-but-falsy `memory` flag is an explicit memory-declined (core)
+    # project — honor it as "none" rather than resurrecting a vault. Only a
+    # record with NO memory signal at all predates the decomposition (#466),
+    # when every project shipped the obsidian-only vault — that is the floor.
+    if "memory" in v:
+        return "none"
     return "obsidian-only"
 
 

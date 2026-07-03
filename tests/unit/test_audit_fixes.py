@@ -26,7 +26,10 @@ class TestMemoryStackBackfill:
             ({"graphify": "true", "obsidian": "true"}, "obsidian-graphify"),
             ({"obsidian": "true"}, "obsidian-only"),
             ({"memory": "true"}, "auto"),
-            ({}, "obsidian-only"),  # bare pre-#466 record → obsidian floor
+            # `memory` recorded-but-empty = explicit core (memory declined) —
+            # must stay "none", never resurrect a vault.
+            ({"memory": ""}, "none"),
+            ({}, "obsidian-only"),  # no memory signal at all → pre-#466 floor
         ],
     )
     def test_stack_from_flags(self, flags, expected):
@@ -70,6 +73,36 @@ class TestPresetVarsReachRender:
     def test_no_vars_returns_input_unchanged(self):
         variables = {"project_name": "p"}
         assert sc._apply_preset_vars(variables, {"layers": ["base"]}) is variables
+
+    def test_bool_false_does_not_enable_a_gate(self):
+        # str(False) == "False" is truthy and would ENABLE the gate — a TOML
+        # false must coerce to "" (off), true to "true".
+        preset = {"layers": ["base"], "vars": {"observability": False, "governance": True}}
+        merged = sc._apply_preset_vars({"observability": "", "governance": ""}, preset)
+        assert merged["observability"] == ""
+        assert merged["governance"] == "true"
+
+    def test_owner_preset_keeps_license_holder_in_step(self):
+        # Preset supplies project_owner, no --owner: LICENSE copyright must track
+        # CODEOWNERS, not stay the project-name fallback.
+        preset = {"layers": ["base"], "vars": {"project_owner": "@acme/team"}}
+        merged = sc._apply_preset_vars(
+            {"project_owner": "", "license_holder": "myproj", "project_name": "myproj"},
+            preset,
+        )
+        assert merged["project_owner"] == "@acme/team"
+        assert merged["license_holder"] == "acme/team"
+
+    def test_explicit_owner_leaves_license_holder_untouched(self):
+        # With an explicit --owner, license_holder was already derived from it;
+        # a preset project_owner must not override the user's owner or holder.
+        preset = {"layers": ["base"], "vars": {"project_owner": "@acme/team"}}
+        merged = sc._apply_preset_vars(
+            {"project_owner": "@mine", "license_holder": "mine", "project_name": "p"},
+            preset,
+        )
+        assert merged["project_owner"] == "@mine"
+        assert merged["license_holder"] == "mine"
 
 
 class TestWizardHonorsMcpsFlag:

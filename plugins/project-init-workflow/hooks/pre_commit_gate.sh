@@ -26,11 +26,20 @@ cmd = (d.get('tool_input', {}) or {}).get('command', '') or ''
 # Strip git global options (git -C PATH / -c K=V / --git-dir=… / --no-pager / …)
 # that sit BETWEEN 'git' and its subcommand, so a disguised 'git -C . commit'
 # still matches the 'git commit' check below instead of bypassing the gate
-# (PI review 2026-07).
+# (PI review 2026-07). The value matcher treats a single-quoted run as one unit
+# so a value with spaces ('-c core.pager=\'less -R\'') is fully consumed rather
+# than leaving residue that dodges the 'git commit' check.
+val = r\"(?:[^\s']|'[^']*')+\"
 cmd = re.sub(
-    r'\bgit\s+(?:-C\s+\S+\s+|-c\s+\S+\s+|--git-dir=\S+\s+|--work-tree=\S+\s+'
-    r'|--namespace=\S+\s+|--exec-path=\S+\s+|-p\s+|--paginate\s+|--no-pager\s+'
-    r'|--bare\s+|--literal-pathspecs\s+)+',
+    r'\bgit\s+(?:'
+    r'-C\s+' + val + r'\s+|'
+    r'-c\s+' + val + r'\s+|'
+    r'--git-dir=' + val + r'\s+|'
+    r'--work-tree=' + val + r'\s+|'
+    r'--namespace=' + val + r'\s+|'
+    r'--exec-path=' + val + r'\s+|'
+    r'-p\s+|--paginate\s+|--no-pager\s+|--bare\s+|--literal-pathspecs\s+'
+    r')+',
     'git ',
     cmd,
 )
