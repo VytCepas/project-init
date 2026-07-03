@@ -345,6 +345,12 @@ def _three_way_merge(base: str, ours: str, theirs: str) -> tuple[str, bool]:
 
 
 def _is_preserved(rel: Path, preserve_globs: list[str] | None = None) -> bool:
+    # KEEP IN SYNC with scaffold._should_preserve: this is the manifest-time
+    # (path-only) view of the same governance/glob/README/preserve-dir policy
+    # that _should_preserve applies at render-time (plus its disk-state and
+    # config-record checks). If the two disagree about what is "managed", the
+    # scaffold that refreshes a file and the upgrade that records it drift apart
+    # — the exact README-parked-as-.new bug this classification fixes.
     if rel.as_posix() in _GOVERNANCE_USER_FILES:
         return True
     if _matches_preserve_glob(rel, preserve_globs or []):

@@ -90,6 +90,16 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# --admin, --no-review and --review-cycle only take effect while merging. Warn
+# loudly if they were passed without --merge (e.g. `monitor_pr.sh 12 --admin`)
+# so the flag isn't silently a no-op — the script would otherwise just monitor
+# and exit 0, looking like a successful merge that never happened.
+if [ "$MODE" != "--merge" ]; then
+  if [ "$ALLOW_ADMIN" -eq 1 ] || [ "$NO_REVIEW" -eq 1 ] || [ "$REVIEW_CYCLE" -ne 0 ]; then
+    echo "WARNING: --admin/--no-review/--review-cycle only apply with --merge; ignoring (monitor-only run)." >&2
+  fi
+fi
+
 _count_pending() {
   echo "$1" | "$PY" -c "
 import json, sys

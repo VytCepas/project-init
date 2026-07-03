@@ -144,9 +144,19 @@ def emit(
     """
     from project_init.scaffold import _emit_generated
 
+    # Detect CCR routes from the live project (detect_root) so upgrade/remove
+    # don't clobber the user's real routes with staging's template default. But
+    # on `add multi_model` the live project has no config yet (it's the file
+    # being added) — fall back to the freshly-rendered one in *target* (staging)
+    # that apply is about to install, so the AIBOM reflects the routes actually
+    # being added rather than an empty table.
+    root = detect_root or target
+    if detect_root is not None and not (detect_root / _CCR_CONFIG_REL).is_file():
+        root = target
+
     return _emit_generated(
         target / _OUTPUT_REL,
-        render_aibom(detect_root or target, variables),
+        render_aibom(root, variables),
         first_scaffold=first_scaffold,
         conflicts=conflicts,
         rel=_OUTPUT_REL,

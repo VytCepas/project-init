@@ -451,6 +451,10 @@ def _should_preserve(rel_path: Path, target: Path, preserve_globs: list[str] | N
     An explicit user glob outranks the README refresh rule — otherwise
     ``preserve: ["README.md"]`` would be silently ineffective while ``upgrade``
     honors the same glob (2026-07 review).
+
+    KEEP IN SYNC with ``upgrade._is_preserved``, which encodes the same
+    governance/glob/README/preserve-dir policy at manifest-recording time. If
+    the two disagree about what is "managed", scaffold and upgrade drift apart.
     """
     dest = target / rel_path
     if not dest.exists():

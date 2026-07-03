@@ -420,9 +420,12 @@ class TestUpgradeApply:
     def test_preserved_dirs_untouched(self, tmp_path: Path, capsys):
         target = tmp_path / "p"
         _scaffold(target)
-        memory_files = list((target / ".claude" / "memory").glob("*.md"))
-        assert memory_files, "fixture needs a scaffolded memory file"
-        probe = memory_files[0]
+        # A user-authored memory note — NOT README.md, which is template-owned
+        # (_ALWAYS_OVERWRITE) and refreshed even inside preserved dirs (see
+        # test_vault_readme_is_managed_and_refreshed). Globbing memory/*.md and
+        # taking [0] was order-dependent and could land on the now-managed
+        # README, so probe an explicit user file instead.
+        probe = target / ".claude" / "memory" / "my-note.md"
         probe.write_text("hand-written agent memory\n")
 
         rc = main(["upgrade", str(target), "--apply"])

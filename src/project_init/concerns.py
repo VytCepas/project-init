@@ -130,8 +130,12 @@ def _delete_orphans(
 
     Returns ``(deleted, kept)``. A removed file whose current bytes differ from
     the recorded hash was edited by the user — it is kept and reported, never
-    deleted. ``removed`` already excludes preserved dirs (memory/vault) and the
-    config record (compute_drift skips them), so source data is safe here.
+    deleted. ``removed`` is drawn from the recorded manifest, which never holds
+    the user's own source data (their memory/vault notes are preserved and were
+    never recorded), so a concern's accumulated notes are safe here. Template-
+    owned files a concern uniquely ships *are* deleted — including a template
+    README inside a now-removed memory/vault dir (READMEs are managed, not
+    preserved; #592 review) — but only when byte-identical to the record.
     """
     deleted: list[Path] = []
     kept: list[Path] = []

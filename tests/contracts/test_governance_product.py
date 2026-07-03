@@ -151,6 +151,30 @@ class TestAIBOM:
         aibom = (target / _GOV / "ai-bom.generated.md").read_text(encoding="utf-8")
         assert "my-custom-model" in aibom
 
+    def test_add_multi_model_populates_aibom_routes(self, tmp_path: Path):
+        # `add multi-model` on a governance project: the live project has no CCR
+        # config yet mid-add (it's the file being installed), so detection must
+        # fall back to the freshly-rendered staging config rather than emitting
+        # an empty routes table. Detecting the *absent* live config would leave
+        # the AIBOM saying "no routes" while the config.json being added has them.
+        from project_init.concerns import apply_concern
+        from project_init.upgrade import write_scaffold_record
+
+        target = tmp_path / "p"
+        preset = load_preset("obsidian-only")
+        extra = overlay_layers("claude", no_plugin=False, governance=True)
+        preset = {**preset, "layers": list(preset["layers"]) + extra}
+        variables = make_variables(governance="true")
+        created = scaffold(target, preset, variables, strict=True)
+        write_scaffold_record(target, "obsidian-only", variables, created)
+        assert not (target / ".claude" / "multi-model" / "config.json").exists()
+
+        assert apply_concern(target, "multi-model", enable=True, apply=True) == 0
+        assert (target / ".claude" / "multi-model" / "config.json").is_file()
+        aibom = (target / _GOV / "ai-bom.generated.md").read_text(encoding="utf-8")
+        assert "Detected CCR routes" in aibom
+        assert "deepseek" in aibom, "AIBOM must show the routes just added, not an empty table"
+
 
 # --------------------------------------------------------------------------- #
 # Declarations lifecycle (seed-once + preserve)
