@@ -74,7 +74,7 @@ class TestInstallScriptPinning:
 
     def test_falls_back_to_main_when_no_release(self):
         content = self._script()
-        assert "falling back to main" in content
+        assert "falling back to the default branch" in content
 
     def test_strips_git_suffix_from_repo_slug(self):
         """Codex review regression: POSIX ERE has no lazy quantifier, so the
@@ -84,10 +84,14 @@ class TestInstallScriptPinning:
 
     def test_no_unpinned_update_path(self):
         """The old `git pull` on whatever-was-checked-out update path is gone:
-        pull only happens on an explicit main checkout."""
+        pull only happens on an explicit, resolved default-branch checkout (a
+        fork/mirror may not use `main`), never a bare `git pull`."""
         content = self._script()
-        assert "checkout -q main" in content
+        assert 'checkout -q "$default_branch"' in content
+        assert 'pull --ff-only origin "$default_branch"' in content
         assert 'checkout -q "$REF"' in content
+        # No unpinned `git pull` that would track whatever HEAD happens to be.
+        assert "pull --ff-only\n" not in content
 
 
 class TestVersionConsistency:

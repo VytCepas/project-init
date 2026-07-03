@@ -12,6 +12,13 @@
 
 [tools]
 just = "1"
+# Shell-hook gate tools — `just lint` shellchecks/shfmts .claude/*.sh in every
+# language. Pinning them here means `mise install` provisions the full lint
+# toolchain; without them a mise-only clone has `just` (which fail-closes the
+# pre-commit hook) but not shellcheck/shfmt, so `just lint` would block every
+# commit.
+shellcheck = "latest"
+shfmt = "latest"
 {{#if python}}python = "3.12"
 uv = "latest"
 {{/if python}}{{#if node}}bun = "1"

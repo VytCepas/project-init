@@ -10,6 +10,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # Resolve Python through the canonical helper (PI-361). _py.sh ships with the
 # base layer at .claude/hooks/_py.sh.
 PY="$HERE/../hooks/_py.sh"
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# Resolve the project root from THIS script's location (.claude/scripts/), not
+# `git rev-parse --show-toplevel`: the latter keys off the caller's CWD, so
+# running the gate from inside a different repo would validate that repo and
+# vacuously pass. The governance tree is always at <root>/.claude/governance,
+# i.e. two levels up from here — deterministic regardless of CWD.
+ROOT="$(cd "$HERE/../.." && pwd)"
 
 exec "$PY" "$HERE/governance_gate.py" "$ROOT"

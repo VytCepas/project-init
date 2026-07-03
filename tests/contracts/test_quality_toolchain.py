@@ -119,6 +119,41 @@ class TestNodeToolchain:
         content = (self.target / "eslint.config.mjs").read_text()
         assert 'project: "./tsconfig.json"' in content
 
+    def test_eslint_day_one_safe_scoping(self):
+        """A fresh scaffold has zero .ts files and this .mjs config sits outside
+        tsconfig — type-aware settings must be scoped to *.ts(x) and the config
+        files given a disableTypeChecked carve-out, or `eslint .` fails day-one
+        (TS18003 / file-not-in-project) and blocks the very first commit."""
+        content = (self.target / "eslint.config.mjs").read_text()
+        # Type-aware block (the one that sets parserOptions.project) is scoped.
+        assert 'files: ["**/*.ts", "**/*.tsx"]' in content
+        # Config / tooling files opt out of the type-checked rules.
+        assert "tseslint.configs.disableTypeChecked" in content
+        assert '["**/*.mjs", "**/*.cjs", "**/*.js"]' in content
+
+    def test_eslint_enforces_public_api_docs(self):
+        """Parity with ruff D / revive exported: public-symbol docs are an ERROR,
+        not a warning — jsdoc/require-jsdoc at error level on exported symbols."""
+        content = (self.target / "eslint.config.mjs").read_text()
+        assert '"jsdoc/require-jsdoc"' in content
+        assert '"error"' in content
+        assert "publicOnly: true" in content
+
+    def test_test_recipe_has_day_one_guard(self):
+        """`bun test` exits 1 with zero test files, which would fail `just ci`
+        (and the pre-push gate) on a fresh scaffold — the recipe must skip until
+        a test file exists, like the go/rust guards."""
+        justfile = (self.target / "justfile").read_text()
+        # The test recipe checks for test files before invoking bun test.
+        assert "*.test.ts" in justfile and "nothing to test" in justfile
+
+    def test_ts_only_policy_documented(self):
+        """TypeScript is mandatory; the rule doc must state no plain JS and warn
+        against re-opening the hole via allowJs."""
+        rule = (self.target / ".claude" / "rules" / "typescript.md").read_text()
+        assert "TypeScript only" in rule
+        assert "allowJs" in rule
+
     def test_tsconfig_base_rendered_and_parseable(self):
         config = json.loads((self.target / "tsconfig.base.json").read_text())
         options = config["compilerOptions"]
@@ -256,6 +291,15 @@ class TestRustToolchain:
         config = tomllib.loads((self.target / "clippy.toml").read_text())
         assert config["cognitive-complexity-threshold"] == 10
 
+    def test_lint_enforces_complexity_and_docs(self):
+        """clippy::cognitive_complexity is a nursery lint that -D pedantic does
+        NOT enable, so the clippy.toml threshold is inert without an explicit
+        -D; missing_docs gives public-API doc parity with ruff D / go revive.
+        Both must be denied on the actual `just lint` clippy invocation."""
+        justfile = (self.target / "justfile").read_text()
+        assert "-D clippy::cognitive_complexity" in justfile
+        assert "-D missing_docs" in justfile
+
     def test_rustfmt_config_rendered(self):
         content = (self.target / "rustfmt.toml").read_text()
         assert "edition" in content
@@ -286,6 +330,32 @@ class TestRustToolchain:
         assert "taiki-e/install-action" in ci
         assert "cargo-llvm-cov" in ci
         assert "llvm-tools-preview" in ci
+
+
+class TestShellLintGate:
+    """The lint recipe's shell-hook checks (shellcheck/shfmt) must not fail-close
+    when those tools are absent — otherwise the fail-closed pre-commit hook
+    blocks every commit on a clone that has `just` but not shellcheck/shfmt."""
+
+    def test_lint_shell_checks_are_fail_open(self, tmp_target: Path):
+        target = _scaffold_language(tmp_target, "python")
+        justfile = (target / "justfile").read_text()
+        # Guarded on tool presence rather than an unconditional `find … -exec`.
+        assert "command -v shellcheck" in justfile
+        assert "command -v shfmt" in justfile
+        assert "skipping shell lint" in justfile
+
+    def test_mise_provisions_shell_gate_tools(self, tmp_target: Path):
+        """mise pins the gate toolchain so `mise install` yields a complete
+        local lint environment (just + shellcheck + shfmt), not just `just`."""
+        scaffold(
+            tmp_target,
+            fallback_preset(),
+            fallback_variables(language="python", python="true", mise="true"),
+        )
+        mise = (tmp_target / "mise.toml").read_text()
+        assert "shellcheck" in mise
+        assert "shfmt" in mise
 
 
 class TestNoLanguage:

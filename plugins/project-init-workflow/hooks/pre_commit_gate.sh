@@ -17,12 +17,33 @@ PY="$(dirname "$0")/_py.sh"
 INPUT=$(cat)
 
 CMD=$(printf '%s' "$INPUT" | "$PY" -c "
-import json, sys
+import json, re, sys
 try:
     d = json.load(sys.stdin)
 except Exception:
     sys.exit(0)
-print((d.get('tool_input', {}) or {}).get('command', '') or '')
+cmd = (d.get('tool_input', {}) or {}).get('command', '') or ''
+# Strip git global options (git -C PATH / -c K=V / --git-dir=… / --no-pager / …)
+# that sit BETWEEN 'git' and its subcommand, so a disguised 'git -C . commit'
+# still matches the 'git commit' check below instead of bypassing the gate
+# (PI review 2026-07). The value matcher treats a single-quoted run as one unit
+# so a value with spaces ('-c core.pager=\'less -R\'') is fully consumed rather
+# than leaving residue that dodges the 'git commit' check.
+val = r\"(?:[^\s']|'[^']*')+\"
+cmd = re.sub(
+    r'\bgit\s+(?:'
+    r'-C\s+' + val + r'\s+|'
+    r'-c\s+' + val + r'\s+|'
+    r'--git-dir=' + val + r'\s+|'
+    r'--work-tree=' + val + r'\s+|'
+    r'--namespace=' + val + r'\s+|'
+    r'--exec-path=' + val + r'\s+|'
+    r'-p\s+|--paginate\s+|--no-pager\s+|--bare\s+|--literal-pathspecs\s+'
+    r')+',
+    'git ',
+    cmd,
+)
+print(cmd)
 " 2>/dev/null || true)
 
 # Only intercept git commit commands
