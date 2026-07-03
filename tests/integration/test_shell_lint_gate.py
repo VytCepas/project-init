@@ -96,6 +96,6 @@ def test_emitted_claude_scripts_pass_shellcheck(tmp_target: Path):
         )
         if result.returncode != 0:
             failures.append(f"{p.relative_to(tmp_target)}:\n{result.stdout}{result.stderr}")
-    assert not failures, "emitted .claude scripts fail `shellcheck -S error`:\n" + "\n".join(
+    assert not failures, "emitted .claude scripts fail `shellcheck -S error -x`:\n" + "\n".join(
         failures
     )

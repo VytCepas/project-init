@@ -73,7 +73,7 @@ def test_ruff_passes_with_lifecycle_hooks(tmp_target: Path):
 
     Reproduces the CLI's layer assembly (preset + lifecycle overlay) so
     ``.claude/hooks/dag_workflow.py`` is emitted and actually linted — the file
-    the obsidian-only-only guard above never covers.
+    the obsidian-only guard above never covers.
     """
     preset = load_preset("obsidian-only")
     stack = preset.get("vars", {}).get("memory_stack", "obsidian-only")
