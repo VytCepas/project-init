@@ -30,9 +30,26 @@ WAIT_MIN=5
 REVIEWERS=()
 while [ $# -gt 0 ]; do
   case "$1" in
-    --reviewer) [ $# -ge 2 ] || { echo "Missing value for --reviewer" >&2; exit 1; }; REVIEWERS+=("$2"); shift 2 ;;
-    --wait) [ $# -ge 2 ] || { echo "Missing value for --wait" >&2; exit 1; }; WAIT_MIN="$2"; shift 2 ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  --reviewer)
+    [ $# -ge 2 ] || {
+      echo "Missing value for --reviewer" >&2
+      exit 1
+    }
+    REVIEWERS+=("$2")
+    shift 2
+    ;;
+  --wait)
+    [ $# -ge 2 ] || {
+      echo "Missing value for --wait" >&2
+      exit 1
+    }
+    WAIT_MIN="$2"
+    shift 2
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
   esac
 done
 
@@ -83,7 +100,10 @@ if [ "$PROFILE" = "org" ]; then
     # parts can be empty when every --reviewer failed to resolve; the ${arr[*]+}
     # guard keeps that path on bash < 4.4 (macOS 3.2), where expanding an empty
     # array under `set -u` is fatal, so it reaches the UNCHANGED warning below.
-    reviewers_json="[$(IFS=,; echo ${parts[*]+"${parts[*]}"})]"
+    reviewers_json="[$(
+      IFS=,
+      echo ${parts[*]+"${parts[*]}"}
+    )]"
   fi
   if [ "$reviewers_json" = "[]" ]; then
     # Do NOT PUT an empty-reviewers payload — that would WIPE any reviewers already
@@ -93,14 +113,14 @@ if [ "$PROFILE" = "org" ]; then
     echo "    setup_env_protection.sh --reviewer @your-org/your-team" >&2
     SKIP_PROD=1
   else
-    cat > "$BODY" <<JSON
+    cat >"$BODY" <<JSON
 { "prevent_self_review": true, "can_admins_bypass": false, "reviewers": $reviewers_json,
   "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true } }
 JSON
     GATE_DESC="required reviewers + prevent-self-review + no admin bypass (hard human gate)"
   fi
 else
-  cat > "$BODY" <<JSON
+  cat >"$BODY" <<JSON
 { "wait_timer": $WAIT_MIN,
   "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true } }
 JSON
@@ -108,12 +128,12 @@ JSON
 fi
 
 if [ "$SKIP_PROD" = 1 ]; then
-  :  # production left untouched (see warning above)
+  : # production left untouched (see warning above)
 elif gh api "repos/$OWNER/$NAME/environments/production" -X PUT --input "$BODY" >/dev/null 2>&1; then
   echo "Environment 'production' ensured: $GATE_DESC"
   # Restrict production deploys to the base branch.
   if gh api "repos/$OWNER/$NAME/environments/production/deployment-branch-policies" \
-       -X POST -f name="$BASE" >/dev/null 2>&1; then
+    -X POST -f name="$BASE" >/dev/null 2>&1; then
     echo "  production deploys restricted to '$BASE'"
   else
     echo "  (branch policy for '$BASE' may already exist)"

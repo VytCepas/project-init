@@ -49,6 +49,13 @@ normalization + GraphQL-merge rule + interpreter-heredoc scanning),
 (rm split-flag detection), `commit-msg` (corrected install comment), and the
 fallback hooks `pre_commit_gate.sh` / `post_edit_lint.sh` (cd to repo root so a
 subdirectory session lints the right paths).
+
+Exception (init-lint fix): `dag_workflow.py` gained three `# noqa: S603`
+directives on its `subprocess.run` calls — the scaffolded `ruff.toml` selects
+`S` and lints `.claude/**`, so a fresh lifecycle-on project's `just lint` failed
+on those argv-list (never shell-string) calls, mirroring the `# noqa: S310`
+package_guard.py already carries. Only the `.claude/hooks/dag_workflow.py` hash
+was re-pinned across all four combos, after verifying every other file matched.
 """
 
 from __future__ import annotations

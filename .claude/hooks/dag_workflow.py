@@ -63,7 +63,7 @@ else:
 
 def _run(cmd: list[str]) -> tuple[int, str]:
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)  # noqa: S603 — argv list built from internal literals/validated state, never a shell string
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return 1, ""
     return proc.returncode, proc.stdout
@@ -531,7 +531,7 @@ def cmd_push(branch: str | None, max_retries: int, *, force: bool = False) -> in
         push_cmd = ["git", "push", "-u", "origin", branch]
         if force:
             push_cmd.append("--force-with-lease")
-        proc = subprocess.run(push_cmd)
+        proc = subprocess.run(push_cmd)  # noqa: S603 — fixed git argv + validated branch name, never a shell string
         if proc.returncode == 0:
             sys.stdout.write(f"push: pushed {branch} ({expected_sha})\n")
             return 0
@@ -627,7 +627,7 @@ def cmd_finish(pr_number: int | None, review_cycle: int | None) -> int:
     monitor_args = ["bash", str(script), str(pr_number), "--merge"]
     if review_cycle is not None:
         monitor_args += ["--review-cycle", str(review_cycle)]
-    return subprocess.run(monitor_args).returncode
+    return subprocess.run(monitor_args).returncode  # noqa: S603 — fixed bash argv + resolved script path, never a shell string
 
 
 _VALID_TYPES = {"feat", "fix", "chore", "docs", "test"}
