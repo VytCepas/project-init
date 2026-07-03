@@ -49,6 +49,14 @@ if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
     trap - EXIT
     echo "" >&2
     echo "❌ pre-commit: 'just lint' failed — fix the errors above before committing." >&2
+    # `just lint` lints the whole tree, so untracked files are included too.
+    # That's usually what you want, but it means an untracked file unrelated to
+    # this commit can trip the gate — call that out so it's diagnosable rather
+    # than baffling.
+    if [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
+      echo "   Note: untracked files are linted too; if the error is in one, it isn't part" >&2
+      echo "   of this commit — check 'git status' (or 'git stash -u' them, then retry)." >&2
+    fi
     echo "   (bypass in an emergency with: git commit --no-verify)" >&2
     exit 1
   fi

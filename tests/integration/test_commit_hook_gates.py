@@ -42,6 +42,9 @@ def test_git_pre_commit_runs_lint_and_keeps_secret_scan(tmp_target: Path):
     # Lints the staged snapshot (strips unstaged changes via a patch), not the
     # working tree, so an unstaged fix can't mask a staged error.
     assert "git apply -R" in pre_commit
+    # Untracked files are linted too — the failure path says so, so a false
+    # failure from an unrelated untracked file is diagnosable, not baffling.
+    assert "git ls-files --others --exclude-standard" in pre_commit
     # Fail-closed when tooling is present, bypassable, and secrets still scanned.
     assert "--no-verify" in pre_commit
     assert "gitleaks" in pre_commit
@@ -63,6 +66,9 @@ def test_pre_commit_gate_has_per_file_shell_block(tmp_target: Path):
     gate = (tmp_target / ".claude" / "hooks" / "pre_commit_gate.sh").read_text()
     assert "shfmt -w -i 2" in gate
     assert "shellcheck -S error -x" in gate
+    # A shfmt parse error (nonzero exit) is recorded as blocking, not swallowed,
+    # so a broken script can't pass when shellcheck is unavailable.
+    assert "Shell format errors (shfmt)" in gate
 
 
 @pytest.mark.skipif(shutil.which("shfmt") is None, reason="shfmt not available")
@@ -95,6 +101,28 @@ def test_pre_commit_gate_autofixes_staged_shell(tmp_path: Path):
         ["git", "show", ":messy.sh"], cwd=target, capture_output=True, text=True
     ).stdout
     assert staged == bad.read_text()
+
+
+@pytest.mark.skipif(shutil.which("shfmt") is None, reason="shfmt not available")
+def test_pre_commit_gate_blocks_a_broken_staged_shell(tmp_path: Path):
+    """A staged .sh shfmt can't parse must block the commit (deny), not slip through."""
+    target = tmp_path / "proj"
+    scaffold(target, fallback_preset(), fallback_variables(language="python", python="true"))
+    hook = target / ".claude" / "hooks" / "pre_commit_gate.sh"
+    subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+    subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=target, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=target, check=True)
+
+    broken = target / "broken.sh"
+    broken.write_text("#!/usr/bin/env bash\nif [ ; then\n")  # unparseable
+    subprocess.run(["git", "add", "broken.sh"], cwd=target, check=True)
+
+    payload = json.dumps({"tool_input": {"command": "git commit -m x"}})
+    result = subprocess.run(
+        ["bash", str(hook)], input=payload, cwd=target, capture_output=True, text=True
+    )
+    # The gate signals a block via a PreToolUse deny decision on stdout.
+    assert '"permissionDecision": "deny"' in result.stdout, result.stdout
 
 
 @pytest.mark.skipif(shutil.which("just") is None, reason="just not available")

@@ -91,7 +91,13 @@ while IFS= read -r _f; do [ -n "$_f" ] && STAGED_SH+=("$_f"); done \
   < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.sh$' || true)
 if [ "${#STAGED_SH[@]}" -gt 0 ]; then
   if command -v shfmt >/dev/null 2>&1; then
-    shfmt -w -i 2 "${STAGED_SH[@]}" >/dev/null 2>&1 || true
+    # -w auto-formats in place. A NONZERO exit means shfmt could not parse a
+    # file (a real shell syntax error) and left it unchanged — record that as a
+    # blocking error instead of swallowing it, so a broken script can't slip
+    # through when shellcheck is unavailable.
+    if ! SHFMT_OUT=$(shfmt -w -i 2 "${STAGED_SH[@]}" 2>&1); then
+      ERRORS="${ERRORS}Shell format errors (shfmt):\n${SHFMT_OUT}\n"
+    fi
     git add "${STAGED_SH[@]}" 2>/dev/null || true
   fi
   if command -v shellcheck >/dev/null 2>&1; then
