@@ -16,6 +16,7 @@ the emitted output. This one does.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -27,6 +28,23 @@ from tests.helpers import make_variables
 
 _SHFMT = shutil.which("shfmt")
 _SHELLCHECK = shutil.which("shellcheck")
+
+
+def _require(tool: str | None, name: str) -> str:
+    """Return the tool path, or fail in CI / skip locally when it is absent.
+
+    A plain ``skipif`` would let this guard silently no-op wherever the tool
+    isn't installed — including CI if its install step is ever dropped, turning
+    a green check into one that tested nothing (the exact failure mode this
+    module exists to prevent). Under ``CI`` a missing tool is a hard error so
+    the gap is loud; locally it degrades to a skip so `just test` still runs.
+    """
+    if tool:
+        return tool
+    msg = f"{name} not on PATH"
+    if os.environ.get("CI"):
+        pytest.fail(f"{msg} — required in CI so the {name} scaffold-lint gate can't silently skip")
+    pytest.skip(msg)
 
 
 def _service_deploy_lifecycle(target: Path) -> Path:
@@ -64,8 +82,8 @@ def _claude_scripts(target: Path) -> list[Path]:
     return sorted((target / ".claude").rglob("*.sh"))
 
 
-@pytest.mark.skipif(_SHFMT is None, reason="shfmt not available")
 def test_emitted_claude_scripts_are_shfmt_clean(tmp_target: Path):
+    shfmt = _require(_SHFMT, "shfmt")
     _service_deploy_lifecycle(tmp_target)
     scripts = _claude_scripts(tmp_target)
     # Guard against the scaffold silently emitting nothing and the test passing
@@ -76,15 +94,15 @@ def test_emitted_claude_scripts_are_shfmt_clean(tmp_target: Path):
     dirty = []
     for p in scripts:
         result = subprocess.run(
-            [_SHFMT, "-d", "-i", "2", str(p)], capture_output=True, text=True
+            [shfmt, "-d", "-i", "2", str(p)], capture_output=True, text=True
         )
         if result.stdout.strip() or result.returncode != 0:
             dirty.append(f"{p.relative_to(tmp_target)}:\n{result.stdout}{result.stderr}")
     assert not dirty, "emitted .claude scripts fail `shfmt -d -i 2`:\n" + "\n".join(dirty)
 
 
-@pytest.mark.skipif(_SHELLCHECK is None, reason="shellcheck not available")
 def test_emitted_claude_scripts_pass_shellcheck(tmp_target: Path):
+    shellcheck = _require(_SHELLCHECK, "shellcheck")
     _service_deploy_lifecycle(tmp_target)
     scripts = _claude_scripts(tmp_target)
     assert scripts, "no .claude/**/*.sh emitted — test guards nothing"
@@ -92,7 +110,7 @@ def test_emitted_claude_scripts_pass_shellcheck(tmp_target: Path):
     failures = []
     for p in scripts:
         result = subprocess.run(
-            [_SHELLCHECK, "-S", "error", "-x", str(p)], capture_output=True, text=True
+            [shellcheck, "-S", "error", "-x", str(p)], capture_output=True, text=True
         )
         if result.returncode != 0:
             failures.append(f"{p.relative_to(tmp_target)}:\n{result.stdout}{result.stderr}")
