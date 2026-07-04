@@ -72,7 +72,8 @@ added individually at the prompts (or later, see §7).
 | **governed** | obsidian-only plus the AI-governance policy layer (for projects that build/operate an AI system). |
 
 Start with `obsidian-only` when in doubt. Move up or down the memory ladder
-later with `project-init add memory <tier> --target . --apply` (or
+later with `project-init add memory <stack> --target . --apply` (a stack name:
+`auto`, `obsidian-only`, `obsidian-graphify`, `obsidian-graphify-rag`; or
 `remove memory`) — it merges without overwriting your existing memory or
 vault content.
 

@@ -20,7 +20,7 @@ Before doing any GitHub issue, branch, push, PR, review, CI, or merge work, read
 ├── tools/                  # sync_plugin.py, third-party update checker, benchmark
 ├── templates/
 │   ├── base/               # always copied into target projects
-│   ├── auto/               # always-on emitted artifacts (agent memory files)
+│   ├── auto/               # agent memory files (memory tiers auto and higher)
 │   ├── fallback/           # shared hooks/skills — rendered only with --no-plugin (ADR-010)
 │   ├── lifecycle/          # GitHub lifecycle enforcement (default; --lifecycle none opts out)
 │   ├── lifecycle_fallback/ # lifecycle guard hooks + skills for --no-plugin

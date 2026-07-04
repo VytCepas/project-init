@@ -9,7 +9,7 @@ Templates live in `templates/` and are copied into target projects by the scaffo
 ```
 templates/
 ├── base/               # always copied into target projects
-├── auto/               # always-on emitted artifacts (agent memory files)
+├── auto/               # agent memory files (memory tiers `auto` and higher)
 ├── fallback/           # shared hooks/skills — rendered only with --no-plugin (ADR-010)
 ├── lifecycle/          # GitHub lifecycle enforcement (default; --lifecycle none opts out)
 ├── lifecycle_fallback/ # lifecycle guard hooks + skills for --no-plugin
@@ -19,7 +19,10 @@ templates/
 ├── multi_model/        # CCR model-switching overlay (--multi-model)
 ├── governance/         # AI governance overlay (--governance)
 ├── observability/      # transcript metrics overlay (--observability)
-├── codex/ antigravity/ amp/ junie/  # per-surface wiring overlays (--agents)
+├── codex/              # per-surface wiring overlay (--agents codex)
+├── antigravity/        # per-surface wiring overlay (--agents antigravity)
+├── amp/                # per-surface wiring overlay (--agents amp)
+├── junie/              # per-surface wiring overlay (--agents junie)
 └── presets/            # TOML preset definitions
 ```
 
