@@ -77,6 +77,9 @@ def _scaffold_agents(target: Path, *agent_names: str) -> Path:
         "agents": ",".join(agents),
         "codex": "true" if "codex" in agents else "",
         "antigravity": "true" if "antigravity" in agents else "",
+        "cursor": "true" if "cursor" in agents else "",
+        "amp": "true" if "amp" in agents else "",
+        "junie": "true" if "junie" in agents else "",
         "ollama": "true" if "ollama" in agents else "",
         "multi_agent": "true"
         if any(a in agents for a in ("codex", "antigravity", "cursor"))
@@ -224,6 +227,19 @@ class TestSupportTierDocs:
         assert "Working from a phone or tablet" in onboarding
         assert "Remote Control" in onboarding
         assert "repo-committed config" in onboarding
+
+    def test_every_selected_surface_named_in_tiers_note(self, tmp_path: Path):
+        """2026-07 QA: a user who picked amp/junie/cursor read a tiers paragraph
+        that never mentioned them — every selected surface gets its own note."""
+        target = _scaffold_agents(tmp_path / "p", "cursor", "amp", "junie")
+        agents_md = (target / "AGENTS.md").read_text()
+        assert "Cursor:" in agents_md
+        assert "Amp:" in agents_md
+        assert "Junie:" in agents_md
+        # Each note names where its artifacts land.
+        assert ".cursor/hooks.json" in agents_md
+        assert ".amp/settings.json" in agents_md
+        assert ".junie/mcp/mcp.json" in agents_md
 
     def test_codex_hook_described_as_advisory(self, tmp_path: Path):
         """#430: codex 0.138.0 does not fire project-scoped hooks without an

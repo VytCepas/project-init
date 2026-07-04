@@ -379,6 +379,13 @@ def _render(text: str, variables: dict[str, str]) -> str:
     looping until no block remains (unclosed markers survive for strict mode
     to flag).
     """
+    text = _process_blocks(text, variables)
+    # Then simple variable substitution.
+    return _VAR_RE.sub(lambda m: variables.get(m.group(1), m.group(0)), text)
+
+
+def _process_blocks(text: str, variables: dict[str, str]) -> str:
+    """Resolve {{#if var}}...{{/if var}} blocks, innermost-first, to a fixpoint."""
 
     def _replace_block(m: re.Match) -> str:
         key = m.group(1)
@@ -389,8 +396,33 @@ def _render(text: str, variables: dict[str, str]) -> str:
         if replaced == text:
             break
         text = replaced
-    # Then simple variable substitution.
-    return _VAR_RE.sub(lambda m: variables.get(m.group(1), m.group(0)), text)
+    return text
+
+
+def _unrendered_markers(text: str, variables: dict[str, str]) -> list[str]:
+    """Markers in template *source* that variable substitution will not resolve.
+
+    Scans after block processing but before substitution, so ``{{...}}`` text
+    arriving through a variable VALUE (e.g. a project description containing
+    literal handlebars) is data, not a template defect, and is never flagged.
+    """
+    blocked = _process_blocks(text, variables)
+    offenders: list[str] = []
+    for match in _ANY_PLACEHOLDER_RE.finditer(blocked):
+        var = _VAR_RE.fullmatch(match.group())
+        if var and var.group(1) in variables:
+            continue  # will be substituted
+        offenders.append(match.group())
+    return offenders
+
+
+def slugify(name: str) -> str:
+    """Kebab-case *name* for identifier-ish template slots (deploy app names).
+
+    Lowercase, non-alphanumerics collapse to single hyphens; a name with no
+    ASCII alphanumerics at all yields "" — callers pick their own fallback.
+    """
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
 def _dot_rename(name: str) -> str:
@@ -683,12 +715,8 @@ def _emit_file(
     return rendered
 
 
-def _validate_no_placeholders(rendered_files: list[tuple[Path, str]]) -> None:
-    """Raise TemplateRenderError if any rendered file kept a ``{{...}}`` marker."""
-    offenders: list[str] = []
-    for rel_path, content in rendered_files:
-        for match in _ANY_PLACEHOLDER_RE.finditer(content):
-            offenders.append(f"{rel_path}: {match.group()}")
+def _validate_no_placeholders(offenders: list[str]) -> None:
+    """Raise TemplateRenderError if any template kept an unresolvable ``{{...}}`` marker."""
     if offenders:
         msg = "strict mode: unrendered placeholders survived scaffolding:\n  " + "\n  ".join(
             offenders
@@ -896,7 +924,7 @@ def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
     created: list[Path] = []
     staged: list[Path] = []
     written: set[Path] = set()  # paths this run has emitted (later layers may overwrite)
-    rendered_files: list[tuple[Path, str]] = []  # for strict-mode scan
+    placeholder_offenders: list[str] = []  # for strict-mode scan
 
     # For strict mode: write to temp, validate, then copy into target.
     # Non-strict: write directly to target (best-effort behavior acceptable per PI-21).
@@ -933,14 +961,21 @@ def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
             if rendered is None:
                 continue
             if is_template and strict:
-                rendered_files.append((rel_path, rendered))
+                # Scan the template SOURCE, not the rendered output: literal
+                # {{...}} inside a variable value (user data) is not a defect.
+                placeholder_offenders += [
+                    f"{rel_path}: {marker}"
+                    for marker in _unrendered_markers(
+                        src.read_text(encoding="utf-8"), variables
+                    )
+                ]
             # Later layers legitimately re-write the same path; report it once.
             if rel_path not in written:
                 (staged if strict else created).append(rel_path)
                 written.add(rel_path)
 
         if strict:
-            _validate_no_placeholders(rendered_files)
+            _validate_no_placeholders(placeholder_offenders)
             created = _commit_staged(
                 work_dir, target, staged, first=first_scaffold, conflicts=conflicts
             )

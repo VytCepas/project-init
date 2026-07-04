@@ -72,6 +72,14 @@ class TestContainerDeploy:
         assert "flyctl deploy" in _deploy_yml(_service_deploy(tmp_path / "f", "fly")).read_text()
         assert "kubectl set image" in _deploy_yml(_service_deploy(tmp_path / "k", "k8s")).read_text()
 
+    @pytest.mark.parametrize("deploy", ["cloud-run", "fly", "k8s"])
+    def test_ship_stubs_use_project_slug(self, tmp_path: Path, deploy: str):
+        """2026-07 QA: the TODO ship stubs name the actual project (kebab-cased
+        {{project_slug}}), not a generic my-service the user must hunt down."""
+        text = _deploy_yml(_service_deploy(tmp_path / "svc", deploy)).read_text()
+        assert "my-project" in text  # make_variables' project_slug
+        assert "my-service" not in text
+
 
 class TestRegistryAndOff:
     def test_registry_publishes_not_deploys(self, tmp_path: Path):

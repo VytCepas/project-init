@@ -71,6 +71,92 @@ class TestCLI:
         with pytest.raises(SystemExit):
             main(["--non-interactive"])
 
+    def test_non_interactive_empty_flag_named_as_empty_not_missing(self, tmp_path, capsys):
+        """2026-07 QA: --name "" was passed, so the error must say it's empty,
+        not tell the user to pass a flag they already passed."""
+        from project_init.__main__ import main
+
+        with pytest.raises(SystemExit) as exc:
+            main(
+                [
+                    str(tmp_path / "p"),
+                    "--non-interactive",
+                    "--preset",
+                    "core",
+                    "--name",
+                    "",
+                    "--description",
+                    "d",
+                ]
+            )
+        assert exc.value.code == 2
+        err = capsys.readouterr().err
+        assert "must not be empty: --name" in err
+        assert "requires" not in err
+
+    def test_bare_subcommand_word_as_target_rejected(self, capsys):
+        """2026-07 QA: 'project-init --flags upgrade' is a mis-ordered subcommand,
+        not a scaffold into ./upgrade — reject with the ./upgrade path-form hint."""
+        from project_init.__main__ import main
+
+        with pytest.raises(SystemExit) as exc:
+            main(
+                [
+                    "--non-interactive",
+                    "--preset",
+                    "core",
+                    "--name",
+                    "p",
+                    "--description",
+                    "d",
+                    "upgrade",
+                ]
+            )
+        assert exc.value.code == 2
+        assert "./upgrade" in capsys.readouterr().err
+
+    def test_summary_notes_missing_git_repo(self, tmp_target: Path, capsys):
+        """2026-07 QA: the emitted hooks/workflows assume git — a non-git target
+        gets a next-step note, and stdout stays quiet about it in --json mode."""
+        from project_init.__main__ import main
+
+        rc = main(
+            [
+                str(tmp_target),
+                "--non-interactive",
+                "--preset",
+                "core",
+                "--name",
+                "p",
+                "--description",
+                "d",
+            ]
+        )
+        assert rc == 0
+        assert "not a git repository" in capsys.readouterr().out
+
+    def test_no_stdout_preamble_on_validation_failure(self, tmp_path, capsys):
+        """2026-07 QA: a failing run must emit nothing on stdout — the profile
+        notice is success output, printed only after validation passes."""
+        from project_init.__main__ import main
+
+        with pytest.raises(SystemExit):
+            main(
+                [
+                    str(tmp_path / "p"),
+                    "--non-interactive",
+                    "--preset",
+                    "core",
+                    "--name",
+                    'bad"name',
+                    "--description",
+                    "d",
+                ]
+            )
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "must not contain" in captured.err
+
     def test_target_is_existing_file_rejected_cleanly(self, tmp_path: Path):
         """A target that exists as a file must fail with a clean parser error,
         not an uncaught FileExistsError from mkdir(exist_ok=True) (e2e sweep)."""

@@ -78,6 +78,24 @@ class TestPythonToolchain:
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just typecheck" in ci
 
+    def test_ci_uv_sync_guarded_for_fresh_scaffold(self):
+        """2026-07 QA: a fresh scaffold ships no pyproject.toml — every CI job
+        that runs `uv sync --group dev` (integration tests, nightly mutation)
+        must guard on it like the justfile's setup recipe, or the first PR
+        shows red on jobs that have nothing to test yet."""
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
+        lines = ci.splitlines()
+        syncs = [i for i, line in enumerate(lines) if "uv sync --group dev" in line]
+        assert syncs, "expected uv sync steps in the python CI workflow"
+        for i in syncs:
+            window = "\n".join(lines[max(0, i - 12) : i])
+            assert "pyproject.toml" in window, (
+                f"line {i + 1}: `uv sync --group dev` without a nearby "
+                "pyproject.toml existence guard"
+            )
+        # Both the integration-tests job and the mutation job carry a guard.
+        assert ci.count("No pyproject.toml yet") >= 2
+
     def test_mkdocs_config_rendered(self):
         content = (self.target / "mkdocs.yml").read_text()
         assert "name: material" in content

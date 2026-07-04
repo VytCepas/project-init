@@ -25,6 +25,7 @@ from project_init.scaffold import (
     memory_tier,
     overlay_layers,
     scaffold,
+    slugify,
 )
 
 
@@ -101,7 +102,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "Subcommands:\n"
             "  project-init upgrade [target] [--apply]        re-render from the "
             "recorded config and report drift (PI-142)\n"
-            "  project-init add|remove <concern> [target]     toggle an overlay "
+            "  project-init add|remove <concern> [--target DIR]  toggle an overlay "
             "on an existing scaffold (#528)\n"
             "  project-init preset new <name> --extends <base>  author a company "
             "preset (#252)\n"
@@ -385,6 +386,23 @@ def _prompt_choice(label: str, valid: tuple[str, ...], *, default: str) -> str:
         Console().print(f"[red]Invalid choice {value!r}. Valid: {', '.join(valid)}[/red]")
 
 
+def _prompt_menu_index(question: str, count: int, *, default: int) -> int:
+    """IntPrompt that re-asks until the answer is inside the 1..count menu.
+
+    Interactive counterpart to _prompt_choice for numbered menus: a typo'd
+    number must not silently become the default selection (2026-07 QA) —
+    re-prompt with the valid range instead.
+    """
+    from rich.console import Console
+    from rich.prompt import IntPrompt
+
+    while True:
+        choice = IntPrompt.ask(question, default=default)
+        if 1 <= choice <= count:
+            return choice
+        Console().print(f"[red]Invalid choice {choice}. Enter a number between 1 and {count}.[/red]")
+
+
 def _prompt_validated(label: str, *, default: str, flag: str, allow_empty: bool = False) -> str:
     """Prompt, re-asking until the value would not corrupt config.yaml.
 
@@ -425,7 +443,6 @@ def _default_preset_index(presets: list[dict]) -> int:
 def _choose_preset_interactive(presets: list[dict]) -> dict:
     from rich.console import Console
     from rich.panel import Panel
-    from rich.prompt import IntPrompt
 
     console = Console()
     # Value framing (#472, ADR-023): say what a preset *is* and that it's only a
@@ -448,10 +465,7 @@ def _choose_preset_interactive(presets: list[dict]) -> dict:
     console.print()
 
     default_idx = _default_preset_index(presets)
-    choice = IntPrompt.ask("Choose a preset", default=default_idx)
-    if choice < 1 or choice > len(presets):
-        console.print(f"[red]Invalid choice. Using preset {default_idx}.[/red]")
-        choice = default_idx
+    choice = _prompt_menu_index("Choose a preset", len(presets), default=default_idx)
     return presets[choice - 1]
 
 
@@ -465,23 +479,37 @@ def _choose_mcps_interactive(catalog: list[dict]) -> list[dict]:
         console.print(f"  [cyan]{i}[/cyan]. {m['name']} — {m['description']}")
     console.print()
 
-    raw = Prompt.ask(
-        "Choose MCPs (comma-separated numbers, or Enter to skip)",
-        default="",
-    )
-    if not raw.strip():
-        return []
+    while True:
+        raw = Prompt.ask(
+            "Choose MCPs (comma-separated numbers, or Enter to skip)",
+            default="",
+        )
+        if not raw.strip():
+            return []
 
-    selected = []
-    seen: set[str] = set()
-    for part in raw.split(","):
-        part = part.strip()
-        if part.isdigit():
-            idx = int(part) - 1
-            if 0 <= idx < len(catalog) and catalog[idx]["id"] not in seen:
-                selected.append(catalog[idx])
-                seen.add(catalog[idx]["id"])
-    return selected
+        selected = []
+        seen: set[str] = set()
+        invalid: list[str] = []
+        for part in raw.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            idx = int(part) - 1 if part.isdigit() else -1
+            if 0 <= idx < len(catalog):
+                if catalog[idx]["id"] not in seen:
+                    selected.append(catalog[idx])
+                    seen.add(catalog[idx]["id"])
+            else:
+                invalid.append(part)
+        if invalid:
+            # Mirror the non-interactive --mcps behavior: never silently drop
+            # part of the user's selection (2026-07 QA) — re-ask instead.
+            console.print(
+                f"[red]Invalid selection(s): {', '.join(invalid)}. "
+                f"Enter numbers 1-{len(catalog)}.[/red]"
+            )
+            continue
+        return selected
 
 
 def _choose_browser_interactive() -> bool:
@@ -503,17 +531,13 @@ def _choose_browser_interactive() -> bool:
 def _choose_profile_interactive() -> str:
     """Present the three distribution profiles and what each bundles (#247)."""
     from rich.console import Console
-    from rich.prompt import IntPrompt
 
     console = Console()
     console.print("\n[bold]Distribution profile[/bold] (ADR-013):")
     for i, name in enumerate(_PROFILES, 1):
         console.print(f"  [cyan]{i}[/cyan]. {name} — {_PROFILE_SUMMARY[name]}")
     console.print()
-    choice = IntPrompt.ask("Choose a profile", default=1)
-    if choice < 1 or choice > len(_PROFILES):
-        console.print("[red]Invalid choice. Using individual.[/red]")
-        choice = 1
+    choice = _prompt_menu_index("Choose a profile", len(_PROFILES), default=1)
     return _PROFILES[choice - 1]
 
 
@@ -646,6 +670,13 @@ def _emit_scaffold_output(  # noqa: PLR0913 — one arg per piece of the result
         result["conflicts"] = [str(sibling) for _orig, sibling in conflicts]
         print(json.dumps(result))
         return
+    # The advisory profile/egress notice is part of the success output: a
+    # failing run must emit nothing but its error on stderr (2026-07 QA).
+    # Interactive runs skip it as before — the wizard's prompts covered it.
+    if args.non_interactive:
+        _print_profile_notice(
+            inputs.profile, no_plugin=inputs.no_plugin, no_egress=inputs.no_egress
+        )
     _print_summary(target, created, preset["name"], variables.get("memory_stack", "none"))
     if conflicts:
         _print_conflicts(conflicts)
@@ -684,6 +715,17 @@ def _print_summary(
     next_step = _MEMORY_NEXT_STEPS.get(memory_stack, "")
     if next_step:
         body += f"\n[bold]Next:[/bold] {next_step}\n"
+
+    # The emitted git hooks, lifecycle scripts, and CI workflows all assume a
+    # git repo; say so instead of scaffolding into a bare dir silently
+    # (2026-07 QA). Checked structurally (.git up the tree — a dir, or a file
+    # for worktrees/submodules) — the scaffolder never shells out to git.
+    if not any((p / ".git").exists() for p in (target, *target.resolve().parents)):
+        body += (
+            "\n[yellow]Note:[/yellow] this directory is not a git repository — "
+            "the scaffolded git hooks and CI workflows assume one.\n"
+            "  Run: [bold]git init && git add -A && git commit -m 'scaffold'[/bold]\n"
+        )
 
     console.print()
     console.print(Panel(body.rstrip(), title="project-init", border_style="green"))
@@ -783,6 +825,8 @@ def _choose_governance_interactive() -> bool:
         "  [dim]examples/SYSTEM_CARD[/dim]    [dim]# system-card template + filled example[/dim]\n"
         "  [dim]ai-bom.generated.md[/dim]     [dim]# AIBOM, regenerated each run[/dim]\n"
         "  [dim]governance_gate.py[/dim]      [dim]# presence-triggered CI gate (in the merge gate)[/dim]\n\n"
+        "[cyan]Helps:[/cyan] answer \"what AI runs here, on what data, under whose "
+        "sign-off\" for reviewers, customers, and regulators.\n"
         "[cyan]Adopts:[/cyan] NIST AI RMF, ISO/IEC 42001, EU AI Act, OWASP LLM/Agentic "
         "Top 10 — referenced, not re-authored.\n"
         "[cyan]Gate:[/cyan] validates every real SYSTEM_CARD.md and fails on missing/"
@@ -853,7 +897,6 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
     """
     from rich.console import Console
     from rich.panel import Panel
-    from rich.prompt import IntPrompt
 
     console = Console()
     body = (
@@ -885,11 +928,8 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
     )
     console.print(Panel(body, title="Memory backend", border_style="cyan"))
     default_idx = _MEMORY_STACKS.index(default) + 1 if default in _MEMORY_STACKS else 3
-    choice = IntPrompt.ask("Choose a memory backend", default=default_idx)
-    if not 1 <= choice <= len(_MEMORY_STACKS):
-        console.print(f"[red]Invalid choice. Using {_MEMORY_STACKS[default_idx - 1]}.[/red]")
-    idx = choice - 1 if 1 <= choice <= len(_MEMORY_STACKS) else default_idx - 1
-    return _MEMORY_STACKS[idx]
+    choice = _prompt_menu_index("Choose a memory backend", len(_MEMORY_STACKS), default=default_idx)
+    return _MEMORY_STACKS[choice - 1]
 
 
 _LIFECYCLE_TIERS = ("github", "none")
@@ -910,7 +950,6 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
     """
     from rich.console import Console
     from rich.panel import Panel
-    from rich.prompt import IntPrompt
 
     console = Console()
     body = (
@@ -931,11 +970,8 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
     )
     console.print(Panel(body, title="GitHub lifecycle (issue → PR → merge)", border_style="cyan"))
     default_idx = _LIFECYCLE_TIERS.index(default) + 1 if default in _LIFECYCLE_TIERS else 1
-    choice = IntPrompt.ask("Ship the GitHub lifecycle?", default=default_idx)
-    if not 1 <= choice <= len(_LIFECYCLE_TIERS):
-        console.print(f"[red]Invalid choice. Using {_LIFECYCLE_TIERS[default_idx - 1]}.[/red]")
-    idx = choice - 1 if 1 <= choice <= len(_LIFECYCLE_TIERS) else default_idx - 1
-    return _LIFECYCLE_TIERS[idx]
+    choice = _prompt_menu_index("Ship the GitHub lifecycle?", len(_LIFECYCLE_TIERS), default=default_idx)
+    return _LIFECYCLE_TIERS[choice - 1]
 
 
 # Wizard-explanation standard (#472, ADR-023): every selectable concern explains
@@ -1112,14 +1148,21 @@ def _require_non_interactive_args(
 ) -> None:
     """Fail fast when --non-interactive is missing one of its required flags."""
     missing = []
-    if not args.preset:
-        missing.append("--preset")
-    if not args.name:
-        missing.append("--name")
-    if not args.description:
-        missing.append("--description")
+    empty = []
+    for value, flag in ((args.preset, "--preset"), (args.name, "--name"), (args.description, "--description")):
+        if value is None:
+            missing.append(flag)
+        elif not value.strip():
+            # An explicit --name "" is a different mistake than a missing flag;
+            # don't tell the user to pass a flag they already passed (2026-07 QA).
+            empty.append(flag)
+    problems = []
     if missing:
-        parser.error(f"--non-interactive requires: {', '.join(missing)}")
+        problems.append(f"--non-interactive requires: {', '.join(missing)}")
+    if empty:
+        problems.append(f"must not be empty: {', '.join(empty)}")
+    if problems:
+        parser.error("; ".join(problems))
 
 
 def _select_preset(
@@ -1269,8 +1312,13 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     resolved_profile = profile or _choose_profile_interactive()
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
     project_name = _prompt_validated("Project name", default=cli_name or default_name, flag="name")
+    # No usable default exists for the description, so say it's required up
+    # front — otherwise an accept-all-defaults user loops on a bare "Description"
+    # prompt with no hint why Enter doesn't advance (2026-07 QA).
     project_description = _prompt_validated(
-        "Description", default=cli_description or "", flag="description"
+        "Description" if cli_description else "Description (required)",
+        default=cli_description or "",
+        flag="description",
     )
     language = _prompt_choice(
         "Language (python/node/go/rust/none)",
@@ -1420,17 +1468,13 @@ def _choose_delivery_interactive(language: str) -> str:
     a language toolchain).
     """
     from rich.console import Console
-    from rich.prompt import IntPrompt
 
     console = Console()
     console.print("\n[bold]How is this delivered?[/bold]")
     for i, name in enumerate(_DELIVERY, 1):
         console.print(f"  {i}. [cyan]{name}[/cyan] — {_DELIVERY_SUMMARY[name]}")
     while True:
-        choice = IntPrompt.ask("Choose a delivery model", default=3)
-        if choice < 1 or choice > len(_DELIVERY):
-            console.print("[red]Invalid choice. Using prototype.[/red]")
-            return "prototype"
+        choice = _prompt_menu_index("Choose a delivery model", len(_DELIVERY), default=3)
         try:
             return resolve_delivery(_DELIVERY[choice - 1], language)
         except ValueError as e:
@@ -1478,16 +1522,12 @@ def resolve_deploy(raw: str | None, delivery: str) -> str:
 def _choose_deploy_interactive() -> str:
     """Present the deploy options (ADR-015); default none. Shown only for services."""
     from rich.console import Console
-    from rich.prompt import IntPrompt
 
     console = Console()
     console.print("\n[bold]How is this service deployed?[/bold]")
     for i, name in enumerate(_DEPLOY_TARGETS, 1):
         console.print(f"  {i}. [cyan]{name}[/cyan] — {_DEPLOY_SUMMARY[name]}")
-    choice = IntPrompt.ask("Choose a deploy target", default=1)
-    if choice < 1 or choice > len(_DEPLOY_TARGETS):
-        console.print("[red]Invalid choice. Using none.[/red]")
-        return "none"
+    choice = _prompt_menu_index("Choose a deploy target", len(_DEPLOY_TARGETS), default=1)
     return _DEPLOY_TARGETS[choice - 1]
 
 
@@ -1516,16 +1556,12 @@ def resolve_iac(raw: str | None) -> str:
 def _choose_iac_interactive() -> str:
     """Present the IaC options (ADR-015); default none."""
     from rich.console import Console
-    from rich.prompt import IntPrompt
 
     console = Console()
     console.print("\n[bold]Infrastructure-as-Code overlay?[/bold]")
     for i, name in enumerate(_IAC_OPTIONS, 1):
         console.print(f"  {i}. [cyan]{name}[/cyan] — {_IAC_SUMMARY[name]}")
-    choice = IntPrompt.ask("Choose an IaC overlay", default=1)
-    if choice < 1 or choice > len(_IAC_OPTIONS):
-        console.print("[red]Invalid choice. Using none.[/red]")
-        return "none"
+    choice = _prompt_menu_index("Choose an IaC overlay", len(_IAC_OPTIONS), default=1)
     return _IAC_OPTIONS[choice - 1]
 
 
@@ -1755,8 +1791,10 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
     p.add_argument("--apply", action="store_true", help="apply changes (default: dry-run report)")
     p.add_argument(
         "--allow-dirty",
+        "--force",
+        dest="allow_dirty",
         action="store_true",
-        help="permit --apply on a dirty git work tree (default: refuse)",
+        help="permit --apply on a dirty git work tree (default: refuse; --force is an alias)",
     )
     if not enable:
         src = p.add_mutually_exclusive_group()
@@ -1773,12 +1811,35 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
     args = p.parse_args(argv)
     target = Path(args.target).resolve()
     value = getattr(args, "value", None)
+    if value is not None and args.concern != "memory":
+        # Only `add memory` takes a value; anything else here is almost always
+        # a target path passed positionally (the old, wrong --help synopsis).
+        p.error(
+            f"concern '{args.concern}' takes no value — "
+            f"did you mean --target {value}?"
+        )
+    if value is not None and args.concern == "memory" and value not in MEMORY_STACKS:
+        # Same mistake for `add memory`: a path-looking non-stack value is a
+        # mis-placed target, not a typo'd stack (Codex review, PR #601).
+        stacks = ", ".join(s for s in MEMORY_STACKS if s != "none")
+        hint = (
+            f" — did you mean --target {value}?"
+            if ("/" in value or value.startswith(".") or Path(value).is_dir())
+            else ""
+        )
+        p.error(f"'{value}' is not a memory stack (valid: {stacks}){hint}")
     export_dir = Path(args.export).resolve() if getattr(args, "export", None) else None
 
     git_status = None
     if args.apply:
         git_status = _git_worktree_status(target)
-        blocked = _enforce_clean_tree(git_status, allow_dirty=args.allow_dirty, target=target)
+        blocked = _enforce_clean_tree(
+            git_status,
+            allow_dirty=args.allow_dirty,
+            target=target,
+            reinvoke=f"project-init {verb} {args.concern} --apply",
+            override_flag="--allow-dirty",
+        )
         if blocked is not None:
             return blocked
 
@@ -1829,6 +1890,9 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
     lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(language, ("", "", ""))
     return {
         "project_name": project_name,
+        # Kebab-cased name for identifier-ish slots (deploy app-name stubs);
+        # a name with no ASCII alphanumerics falls back to a generic slug.
+        "project_slug": slugify(project_name) or "my-app",
         "project_description": project_description,
         "created_date": date.today().isoformat(),
         "project_init_version": __version__,
@@ -1909,10 +1973,15 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
         "codex": "true" if "codex" in agents else "",
         "ollama": "true" if "ollama" in agents else "",
         # Antigravity has a flag (it ships an .agents/skills layer + an AGENTS.md
-        # support note, PI-386). No flags for cursor/vscode: their config is
-        # generated from the `agents` list by surfaces.emit (PI-366), not by
-        # templates. ("vscode" here would also collide with the VS Code var.)
+        # support note, PI-386). No flag for vscode: its config is generated
+        # from the `agents` list by surfaces.emit (PI-366), not by templates
+        # ("vscode" here would also collide with the VS Code var). Cursor/Amp/
+        # Junie flags gate only their AGENTS.md support-tier notes (2026-07 QA);
+        # their config is likewise generated by surfaces.emit.
         "antigravity": "true" if "antigravity" in agents else "",
+        "cursor": "true" if "cursor" in agents else "",
+        "amp": "true" if "amp" in agents else "",
+        "junie": "true" if "junie" in agents else "",
         # The guard adapter is needed by every surface that wires a hook to it
         # (codex + the GUI surfaces cursor/antigravity); PI-366.
         "multi_agent": "true"
@@ -1997,11 +2066,6 @@ def _resolve_inputs(
         iac = resolve_iac(args.iac)
     except ValueError as e:
         parser.error(str(e))
-    # In --json mode stdout must be the JSON result only (#510); skip the human
-    # profile/egress notice. (It is advisory output, not a silent default — the
-    # JSON result and the recorded config carry the resolved profile.)
-    if not getattr(args, "json", False):
-        _print_profile_notice(profile, no_plugin=no_plugin, no_egress=args.no_egress)
     return ScaffoldInputs(
         project_name=args.name,
         project_description=args.description,
@@ -2038,7 +2102,18 @@ def _preset_main(argv: list[str]) -> int:
         description="Author company presets (inheritance, compat markers) — #252.",
     )
     sub = p.add_subparsers(dest="cmd", required=True)
-    new = sub.add_parser("new", help="Generate a starter company preset that extends a base preset")
+    new = sub.add_parser(
+        "new",
+        help="Generate a starter company preset that extends a base preset",
+        description=(
+            "Generate a starter company preset. The file is written into THIS "
+            "project-init installation's templates/presets/ directory — the "
+            "fork-source-of-truth model (#252): presets live with the scaffolder "
+            "(commit them to your fork), not with the scaffolded projects, and "
+            "a project scaffolded from one needs that same installation for "
+            "later `upgrade`/`add`/`remove` runs."
+        ),
+    )
     new.add_argument("name", help="New preset name (bare stem, e.g. acme-backend)")
     new.add_argument("--extends", required=True, help="Base preset to extend")
     new.add_argument("--description", default="", help="One-line description")
@@ -2197,16 +2272,52 @@ def _resolve_preset_lifecycle(preset: dict, parser: argparse.ArgumentParser) -> 
     return raw
 
 
+# Subcommand names, single-sourced for _cli dispatch AND the bare-target
+# rejection below — adding a subcommand must update both behaviors together.
+_SUBCOMMANDS = ("upgrade", "add", "remove", "preset")
+
+
+def _record_scaffold(target: Path, preset: dict, variables: dict, created: list[Path]) -> None:
+    """Write the scaffold record and keep the created-list honest.
+
+    The record lets a later `project-init upgrade` re-render faithfully and
+    detect drift. Writing it can create .claude/config.yaml itself; count that
+    so the summary matches what is actually on disk (2026-07 QA).
+    """
+    from project_init.upgrade import write_scaffold_record
+
+    write_scaffold_record(target, preset["name"], variables, created)
+    config_rel = Path(".claude/config.yaml")
+    if config_rel not in created and (target / config_rel).exists():
+        created.append(config_rel)
+
+
+def _reject_bare_subcommand_target(raw_target: str, parser: argparse.ArgumentParser) -> None:
+    """Refuse a bare subcommand word as the scaffold target.
+
+    "project-init --flags upgrade" is far more likely a mis-ordered subcommand
+    than a wish to scaffold into ./upgrade — the epilog promises the ./upgrade
+    path form for the latter (2026-07 QA). Only the undecorated name is rejected.
+    """
+    if raw_target in _SUBCOMMANDS:
+        parser.error(
+            f"'{raw_target}' looks like the {raw_target!r} subcommand, which must "
+            f"come first (project-init {raw_target} ...). To scaffold into a "
+            f"directory named {raw_target!r}, pass the path form: ./{raw_target}"
+        )
+
+
 def _cli(argv: list[str]) -> int:
     """Dispatch a fully-formed argv to the scaffold CLI or a subcommand."""
-    _subcommands = {
+    _dispatch = {
         "upgrade": lambda a: _upgrade_main(a),
         "add": lambda a: _concern_main(a, enable=True),
         "remove": lambda a: _concern_main(a, enable=False),
         "preset": lambda a: _preset_main(a),
     }
-    if argv[:1] and argv[0] in _subcommands:
-        return _subcommands[argv[0]](argv[1:])
+    assert set(_dispatch) == set(_SUBCOMMANDS)  # keep bare-target rejection in sync
+    if argv[:1] and argv[0] in _dispatch:
+        return _dispatch[argv[0]](argv[1:])
     parser = _build_parser()
     args = parser.parse_args(argv)
 
@@ -2231,6 +2342,7 @@ def _cli(argv: list[str]) -> int:
     if args.non_interactive:
         _require_non_interactive_args(args, parser)
 
+    _reject_bare_subcommand_target(args.target, parser)
     target = Path(args.target).resolve()
 
     # Select preset BEFORE creating the target directory — a typo'd --preset
@@ -2319,13 +2431,10 @@ def _cli(argv: list[str]) -> int:
     # 2026-07 review, C1) and writes a `.new` sibling rather than clobbering it.
     # Always pass the list so a re-run stays protected too.
     conflicts: list[tuple[Path, Path]] = []
-    from project_init.upgrade import write_scaffold_record
 
     try:
         created = scaffold(target, preset, variables, strict=args.strict, conflicts=conflicts)
-        # Record the scaffold inputs + rendered-content hashes so a later
-        # `project-init upgrade` can re-render faithfully and detect drift.
-        write_scaffold_record(target, preset["name"], variables, created)
+        _record_scaffold(target, preset, variables, created)
     except TemplateRenderError as e:
         sys.stderr.write(f"error: {e}\n")
         return 2

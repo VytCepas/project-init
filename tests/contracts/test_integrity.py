@@ -80,6 +80,26 @@ class TestStrictMode:
         finally:
             sm._TEMPLATES_DIR = original
 
+    def test_strict_allows_literal_braces_in_variable_values(self, tmp_path: Path):
+        """User data containing literal {{...}} (e.g. a description) is data,
+        not an unrendered placeholder — strict mode must not reject it."""
+        target = tmp_path / "p"
+        fake_dir = tmp_path / "data-layer"
+        (fake_dir / "dot_claude").mkdir(parents=True)
+        (fake_dir / "dot_claude" / "about.md.tmpl").write_text(
+            "desc: {{description}}\n"
+        )
+        import project_init.scaffold as sm
+        original = sm._TEMPLATES_DIR
+        sm._TEMPLATES_DIR = fake_dir.parent
+        try:
+            variables = make_variables(description="literal {{ evil }} braces")
+            scaffold(target, {"name": "fake", "layers": ["data-layer"]}, variables, strict=True)
+            rendered = (target / ".claude" / "about.md").read_text()
+            assert "literal {{ evil }} braces" in rendered
+        finally:
+            sm._TEMPLATES_DIR = original
+
     def test_strict_target_untouched_on_validation_error(self, tmp_path: Path):
         """PI-21: strict mode must leave target untouched on validation error."""
         from project_init.scaffold import TemplateRenderError

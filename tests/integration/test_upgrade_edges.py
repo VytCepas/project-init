@@ -53,6 +53,24 @@ class TestNonUtf8Config:
         assert "UnicodeDecodeError" not in capsys.readouterr().err
 
 
+class TestRecordMarkerLost:
+    def test_missing_record_marker_prints_note(self, tmp_path: Path, capsys):
+        """2026-07 QA: a config.yaml whose scaffold-record block was destroyed
+        silently fell back to migration mode; the fallback stays (legacy
+        configs are legitimate) but must announce itself on stderr."""
+        target = tmp_path / "proj"
+        _scaffold(target)
+        (target / _CONFIG).write_text("%%% not: [valid: yaml\n")
+        read_scaffold_record(target)
+        assert "no scaffold record marker" in capsys.readouterr().err
+
+    def test_intact_record_prints_no_note(self, tmp_path: Path, capsys):
+        target = tmp_path / "proj"
+        _scaffold(target)
+        read_scaffold_record(target)
+        assert "no scaffold record marker" not in capsys.readouterr().err
+
+
 class TestFileDirCollision:
     def test_directory_where_file_expected_is_a_conflict_not_a_crash(self, tmp_path: Path):
         target = tmp_path / "proj"
