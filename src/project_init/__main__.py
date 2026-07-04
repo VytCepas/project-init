@@ -2262,6 +2262,11 @@ def _resolve_preset_lifecycle(preset: dict, parser: argparse.ArgumentParser) -> 
     return raw
 
 
+# Subcommand names, single-sourced for _cli dispatch AND the bare-target
+# rejection below — adding a subcommand must update both behaviors together.
+_SUBCOMMANDS = ("upgrade", "add", "remove", "preset")
+
+
 def _record_scaffold(target: Path, preset: dict, variables: dict, created: list[Path]) -> None:
     """Write the scaffold record and keep the created-list honest.
 
@@ -2284,7 +2289,7 @@ def _reject_bare_subcommand_target(raw_target: str, parser: argparse.ArgumentPar
     than a wish to scaffold into ./upgrade — the epilog promises the ./upgrade
     path form for the latter (2026-07 QA). Only the undecorated name is rejected.
     """
-    if raw_target in ("upgrade", "add", "remove", "preset"):
+    if raw_target in _SUBCOMMANDS:
         parser.error(
             f"'{raw_target}' looks like the {raw_target!r} subcommand, which must "
             f"come first (project-init {raw_target} ...). To scaffold into a "
@@ -2294,14 +2299,15 @@ def _reject_bare_subcommand_target(raw_target: str, parser: argparse.ArgumentPar
 
 def _cli(argv: list[str]) -> int:
     """Dispatch a fully-formed argv to the scaffold CLI or a subcommand."""
-    _subcommands = {
+    _dispatch = {
         "upgrade": lambda a: _upgrade_main(a),
         "add": lambda a: _concern_main(a, enable=True),
         "remove": lambda a: _concern_main(a, enable=False),
         "preset": lambda a: _preset_main(a),
     }
-    if argv[:1] and argv[0] in _subcommands:
-        return _subcommands[argv[0]](argv[1:])
+    assert set(_dispatch) == set(_SUBCOMMANDS)  # keep bare-target rejection in sync
+    if argv[:1] and argv[0] in _dispatch:
+        return _dispatch[argv[0]](argv[1:])
     parser = _build_parser()
     args = parser.parse_args(argv)
 

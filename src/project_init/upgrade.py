@@ -645,6 +645,7 @@ def _backfill_variables(variables: dict) -> dict:
     # explicit `none`, and re-deriving the gate from the tier keeps them aligned.
     ltier = v.get("lifecycle_tier", "github")
     url = v.get("project_init_url", _MIGRATION_DEFAULTS["project_init_url"])
+    recorded_agents = _recorded_agents(v)
 
     derived: dict[str, str] = {
         # Descriptor contract (#498): a pre-field record backfills to current so
@@ -685,9 +686,9 @@ def _backfill_variables(variables: dict) -> dict:
         # from the recorded agents list, AFTER the off-defaults spread so the
         # derivation wins over the generic "" (a recorded flag still wins via
         # setdefault below).
-        "cursor": "true" if "cursor" in _recorded_agents(v) else "",
-        "amp": "true" if "amp" in _recorded_agents(v) else "",
-        "junie": "true" if "junie" in _recorded_agents(v) else "",
+        "cursor": "true" if "cursor" in recorded_agents else "",
+        "amp": "true" if "amp" in recorded_agents else "",
+        "junie": "true" if "junie" in recorded_agents else "",
         **_MIGRATION_DEFAULTS,
         # Host-aware marketplace fields from the recorded repo URL (#248) — last
         # so a real recorded URL wins over the github.com migration default.
