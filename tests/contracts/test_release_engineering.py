@@ -51,15 +51,32 @@ class TestReleaseWorkflow:
         assert "pyproject.toml" in content
 
     def test_dispatch_release_path(self):
-        """A tag can't always be pushed (e.g. a branch-scoped git proxy), so the
-        workflow is also dispatchable with an explicit tag: verified against
-        pyproject like a pushed tag, created at HEAD by the release step, and
-        the changelog scoped to the unreleased span as that tag."""
-        content = self._workflow()
-        assert "workflow_dispatch" in content
-        assert "inputs.tag" in content
-        assert "tag_name:" in content
-        assert "--unreleased --tag" in content
+        """A tag can't always be pushed (e.g. a branch-scoped git proxy). The
+        escape hatch is two-stage (review of #599): tag-release.yml verifies
+        the requested tag against pyproject, creates it, and chain-dispatches
+        release.yml ON the tag ref — release.yml itself gains only a bare
+        workflow_dispatch, so every step (version guard, --latest changelog,
+        release) reads the run ref exactly like a pushed tag, and the pypi
+        environment's v*-tags-only rule (ADR-011) stays satisfied."""
+        release = self._workflow()
+        assert "workflow_dispatch" in release
+        # No dispatch inputs in release.yml: the run ref IS the tag, so the
+        # existing GITHUB_REF_NAME guard covers dispatches unchanged.
+        assert "inputs.tag" not in release
+
+        tagger = (_REPO_ROOT / ".github" / "workflows" / "tag-release.yml").read_text()
+        # The input reaches the shell only via env (never inline ${{ }} in
+        # run: — that would allow command injection into a contents:write job).
+        assert "INPUT_TAG: ${{ inputs.tag }}" in tagger
+        run_blocks = tagger.split("run: |")[1:]
+        assert run_blocks, "no run: scripts found in tag-release.yml"
+        for block in run_blocks:
+            script = block.split("- name:")[0]
+            assert "${{" not in script, f"inline interpolation in a run: script: {script[:80]}"
+        # Same version guard as release.yml, then tag + chain-dispatch.
+        assert '"v$PKG_VERSION" != "$INPUT_TAG"' in tagger
+        assert 'git push origin "refs/tags/$INPUT_TAG"' in tagger
+        assert 'gh workflow run release.yml --ref "$INPUT_TAG"' in tagger
 
 
 class TestCliffConfig:
