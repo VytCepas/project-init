@@ -51,13 +51,23 @@ shift 1  # drop PR_NUMBER
 while [ $# -gt 0 ]; do
   case "$1" in
     --merge)          MODE="--merge"; shift ;;
-    --review-cycle)   REVIEW_CYCLE="${2:-0}"; shift 2 ;;
+    --review-cycle)
+      # Validate before `shift 2`: with no value, the shift fails under set -e
+      # and aborts with no message (Copilot review).
+      if [ $# -lt 2 ]; then
+        echo "--review-cycle requires a numeric value" >&2
+        exit 2
+      fi
+      REVIEW_CYCLE="$2"; shift 2 ;;
     --review-cycle=*) REVIEW_CYCLE="${1#*=}"; shift ;;
     --no-review)      NO_REVIEW=1; shift ;;
     --admin)          ALLOW_ADMIN=1; shift ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
+case "$REVIEW_CYCLE" in
+  '' | *[!0-9]*) echo "--review-cycle must be a non-negative integer (got '$REVIEW_CYCLE')" >&2; exit 2 ;;
+esac
 
 # --admin, --no-review and --review-cycle only take effect while merging. Warn
 # loudly if they were passed without --merge so the flag isn't silently a no-op.

@@ -68,7 +68,13 @@ while [ $# -gt 0 ]; do
     shift
     ;;
   --review-cycle)
-    REVIEW_CYCLE="${2:-0}"
+    # Validate before `shift 2`: with no value, the shift fails under set -e
+    # and aborts with no message (Copilot review).
+    if [ $# -lt 2 ]; then
+      echo "--review-cycle requires a numeric value" >&2
+      exit 2
+    fi
+    REVIEW_CYCLE="$2"
     shift 2
     ;;
   --review-cycle=*)
@@ -89,6 +95,12 @@ while [ $# -gt 0 ]; do
     ;;
   esac
 done
+case "$REVIEW_CYCLE" in
+'' | *[!0-9]*)
+  echo "--review-cycle must be a non-negative integer (got '$REVIEW_CYCLE')" >&2
+  exit 2
+  ;;
+esac
 
 # --admin, --no-review and --review-cycle only take effect while merging. Warn
 # loudly if they were passed without --merge (e.g. `monitor_pr.sh 12 --admin`)
