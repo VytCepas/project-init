@@ -23,10 +23,10 @@ just --list         # see all recipes
 
 | Recipe | What it does |
 |---|---|
-| `just lint` | ruff check + format check (the gate hooks/CI enforce) |
+| `just lint` | ruff check (the gate hooks/CI enforce) |
 | `just format` | ruff format |
 | `just test` | full pytest suite (`pytest -n auto`) |
-| `just docs` | build the MkDocs site |
+| `just docs` | serve the MkDocs site locally |
 | `just ci` | lint + test (also enforced automatically on `git push`) |
 
 `just setup` points `core.hooksPath` at `.githooks/`, so the `pre-push` hook

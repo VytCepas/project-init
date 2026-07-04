@@ -453,18 +453,19 @@ def _choose_preset_interactive(presets: list[dict]) -> dict:
             "overlays (memory, lifecycle, toolchain).\n\n"
             "[cyan]Helps:[/cyan] pick the closest fit, then the prompts below let "
             "you still decline or add individual pieces.\n"
-            "[dim]Default: the recommended Obsidian-only preset. `core` is the "
+            "[dim]Default: the recommended obsidian-only preset. \"core\" is the "
             "leanest (no memory backend).[/dim]",
             title="Preset",
             border_style="cyan",
         )
     )
     console.print("[bold]Available presets:[/bold]")
+    default_idx = _default_preset_index(presets)
     for i, p in enumerate(presets, 1):
-        console.print(f"  [cyan]{i}[/cyan]. {p['name']} — {p['description']}")
+        marker = "  [green](recommended)[/green]" if i == default_idx else ""
+        console.print(f"  [cyan]{i}[/cyan]. {p['name']} — {p['description']}{marker}")
     console.print()
 
-    default_idx = _default_preset_index(presets)
     choice = _prompt_menu_index("Choose a preset", len(presets), default=default_idx)
     return presets[choice - 1]
 
@@ -474,7 +475,10 @@ def _choose_mcps_interactive(catalog: list[dict]) -> list[dict]:
     from rich.prompt import Prompt
 
     console = Console()
-    console.print("\n[bold]MCPs to install:[/bold]")
+    console.print(
+        "\n[bold]MCP servers[/bold] — optional plug-in tool servers your agent "
+        "can call (Model Context Protocol):"
+    )
     for i, m in enumerate(catalog, 1):
         console.print(f"  [cyan]{i}[/cyan]. {m['name']} — {m['description']}")
     console.print()
@@ -529,11 +533,22 @@ def _choose_browser_interactive() -> bool:
 
 
 def _choose_profile_interactive() -> str:
-    """Present the three distribution profiles and what each bundles (#247)."""
+    """Present the three distribution profiles and what each bundles (#247, ADR-023)."""
     from rich.console import Console
+    from rich.panel import Panel
 
     console = Console()
-    console.print("\n[bold]Distribution profile[/bold] (ADR-013):")
+    console.print(
+        Panel(
+            "A [bold]profile[/bold] sets how this project receives project-init "
+            "updates and how strictly its rules are enforced.\n\n"
+            "[cyan]Helps:[/cyan] match the scaffold to who maintains it — a "
+            "personal project, a self-contained repo, or an org fleet.\n"
+            "[dim]Default: individual — right for a personal project.[/dim]",
+            title="Distribution profile",
+            border_style="cyan",
+        )
+    )
     for i, name in enumerate(_PROFILES, 1):
         console.print(f"  [cyan]{i}[/cyan]. {name} — {_PROFILE_SUMMARY[name]}")
     console.print()
@@ -727,6 +742,11 @@ def _print_summary(
             "  Run: [bold]git init && git add -A && git commit -m 'scaffold'[/bold]\n"
         )
 
+    body += (
+        "\n[bold]Start:[/bold] cd into the project and run [bold]claude[/bold] — "
+        "it picks up CLAUDE.md and .claude/ automatically.\n"
+    )
+
     console.print()
     console.print(Panel(body.rstrip(), title="project-init", border_style="green"))
     console.print()
@@ -771,25 +791,23 @@ def _choose_multi_model_interactive() -> bool:
 
     console = Console()
     body = (
-        "Run other models [bold]through the Claude Code harness[/bold] — one "
-        "terminal, live switching, and automatic [bold]cost-routing[/bold] "
-        "(background work goes to a cheap model). Your hooks, CI gates, and "
-        "standards stay identical — they run below the model.\n\n"
-        "  [dim]claude[/dim]                          [dim]# opens as usual[/dim]\n"
+        "Run other models [bold]through the Claude Code harness[/bold] via "
+        "claude-code-router (CCR) — one terminal, live switching, and automatic "
+        "[bold]cost-routing[/bold] (background work goes to a cheap model). Your "
+        "hooks, CI gates, and standards stay identical — they run below the "
+        "model.\n\n"
+        "  [dim]claude[/dim]                            [dim]# opens as usual[/dim]\n"
         "  [dim]/model deepseek,deepseek-v4-flash[/dim] [dim]# switch mid-session, context kept[/dim]\n"
-        "  [dim]/model ollama,qwen3-coder:30b[/dim]      [dim]# or qwen3-coder-next (newer)[/dim]\n"
-        "  [dim]/model anthropic,claude-opus-4-8[/dim] [dim]# back to Claude[/dim]\n\n"
+        "  [dim]/model ollama,qwen3-coder:30b[/dim]     [dim]# local model[/dim]\n\n"
         "[cyan]Helps:[/cyan] control cost / test models without leaving the terminal.\n"
-        "[cyan]Alternatives:[/cyan]\n"
+        "[cyan]Alternatives:[/cyan] [bold]skip this if you only use Claude.[/bold]\n"
         "  • [bold]OpenAI/Codex[/bold] has a native harness "
         "([dim]--agents codex[/dim]) — better quality there; route it through CCR "
         "only for one-terminal convenience.\n"
         "  • [bold]Ollama[/bold] models also run natively/locally.\n"
         "  • Say yes and the scaffolded [dim]setup_models.sh[/dim] installs CCR "
-        "(pinned), seeds the config, and can pull local models for you.\n\n"
-        "[cyan]Updates:[/cyan] the pinned CCR version flows from project-init via "
-        "upgrade-as-PR; set up another way and you update it yourself.\n"
-        "Clean by default — decline and nothing is added."
+        "(pinned), seeds the config, and can pull local models for you.\n"
+        "[dim]Default: off — decline and nothing is added.[/dim]"
     )
     console.print(
         Panel(body, title="Multi-model switching (claude-code-router)", border_style="cyan")
@@ -817,13 +835,15 @@ def _choose_governance_interactive() -> bool:
         "travels with the repo — for projects that build or operate an AI "
         "system.\n\n"
         "[bold]Scaffolds today:[/bold]\n"
-        "  [dim]AI_USAGE_POLICY.md[/dim]      [dim]# 1-page AUP (NIST-aligned)[/dim]\n"
+        "  [dim]AI_USAGE_POLICY.md[/dim]      [dim]# 1-page acceptable-use policy "
+        "(NIST-aligned)[/dim]\n"
         "  [dim]approved-tools.md[/dim]       [dim]# allow/deny models, endpoints, data[/dim]\n"
         "  [dim]data-handling.md[/dim]        [dim]# what data may reach AI tools[/dim]\n"
         "  [dim]ai-code-provenance.md[/dim]   [dim]# attribution + licence checks[/dim]\n"
         "  [dim]NIST_RMF_CROSSWALK.md[/dim]   [dim]# maps to Govern/Map/Measure/Manage[/dim]\n"
         "  [dim]examples/SYSTEM_CARD[/dim]    [dim]# system-card template + filled example[/dim]\n"
-        "  [dim]ai-bom.generated.md[/dim]     [dim]# AIBOM, regenerated each run[/dim]\n"
+        "  [dim]ai-bom.generated.md[/dim]     [dim]# AI bill of materials (AIBOM), "
+        "regenerated each run[/dim]\n"
         "  [dim]governance_gate.py[/dim]      [dim]# presence-triggered CI gate (in the merge gate)[/dim]\n\n"
         "[cyan]Helps:[/cyan] answer \"what AI runs here, on what data, under whose "
         "sign-off\" for reviewers, customers, and regulators.\n"
@@ -833,7 +853,7 @@ def _choose_governance_interactive() -> bool:
         "placeholder fields — inert until you write a card.\n"
         "[cyan]Note:[/cyan] most projects are not AI products — keep this off unless "
         "yours calls an LLM API over data.\n"
-        "Clean by default — decline and nothing is added."
+        "[dim]Default: off — decline and nothing is added.[/dim]"
     )
     console.print(Panel(body, title="AI governance (governance-as-code)", border_style="cyan"))
     return Confirm.ask("Set up the AI-governance overlay?", default=False)
@@ -862,7 +882,7 @@ def _choose_observability_interactive() -> bool:
         "  [dim]observability.sh[/dim]   [dim]# one command → an HTML report[/dim]\n"
         "  [dim]hook self-log[/dim]      [dim]# guarded, stdin-safe activity log[/dim]\n\n"
         "[cyan]Helps:[/cyan] see what your agents actually do without a backend.\n"
-        "Clean by default — decline and nothing is added."
+        "[dim]Default: off — decline and nothing is added.[/dim]"
     )
     console.print(Panel(body, title="Observability (file-based usage report)", border_style="cyan"))
     return Confirm.ask("Set up the observability overlay?", default=False)
@@ -899,11 +919,12 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
     from rich.panel import Panel
 
     console = Console()
+    default_idx = _MEMORY_STACKS.index(default) + 1 if default in _MEMORY_STACKS else 3
     body = (
         "A [bold]memory backend[/bold] gives your agents a place to persist "
         "decisions, conventions, and session notes [bold]across conversations[/bold] "
         "— so context survives beyond a single chat. Everything stays on disk. "
-        "Each rung is a [bold]superset[/bold] of the one above (ADR-024).\n\n"
+        "Each rung is a [bold]superset[/bold] of the one above.\n\n"
         "[bold]1. none[/bold]      [dim]no memory — leanest; bring your own docs[/dim]\n"
         "            [dim]Installs now: nothing · You run later: nothing[/dim]\n"
         "[bold]2. auto[/bold]      [dim].claude/memory (flat agent facts) — no vault[/dim]\n"
@@ -915,19 +936,20 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
         "            [dim]graph agents can query (Graphify)[/dim]\n"
         "            [dim]Installs now: files only · You run later:[/dim]\n"
         "            [dim]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/dim]\n"
-        "[bold]5. obsidian-graphify-rag[/bold]  [dim]graphify PLUS a semantic /[/dim]\n"
-        "            [dim]vector recall surface over the whole corpus (RAG)[/dim]\n"
+        "            [dim](the package name really has two y's)[/dim]\n"
+        "[bold]5. obsidian-graphify-rag[/bold]  [dim]graphify PLUS search-by-meaning[/dim]\n"
+        "            [dim]over all notes+code, not just exact words (RAG)[/dim]\n"
         "            [dim]Installs now: files only · You run later:[/dim]\n"
         "            [dim].claude/scripts/setup_rag.sh (cocoindex-code —[/dim]\n"
         "            [dim]keyless, on-device; no container, no API key)[/dim]\n\n"
         "[cyan]Helps:[/cyan] agents recall why a decision was made weeks later;\n"
-        "the RAG rung (option 5, tier 3) adds cross-corpus semantic search worth\n"
-        "it only at [bold]multi-project / monorepo[/bold] scale — for one small/medium\n"
-        "repo, vault + the graph + grep already win, so [bold]skip it[/bold] (default off).\n"
-        "Clean by default — pick [bold]none[/bold] and no memory is added."
+        "the RAG rung (option 5) is worth it only at [bold]multi-project /\n"
+        "monorepo[/bold] scale — for one small/medium repo, vault + the graph +\n"
+        "grep already win, so [bold]skip it[/bold].\n"
+        f"[dim]Default: option {default_idx} ({default}) — your preset's stack. "
+        "Choose 1 (none) and no memory is added at all.[/dim]"
     )
     console.print(Panel(body, title="Memory backend", border_style="cyan"))
-    default_idx = _MEMORY_STACKS.index(default) + 1 if default in _MEMORY_STACKS else 3
     choice = _prompt_menu_index("Choose a memory backend", len(_MEMORY_STACKS), default=default_idx)
     return _MEMORY_STACKS[choice - 1]
 
@@ -957,20 +979,21 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
         "workflow — [bold]issue → branch → PR → review → merge[/bold], enforced "
         "by deterministic guard hooks so the steps can't be skipped or "
         "mis-ordered.\n\n"
-        "[bold]1. github[/bold]  [dim]DAG guard hooks, lifecycle scripts "
-        "(start_issue/finish_pr/…),[/dim]\n"
-        "          [dim]board+wiki+PR-validation workflows, issue/PR templates,[/dim]\n"
-        "          [dim]and the create_issue/start_task/github_workflow skills[/dim]\n"
-        "[bold]2. none[/bold]    [dim]decline it — forge-agnostic / minimalist; "
-        "bring your own flow[/dim]\n\n"
+        "[bold]1. github[/bold]  [dim]guard hooks that enforce the step order, "
+        "lifecycle scripts[/dim]\n"
+        "          [dim](start_issue/finish_pr/…), board+wiki+PR-validation "
+        "workflows,[/dim]\n"
+        "          [dim]issue/PR templates, and the matching skills[/dim]\n"
+        "[bold]2. none[/bold]    [dim]not tied to GitHub, or you prefer your own "
+        "flow — minimal[/dim]\n\n"
         "[cyan]Helps:[/cyan] every change is traceable to an issue and a "
         "reviewed PR; no accidental pushes to main.\n"
-        "[dim]Forge-portable quality hooks (commit-msg, gitleaks secret scan, "
+        "[dim]Default: github. Quality hooks (commit-msg, gitleaks secret scan, "
         "lint/format gate, prod-safety) stay either way.[/dim]"
     )
     console.print(Panel(body, title="GitHub lifecycle (issue → PR → merge)", border_style="cyan"))
     default_idx = _LIFECYCLE_TIERS.index(default) + 1 if default in _LIFECYCLE_TIERS else 1
-    choice = _prompt_menu_index("Ship the GitHub lifecycle?", len(_LIFECYCLE_TIERS), default=default_idx)
+    choice = _prompt_menu_index("Choose a lifecycle tier", len(_LIFECYCLE_TIERS), default=default_idx)
     return _LIFECYCLE_TIERS[choice - 1]
 
 
@@ -1036,8 +1059,7 @@ def _choose_docs_interactive(language: str) -> bool:
         f"A [bold]{tool}[/bold] config for a local documentation preview "
         f"({'mkdocs serve' if language == 'python' else 'typedoc'}).\n\n"
         "[cyan]Helps:[/cyan] browsable docs from your markdown/docstrings.\n"
-        "[dim]Local-only — no publish workflow ships (PI-343). On by default; "
-        "decline with --no-docs.[/dim]",
+        "[dim]Local-only — no publish workflow is included. Default: on.[/dim]",
         f"Include the local docs-preview config ({tool})?",
         default=True,
     )
@@ -1387,7 +1409,8 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     resolved_lifecycle = lifecycle_flag or _choose_lifecycle_interactive(default=preset_lifecycle)
     while True:
         agents_raw = _prompt(
-            "Agents/surfaces (claude always; add codex/ollama/cursor/antigravity/vscode, comma-separated)",
+            "Agents/surfaces (claude always; add codex/ollama/cursor/antigravity/"
+            "vscode/amp/junie, comma-separated)",
             default=cli_agents or "claude",
         )
         try:
@@ -1437,8 +1460,11 @@ _DELIVERY_ALIASES = {
 
 _DELIVERY_SUMMARY = {
     "library": "a package/library published to a registry (PyPI/npm/crate)",
-    "service": "a deployed service or app — gets the container parity bundle",
-    "prototype": "a prototype / not sure yet — single trunk, nothing env-specific",
+    "service": (
+        "a deployed service or app — adds a Dockerfile + CI that builds the "
+        "same container locally and in CI"
+    ),
+    "prototype": "just exploring / not sure yet — minimal setup, no deploy extras (default)",
 }
 
 
@@ -1493,10 +1519,12 @@ _DEPLOY_OIDC = ("cloud-run",)
 
 _DEPLOY_SUMMARY = {
     "none": "my platform/PaaS deploys it, or not deployed via Actions yet (default)",
-    "cloud-run": "Google Cloud Run (build-once, promote the digest)",
-    "fly": "Fly.io (build-once, promote the digest)",
-    "k8s": "Kubernetes (kubectl/helm set image to the digest)",
-    "registry": "publish the image to GHCR only — not a deployment",
+    "cloud-run": "Google Cloud Run (build one image, ship that exact image to prod)",
+    "fly": "Fly.io (build one image, ship that exact image to prod)",
+    "k8s": "Kubernetes (kubectl/helm set image to the built image)",
+    "registry": (
+        "publish the image to GitHub Container Registry (GHCR) only — not a deployment"
+    ),
     "custom": "container deploy with a TODO ship step you fill in",
 }
 
@@ -1534,8 +1562,11 @@ def _choose_deploy_interactive() -> str:
 _IAC_OPTIONS = ("none", "opentofu")
 _IAC_ALIASES = {"tofu": "opentofu", "terraform": "opentofu"}
 _IAC_SUMMARY = {
-    "none": "no infrastructure-as-code scaffolding",
-    "opentofu": "OpenTofu (HCL) skeleton + plan-on-PR workflow; apply manual/gated",
+    "none": "no infrastructure-as-code scaffolding (default)",
+    "opentofu": (
+        "OpenTofu (open-source Terraform) starter under infra/ + a plan preview "
+        "on each PR; applying stays manual"
+    ),
 }
 
 
@@ -1604,15 +1635,17 @@ _PROFILES = ("individual", "standalone", "org")
 # the non-interactive notice so the choice is never silent (ADR-013, #247).
 _PROFILE_SUMMARY = {
     "individual": (
-        "plugin-first (project-init + external official plugins), track upstream, "
-        "advisory enforcement — today's default"
+        "you maintain it — updates arrive through the project-init plugin, "
+        "rules are advisory (default)"
     ),
     "standalone": (
-        "project-init payload copied in locally, owner-driven pinned updates, "
-        "advisory enforcement (external official marketplace still enabled — "
-        "full no-egress is the org mode, #258)"
+        "everything copied into the repo, no plugin dependency — you apply "
+        "updates yourself, rules stay advisory"
     ),
-    "org": ("fork as source-of-truth, host-adaptive delivery, hard (server-side) enforcement"),
+    "org": (
+        "your organization runs a project-init fork and controls updates — "
+        "rules are enforced server-side"
+    ),
 }
 
 

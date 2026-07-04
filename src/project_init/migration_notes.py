@@ -15,6 +15,30 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.0.0": {
+        "summary": (
+            "First stable release, following a full QA sweep (~180 scaffolder "
+            "invocations across presets, languages, overlays, hostile input, "
+            "and subcommand lifecycles — zero crashes). Fixes: `--strict` no "
+            "longer rejects user text containing literal `{{...}}`; wizard "
+            "menus re-prompt on a mistyped number instead of silently using "
+            "the default, and invalid MCP selections re-ask; `add`/`remove` "
+            "reject a positional path with a `--target` hint (including `add "
+            "memory <path>`); clearer errors for empty `--name`/`--description` "
+            "and a bare trailing subcommand word; failing runs print nothing "
+            "on stdout. Scaffolded fixes: CI's integration and nightly-mutation "
+            "jobs skip cleanly before a pyproject.toml exists; deploy.yml ship "
+            "stubs name your project (new `{{project_slug}}` variable) instead "
+            "of `my-service`; AGENTS.md support-tier notes now cover "
+            "Cursor/Amp/Junie. Wizard explainers were rewritten for newcomers "
+            "(profile panel, glossed MCP/RAG/OpenTofu/GHCR jargon, accurate "
+            "default lines)."
+        ),
+        "action_required": (
+            "Re-run `project-init upgrade` to pick up the CI-guard, deploy-stub, "
+            "and AGENTS.md fixes. No breaking changes."
+        ),
+    },
     "0.6.1": {
         "summary": (
             "Bug-fix pass from a full code review. Scaffolder: `upgrade --apply` "

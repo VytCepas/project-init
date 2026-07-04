@@ -1,35 +1,23 @@
 # Contributing
 
-## Setup
+The canonical, always-current guide lives in the repo root:
+**[CONTRIBUTING.md](https://github.com/VytCepas/project-init/blob/main/CONTRIBUTING.md)**.
+This page is intentionally a stub so the two can never drift apart.
+
+The 30-second version:
 
 ```bash
 git clone https://github.com/VytCepas/project-init.git
 cd project-init
-uv sync --extra dev
+just setup     # uv sync + dev deps + pre-push CI gate
+just ci        # lint + full test suite — must be green before a PR
 ```
 
-## Workflow
-
-1. `gh issue list` — pick or create an issue
-2. Create a branch for the issue work using `<issue_type>/PI-<issue-number>-<branch-short-description>`
-3. Write failing tests first (TDD)
-4. Implement until tests pass
-5. `uv run ruff check . && uv run ruff format .` — lint and format
-6. `uv run pytest` — all tests pass
-7. Open a PR following `.github/copilot-instructions.md`
-
-## PR checklist
-
-- [ ] Title: `[PI-IssueNumber][type] description`
-- [ ] Body includes `Closes #<number>`
-- [ ] New template files have a corresponding test
-- [ ] No unrendered `{{...}}` placeholders in template output
-- [ ] `uv run ruff check .` passes
-- [ ] `uv run pytest` passes
-
-## Principles
-
-- Keep the scaffolder small — no new dependencies unless unavoidable
-- Deterministic — scaffold output must be identical for the same inputs
-- No LLM calls from the scaffolder itself
-- `uv` everywhere — never `pip install` or `python -m venv`
+- The `justfile` is the command surface (`just --list`); `uv` for everything,
+  `ruff` only.
+- Branches: `type/PI-<n>-slug` for issue-linked work; PR titles use
+  Conventional Commits (`type(PI-N): description`, or `type: description`
+  with no issue).
+- Any change under `templates/` needs a matching test in the focused
+  `tests/<layer>/test_*.py` module — templates are tested by scaffolding
+  into a temp dir.

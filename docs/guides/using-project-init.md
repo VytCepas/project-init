@@ -39,26 +39,43 @@ uvx --from ~/.local/share/project-init project-init . \
   --mcps context7
 ```
 
-Available flags:
+The most-used flags:
 
 | Flag | Values | Default |
 |------|--------|---------|
-| `--preset` | `obsidian-only`, `obsidian-graphify` | (asked interactively) |
-| `--language` | `python`, `node`, `go`, `none` | `none` |
-| `--mcps` | `context7` (comma-separated) | none |
+| `--preset` | `core`, `auto`, `obsidian-only`, `obsidian-graphify`, `governed` (see `--list-presets`) | (asked interactively) |
+| `--language` | `python`, `node`, `go`, `rust`, `none` | `none` |
+| `--memory` | `none`, `auto`, `obsidian-only`, `obsidian-graphify`, `obsidian-graphify-rag` | the preset's tier |
+| `--lifecycle` | `github`, `none` | `github` |
+| `--mcps` | `context7`, `context7-http` (comma-separated) | none |
 | `--browser` | flag (Playwright MCP) | off |
 | `--strict` | flag (fail on unrendered placeholders) | off |
+
+The full surface (delivery/deploy/IaC overlays, governance, observability,
+multi-model, agents, license, profile, …) is documented by `project-init --help`
+and the [README](https://github.com/VytCepas/project-init#readme); machine-readable
+preset discovery via `project-init --list-presets --json`.
 
 ---
 
 ## 3. Choosing a Preset
 
+A preset is just a starting bundle — every piece can still be declined or
+added individually at the prompts (or later, see §7).
+
 | Preset | When to use |
 |--------|-------------|
-| **obsidian-only** | Small to medium projects. Plain markdown vault, no external APIs needed. Human-friendly and agent-readable. |
+| **core** | Leanest: the agentic base layer with **no memory backend** and no vault. |
+| **auto** | Flat agent-memory files in `.claude/memory/` — no Obsidian vault. |
+| **obsidian-only** | Small to medium projects. Plain markdown vault, no external APIs needed. Human-friendly and agent-readable. **Recommended default.** |
 | **obsidian-graphify** | Code-heavy projects. Adds a Graphify code knowledge graph agents query before grepping. No API keys for IDE use (ADR-009). |
+| **governed** | obsidian-only plus the AI-governance policy layer (for projects that build/operate an AI system). |
 
-Start with `obsidian-only` when in doubt. Upgrade later by re-running with `--preset obsidian-graphify` — it merges without overwriting your existing memory or vault content.
+Start with `obsidian-only` when in doubt. Move up or down the memory ladder
+later with `project-init add memory <stack> --target . --apply` (a stack name:
+`auto`, `obsidian-only`, `obsidian-graphify`, `obsidian-graphify-rag`; or
+`remove memory`) — it merges without overwriting your existing memory or
+vault content.
 
 ---
 
@@ -181,7 +198,17 @@ The graph rebuilds incrementally per commit; agents query `graphify-out/graph.js
 
 **Add a slash command**: run `/add_command`. Creates a `SKILL.md` in `.claude/skills/<name>/`. Register it in `.claude/skills/INDEX.md`.
 
-**Re-run to update**: `/project-init` is safe to re-run anytime. It never overwrites `memory/` or `vault/` content.
+**Upgrade to current templates**: `project-init upgrade .` reports drift between
+your project and the current templates (nothing is touched); `project-init
+upgrade . --apply` re-renders, 3-way-merging files you edited and parking real
+conflicts as `<file>.new` siblings. Re-running the wizard itself is also safe
+anytime — it never overwrites `memory/` or `vault/` content.
+
+**Plugin vs `--no-plugin`**: by default a scaffold is *plugin-first* — its
+`settings.json` references the `project-init-workflow` / `project-init-lifecycle`
+plugins, so hook/skill updates arrive through the plugin marketplace. Pass
+`--no-plugin` to copy everything into `.claude/` instead (offline or
+no-marketplace-trust environments).
 
 **Add or remove a whole concern later**: to opt into a tier you declined at init —
 or drop one you no longer want — use `add` / `remove` instead of re-running the

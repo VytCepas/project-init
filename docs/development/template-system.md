@@ -8,10 +8,22 @@ Templates live in `templates/` and are copied into target projects by the scaffo
 
 ```
 templates/
-├── base/           # Always copied (every preset)
-├── obsidian/       # Overlay for both Obsidian presets
-├── graphify/       # Overlay for the obsidian-graphify preset
-└── presets/        # TOML preset definitions
+├── base/               # always copied into target projects
+├── auto/               # agent memory files (memory tiers `auto` and higher)
+├── fallback/           # shared hooks/skills — rendered only with --no-plugin (ADR-010)
+├── lifecycle/          # GitHub lifecycle enforcement (default; --lifecycle none opts out)
+├── lifecycle_fallback/ # lifecycle guard hooks + skills for --no-plugin
+├── obsidian/           # vault overlay for both Obsidian-* presets
+├── graphify/           # Graphify overlay (implies obsidian)
+├── rag/                # tier-3 RAG memory overlay
+├── multi_model/        # CCR model-switching overlay (--multi-model)
+├── governance/         # AI governance overlay (--governance)
+├── observability/      # transcript metrics overlay (--observability)
+├── codex/              # per-surface wiring overlay (--agents codex)
+├── antigravity/        # per-surface wiring overlay (--agents antigravity)
+├── amp/                # per-surface wiring overlay (--agents amp)
+├── junie/              # per-surface wiring overlay (--agents junie)
+└── presets/            # TOML preset definitions
 ```
 
 Layers are applied in order defined by the preset's `layers` list. Later layers overwrite earlier ones for the same relative path.
