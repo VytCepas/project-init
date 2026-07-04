@@ -1,19 +1,31 @@
-# docs — project-init internal knowledge base
+# project-init documentation
 
-Architecture decisions, development guides, and references for contributors and AI agents.
+**project-init** scaffolds agentic-development infrastructure: one command
+drops a `.claude/` layout (memory, docs, hooks, skills, curated MCPs, a
+GitHub lifecycle) into any project so Claude Code — and other agents — are
+productive and governed from the first prompt.
 
-## Contents
+```bash
+uv tool install project-init   # or one-off: uvx project-init .
+```
+
+New here? Start with:
+
+- **[Using project-init](guides/using-project-init.md)** — install, wizard, day-to-day usage
+- **[Positioning](positioning.md)** — how it compares to other scaffolders and plugins
+- **[README on GitHub](https://github.com/VytCepas/project-init#readme)** — full flag reference and agent-support tiers
+
+## For contributors and AI agents
 
 | Path | Purpose |
 |---|---|
-| [`positioning.md`](positioning.md) | Where project-init sits in the ecosystem — comparison table + moat |
-| [`adr/`](adr/) | Architecture Decision Records — why decisions were made |
-| [`development/`](development/) | Standards, testing, template system |
-| [`guides/`](guides/) | How-to guides for users and contributors |
+| [`adr/`](adr/adr-001-scaffolder-design.md) | Architecture Decision Records — why decisions were made |
+| [`development/`](development/contributing.md) | Contributing, standards, testing, template system |
+| [`guides/`](guides/using-project-init.md) | How-to guides for users and contributors |
 
-## Agent instruction
-
-For active agent workflow rules, start with `CLAUDE.md`. `AGENTS.md` redirects there. Use `.github/copilot-instructions.md` for GitHub Issues, PR titles, PR bodies, and board behavior.
+For active agent workflow rules, start with `CLAUDE.md` in the repo (AGENTS.md
+redirects there); `.github/copilot-instructions.md` covers GitHub Issues, PR
+titles, PR bodies, and board behavior.
 
 ## Adding an ADR
 

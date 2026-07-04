@@ -26,8 +26,9 @@ MCP_CATALOG: list[dict] = [
     {
         "id": "context7-http",
         "name": "Context7 (hosted HTTP)",
-        "description": "Live library docs over Streamable HTTP — the transport that "
-        "works on Claude web/mobile/Cowork (stdio servers are invisible there)",
+        "description": "Same docs lookup, hosted — choose this (or both) if you "
+        "also use Claude in the browser or on mobile, where locally-run servers "
+        "are unavailable",
         # HTTP/remote server (PI-397): rendered with type:http for Claude/VS Code,
         # url-only for Amp/Junie/Codex. Never SSE (deprecated in the MCP spec).
         # Register under the same name as the rendered config key (the id) so the

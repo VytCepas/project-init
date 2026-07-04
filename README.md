@@ -65,14 +65,14 @@ This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to 
 Pin a specific version, or opt into the unreleased development head:
 
 ```bash
-PROJECT_INIT_REF=v0.5.1 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
+PROJECT_INIT_REF=v1.0.0 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 PROJECT_INIT_REF=main   bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 ```
 
 Direct tool install without the slash command (any pinned tag):
 
 ```bash
-uv tool install git+https://github.com/VytCepas/project-init@v0.5.1
+uv tool install git+https://github.com/VytCepas/project-init@v1.0.0
 ```
 
 Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
@@ -182,11 +182,11 @@ The wizard asks (interactive mode only):
 - Multi-model switching (`--multi-model`) — opt-in overlay (ADR-016) that scaffolds a [claude-code-router](https://github.com/musistudio/claude-code-router) config + a `setup_models.sh` installer, so you can run DeepSeek/Kimi/Ollama **through the Claude Code harness** with live `/model` switching and background **cost-routing** — your hooks, CI gates, and standards stay identical (they run below the model). OpenAI/Codex is better in its native `--agents` harness. CCR is **pinned**, machine-level, and the scaffolder never runs it (ADR-001). Clean by default.
 - AI governance (`--governance`) — opt-in overlay (ADR-018) that ships **governance-as-code** for projects that build or operate an AI system: a **policy layer** (AI usage policy, approved-tools / data-handling / code-provenance docs, NIST RMF crosswalk), a **system card** template carrying a flat-scalar governance manifest, a two-file **AIBOM** (generated MCP + detected-CCR-route inventory, plus a user-owned declarations file), and a **presence-triggered CI gate** that validates every real system card (required fields, allowed values, the `prohibited`+`allowed:true` illegal combo, declarations completeness, `last_reviewed` staleness) — failing the build, not producing a PDF. Adopts NIST AI RMF / ISO 42001 / EU AI Act / OWASP conventions (referenced, not re-authored). A freshly scaffolded project ships only an example/template, so the gate passes until a team deliberately writes a card. Most projects are not AI products — strictly opt-in, off by default. The `governed` preset enables it.
 - Observability (`--observability`) — opt-in overlay (ADR-019) that scaffolds a **file-based usage report**: a stdlib analyzer over the Claude Code transcript JSONL plus a guarded, stdin-safe hook self-log, rendered to an HTML report with one command. **No Docker, no OTEL, no egress** — everything stays on disk. Lets you see what your agents actually do (tokens, tool calls, activity) without a telemetry backend. Strictly opt-in, off by default.
-- Memory backend (`--memory none|auto|obsidian|obsidian-graphify|obsidian-graphify-rag`) — a **superset ladder** (ADR-024): **none** (vault-free; the `core` preset), **auto** (flat agent-memory files in `.claude/memory/`, no vault — pure files, installs nothing), **Obsidian-only** (auto **plus** a human markdown vault), **Obsidian + Graphify** (obsidian **plus** a derived code knowledge graph; recommended for code-heavy projects), or **+ RAG** (`obsidian-graphify-rag`, tier 3 — a semantic recall *seam*: docs + a user-run `setup_rag.sh` stub + the `rag_endpoint` descriptor, **engine not bundled**; worth it only at multi-project/monorepo scale, parked in #495). Each rung adds a retrieval surface without relocating the anchors. The flag overrides the preset's default; the wizard explains each backend and its install cost before asking (#466, #497, ADR-024).
+- Memory backend (`--memory none|auto|obsidian-only|obsidian-graphify|obsidian-graphify-rag`; `obsidian` is accepted as an alias for `obsidian-only`) — a **superset ladder** (ADR-024): **none** (vault-free; the `core` preset), **auto** (flat agent-memory files in `.claude/memory/`, no vault — pure files, installs nothing), **Obsidian-only** (auto **plus** a human markdown vault), **Obsidian + Graphify** (obsidian **plus** a derived code knowledge graph; recommended for code-heavy projects), or **+ RAG** (`obsidian-graphify-rag`, tier 3 — a semantic recall *seam*: docs + a user-run `setup_rag.sh` stub + the `rag_endpoint` descriptor, **engine not bundled**; worth it only at multi-project/monorepo scale, parked in #495). Each rung adds a retrieval surface without relocating the anchors. The flag overrides the preset's default; the wizard explains each backend and its install cost before asking (#466, #497, ADR-024).
 - GitHub lifecycle (`--lifecycle github|none`) — **github** (default) ships the issue → branch → PR → review → merge automation: DAG guard hooks, lifecycle scripts (`start_issue`/`finish_pr`/…), board/PR-validation workflows, issue/PR templates, the `create_issue`/`start_task`/`github_workflow` skills, and — in plugin mode — the `project-init-lifecycle` plugin. **none** declines it for a forge-agnostic or minimalist scaffold (the `core` preset's audience). The forge-portable quality hooks (commit-msg, gitleaks secret scan, lint/format gate, prod-safety) stay either way. The flag overrides the preset's default; the wizard explains it before asking (#476, ADR-021).
-- Core MCPs (Context7)
-- Database MCP — none / Postgres / SQLite
+- Core MCPs (Context7, stdio or hosted-HTTP) — database MCPs are intentionally not offered: the reference Postgres/SQLite servers were archived upstream with unpatched CVEs (PI-387); use the agent's native `psql`/`sqlite3` access instead
 - Browser automation — Playwright (yes/no)
+- Distribution profile (`--profile individual|standalone|org`) — how the project receives project-init updates and how strictly rules are enforced (ADR-013): **individual** (default — plugin-first, updates tracked from upstream, advisory enforcement), **standalone** (everything copied into the repo, no plugin dependency, you apply updates), **org** (your organization's fork is the source of truth, server-side enforcement). Org mode can add `--no-egress` to omit the external official plugin marketplace from scaffolded settings (#258)
 - Owner/team (`--owner`) — default CODEOWNERS owner, SECURITY contact, and LICENSE copyright holder (e.g. `@org/team`)
 - License (`--license mit|apache-2.0|proprietary|none`) — renders a LICENSE with the current year and the owner (or project name); `none` skips the file
 - No-plugin fallback (`--no-plugin`) — copies the shared hooks/skills into `.claude/` and wires them in `settings.json` instead of relying on the `project-init-workflow` plugin (offline / no-trust environments)
@@ -244,7 +244,8 @@ The test suite validates this command works correctly — see `TestREADMEExample
 
 ## Update
 
-Re-run the installer — it moves the clone to the latest tagged release:
+PyPI install: `uv tool upgrade project-init`. Git install: re-run the
+installer — it moves the clone to the latest tagged release:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
@@ -360,6 +361,9 @@ directory yourself.
 ## Uninstall
 
 ```bash
+# PyPI install:
+uv tool uninstall project-init
+# git install (installer path):
 rm -rf ~/.local/share/project-init ~/.claude/commands/project-init.md
 ```
 
@@ -384,7 +388,7 @@ The hooks need `python3` on `PATH` (replaces the previous `jq` dependency). They
 Edit and commit from inside WSL (`wsl` then `cd ~/projects/...`). Editing WSL files from Git Bash on Windows mangles executable bits and line endings.
 
 **`Unknown preset 'foo'`**
-Run `project-init --help` and pick from `core` (vault-free), `auto` (memory files, no vault), `obsidian-only`, `obsidian-graphify` (ADR-009), or `governed`. Custom presets go in `templates/presets/<name>.toml`.
+Run `project-init --list-presets` and pick from `core` (vault-free), `auto` (memory files, no vault), `obsidian-only`, `obsidian-graphify` (ADR-009), or `governed`. Custom presets go in `templates/presets/<name>.toml` — author one with `project-init preset new <name> --extends <base>` (#252).
 
 ## Positioning in the ecosystem
 
@@ -450,7 +454,7 @@ project-init/
 
 ## Status
 
-Actively developed and published to [PyPI](https://pypi.org/project/project-init/) (current release: v0.6.1). Contributions welcome — track and propose work in [GitHub Issues](https://github.com/VytCepas/project-init/issues), and use [GitHub Discussions](https://github.com/VytCepas/project-init/discussions) for questions, ideas, and feedback. Forks and pull requests are encouraged.
+Actively developed and published to [PyPI](https://pypi.org/project/project-init/) (current release: v1.0.0). Contributions welcome — track and propose work in [GitHub Issues](https://github.com/VytCepas/project-init/issues), and use [GitHub Discussions](https://github.com/VytCepas/project-init/discussions) for questions, ideas, and feedback. Forks and pull requests are encouraged.
 
 ## License
 
