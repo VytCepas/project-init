@@ -39,6 +39,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,6 +60,7 @@ from project_init.scaffold import (
     parse_version,
     read_preserve_globs,
     scaffold,
+    slugify,
 )
 
 _CONFIG_REL = Path(".claude/config.yaml")
@@ -102,6 +104,9 @@ def _overlay_off_defaults() -> dict[str, str]:
         "agents": "claude",
         "codex": "",
         "antigravity": "",
+        "cursor": "",
+        "amp": "",
+        "junie": "",
         "ollama": "",
         "multi_agent": "",
         "other_agents": "",
@@ -581,6 +586,7 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
         **_overlay_off_defaults(),
         "vscode_off": "true",
         "license_holder": fields.get("project.name", ""),
+        "project_slug": slugify(fields.get("project.name", "")) or "my-app",
         "created_year": fields.get("project.created", "").split("-")[0],
         **_MIGRATION_DEFAULTS,
     }
@@ -667,11 +673,21 @@ def _backfill_variables(variables: dict) -> dict:
         # Strip the CODEOWNERS "@" prefix, matching _build_variables — else a
         # re-rendered LICENSE reads "Copyright … @acme/team" (PI-181).
         "license_holder": (v.get("project_owner") or v.get("project_name", "")).removeprefix("@"),
+        # project_slug + per-agent AGENTS.md gates postdate older records
+        # (2026-07 QA); derive them the same way _build_variables does.
+        "project_slug": slugify(v.get("project_name", "")) or "my-app",
         "created_year": v.get("created_date", "").split("-")[0],
         "vscode_off": "" if v.get("vscode") else "true",
         # Opt-in overlays + governance default off — they postdate the record;
         # shared with migration (PI-190).
         **_overlay_off_defaults(),
+        # Per-agent AGENTS.md gates (2026-07 QA) postdate older records — derive
+        # from the recorded agents list, AFTER the off-defaults spread so the
+        # derivation wins over the generic "" (a recorded flag still wins via
+        # setdefault below).
+        "cursor": "true" if "cursor" in _recorded_agents(v) else "",
+        "amp": "true" if "amp" in _recorded_agents(v) else "",
+        "junie": "true" if "junie" in _recorded_agents(v) else "",
         **_MIGRATION_DEFAULTS,
         # Host-aware marketplace fields from the recorded repo URL (#248) — last
         # so a real recorded URL wins over the github.com migration default.
@@ -693,6 +709,11 @@ def _backfill_variables(variables: dict) -> dict:
         "true" if (v.get("devcontainer") or v.get("delivery") == "service") else ""
     )
     return v
+
+
+def _recorded_agents(variables: dict) -> list[str]:
+    """The recorded agents list as names (backfill helper; default claude-only)."""
+    return [a.strip() for a in variables.get("agents", "claude").split(",") if a.strip()]
 
 
 def _migrate_agents(variables: dict) -> dict:
@@ -737,6 +758,16 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
     if parsed is not None:
         preset_name, variables, manifest = parsed
         return preset_name, _migrate_agents(_backfill_variables(variables)), manifest, False
+    # No record marker: either a genuine pre-record scaffold (expected) or a
+    # config.yaml whose record block was destroyed. Migration mode handles
+    # both, but the latter deserves a signal instead of a silent guess
+    # (2026-07 QA) — the record is recoverable from git.
+    sys.stderr.write(
+        f"note: {config_path} carries no scaffold record marker — inferring the "
+        "config from the file's contents (migration mode). If this project was "
+        "scaffolded by a recent project-init, the record may have been "
+        "corrupted; restore .claude/config.yaml from git instead.\n"
+    )
     preset_name, variables, manifest = _migrate_semantic_config(text.splitlines())
     return preset_name, _migrate_agents(_backfill_variables(variables)), manifest, True
 
@@ -1422,14 +1453,22 @@ def _git_prefix(target: Path) -> str:
     return f"git -C {target}"
 
 
-def _enforce_clean_tree(status: str | None, *, allow_dirty: bool, target: Path) -> int | None:
+def _enforce_clean_tree(
+    status: str | None,
+    *,
+    allow_dirty: bool,
+    target: Path,
+    reinvoke: str = "project-init upgrade --apply",
+    override_flag: str = "--force",
+) -> int | None:
     """Gate ``--apply`` on a clean work tree (#242); print guidance.
 
     Return an exit code to abort with, or None to proceed. A clean tree means
     the apply lands as the only uncommitted change, so it is trivially
     reviewable and revertible (see _print_undo_hint). Printed git commands are
     scoped to *target* so they never touch dirty repo siblings the guard left
-    alone.
+    alone. *reinvoke*/*override_flag* name the caller's own command and dirty-
+    tree flag so `add`/`remove` guidance doesn't point at `upgrade` (#528 QA).
     """
     from rich.console import Console
 
@@ -1446,19 +1485,19 @@ def _enforce_clean_tree(status: str | None, *, allow_dirty: bool, target: Path) 
         return None
     if allow_dirty:
         console.print(
-            "[yellow]--force:[/yellow] proceeding on a dirty work tree; "
-            "your uncommitted changes and the upgrade will be intermixed in "
+            f"[yellow]{override_flag}:[/yellow] proceeding on a dirty work tree; "
+            "your uncommitted changes and the apply will be intermixed in "
             "[bold]git diff[/bold]."
         )
         return None
     gx = _git_prefix(target)
     console.print(
-        "[bold red]Upgrade blocked[/bold red] — the git work tree has "
-        "uncommitted changes. Commit or stash them first so the upgrade lands "
+        "[bold red]Apply blocked[/bold red] — the git work tree has "
+        "uncommitted changes. Commit or stash them first so the apply lands "
         "as a single, reviewable, revertible diff:\n"
         f"  [bold]{gx} add . && {gx} commit[/bold]   (or [bold]{gx} stash[/bold])\n"
-        "then re-run [bold]project-init upgrade --apply[/bold]. Override with "
-        "[bold]--force[/bold] (not recommended)."
+        f"then re-run [bold]{reinvoke}[/bold]. Override with "
+        f"[bold]{override_flag}[/bold] (not recommended)."
     )
     return _DIRTY_TREE_EXIT
 

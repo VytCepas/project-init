@@ -2,8 +2,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from project_init.scaffold import load_preset, scaffold
+from project_init.scaffold import load_preset, scaffold, slugify
 from tests.helpers import make_variables
+
+
+class TestSlugify:
+    """2026-07 QA: {{project_slug}} — kebab-cased name for identifier-ish slots."""
+
+    def test_basic_kebab(self):
+        assert slugify("My Cool App") == "my-cool-app"
+
+    def test_collapses_and_strips_punctuation(self):
+        assert slugify("  a__b!!c  ") == "a-b-c"
+
+    def test_no_ascii_alnum_yields_empty(self):
+        # Callers supply their own fallback (e.g. "my-app" in _build_variables).
+        assert slugify("プロジェクト") == ""
+        assert slugify("🚀") == ""
 
 
 class TestCommandVariables:

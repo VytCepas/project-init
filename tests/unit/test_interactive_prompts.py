@@ -13,10 +13,14 @@ from project_init import __main__
 from project_init.mcps import MCP_CATALOG
 
 
-def test_choose_preset_interactive_out_of_range_falls_back(monkeypatch):
+def test_choose_preset_interactive_out_of_range_reprompts(monkeypatch, capsys):
+    """2026-07 QA: a typo'd menu number must re-prompt, not silently pick the
+    default — the user's next answer wins."""
     presets = [{"name": "a", "description": "x"}, {"name": "b", "description": "y"}]
-    monkeypatch.setattr("rich.prompt.IntPrompt.ask", lambda *a, **k: 99)
-    assert __main__._choose_preset_interactive(presets) is presets[0]
+    answers = iter([99, 2])
+    monkeypatch.setattr("rich.prompt.IntPrompt.ask", lambda *a, **k: next(answers))
+    assert __main__._choose_preset_interactive(presets) is presets[1]
+    assert "Invalid choice" in capsys.readouterr().out
 
 
 def test_choose_preset_interactive_valid_choice(monkeypatch):
@@ -26,15 +30,37 @@ def test_choose_preset_interactive_valid_choice(monkeypatch):
 
 
 def test_choose_mcps_interactive_parses_and_dedups(monkeypatch):
-    # Duplicates collapse; out-of-range and non-numeric tokens are ignored.
-    monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "1,1,99,abc")
+    # Duplicates collapse silently; a fully-valid answer needs no re-prompt.
+    monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "1,1")
     selected = __main__._choose_mcps_interactive(MCP_CATALOG)
     assert [m["id"] for m in selected] == [MCP_CATALOG[0]["id"]]
+
+
+def test_choose_mcps_interactive_invalid_tokens_reprompt(monkeypatch, capsys):
+    """2026-07 QA: out-of-range / non-numeric tokens must not be silently
+    dropped (the non-interactive --mcps path errors on them) — re-ask."""
+    answers = iter(["1,99,abc", "2"])
+    monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: next(answers))
+    selected = __main__._choose_mcps_interactive(MCP_CATALOG)
+    assert [m["id"] for m in selected] == [MCP_CATALOG[1]["id"]]
+    out = capsys.readouterr().out
+    assert "99" in out and "abc" in out
 
 
 def test_choose_mcps_interactive_empty_skips(monkeypatch):
     monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: "")
     assert __main__._choose_mcps_interactive(MCP_CATALOG) == []
+
+
+def test_prompt_menu_index_reprompts_until_in_range(monkeypatch, capsys):
+    """2026-07 QA: the shared numbered-menu helper (preset/profile/delivery/
+    deploy/iac/memory/lifecycle) re-asks on out-of-range answers."""
+    answers = iter([0, 99, 3])
+    monkeypatch.setattr("rich.prompt.IntPrompt.ask", lambda *a, **k: next(answers))
+    assert __main__._prompt_menu_index("Pick", 5, default=1) == 3
+    out = capsys.readouterr().out
+    assert out.count("Invalid choice") == 2
+    assert "between 1 and 5" in out
 
 
 @pytest.mark.parametrize("answer", [True, False])

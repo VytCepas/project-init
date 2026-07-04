@@ -250,6 +250,20 @@ class TestPurgeExport:
         assert not leftover.exists()  # purge cleans it despite the no-op toggle
 
 
+class TestReportTruncationMarker:
+    def test_file_list_marks_whats_beyond_the_cap(self):
+        """2026-07 QA: the count prefix and the listing must never silently
+        disagree — entries past the cap get an explicit '… and N more'."""
+        from project_init.concerns import _file_list
+
+        paths = [Path(f"f{i:02}.txt") for i in range(11)]
+        listing = _file_list(paths)
+        assert "f07.txt" in listing
+        assert "f08.txt" not in listing
+        assert "… and 3 more" in listing
+        assert "… and" not in _file_list(paths[:8])
+
+
 class TestCLIDispatch:
     """`main()` routes `add`/`remove` to the engine and parses args (#528)."""
 
@@ -269,6 +283,20 @@ class TestCLIDispatch:
         rc = main(["add", "memory", "auto", "--target", str(target), "--apply"])
         assert rc == 0
         assert (target / ".claude/memory/MEMORY.md").is_file()
+
+    def test_cli_add_positional_path_rejected_with_target_hint(self, tmp_path: Path, capsys):
+        """2026-07 QA: `add governance ./proj` used to swallow ./proj as the
+        memory-stack value and then error about the WRONG directory (cwd).
+        Only `add memory` takes a value — anything else points at --target."""
+        from project_init.__main__ import main
+
+        target = _scaffold(tmp_path / "p")
+        with pytest.raises(SystemExit) as exc:
+            main(["add", "governance", str(target)])
+        assert exc.value.code == 2
+        err = capsys.readouterr().err
+        assert "takes no value" in err
+        assert f"--target {target}" in err
 
     def test_cli_remove_dispatches(self, tmp_path: Path):
         from project_init.__main__ import main

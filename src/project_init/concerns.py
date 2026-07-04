@@ -404,30 +404,34 @@ def _print_summary(  # noqa: PLR0913 — one list per drift category, all distin
     added = list(report.new) + list(seeded)
     changed = report.changed + report.merged + report.conflicts
     if added:
-        print(f"  added ({len(added)}): " + ", ".join(p.as_posix() for p in sorted(added)[:8]))
+        print(f"  added ({len(added)}): " + _file_list(added))
     if changed:
-        print(
-            f"  re-rendered ({len(changed)}): "
-            + ", ".join(p.as_posix() for p in sorted(changed)[:8])
-        )
+        print(f"  re-rendered ({len(changed)}): " + _file_list(changed))
     if applied:
         if deleted:
-            print(
-                f"  deleted ({len(deleted)}): "
-                + ", ".join(p.as_posix() for p in sorted(deleted)[:8])
-            )
+            print(f"  deleted ({len(deleted)}): " + _file_list(deleted))
         if kept:
             print(
                 f"  KEPT — user-modified, not deleted ({len(kept)}): "
                 + ", ".join(p.as_posix() for p in sorted(kept))
             )
     elif report.removed:
-        print(
-            f"  would delete ({len(report.removed)}): "
-            + ", ".join(p.as_posix() for p in sorted(report.removed)[:8])
-        )
+        print(f"  would delete ({len(report.removed)}): " + _file_list(report.removed))
     if not applied:
         print("  (re-run with --apply to make these changes)")
+
+
+def _file_list(paths, limit: int = 8) -> str:
+    """First *limit* sorted paths, with an explicit marker for the rest.
+
+    The count prefix and the listing must never silently disagree
+    (2026-07 QA) — say "… and N more" like the scaffold summary panel does.
+    """
+    shown = sorted(paths)
+    listing = ", ".join(p.as_posix() for p in shown[:limit])
+    if len(shown) > limit:
+        listing += f", … and {len(shown) - limit} more"
+    return listing
 
 
 def _print_source(
@@ -436,7 +440,7 @@ def _print_source(
     if not source:
         print("  source data: none orphaned by this change.")
         return
-    files = ", ".join(p.as_posix() for p in sorted(source)[:8])
+    files = _file_list(source)
     if purge:
         verb = "PURGED — permanently deleted" if applied else "WOULD PURGE (permanently delete)"
     else:
