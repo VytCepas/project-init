@@ -56,6 +56,13 @@ directives on its `subprocess.run` calls — the scaffolded `ruff.toml` selects
 on those argv-list (never shell-string) calls, mirroring the `# noqa: S310`
 package_guard.py already carries. Only the `.claude/hooks/dag_workflow.py` hash
 was re-pinned across all four combos, after verifying every other file matched.
+
+Exception (2026-07 review, second pass): `dag_workflow.py` closed the
+quoted-global-option guard bypass (`git -c foo='a b' push …`), capped its
+per-subprocess timeout below the hook budget, and made the nojira "PR already
+exists" short-circuit check the PR is OPEN. Deliberate guard fixes, not
+move-drift — only the `.claude/hooks/dag_workflow.py` hash was re-pinned across
+all four combos, after verifying every other file still matched.
 """
 
 from __future__ import annotations

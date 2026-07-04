@@ -104,11 +104,20 @@ if ! echo "$PROJECT_KEY" | grep -qE '^[A-Z][A-Z0-9]{1,9}$'; then
 fi
 
 # --- Fetch issue title ---
-ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title -q '.title' 2>/dev/null)
+# `|| true`: under set -e a failing gh would kill the script at this assignment
+# before the error branch below could run. Capture stderr to a file (NOT 2>&1 —
+# that would mix gh's error text into ISSUE_TITLE and defeat the empty-check)
+# so an auth/network failure is reported as itself, not as "issue not found"
+# (Copilot review).
+GH_ERR=$(mktemp)
+ISSUE_TITLE=$(gh issue view "$ISSUE_NUMBER" --json title -q '.title' 2>"$GH_ERR" || true)
 if [ -z "$ISSUE_TITLE" ]; then
-  echo "ERROR: issue #$ISSUE_NUMBER not found" >&2
+  echo "ERROR: could not fetch issue #$ISSUE_NUMBER — it may not exist, or gh failed:" >&2
+  sed 's/^/  /' "$GH_ERR" >&2
+  rm -f "$GH_ERR"
   exit 1
 fi
+rm -f "$GH_ERR"
 
 ISSUE_REF="${PROJECT_KEY}-${ISSUE_NUMBER}"
 

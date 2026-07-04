@@ -11,7 +11,11 @@ import pytest
 
 from project_init import scaffold as sc
 from project_init.__main__ import _gather_mcps_interactive
-from project_init.upgrade import _backfill_variables, _memory_stack_from_flags
+from project_init.upgrade import (
+    _backfill_variables,
+    _carry_rag_endpoint,
+    _memory_stack_from_flags,
+)
 
 
 class TestMemoryStackBackfill:
@@ -77,10 +81,28 @@ class TestPresetVarsReachRender:
     def test_bool_false_does_not_enable_a_gate(self):
         # str(False) == "False" is truthy and would ENABLE the gate — a TOML
         # false must coerce to "" (off), true to "true".
-        preset = {"layers": ["base"], "vars": {"observability": False, "governance": True}}
-        merged = sc._apply_preset_vars({"observability": "", "governance": ""}, preset)
+        preset = {"layers": ["base"], "vars": {"observability": False, "multi_model": True}}
+        merged = sc._apply_preset_vars({"observability": "", "multi_model": ""}, preset)
         assert merged["observability"] == ""
-        assert merged["governance"] == "true"
+        assert merged["multi_model"] == "true"
+
+    def test_control_keys_never_refill_the_render_context(self):
+        # memory_stack/lifecycle/governance configure the CLI/upgrade resolution
+        # and are folded into the variables upstream. Merging them here breaks
+        # convergence: a `governed` preset's `governance = true` would re-enable
+        # the gate an explicit `remove governance` set to "", and a preset's
+        # `lifecycle = "none"` (a tier name) is a TRUTHY string that would turn
+        # every {{#if lifecycle}} block ON (2026-07 review).
+        preset = {
+            "layers": ["base"],
+            "vars": {"governance": True, "lifecycle": "none", "memory_stack": "obsidian-only"},
+        }
+        merged = sc._apply_preset_vars(
+            {"governance": "", "lifecycle": "", "memory_stack": "none"}, preset
+        )
+        assert merged["governance"] == ""  # explicit OFF survives the preset
+        assert merged["lifecycle"] == ""  # tier name never leaks into the gate
+        assert merged["memory_stack"] == "none"
 
     def test_owner_preset_keeps_license_holder_in_step(self):
         # Preset supplies project_owner, no --owner: LICENSE copyright must track
@@ -105,12 +127,65 @@ class TestPresetVarsReachRender:
         assert merged["license_holder"] == "mine"
 
 
+class TestCarryRagEndpoint:
+    """The memory-block splice on upgrade must not reset a hand-set
+    memory.rag_endpoint — the template always renders it empty and
+    setup_rag.sh explicitly instructs the user to set it (2026-07 review)."""
+
+    _OLD = (
+        "memory:\n"
+        "  tier: 3\n"
+        '  rag_endpoint: "ccc mcp"  # user-set per setup_rag.sh\n'
+        "\n"
+    )
+    _NEW = (
+        "memory:\n"
+        "  tier: 3\n"
+        "  rag_endpoint:        # tier 3: set after running setup_rag.sh\n"
+        "\n"
+    )
+
+    def test_user_value_survives_the_splice(self):
+        out = _carry_rag_endpoint(self._OLD, self._NEW)
+        assert '  rag_endpoint: "ccc mcp"  # user-set per setup_rag.sh' in out
+        assert "tier: 3" in out
+
+    def test_untouched_endpoint_takes_fresh_render(self):
+        out = _carry_rag_endpoint(self._NEW, self._NEW)
+        assert out == self._NEW
+
+    def test_template_supplied_value_wins_over_old(self):
+        rendered = self._NEW.replace("rag_endpoint:  ", "rag_endpoint: new-value")
+        assert _carry_rag_endpoint(self._OLD, rendered) == rendered
+
+    def test_no_endpoint_line_is_a_no_op(self):
+        no_rag = "memory:\n  tier: 2\n\n"
+        assert _carry_rag_endpoint(self._OLD, no_rag) == no_rag
+
+
 class TestWizardHonorsMcpsFlag:
     """--mcps passed without --non-interactive must be honored, not dropped."""
 
-    def test_cli_mcps_resolved_without_prompting(self):
+    def test_cli_mcps_resolved_without_catalog_prompt(self, monkeypatch):
+        # --mcps pins the catalog picks without the multi-select, but browser
+        # automation is its own selectable concern (ADR-023): it must still be
+        # OFFERED when --browser was not given, matching how devcontainer/mise/
+        # vscode still prompt in the same run (2026-07 review).
+        offered = []
+        monkeypatch.setattr(
+            "project_init.__main__._choose_browser_interactive",
+            lambda: offered.append(True) or False,
+        )
         selected = _gather_mcps_interactive("context7", False)
         assert [m["id"] for m in selected] == ["context7"]
+        assert offered, "browser concern must still be offered (ADR-023)"
+
+    def test_cli_mcps_browser_prompt_accept_adds_playwright(self, monkeypatch):
+        monkeypatch.setattr(
+            "project_init.__main__._choose_browser_interactive", lambda: True
+        )
+        selected = _gather_mcps_interactive("context7", False)
+        assert [m["id"] for m in selected] == ["context7", "playwright"]
 
     def test_cli_mcps_with_browser(self):
         selected = _gather_mcps_interactive("context7", True)

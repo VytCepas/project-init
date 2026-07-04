@@ -83,6 +83,15 @@ def test_no_gui_hooks_section_without_gui_surfaces(tmp_path: Path):
     assert "### GUI surface hooks" not in (t / _REL).read_text()
 
 
+def test_http_mcp_server_shows_url_invocation(tmp_path: Path):
+    # HTTP-transport servers (context7-http) carry a url instead of
+    # command+args — the Invocation cell must surface it, not render empty
+    # (2026-07 review; mirrors governance._server_transport).
+    t = _scaffold(tmp_path / "p", agents="claude,codex", installed_mcps="context7-http")
+    text = (t / _REL).read_text()
+    assert "| context7-http | https://mcp.context7.com/mcp |" in text
+
+
 def test_mcp_section_empty_when_none(tmp_path: Path):
     t = _scaffold(tmp_path / "p", agents="claude", installed_mcps="none")
     text = (t / _REL).read_text()

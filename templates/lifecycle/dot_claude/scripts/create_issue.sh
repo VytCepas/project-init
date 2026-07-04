@@ -534,6 +534,7 @@ PYEOF
   fi
 
   if [ -z "$item_id" ]; then
+    rm -f "$pdata_file"
     echo "Warning: could not add #$issue_num to project #$project_num — skipping field sync" >&2
     return 0
   fi

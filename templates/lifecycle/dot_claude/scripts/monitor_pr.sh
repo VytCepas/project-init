@@ -68,7 +68,13 @@ while [ $# -gt 0 ]; do
     shift
     ;;
   --review-cycle)
-    REVIEW_CYCLE="${2:-0}"
+    # Validate before `shift 2`: with no value, the shift fails under set -e
+    # and aborts with no message (Copilot review).
+    if [ $# -lt 2 ]; then
+      echo "--review-cycle requires a numeric value" >&2
+      exit 2
+    fi
+    REVIEW_CYCLE="$2"
     shift 2
     ;;
   --review-cycle=*)
@@ -89,6 +95,12 @@ while [ $# -gt 0 ]; do
     ;;
   esac
 done
+case "$REVIEW_CYCLE" in
+'' | *[!0-9]*)
+  echo "--review-cycle must be a non-negative integer (got '$REVIEW_CYCLE')" >&2
+  exit 2
+  ;;
+esac
 
 # --admin, --no-review and --review-cycle only take effect while merging. Warn
 # loudly if they were passed without --merge (e.g. `monitor_pr.sh 12 --admin`)
@@ -267,6 +279,7 @@ while { [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UN
   # Bot reviewers like Codex post comments without changing reviewDecision.
   if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] && _has_review_activity; then
     echo "  Review comments detected — proceeding without waiting for formal approval."
+    REVIEW_ACTIVITY=1
     break
   fi
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
@@ -297,8 +310,15 @@ if [ "$REVIEW_DECISION" = "CHANGES_REQUESTED" ]; then
 fi
 
 if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
-  echo "PR #$PR_NUMBER: review/decision still pending after ${REVIEW_TIMEOUT}s — no reviewer has acted."
-  echo "  Full PR: $(gh pr view "$PR_NUMBER" --json url -q '.url' 2>/dev/null || true)"
+  if [ "${REVIEW_ACTIVITY:-0}" -eq 1 ]; then
+    # The wait loop broke early because reviews were posted (e.g. a bot's
+    # COMMENTED review) — surface them instead of claiming nobody acted.
+    echo "PR #$PR_NUMBER: review comments posted, but no formal approval yet:"
+    _print_review_comments
+  else
+    echo "PR #$PR_NUMBER: review/decision still pending after ${REVIEW_TIMEOUT}s — no reviewer has acted."
+    echo "  Full PR: $(gh pr view "$PR_NUMBER" --json url -q '.url' 2>/dev/null || true)"
+  fi
 
   if [ "$MODE" = "--merge" ]; then
     if [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ]; then

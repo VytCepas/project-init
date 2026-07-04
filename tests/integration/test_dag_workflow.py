@@ -293,6 +293,12 @@ class TestGuardSteering:
             "git --git-dir=/tmp/x/.git push origin main",
             "git --work-tree=/tmp/x -C /tmp/x push origin main",
             "git -p push origin main",
+            # Quoted option values containing spaces must normalize away too —
+            # a bare \S+ matcher stops inside the quotes and the mangled
+            # residue defeated every git rule (2026-07 review, second pass).
+            "git -c foo='a b' push origin main",
+            'git --git-dir="/a b/.git" push origin main',
+            "git -C '/tmp/some dir' push origin main",
         ],
     )
     def test_blocks_push_to_main_through_git_global_options(self, cmd: str, tmp_path: Path):

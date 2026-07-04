@@ -8,7 +8,7 @@
             "type": "command",
             "shell": "bash",
             "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/github_command_guard.sh",
-            "timeout": 10
+            "timeout": 60
           }
         ]
       }

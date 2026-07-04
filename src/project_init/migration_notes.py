@@ -15,6 +15,29 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "0.6.1": {
+        "summary": (
+            "Bug-fix pass from a full code review. Scaffolder: `upgrade --apply` "
+            "no longer resets a hand-set `memory.rag_endpoint`, preset control "
+            "vars (governance/lifecycle/memory_stack) no longer leak into the "
+            "template gates (so `remove governance` on a governed-preset project "
+            "now converges, and a preset's `lifecycle = \"none\"` renders "
+            "correctly), and the wizard honors `--agents`, re-prompts on a "
+            "mistyped language/license instead of silently coercing to `none`, "
+            "and still offers the browser concern when `--mcps` is passed. "
+            "Scaffolded fixes: the GitHub command-guard closes a quoted "
+            "global-option bypass (`git -c foo='a b' push`), its hook budget no "
+            "longer fails open on one slow gh call, start_issue.sh reports a "
+            "nonexistent issue instead of dying silently, monitor_pr.sh "
+            "surfaces bot review comments instead of a false timeout message, "
+            "and the commit gate no longer blocks commits in uv projects that "
+            "don't ship ruff."
+        ),
+        "action_required": (
+            "Re-run `project-init upgrade` to pick up the guard and script "
+            "fixes. No breaking changes."
+        ),
+    },
     "0.6.0": {
         "summary": (
             "Robustness + hardening pass (2026-07 review). Re-running the "

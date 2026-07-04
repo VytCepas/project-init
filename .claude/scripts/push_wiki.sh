@@ -41,8 +41,13 @@ git clone "https://github.com/${REPO_SLUG}.wiki.git" "$WIKI_DIR"
 cp "$SOURCE_FILE" "$WIKI_DIR/Home.md"
 
 cd "$WIKI_DIR"
-for page in "${PRUNE_PAGES[@]}"; do
-  [[ -f "$page" ]] && git rm -q "$page" && echo "Pruned $page"
+# ${arr[@]+...} guard: expanding an empty array under `set -u` is a fatal
+# "unbound variable" on bash 3.2-4.3 (stock macOS), aborting before the commit.
+for page in ${PRUNE_PAGES[@]+"${PRUNE_PAGES[@]}"}; do
+  if [[ -f "$page" ]]; then
+    git rm -q "$page"
+    echo "Pruned $page"
+  fi
 done
 git add Home.md
 if git diff --cached --quiet; then

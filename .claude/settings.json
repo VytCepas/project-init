@@ -8,7 +8,7 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/github_command_guard.sh",
-            "timeout": 10
+            "timeout": 60
           }
         ]
       }
