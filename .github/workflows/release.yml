@@ -10,6 +10,14 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Manual dispatch for environments where a tag can't be pushed directly
+  # (e.g. a branch-scoped git proxy): the requested tag is verified against
+  # pyproject the same way, and the release step creates it at HEAD.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (vX.Y.Z) — must match the pyproject version"
+        required: true
 
 permissions:
   contents: write
@@ -30,9 +38,13 @@ jobs:
 
       - name: Verify tag matches package version
         run: |
+          # Tag push: GITHUB_REF_NAME is the tag. Dispatch: the tag comes from
+          # the input (GITHUB_REF_NAME would be the branch).
+          RELEASE_TAG="${{ inputs.tag || '' }}"
+          RELEASE_TAG="${RELEASE_TAG:-$GITHUB_REF_NAME}"
           PKG_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          if [ "v$PKG_VERSION" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match pyproject version $PKG_VERSION"
+          if [ "v$PKG_VERSION" != "$RELEASE_TAG" ]; then
+            echo "Tag $RELEASE_TAG does not match pyproject version $PKG_VERSION"
             exit 1
           fi
 
@@ -43,13 +55,19 @@ jobs:
         uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5  # v4
         with:
           config: cliff.toml
-          args: --latest
+          # Tag push: the tag exists, scope to it. Dispatch: the tag doesn't
+          # exist yet, so scope to the unreleased span AS the requested tag.
+          args: ${{ github.event_name == 'workflow_dispatch' && format('--unreleased --tag {0}', inputs.tag) || '--latest' }}
         env:
           OUTPUT: RELEASE_NOTES.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v3
         with:
+          # Tag push: same as github.ref (no behavior change). Dispatch: the
+          # tag doesn't exist yet — the action creates it at the checked-out
+          # HEAD, which the version guard above already validated.
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           # Only the build artifacts — an unscoped glob also picks up the
           # tracked dist/.gitignore and uploads it as a stray
           # `default.gitignore` asset (PI-183).

@@ -50,6 +50,17 @@ class TestReleaseWorkflow:
         assert "GITHUB_REF_NAME" in content
         assert "pyproject.toml" in content
 
+    def test_dispatch_release_path(self):
+        """A tag can't always be pushed (e.g. a branch-scoped git proxy), so the
+        workflow is also dispatchable with an explicit tag: verified against
+        pyproject like a pushed tag, created at HEAD by the release step, and
+        the changelog scoped to the unreleased span as that tag."""
+        content = self._workflow()
+        assert "workflow_dispatch" in content
+        assert "inputs.tag" in content
+        assert "tag_name:" in content
+        assert "--unreleased --tag" in content
+
 
 class TestCliffConfig:
     def test_parses_and_uses_conventional_commits(self):
