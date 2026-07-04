@@ -298,6 +298,29 @@ class TestCLIDispatch:
         assert "takes no value" in err
         assert f"--target {target}" in err
 
+    def test_cli_add_memory_path_value_rejected_with_target_hint(self, tmp_path: Path, capsys):
+        """Codex review (PR #601): `add memory /repo` must not treat the path as
+        a stack value and then act on the wrong directory (cwd)."""
+        from project_init.__main__ import main
+
+        target = _scaffold(tmp_path / "p")
+        with pytest.raises(SystemExit) as exc:
+            main(["add", "memory", str(target)])
+        assert exc.value.code == 2
+        err = capsys.readouterr().err
+        assert "is not a memory stack" in err
+        assert f"--target {target}" in err
+
+    def test_cli_add_memory_typo_stack_lists_stacks(self, tmp_path: Path, capsys):
+        from project_init.__main__ import main
+
+        with pytest.raises(SystemExit) as exc:
+            main(["add", "memory", "obsidain"])
+        assert exc.value.code == 2
+        err = capsys.readouterr().err
+        assert "is not a memory stack" in err
+        assert "did you mean --target" not in err  # not path-like: no target hint
+
     def test_cli_remove_dispatches(self, tmp_path: Path):
         from project_init.__main__ import main
 

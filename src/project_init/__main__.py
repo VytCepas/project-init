@@ -1818,6 +1818,16 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
             f"concern '{args.concern}' takes no value — "
             f"did you mean --target {value}?"
         )
+    if value is not None and args.concern == "memory" and value not in MEMORY_STACKS:
+        # Same mistake for `add memory`: a path-looking non-stack value is a
+        # mis-placed target, not a typo'd stack (Codex review, PR #601).
+        stacks = ", ".join(s for s in MEMORY_STACKS if s != "none")
+        hint = (
+            f" — did you mean --target {value}?"
+            if ("/" in value or value.startswith(".") or Path(value).is_dir())
+            else ""
+        )
+        p.error(f"'{value}' is not a memory stack (valid: {stacks}){hint}")
     export_dir = Path(args.export).resolve() if getattr(args, "export", None) else None
 
     git_status = None
