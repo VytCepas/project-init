@@ -5,11 +5,21 @@
 # Cutting a release:
 #   1. Bump version in pyproject.toml AND src/project_init/__init__.py
 #   2. git tag vX.Y.Z && push the tag
+#      — or, where a tag can't be pushed directly, run the "Tag Release"
+#        workflow (tag-release.yml): it verifies + creates the tag and then
+#        dispatches THIS workflow on the new tag ref.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  # Dispatchable on an EXISTING v* tag ref (tag-release.yml does this after
+  # creating the tag — a GITHUB_TOKEN tag push never triggers the tag-push
+  # path above, by GitHub's recursive-workflow rule). Every step below reads
+  # the tag from the run ref, so a dispatch on a non-tag ref fails the
+  # version guard cleanly. Keeping the run ON the tag ref also satisfies the
+  # pypi environment's v*-tags-only deployment rule (ADR-011).
+  workflow_dispatch: {}
 
 permissions:
   contents: write
