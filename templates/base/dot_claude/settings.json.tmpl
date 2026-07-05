@@ -64,7 +64,18 @@
             "timeout": 15
           }
         ]
-      }
+      }{{#if lifecycle}},
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre_edit_issue_guard.py",
+            "timeout": 10
+          }
+        ]
+      }{{/if lifecycle}}
     ],
     "PostToolUse": [
       {

@@ -122,6 +122,8 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #     the --no-plugin combos copy the skill in (plugin mode ships it via the
 #     workflow plugin), and the INDEX gains its row
 _ADDED_SINCE_BASELINE = {
+    # #606: the pre-edit issue guard — a new lifecycle hook, not lifecycle-move drift.
+    ".claude/hooks/pre_edit_issue_guard.py",
     ".claude/skills/report_upstream_issue/SKILL.md",
     ".claude/skills/INDEX.md",
     # ... and its discoverability rows in the surface-independent skill tables.

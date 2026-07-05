@@ -114,6 +114,8 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #   • report_upstream_issue skill (SKILL.md + INDEX/README/project-init.md rows)
 #     — new default-on skill routing tooling bugs upstream to project-init
 _ADDED_SINCE_BASELINE = {
+    # #606: the pre-edit issue guard — a new lifecycle hook, not lifecycle-move drift.
+    ".claude/hooks/pre_edit_issue_guard.py",
     ".gitleaks.toml",
     ".github/workflows/ci.yml",
     ".claude/scripts/setup_github.sh",
