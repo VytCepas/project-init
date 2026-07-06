@@ -19,7 +19,7 @@ from types import ModuleType
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables
 
-_OBS = Path(".claude") / "observability"
+_OBS = Path(".agents") / "observability"
 
 # Tokens that must never appear verbatim in the fixture transcript leak into the
 # report (aggregate-only): a prompt string, a command string, a file body line.
@@ -229,7 +229,7 @@ class TestHtmlReport:
 class TestInvariants:
     def test_script_is_executable(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
-        script = target / ".claude" / "scripts" / "observability.sh"
+        script = target / ".agents" / "scripts" / "observability.sh"
         assert script.is_file()
         assert os.access(script, os.X_OK)
 

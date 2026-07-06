@@ -48,7 +48,7 @@ def _run(target: Path, *extra: str) -> int:
 
 def _assert_well_formed(target: Path) -> dict:
     assert (target / "AGENTS.md").is_file(), "base layer missing"
-    settings = json.loads((target / ".claude" / "settings.json").read_text())
+    settings = json.loads((target / ".agents" / "settings.json").read_text())
     assert "enabledPlugins" in settings
     return settings
 
@@ -73,10 +73,10 @@ def test_combination_renders_strict_clean(
     settings = _assert_well_formed(target)
 
     # The gating actually took effect for this combination — not just "renders".
-    has_vault = (target / ".claude" / "vault").exists()
+    has_vault = (target / ".agents" / "vault").exists()
     assert has_vault == (memory != "none"), "memory gating wrong for this combo"
 
-    has_lifecycle = (target / ".claude" / "scripts" / "start_issue.sh").exists()
+    has_lifecycle = (target / ".agents" / "scripts" / "start_issue.sh").exists()
     assert has_lifecycle == (lifecycle == "github"), "lifecycle gating wrong for this combo"
 
     # The two-plugin split (#476): the lifecycle plugin is enabled iff lifecycle
@@ -111,8 +111,8 @@ def test_minimal_extreme_renders_strict_clean(tmp_path: Path):
     )
     assert rc == 0
     _assert_well_formed(target)
-    assert not (target / ".claude" / "vault").exists()
-    assert not (target / ".claude" / "scripts" / "start_issue.sh").exists()
+    assert not (target / ".agents" / "vault").exists()
+    assert not (target / ".agents" / "scripts" / "start_issue.sh").exists()
     assert not (target / "renovate.json").exists()
 
 
@@ -138,7 +138,7 @@ def test_maximal_extreme_renders_strict_clean(tmp_path: Path):
     )
     assert rc == 0
     _assert_well_formed(target)
-    assert (target / ".claude" / "vault").is_dir()
-    assert (target / ".claude" / "scripts" / "start_issue.sh").is_file()
+    assert (target / ".agents" / "vault").is_dir()
+    assert (target / ".agents" / "scripts" / "start_issue.sh").is_file()
     assert (target / "mkdocs.yml").is_file()
     assert (target / "renovate.json").is_file()

@@ -16,8 +16,8 @@ derived through `overlay_layers(memory_stack=...)`). What it did **not** give is
 2026 research keeps flagging, treating RAG and wiki-memory as *complements*: "RAG retrieves,
 wikis compile"), or a deterministic answer to staleness. Spike #478 closes those.
 
-The repo also bundles two things in one overlay that serve different needs: `.claude/memory/`
-(small structured agent facts) and `.claude/vault/` (an Obsidian human workspace). They are
+The repo also bundles two things in one overlay that serve different needs: `.agents/memory/`
+(small structured agent facts) and `.agents/vault/` (an Obsidian human workspace). They are
 separable, and separating them yields a cleaner ladder where each rung is a strict superset
 of the one below.
 
@@ -28,8 +28,8 @@ of the one below.
 | Tier | `memory_stack` | Adds | External install | Use it when… |
 |---|---|---|---|---|
 | — | `none` | nothing (the `core` preset) | none | You bring your own memory, or want none. |
-| 0 | `auto` | `.claude/memory/` flat facts + `SCHEMA.md` + `lint_memory.sh` | none (pure files) | You want durable agent facts/decisions with zero tooling and no human vault to curate. |
-| 1 | `obsidian-only` | + `.claude/vault/` (sessions/decisions/design/knowledge) | optional Obsidian app | A human will curate notes/ADRs alongside agent facts. |
+| 0 | `auto` | `.agents/memory/` flat facts + `SCHEMA.md` + `lint_memory.sh` | none (pure files) | You want durable agent facts/decisions with zero tooling and no human vault to curate. |
+| 1 | `obsidian-only` | + `.agents/vault/` (sessions/decisions/design/knowledge) | optional Obsidian app | A human will curate notes/ADRs alongside agent facts. |
 | 2 | `obsidian-graphify` | + Graphify structural **code** knowledge graph | `uv tool install graphifyy` → run `setup_graphify.sh` | "How does the code fit together?" recall matters — agents should query the graph before grepping. |
 | 3 | `…-rag` | + semantic / vector retrieval over a corpus | `uv tool install 'cocoindex-code[full]'` → run `setup_rag.sh` (keyless, on-device; see §4, ADR-026) | **Multi-project / multi-repo / monorepo** scale, where cross-corpus semantic recall beats per-repo grep. Opt-in only. |
 
@@ -44,7 +44,7 @@ ADR-009; tier 3 is now built on cocoindex-code (§4, ADR-026).
   source of truth, never hand-edited.
 - **RAG (when it lands) is authoritative for nothing** — it is a *recall surface* over the
   corpus (vault + memory + code), additive only. Higher tiers never relocate the anchors
-  (`.claude/memory/MEMORY.md`, `.claude/docs/adr/`, `.claude/vault/`); they only add surfaces.
+  (`.agents/memory/MEMORY.md`, `.agents/docs/adr/`, `.agents/vault/`); they only add surfaces.
 
 ### 3. The documentation axis is separate from the recall axis
 

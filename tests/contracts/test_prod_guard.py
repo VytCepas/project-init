@@ -12,7 +12,7 @@ from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_HOOK = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "prod_guard.py"
+_HOOK = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "prod_guard.py"
 
 DESTRUCTIVE = [
     "terraform destroy -auto-approve",
@@ -107,7 +107,7 @@ class TestVerdicts:
         assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
 
     def test_allowlist_suppresses_flag(self, tmp_path: Path):
-        config = tmp_path / ".claude" / "config.yaml"
+        config = tmp_path / ".agents" / "config.yaml"
         config.parent.mkdir(parents=True)
         config.write_text(
             'safety:\n  allow: ["kubectl delete .* --context kind-dev"]\n'
@@ -121,7 +121,7 @@ class TestVerdicts:
     def test_allowlist_honored_from_subdirectory(self, tmp_path: Path):
         """Bash often runs after `cd` into a subdir — the guard walks up to
         the project's config.yaml (PR #174 review)."""
-        config = tmp_path / ".claude" / "config.yaml"
+        config = tmp_path / ".agents" / "config.yaml"
         config.parent.mkdir(parents=True)
         config.write_text('safety:\n  allow: ["kubectl delete .* --context kind-dev"]\n')
         subdir = tmp_path / "services" / "api"
@@ -133,7 +133,7 @@ class TestVerdicts:
     def test_allowlist_multiline_yaml_suppresses_flag(self, tmp_path: Path):
         """PI-187: a multi-line YAML allow list must work, not just inline JSON
         — the old parser silently dropped it to []."""
-        config = tmp_path / ".claude" / "config.yaml"
+        config = tmp_path / ".agents" / "config.yaml"
         config.parent.mkdir(parents=True)
         config.write_text(
             'safety:\n  allow:\n    - "kubectl delete .* --context kind-dev"\n'
@@ -187,7 +187,7 @@ class TestVerdicts:
         assert result.stdout == ""
 
     def test_corrupt_allowlist_fails_open_but_still_guards(self, tmp_path: Path):
-        config = tmp_path / ".claude" / "config.yaml"
+        config = tmp_path / ".agents" / "config.yaml"
         config.parent.mkdir(parents=True)
         config.write_text("safety:\n  allow: [broken json\n")
         verdict = _run_hook(
@@ -199,7 +199,7 @@ class TestVerdicts:
         """A scalar `allow:` (valid JSON string/object, not a list) must not be
         iterated character-by-character into an allowlist whose single-char
         patterns silently suppress every command (PI-187 review)."""
-        config = tmp_path / ".claude" / "config.yaml"
+        config = tmp_path / ".agents" / "config.yaml"
         config.parent.mkdir(parents=True)
         config.write_text('safety:\n  allow: "terraform destroy"\n')
         verdict = _run_hook(
@@ -216,19 +216,19 @@ class TestWiring:
 
         target = tmp_path / "p"
         scaffold(target, fallback_preset(), fallback_variables(), strict=True)
-        settings = json.loads((target / ".claude" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text())
         commands = [
             h["command"]
             for entry in settings["hooks"]["PreToolUse"]
             for h in entry["hooks"]
         ]
         assert any("prod_guard.py" in c for c in commands)
-        assert (target / ".claude" / "hooks" / "prod_guard.py").is_file()
+        assert (target / ".agents" / "hooks" / "prod_guard.py").is_file()
 
     def test_config_has_safety_allow_section(self, tmp_path: Path):
         target = tmp_path / "p"
         scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
-        config = (target / ".claude" / "config.yaml").read_text()
+        config = (target / ".agents" / "config.yaml").read_text()
         assert "safety:" in config
         assert "allow: []" in config
 
@@ -246,7 +246,7 @@ class TestWiring:
     def test_docs_state_guardrail_vs_boundary(self, tmp_path: Path):
         target = tmp_path / "p"
         scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
-        secrets = (target / ".claude" / "docs" / "guides" / "secrets.md").read_text()
+        secrets = (target / ".agents" / "docs" / "guides" / "secrets.md").read_text()
         assert "guardrail" in secrets
         assert "cannot delete what the session cannot reach" in secrets
         agents_md = (target / "AGENTS.md").read_text()

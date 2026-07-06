@@ -2,7 +2,7 @@
 
 Scope: entire repository at commit `a9ecfa1` — `src/project_init/` (engine, wizard, upgrade),
 the full `templates/` tree, `plugins/`, `tools/`, `tests/`, `.github/workflows/`, this repo's
-own `.claude/` infrastructure, `install.sh`, and top-level docs. Every finding below was
+own `.agents/` infrastructure, `install.sh`, and top-level docs. Every finding below was
 verified against the actual code (several by executing the code path); speculative findings
 were dropped. The full test suite was run: **1795 passed, 1 skipped, 2 failed** (the failures
 are themselves finding M5).
@@ -40,7 +40,7 @@ project every rendered file is written directly — no clean-tree guard (that ex
 `.upgrade-base.json` merge-base sidecar from the freshly clobbered bytes, so even the
 upgrade engine's 3-way merge can no longer recover the user's edits.
 
-Scenario: scaffold → hand-edit `.claude/settings.json` and `justfile` → re-run
+Scenario: scaffold → hand-edit `.agents/settings.json` and `justfile` → re-run
 `project-init . --non-interactive …` to add an MCP → both edited files are replaced and the
 drift record is reset. Unrecoverable without git.
 
@@ -72,14 +72,14 @@ for that combination. (Verified: both lines present; `just` rejects duplicates.)
 The antigravity equivalent (`.agents/`) is correctly *not* ignored.
 
 ### M3 — `monitor_pr.sh` `--merge` admin-merges through its own branch protection
-`templates/lifecycle/dot_claude/scripts/monitor_pr.sh:313-315`: after the review gate
+`templates/lifecycle/dot_agents/scripts/monitor_pr.sh:313-315`: after the review gate
 passes, a `BLOCKED` merge state triggers an immediate `--admin` merge on cycle 0. But
 `setup_github.sh --protect` provisions `required_conversation_resolution: true` — so one
 unresolved review thread puts the PR in `BLOCKED`, and the monitor force-merges past the
 protection its sibling script created. Only the `org` profile refuses admin merges.
 
 ### M4 — the DAG command guard is trivially bypassed by ordinary git variants
-`.claude/hooks/dag_workflow.py` (and its template copy) anchors rules on
+`.agents/hooks/dag_workflow.py` (and its template copy) anchors rules on
 `\bgit\s+push\b` etc. Verified live against `guard`:
 - `git -C /tmp/x push origin main` → **allowed** (should block)
 - `git -c core.pager=cat push origin main` → **allowed**
@@ -94,7 +94,7 @@ boundary (which ADR-007 already says — the guard's marketing overshoots it).
 
 ### M5 — two tests fail on any machine without `gh` installed
 `tests/integration/test_issue_metadata_workflow.py:148,202` invoke the scaffolded
-`create_issue.sh`, which hard-requires `gh` (`templates/lifecycle/dot_claude/scripts/create_issue.sh:17`)
+`create_issue.sh`, which hard-requires `gh` (`templates/lifecycle/dot_agents/scripts/create_issue.sh:17`)
 *before* parsing `--help` or validating flags. No skip guard. Secondary defect: `--help`
 should not require the tool to be installed — move arg parsing ahead of the `gh` check.
 

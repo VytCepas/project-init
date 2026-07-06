@@ -5,9 +5,9 @@ including docstring and complexity gates) has to accept everything
 project-init itself puts in the target directory.
 
 The lifecycle-on case is a distinct guard: the default scaffold enables the
-GitHub lifecycle overlay, which ships ``.claude/hooks/dag_workflow.py`` — a file
+GitHub lifecycle overlay, which ships ``.agents/hooks/dag_workflow.py`` — a file
 the base/obsidian-only case never emits. Since the scaffolded ``ruff.toml``
-selects ``S`` (bandit) and lints ``.claude/**``, that hook's ``subprocess.run``
+selects ``S`` (bandit) and lints ``.agents/**``, that hook's ``subprocess.run``
 calls tripped ``S603`` and turned a fresh project's ``just lint`` red on the
 first push until the calls were annotated. Lint the config the CLI actually
 produces, not just the barest preset.
@@ -31,7 +31,7 @@ def _ruff_check(target: Path) -> subprocess.CompletedProcess:
 
     ``--config`` pins the scaffolded ruff.toml so this repo's config can't leak
     in; cwd must be the target because ruff resolves relative per-file-ignores
-    globs (``.claude/**``) against the working directory. ``--project`` keeps uv
+    globs (``.agents/**``) against the working directory. ``--project`` keeps uv
     resolving this repo's environment for the ruff bin.
     """
     return subprocess.run(
@@ -72,7 +72,7 @@ def test_ruff_passes_with_lifecycle_hooks(tmp_target: Path):
     """The default lifecycle-on scaffold must also start green.
 
     Reproduces the CLI's layer assembly (preset + lifecycle overlay) so
-    ``.claude/hooks/dag_workflow.py`` is emitted and actually linted — the file
+    ``.agents/hooks/dag_workflow.py`` is emitted and actually linted — the file
     the obsidian-only guard above never covers.
     """
     preset = load_preset("obsidian-only")
@@ -84,7 +84,7 @@ def test_ruff_passes_with_lifecycle_hooks(tmp_target: Path):
         preset,
         make_variables(language="python", python="true", node="", go="", lifecycle="true"),
     )
-    assert (tmp_target / ".claude" / "hooks" / "dag_workflow.py").is_file(), (
+    assert (tmp_target / ".agents" / "hooks" / "dag_workflow.py").is_file(), (
         "lifecycle overlay did not emit dag_workflow.py — test no longer guards the S603 path"
     )
 

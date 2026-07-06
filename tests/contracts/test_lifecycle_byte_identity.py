@@ -15,12 +15,12 @@ the move. If this test fails, the move/gating changed rendered bytes — fix the
 template, do NOT regenerate the baseline.
 
 Exception (#496): the code-map feature intentionally ADDS
-`.claude/scripts/gen_code_map.py` and edits AGENTS.md + the justfile. Only those
+`.agents/scripts/gen_code_map.py` and edits AGENTS.md + the justfile. Only those
 three keys were re-pinned, after verifying every other file still matched the
 baseline — the move invariant is intact for everything else.
 
 Exception (#497/#498): later features re-pinned `lint_memory.sh` (staleness) and
-`.claude/config.yaml` (memory descriptor `tier`/`graph_path`, then the top-level
+`.agents/config.yaml` (memory descriptor `tier`/`graph_path`, then the top-level
 `project_init_contract_version`, ADR-025) the same way — only the intentionally
 changed key, after verifying no other drift.
 
@@ -32,12 +32,12 @@ deliberate fix, not move-drift. Only those three SKILL.md hashes were re-pinned
 Exception (PI-550): `dag_workflow.py` gained `_strip_text_flag_values` so the
 command-guard no longer false-positives on blocked-command phrases inside
 free-text flag values (`--body`/`-m`/`--title`/`--notes`). A deliberate guard
-fix, not move-drift. Only the `.claude/hooks/dag_workflow.py` hash was re-pinned
+fix, not move-drift. Only the `.agents/hooks/dag_workflow.py` hash was re-pinned
 across all four combos, after verifying every other file still matched.
 
 Exception (PI-570): `ruff.toml` gained the RUF/PERF/PTH/RET/ARG/A/S/BLE rule
 groups (per-language quality-gate strictness pass) — a deliberate content
-change, not move-drift. `.claude/hooks/package_guard.py` also picked up
+change, not move-drift. `.agents/hooks/package_guard.py` also picked up
 `# noqa: S310` placement fixes for the new `S` rule group; it was already
 excluded above. Only `ruff.toml` is newly excluded here, after verifying
 every other file still matched.
@@ -52,16 +52,16 @@ subdirectory session lints the right paths).
 
 Exception (init-lint fix): `dag_workflow.py` gained three `# noqa: S603`
 directives on its `subprocess.run` calls — the scaffolded `ruff.toml` selects
-`S` and lints `.claude/**`, so a fresh lifecycle-on project's `just lint` failed
+`S` and lints `.agents/**`, so a fresh lifecycle-on project's `just lint` failed
 on those argv-list (never shell-string) calls, mirroring the `# noqa: S310`
-package_guard.py already carries. Only the `.claude/hooks/dag_workflow.py` hash
+package_guard.py already carries. Only the `.agents/hooks/dag_workflow.py` hash
 was re-pinned across all four combos, after verifying every other file matched.
 
 Exception (2026-07 review, second pass): `dag_workflow.py` closed the
 quoted-global-option guard bypass (`git -c foo='a b' push …`), capped its
 per-subprocess timeout below the hook budget, and made the nojira "PR already
 exists" short-circuit check the PR is OPEN. Deliberate guard fixes, not
-move-drift — only the `.claude/hooks/dag_workflow.py` hash was re-pinned across
+move-drift — only the `.agents/hooks/dag_workflow.py` hash was re-pinned across
 all four combos, after verifying every other file still matched.
 """
 
@@ -91,7 +91,7 @@ COMBOS = [
 # "GitHub lifecycle: on/off" row + the lifecycle skills now sourced from the
 # lifecycle_fallback overlay (#476). Their correctness is covered by
 # test_lifecycle_none.py, not byte-identity.
-_GENERATED = {".claude/CAPABILITIES.md"}
+_GENERATED = {".agents/CAPABILITIES.md"}
 
 # Files added or intentionally edited AFTER the frozen baseline was captured —
 # legitimate content changes, not the static template move this contract guards.
@@ -123,41 +123,41 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #     workflow plugin), and the INDEX gains its row
 _ADDED_SINCE_BASELINE = {
     # #606: the pre-edit issue guard — a new lifecycle hook, not lifecycle-move drift.
-    ".claude/hooks/pre_edit_issue_guard.py",
-    ".claude/skills/report_upstream_issue/SKILL.md",
-    ".claude/skills/INDEX.md",
+    ".agents/hooks/pre_edit_issue_guard.py",
+    ".agents/skills/report_upstream_issue/SKILL.md",
+    ".agents/skills/INDEX.md",
     # ... and its discoverability rows in the surface-independent skill tables.
-    ".claude/project-init.md",
-    ".claude/skills/README.md",
+    ".agents/project-init.md",
+    ".agents/skills/README.md",
     ".gitleaks.toml",
     ".github/workflows/ci.yml",
-    ".claude/scripts/setup_github.sh",
-    ".claude/scripts/create_issue.sh",
+    ".agents/scripts/setup_github.sh",
+    ".agents/scripts/create_issue.sh",
     ".github/workflows/board-automation.yml",
     ".github/workflows/issue-validation.yml",
-    ".claude/config.yaml",
-    ".claude/hooks/session_setup.sh",
+    ".agents/config.yaml",
+    ".agents/hooks/session_setup.sh",
     "mypy.ini",
     "justfile",
-    ".claude/hooks/post_edit_lint.sh",
-    ".claude/rules/python.md",
+    ".agents/hooks/post_edit_lint.sh",
+    ".agents/rules/python.md",
     # node.md gained the `just sbom` (#574) / `just license` (#579) reference
     # lines — a deliberate content edit, like the other rules files here.
-    ".claude/rules/node.md",
-    ".claude/rules/go.md",
-    ".claude/hooks/_py.sh",
-    ".claude/scripts/gh_host.sh",
-    ".claude/scripts/lint_memory.sh",
-    ".claude/scripts/monitor_pr.sh",
-    ".claude/scripts/start_issue.sh",
-    ".claude/hooks/github_command_guard.sh",
-    ".claude/hooks/pre_commit_gate.sh",
-    ".claude/hooks/workflow_state_reminder.sh",
-    ".claude/hooks/package_guard.py",
-    ".claude/settings.json",
+    ".agents/rules/node.md",
+    ".agents/rules/go.md",
+    ".agents/hooks/_py.sh",
+    ".agents/scripts/gh_host.sh",
+    ".agents/scripts/lint_memory.sh",
+    ".agents/scripts/monitor_pr.sh",
+    ".agents/scripts/start_issue.sh",
+    ".agents/hooks/github_command_guard.sh",
+    ".agents/hooks/pre_commit_gate.sh",
+    ".agents/hooks/workflow_state_reminder.sh",
+    ".agents/hooks/package_guard.py",
+    ".agents/settings.json",
     "AGENTS.md",
-    ".claude/rules/rust.md",
-    ".claude/rules/typescript.md",
+    ".agents/rules/rust.md",
+    ".agents/rules/typescript.md",
     "ruff.toml",
     # Shift-left commit hooks: the git pre-commit gained a `just lint` gate (so
     # human commits are held to the same static gate as CI, not only agent
@@ -175,6 +175,8 @@ def _manifest(target: Path) -> dict[str, str]:
             continue
         rel = p.relative_to(target)
         if "__pycache__" in rel.parts or rel.suffix == ".pyc":
+            continue
+        if rel.parts and rel.parts[0] == ".claude":
             continue
         if rel.as_posix() in _GENERATED:
             continue
@@ -203,7 +205,7 @@ def test_lifecycle_move_byte_identical(preset_name: str, no_plugin: bool, tmp_pa
     # in the comparison. The plugin-mode change is covered by test_lifecycle_none.
     drop = set(_GENERATED) | _ADDED_SINCE_BASELINE
     if not no_plugin:
-        drop.add(".claude/settings.json")
+        drop.add(".agents/settings.json")
     got = {k: v for k, v in got.items() if k not in drop}
 
     mode = "no_plugin" if no_plugin else "plugin"

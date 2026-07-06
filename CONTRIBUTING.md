@@ -1,6 +1,6 @@
 # Contributing to project-init
 
-Thanks for your interest! **project-init** is a scaffolder that drops a `.claude/`
+Thanks for your interest! **project-init** is a scaffolder that drops a `.agents/`
 agentic-development layout into other projects. Bug reports, ideas, docs fixes,
 and pull requests are all welcome.
 

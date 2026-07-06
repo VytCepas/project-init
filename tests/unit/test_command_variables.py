@@ -38,7 +38,7 @@ class TestCommandVariables:
         content = (target / "AGENTS.md").read_text()
         assert "just lint" in content
         assert "uv run ruff check ." in (target / "justfile").read_text()
-        config = (target / ".claude" / "config.yaml").read_text()
+        config = (target / ".agents" / "config.yaml").read_text()
         assert 'lint_command: "uv run ruff check ."' in config
         assert 'test_command: "uv run pytest"' in config
 
@@ -52,7 +52,7 @@ class TestCommandVariables:
             format_command="bun run format",
             test_command="bun test",
         )
-        config = (target / ".claude" / "config.yaml").read_text()
+        config = (target / ".agents" / "config.yaml").read_text()
         assert 'lint_command: "bun run lint"' in config
         assert 'test_command: "bun test"' in config
 

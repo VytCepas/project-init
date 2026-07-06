@@ -5,7 +5,7 @@
 
 ## Context
 
-project-init generates a `.claude/` layout inside other projects. It needed to be fast, deterministic, and usable in CI without API keys.
+project-init generates a `.agents/` layout inside other projects. It needed to be fast, deterministic, and usable in CI without API keys.
 
 ## Decision
 

@@ -5,12 +5,12 @@
 
 ## Context
 
-Templates contain a `.claude/` directory that needs to be visible on GitHub and not trigger Claude Code's auto-loading of CLAUDE.md files from this repo into scaffolded projects.
+Templates contain a `.agents/` directory that needs to be visible on GitHub and not trigger Claude Code's auto-loading of CLAUDE.md files from this repo into scaffolded projects.
 
 ## Decision
 
 Template directories beginning with `.` are stored with a `dot_` prefix in the repo:
-- `templates/base/dot_claude/` → `.claude/` in the target project
+- `templates/base/dot_agents/` → `.agents/` in the target project
 - `templates/base/dot_gitignore.tmpl` → `.gitignore` in the target project
 
 The scaffold engine (`scaffold.py:_dot_rename`) strips the prefix on copy.

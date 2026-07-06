@@ -34,7 +34,7 @@ def _scaffold(target: Path, *extra: str) -> None:
 
 
 def _has_lifecycle(target: Path) -> bool:
-    return (target / ".claude" / "scripts" / "start_issue.sh").exists()
+    return (target / ".agents" / "scripts" / "start_issue.sh").exists()
 
 
 class TestLifecyclePrecedence:
@@ -52,7 +52,7 @@ class TestLifecyclePrecedence:
         _scaffold(target, "--preset", "obsidian-only", "--lifecycle", "none")
         assert not _has_lifecycle(target)
         assert not (target / ".github" / "workflows" / "board-automation.yml").exists()
-        assert not (target / ".claude" / "hooks" / "dag_workflow.py").exists()
+        assert not (target / ".agents" / "hooks" / "dag_workflow.py").exists()
 
     def test_flag_none_keeps_quality_core(self, tmp_path: Path):
         target = tmp_path / "p"
@@ -60,15 +60,15 @@ class TestLifecyclePrecedence:
         # Quality core survives: git hooks, CI, install, prod-safety.
         assert (target / ".github" / "hooks" / "pre-push").is_file()
         assert (target / ".github" / "workflows" / "ci.yml").is_file()
-        assert (target / ".claude" / "scripts" / "install_hooks.sh").is_file()
-        assert (target / ".claude" / "hooks" / "prod_guard.py").is_file()
+        assert (target / ".agents" / "scripts" / "install_hooks.sh").is_file()
+        assert (target / ".agents" / "hooks" / "prod_guard.py").is_file()
 
     def test_core_lifecycle_none_is_minimal(self, tmp_path: Path):
         """`--preset core --lifecycle none`: the leanest scaffold — no memory,
         no GitHub lifecycle, quality core only."""
         target = tmp_path / "p"
         _scaffold(target, "--preset", "core", "--lifecycle", "none")
-        assert not (target / ".claude" / "vault").exists()
+        assert not (target / ".agents" / "vault").exists()
         assert not _has_lifecycle(target)
         assert (target / "AGENTS.md").is_file()
 

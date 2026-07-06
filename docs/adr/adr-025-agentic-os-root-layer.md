@@ -11,7 +11,7 @@
 
 ## Context
 
-`project_init` is a per-project scaffolder: it drops a `.claude/` layout into one
+`project_init` is a per-project scaffolder: it drops a `.agents/` layout into one
 repo and exits (ADR-001 — deterministic file-ops, no long-running service, no LLM
 calls, stay small). A recurring question (#479) is whether a **root-level
 "agentic-OS" layer** should sit *above* it for cross-project concerns: global
@@ -55,11 +55,11 @@ Rationale, tied to existing constraints:
 ### 2. A multirepo + registry, not a monorepo, and never branches-as-projects
 
 The root layer operates over **N independent repos**, each carrying its own
-`.claude/` descriptor; the orchestrator keeps a registry (a list of project roots)
+`.agents/` descriptor; the orchestrator keeps a registry (a list of project roots)
 and indexes across them.
 
 - **Monorepo (per-subtree scaffold)** is *supported but not required*: if a user
-  keeps projects as subtrees, `project_init` scaffolds each `packages/*/.claude/`
+  keeps projects as subtrees, `project_init` scaffolds each `packages/*/.agents/`
   and the orchestrator walks subtrees. Same descriptor contract; different walk.
 - **Branches-as-projects is rejected.** A git branch is a temporal version of one
   tree, not a multiplexer for N projects. Using branches to hold parallel projects
@@ -76,11 +76,11 @@ The smallest useful orchestrator is three read-only capabilities over the
 registry — no writes back into child repos, no runtime:
 
 1. **Project registry** — a list of project roots (multirepo) or a subtree glob
-   (monorepo). Hand-maintained or discovered by globbing for `.claude/config.yaml`.
-2. **Memory aggregation** — read each project's `.claude/memory/MEMORY.md` (the
+   (monorepo). Hand-maintained or discovered by globbing for `.agents/config.yaml`.
+2. **Memory aggregation** — read each project's `.agents/memory/MEMORY.md` (the
    stable anchor, ADR-024) into a global view; optionally a global
-   `~/.claude/memory/` that links back to per-project facts.
-3. **Tool/MCP inventory** — union of each project's `.claude/CAPABILITIES.md`
+   `~/.agents/memory/` that links back to per-project facts.
+3. **Tool/MCP inventory** — union of each project's `.agents/CAPABILITIES.md`
    (ADR-017) so "which projects expose which MCP/skill" is answerable centrally.
 
 Tier-3 RAG (#495), when built, is the *fourth* capability and lives **here**: one
@@ -93,9 +93,9 @@ a per-project engine already exists.
 The orchestrator reads, per project, the **memory descriptor** standardized in
 #498 / ADR-024 — no new per-project artifact is required:
 
-- **Anchor (invariant across tiers):** `.claude/config.yaml` `memory:` block with
+- **Anchor (invariant across tiers):** `.agents/config.yaml` `memory:` block with
   `tier`, `stack`, `memory_path`, and (tier-gated) `vault_path`, `graph_path`,
-  `rag_endpoint`; plus `.claude/CAPABILITIES.md` as the human-readable mirror.
+  `rag_endpoint`; plus `.agents/CAPABILITIES.md` as the human-readable mirror.
   *Field availability:* tiers 0–2 (`tier`/`stack`/`memory_path`/`vault_path`/
   `graph_path`) ship today via #498; the tier-3 `rag_endpoint` field is added by
   the seam PR (#505/#506) and is only present on `obsidian-graphify-rag` scaffolds
@@ -106,7 +106,7 @@ The orchestrator reads, per project, the **memory descriptor** standardized in
   retrieval path — `tier ≥ 3` → query the RAG endpoint; `≥ 2` → query the graph;
   `≥ 0` → grep `memory_path`. The anchors never move between tiers; higher tiers
   only *add* surfaces, so a reader written against tier 0 keeps working at tier 3.
-- **Discovery:** glob for `.claude/config.yaml`; its presence + the `memory:` block
+- **Discovery:** glob for `.agents/config.yaml`; its presence + the `memory:` block
   *is* the registration breadcrumb. No callback, no daemon, no write-back.
 
 This is why §1's "separate tool" is cheap to start: the contract is data the

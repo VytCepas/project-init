@@ -7,7 +7,7 @@ apply. ``remove`` additionally **deletes** the files that the concern uniquely
 owned — but only those byte-identical to the recorded manifest hash, so a user's
 edits are never destroyed (they are kept and reported instead).
 
-``.claude/memory/`` and ``.claude/vault/`` are in ``scaffold._PRESERVE_DIRS``, so
+``.agents/memory/`` and ``.agents/vault/`` are in ``scaffold._PRESERVE_DIRS``, so
 ``compute_drift`` never lists them as removed: ``remove memory`` downgrades the
 tier and unwires it, but the user's accumulated notes stay on disk. Explicit
 source-data deletion/transfer (``--purge`` / ``--export``) is a later slice.
@@ -164,7 +164,7 @@ def _seed_preserved(
 
     ``compute_drift``/``apply_drift`` skip preserved dirs entirely — which keeps a
     user's notes safe on ``remove`` but also means ``add memory`` would never lay
-    down the ``.claude/memory/`` skeleton. Returns the files that are missing (so a
+    down the ``.agents/memory/`` skeleton. Returns the files that are missing (so a
     dry run can report them); with *write*, copies them — existing user content is
     never overwritten.
     """
@@ -190,7 +190,7 @@ def _seed_preserved(
 # exact paths that --purge/--export on `remove <concern>` may touch. Concerns
 # absent here own no preserved source data, so purging them is meaningless.
 _CONCERN_SOURCE_SCOPE: dict[str, tuple[str, ...]] = {
-    "memory": (".claude/memory/", ".claude/vault/"),
+    "memory": (".agents/memory/", ".agents/vault/"),
     "governance": tuple(sorted(_GOVERNANCE_USER_FILES)),
 }
 
@@ -203,14 +203,14 @@ def _in_source_scope(rel: Path, scope: tuple[str, ...]) -> bool:
 def _orphaned_preserved(target: Path, rendered: list[Path], concern: str) -> list[Path]:
     """Preserved source files of *concern* on disk but not in the new render.
 
-    Preserved files (``.claude/memory/``, ``.claude/vault/``, governance user
+    Preserved files (``.agents/memory/``, ``.agents/vault/``, governance user
     files) are normally kept on every re-render. After a toggle that drops their
     concern, the new staging render no longer produces them — so a preserved file
     whose path is absent from *rendered* is orphaned source data, the target of
     ``--purge`` / ``--export``.
 
     Scoped to the toggled concern's own source data (``_CONCERN_SOURCE_SCOPE``):
-    every user note under ``.claude/`` is preserved and absent from a fresh
+    every user note under ``.agents/`` is preserved and absent from a fresh
     render, so an unscoped sweep would let ``remove docs --purge`` delete the
     user's entire vault — data the concern being removed never owned.
     """
@@ -219,7 +219,7 @@ def _orphaned_preserved(target: Path, rendered: list[Path], concern: str) -> lis
         return []
     preserve_globs = read_preserve_globs(target)
     rendered_set = {r.as_posix() for r in rendered}
-    claude = target / ".claude"
+    claude = target / ".agents"
     if not claude.is_dir():
         return []
     out: list[Path] = []
@@ -321,11 +321,11 @@ def apply_concern(  # noqa: PLR0913 — flags map 1:1 to the add/remove CLI opti
     Without *apply* this is a dry run: it reports what would change and deletes
     nothing. With *apply* it re-renders the shared wiring with the concern's flag
     flipped, lands the concern's files (add) or deletes its orphaned files
-    (remove, byte-unmodified only), and refreshes ``.claude/config.yaml``.
+    (remove, byte-unmodified only), and refreshes ``.agents/config.yaml``.
 
     *purge* / *export_dir* (remove only, mutually exclusive) act on **orphaned
     preserved source data owned by the toggled concern** — the user's
-    ``.claude/memory/`` / ``.claude/vault/`` notes for ``memory``, the
+    ``.agents/memory/`` / ``.agents/vault/`` notes for ``memory``, the
     governance user files for ``governance`` — that ``remove`` keeps by
     default: *purge* deletes them, *export_dir* moves them out first. Without
     either, source data is left in place. Concerns that own no source data

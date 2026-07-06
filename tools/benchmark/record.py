@@ -30,7 +30,7 @@ class RunRecord:
     target: str  # "bare" or a preset name (obsidian-only, obsidian-graphify)
     run_index: int  # 0-based repeat index (variance comes from repeats)
     model: str  # pinned model id used for the run
-    claude_version: str  # `claude --version`, recorded per methodology
+    agents_version: str  # `claude --version`, recorded per methodology
     session_id: str  # → transcript path; "" if unknown
     transcript_path: str  # absolute path to the parsed transcript JSONL
 

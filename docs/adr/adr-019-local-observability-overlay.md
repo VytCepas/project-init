@@ -34,7 +34,7 @@ The hard constraints:
    pinned interpreter.
 4. **Two facts about the available signals:**
    - Claude Code already writes a per-session **transcript JSONL**
-     (`~/.claude/projects/<slug>/*.jsonl`) carrying model usage, tool calls, and
+     (`~/.agents/projects/<slug>/*.jsonl`) carrying model usage, tool calls, and
      timings — always present, no setup. Its schema is **not officially stable**.
    - The one thing the transcript does *not* record cleanly is **which hooks
      fired**. Claude Code's OTEL export captures more (exact active-time,
@@ -56,11 +56,11 @@ visibility with zero standing infrastructure.
 - **Transcript JSONL** — the primary source (tokens, tool/skill/sub-agent/MCP
   counts, errors, timings). Parsing is confined to one module and tolerates
   missing fields, because the schema is unstable.
-- **Hook self-log** (`.claude/observability/usage.jsonl`) — the missing
+- **Hook self-log** (`.agents/observability/usage.jsonl`) — the missing
   hook-firing signal. A guarded helper (`_usage_log.sh`) is sourced by the
   always-on shell hooks and folded into `prod_guard.py`; it is
   **shipped-always-dormant** — present in every scaffold but a no-op unless the
-  overlay marker directory `.claude/observability/` exists. The plugin
+  overlay marker directory `.agents/observability/` exists. The plugin
   `hooks.json` is static and non-gateable (ADR-010), so the gate lives in the
   hook body, not in separate wiring. The helper **never reads stdin** (the hook
   payload belongs to the real hook body) and is fully fail-open.
@@ -147,6 +147,6 @@ other people's projects.
 ## References
 
 - Methodology (shared with Track B): `docs/development/measurement-methodology.md`
-- Guides: `templates/observability/dot_claude/docs/guides/using-observability.md`,
+- Guides: `templates/observability/dot_agents/docs/guides/using-observability.md`,
   `…/upgrading-observability.md`
 - epic #269 Track A; child issues #404–#407

@@ -18,7 +18,7 @@
 
 ## Context
 
-The scaffolded `.claude/` output is consumed losslessly only by the Claude Code
+The scaffolded `.agents/` output is consumed losslessly only by the Claude Code
 CLI (and, per the #365 spike, the Anthropic Claude Code VS Code extension, which
 shares the CLI's config). The other agent surfaces our users run — Cursor, the
 OpenAI Codex IDE, Google Antigravity, GitHub Copilot agent mode — read different
@@ -33,10 +33,10 @@ The #365 spike validated the surface behaviors and surfaced the shape of the
 problem (full matrix in `docs/development/non-cli-surface-matrix.md`):
 
 - **Skills are nearly a free, cross-surface standard.** `SKILL.md` in
-  `.claude/skills/` and `.agents/skills/` is already read by Claude (ext),
+  `.agents/skills/` and `.agents/skills/` is already read by Claude (ext),
   Copilot, Cursor, Codex, and Antigravity. No per-surface skill rendering needed.
 - **Hooks do not translate cleanly.** Three incompatible dialects:
-  Claude-family **PascalCase** in `.claude/settings.json` / `.codex/hooks.json`
+  Claude-family **PascalCase** in `.agents/settings.json` / `.codex/hooks.json`
   (Claude ext, Copilot, Codex); Cursor's **own camelCase** vocabulary in
   `.cursor/hooks.json` (`beforeShellExecution`, `beforeSubmitPrompt`, …);
   Antigravity's `safety-gate`/`PreToolUse` model in `.agents/hooks.json`.
@@ -73,11 +73,11 @@ declares:
 
 | Field | Examples |
 |---|---|
-| hooks file | `.claude/settings.json` · `.cursor/hooks.json` · `.codex/hooks.json` · `.agents/hooks.json` |
+| hooks file | `.agents/settings.json` · `.cursor/hooks.json` · `.codex/hooks.json` · `.agents/hooks.json` |
 | hook event mapping | PascalCase identity (Claude/Codex) · PascalCase→camelCase (Cursor) · subset→`safety-gate` (Antigravity) |
 | matcher fidelity | honored · **advisory** (Copilot/where matchers are dropped) |
 | MCP file + key | `.mcp.json`/`mcpServers` · `.vscode/mcp.json`/`servers` · `.cursor/mcp.json`/`mcpServers` · `.codex/config.toml`/`[mcp_servers.*]` |
-| skills path | `.claude/skills` + `.agents/skills` (shared; not per-surface) |
+| skills path | `.agents/skills` + `.agents/skills` (shared; not per-surface) |
 
 Adding a surface = appending one entry.
 
@@ -85,9 +85,9 @@ Adding a surface = appending one entry.
 
 | Surface | Emission |
 |---|---|
-| Claude Code CLI / Desktop / VS Code ext | none for hooks/skills (native `.claude/`); **root `.mcp.json`** only when MCPs are configured (shareable project scope) |
-| VS Code Copilot agent mode | reads `.claude/` natively; `.vscode/mcp.json` (`servers`) when MCPs configured; matchers advisory |
-| Cursor | `.cursor/hooks.json` (camelCase translation) + `.cursor/mcp.json`; skills already via `.claude/skills` |
+| Claude Code CLI / Desktop / VS Code ext | none for hooks/skills (native `.agents/`); **root `.mcp.json`** only when MCPs are configured (shareable project scope) |
+| VS Code Copilot agent mode | reads `.agents/` natively; `.vscode/mcp.json` (`servers`) when MCPs configured; matchers advisory |
+| Cursor | `.cursor/hooks.json` (camelCase translation) + `.cursor/mcp.json`; skills already via `.agents/skills` |
 | Codex IDE / CLI | schema-correct emission (`.codex/hooks.json` + `.agents/skills`); add `.codex/config.toml` `[mcp_servers.*]` when MCPs configured. NB: codex 0.138.0 may not fire project-scoped hooks without an enable step (advisory; git + CI are the boundary, ADR-007) |
 | Antigravity | `.agents/hooks.json` (`PreToolUse` only, confirmed) + MCP variant; skills via `.agents/skills` |
 | (future) | one surface-table entry |
@@ -95,7 +95,7 @@ Adding a surface = appending one entry.
 ### 4. Selection & opt-in
 
 Which surfaces to emit is **opt-in** (wizard question + flag) and recorded in the
-existing `.claude/config.yaml` scaffold-record, which `upgrade` already reads back
+existing `.agents/config.yaml` scaffold-record, which `upgrade` already reads back
 (so re-renders stay consistent, PI-189). Clean-by-default: emit nothing extra
 unless asked.
 

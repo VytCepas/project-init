@@ -38,20 +38,20 @@ class TestHookExecutability:
 
     @pytest.mark.skipif(sys.platform == "win32", reason="executable bits don't work on Windows")
     def test_shell_hooks_are_executable(self):
-        hooks_dir = self.target / ".claude" / "hooks"
+        hooks_dir = self.target / ".agents" / "hooks"
         for sh in hooks_dir.glob("*.sh"):
             assert sh.stat().st_mode & 0o111, f"{sh.name} must be executable"
 
     @pytest.mark.skipif(sys.platform == "win32", reason="executable bits don't work on Windows")
     def test_python_hooks_are_not_executable(self):
-        hooks_dir = self.target / ".claude" / "hooks"
+        hooks_dir = self.target / ".agents" / "hooks"
         for py in hooks_dir.glob("*.py"):
             assert not (py.stat().st_mode & 0o111), (
                 f"{py.name} should not be executable (invoked via python3)"
             )
 
     def test_hooks_readme_documents_convention(self):
-        readme = self.target / ".claude" / "hooks" / "README.md"
+        readme = self.target / ".agents" / "hooks" / "README.md"
         content = readme.read_text()
         assert "executable" in content.lower() or "executable bit" in content.lower()
         assert ".sh" in content or "Shell" in content
@@ -66,17 +66,17 @@ class TestSecurityEnforcementMigration:
         scaffold(tmp_target, fallback_preset(), fallback_variables())
 
     def test_legacy_safety_hooks_removed(self):
-        hooks_dir = self.target / ".claude" / "hooks"
+        hooks_dir = self.target / ".agents" / "hooks"
         assert not (hooks_dir / "secret-guard.py").exists()
         assert not (hooks_dir / "bash_safety_guard.sh").exists()
 
     def test_settings_drops_legacy_hook_references(self):
-        content = (self.target / ".claude" / "settings.json").read_text()
+        content = (self.target / ".agents" / "settings.json").read_text()
         assert "secret-guard" not in content
         assert "bash_safety_guard" not in content
 
     def test_settings_enables_security_guidance_plugin(self):
-        data = json.loads((self.target / ".claude" / "settings.json").read_text())
+        data = json.loads((self.target / ".agents" / "settings.json").read_text())
         assert data["enabledPlugins"]["security-guidance@claude-plugins-official"] is True
         marketplace = data["extraKnownMarketplaces"]["claude-plugins-official"]
         assert marketplace["source"] == {
@@ -86,7 +86,7 @@ class TestSecurityEnforcementMigration:
 
     def test_dag_workflow_hooks_unchanged(self):
         """The genuinely custom workflow guards stay wired."""
-        hooks_dir = self.target / ".claude" / "hooks"
+        hooks_dir = self.target / ".agents" / "hooks"
         for name in (
             "github_command_guard.sh",
             "dag_workflow.py",
@@ -96,7 +96,7 @@ class TestSecurityEnforcementMigration:
         ):
             assert (hooks_dir / name).is_file(), f"{name} must survive ADR-007"
 
-        data = json.loads((self.target / ".claude" / "settings.json").read_text())
+        data = json.loads((self.target / ".agents" / "settings.json").read_text())
         commands = [
             h["command"]
             for groups in data["hooks"].values()
@@ -207,7 +207,7 @@ class TestInstallHooks:
             ["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True
         )
         result = subprocess.run(
-            ["bash", str(tmp_target / ".claude" / "scripts" / "install_hooks.sh")],
+            ["bash", str(tmp_target / ".agents" / "scripts" / "install_hooks.sh")],
             cwd=tmp_target,
             capture_output=True,
             text=True,
@@ -232,7 +232,7 @@ class TestInstallHooks:
         dst.symlink_to(referent)
 
         result = subprocess.run(
-            ["bash", str(tmp_target / ".claude" / "scripts" / "install_hooks.sh")],
+            ["bash", str(tmp_target / ".agents" / "scripts" / "install_hooks.sh")],
             cwd=tmp_target,
             capture_output=True,
             text=True,
@@ -276,7 +276,7 @@ class TestCiSecretScanMirror:
 class TestShellLineEndings:
     """Regression: shell hook scripts must be LF-only.
 
-    Codex evaluation 2026-04-25 caught templates/base/dot_claude/hooks/
+    Codex evaluation 2026-04-25 caught templates/base/dot_agents/hooks/
     shell scripts shipping with CRLF endings, which made
     `/usr/bin/env: 'bash\\r': No such file or directory` on Unix.
     """

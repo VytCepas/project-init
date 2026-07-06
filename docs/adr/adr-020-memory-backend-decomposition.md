@@ -10,8 +10,8 @@
 
 ## Context
 
-The `base` layer force-shipped an Obsidian memory stack (`.claude/vault/` +
-`.claude/memory/`) into **every** scaffold. Every preset listed `obsidian` in its
+The `base` layer force-shipped an Obsidian memory stack (`.agents/vault/` +
+`.agents/memory/`) into **every** scaffold. Every preset listed `obsidian` in its
 `layers`, and `base` itself carried the vault/memory starters — so "no Obsidian"
 was impossible, even though the scaffold engine has zero dependency on it. The
 coupling was purely: prose links, a `config.yaml` block, preset `layers`, ADR-001

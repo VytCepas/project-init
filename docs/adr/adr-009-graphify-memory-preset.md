@@ -44,7 +44,7 @@ mark `obsidian-lightrag` legacy (still functional, no new features).
 Scaffolder boundaries (unchanged by this ADR):
 
 - The scaffolder never runs Graphify — it renders docs, a setup script the
-  *user* runs once (`.claude/scripts/setup_graphify.sh`), and agent rules.
+  *user* runs once (`.agents/scripts/setup_graphify.sh`), and agent rules.
   Deterministic file ops only.
 - Graphify's own artifacts (`graphify-out/`) are gitignored except the
   markdown report; the graph is a derived cache, not source.

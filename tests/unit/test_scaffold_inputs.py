@@ -92,7 +92,7 @@ class TestDeliveryModel:
 
         target = tmp_path / "p"
         scaffold(target, load_preset("obsidian-only"), make_variables(delivery="library"), strict=True)
-        config = (target / ".claude" / "config.yaml").read_text()
+        config = (target / ".agents" / "config.yaml").read_text()
         assert "delivery: library" in config
 
     def test_alias_survives_argparse(self):
@@ -108,7 +108,7 @@ class TestDeliveryModel:
 
 
 class TestConfigSchemaEnvFields:
-    """PI-327 (epic #316): .claude/config.yaml records the delivery/deploy/iac
+    """PI-327 (epic #316): .agents/config.yaml records the delivery/deploy/iac
     schema so `upgrade` can re-render and backfill faithfully."""
 
     def test_config_records_all_three_overlays(self, tmp_path):
@@ -122,7 +122,7 @@ class TestConfigSchemaEnvFields:
             make_variables(delivery="service", deploy_target="cloud-run", iac="opentofu"),
             strict=True,
         )
-        config = (target / ".claude" / "config.yaml").read_text()
+        config = (target / ".agents" / "config.yaml").read_text()
         assert "delivery: service" in config
         assert "deploy: cloud-run" in config
         assert "iac: opentofu" in config

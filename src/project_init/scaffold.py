@@ -45,17 +45,17 @@ _ALWAYS_OVERWRITE = {"README.md"}
 # deliberately absent here: it must refresh every run.
 _GOVERNANCE_USER_FILES = frozenset(
     {
-        ".claude/governance/SYSTEM_CARD.md",
-        ".claude/governance/ai-declarations.md",
-        ".claude/governance/config.json",
+        ".agents/governance/SYSTEM_CARD.md",
+        ".agents/governance/ai-declarations.md",
+        ".agents/governance/config.json",
     }
 )
 # The owner-edited record file. On a re-scaffold it is preserved (not re-rendered)
 # once it carries the scaffold record, so hand-edits — preserve list, project_key,
 # declined_additions, safety.allow — survive (#296); write_scaffold_record then
 # updates the record block in place. A first scaffold (no record) renders it.
-_CONFIG_REL = Path(".claude/config.yaml")
-# Marker that write_scaffold_record (upgrade.py) appends to .claude/config.yaml
+_CONFIG_REL = Path(".agents/config.yaml")
+# Marker that write_scaffold_record (upgrade.py) appends to .agents/config.yaml
 # after a real project-init scaffold. Its PRESENCE — not the file merely
 # existing — distinguishes a re-run from a first scaffold (PI-196).
 _RECORD_MARKER = (
@@ -271,7 +271,7 @@ def memory_layers(memory_stack: str) -> list[str]:
     """Template layers contributed by the memory backend (#466, #497).
 
     The ladder is a strict superset chain (ADR-024): ``auto`` → ``["auto"]``
-    (flat agent facts in ``.claude/memory/`` — no vault); ``obsidian-only`` →
+    (flat agent facts in ``.agents/memory/`` — no vault); ``obsidian-only`` →
     ``["auto", "obsidian"]`` (adds the human Obsidian vault on top of the memory
     facts); ``obsidian-graphify`` → ``["auto", "obsidian", "graphify"]`` (adds
     the derived code knowledge graph); ``obsidian-graphify-rag`` → ``["auto",
@@ -433,14 +433,14 @@ def _dot_rename(name: str) -> str:
 
 
 def read_preserve_globs(target: Path) -> list[str]:
-    """User-declared extra preserve globs from ``.claude/config.yaml`` (#243).
+    """User-declared extra preserve globs from ``.agents/config.yaml`` (#243).
 
     Reads a single-line ``preserve: ["a", "b/*"]`` JSON array (a valid YAML flow
     sequence, parseable with stdlib — consistent with the scaffold record's
     single-line JSON values). Returns ``[]`` when the file or key is absent or
     malformed; the built-in ``memory``/``vault`` defaults always apply on top.
     """
-    config = target / ".claude" / "config.yaml"
+    config = target / ".agents" / "config.yaml"
     try:
         # errors="ignore" so a pre-existing non-UTF-8 config.yaml degrades to
         # "no extra globs" instead of crashing the first scaffold (PI-535) —
@@ -792,7 +792,7 @@ def _commit_staged(
 
 
 def _has_scaffold_record(config_file: Path) -> bool:
-    """Return True if .claude/config.yaml carries the scaffold record marker.
+    """Return True if .agents/config.yaml carries the scaffold record marker.
 
     A read failure (permissions, or the file removed between the check and the
     read) is treated as "no record" so overwrite protection stays on and user
@@ -907,11 +907,11 @@ def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
     """
     import uuid
 
-    # A pre-existing .claude/config.yaml only proves a prior project-init run
+    # A pre-existing .agents/config.yaml only proves a prior project-init run
     # when it carries the scaffold record marker; a hand-written or third-party
     # config.yaml must still count as a first scaffold so existing user files are
     # protected as `.new` siblings rather than silently overwritten (PI-196).
-    _config_file = target / ".claude" / "config.yaml"
+    _config_file = target / ".agents" / "config.yaml"
     first_scaffold = not _has_scaffold_record(_config_file)
     preserve_globs = read_preserve_globs(target)
     # On a re-run the recorded manifest hashes tell user-edited files apart from
@@ -1042,7 +1042,20 @@ def _emit_generated_files(
             conflicts=conflicts,
             detect_root=detect_root,
         )
+
+    _generate_claude_projection(target)
     return created
+
+def _generate_claude_projection(target: Path) -> None:
+    """Generate the .agents projection from the canonical .agents tree."""
+    import shutil
+    
+    agents_dir = target / ".agents"
+    claude_dir = target / ".claude"
+    if not agents_dir.exists():
+        return
+        
+    shutil.copytree(agents_dir, claude_dir, dirs_exist_ok=True)
 
 
 def _emit_generated(

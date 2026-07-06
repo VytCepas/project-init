@@ -18,7 +18,7 @@ _HOOK = (
     _REPO_ROOT
     / "templates"
     / "lifecycle_fallback"
-    / "dot_claude"
+    / "dot_agents"
     / "hooks"
     / "pre_edit_issue_guard.py"
 )
@@ -121,9 +121,9 @@ class TestWiring:
     def test_fallback_lifecycle_settings_wire_the_guard(self, tmp_path: Path):
         target = tmp_path / "p"
         scaffold(target, fallback_preset(), fallback_variables(), strict=True)
-        settings = json.loads((target / ".claude" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text())
         commands = [
             h["command"] for entry in settings["hooks"]["PreToolUse"] for h in entry["hooks"]
         ]
         assert any("pre_edit_issue_guard.py" in c for c in commands)
-        assert (target / ".claude" / "hooks" / "pre_edit_issue_guard.py").is_file()
+        assert (target / ".agents" / "hooks" / "pre_edit_issue_guard.py").is_file()

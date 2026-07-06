@@ -1,12 +1,12 @@
 # project-init runtime artifacts
 # NB: do NOT ignore .codex/ wholesale — the codex overlay commits
 # .codex/hooks.json and .codex/config.toml as project config (2026-07 review).
-.claude/scheduled_tasks.lock
-.claude/.session_setup_stamp
-.claude/settings.local.json
-{{#if memory}}.claude/memory/.cache/
-{{/if memory}}.claude/logs/
-.claude/.local/
+.agents/scheduled_tasks.lock
+.agents/.session_setup_stamp
+.agents/settings.local.json
+{{#if memory}}.agents/memory/.cache/
+{{/if memory}}.agents/logs/
+.agents/.local/
 
 # Python
 __pycache__/
@@ -42,9 +42,9 @@ graphify-out/*
 .cocoindex_code/
 
 {{/if rag}}{{#if obsidian}}# Obsidian (vault workspace state only; keep notes tracked)
-.claude/vault/.obsidian/workspace*
-.claude/vault/.obsidian/cache
-.claude/vault/.trash/
+.agents/vault/.obsidian/workspace*
+.agents/vault/.obsidian/cache
+.agents/vault/.trash/
 
 {{/if obsidian}}# OS / editor
 .DS_Store

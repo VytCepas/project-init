@@ -114,6 +114,6 @@ def test_vscode_mcp_is_committable(tmp_path: Path):
 
 def test_guard_adapter_has_gui_dialects(tmp_path: Path):
     t = _scaffold(tmp_path / "p", agents="claude,codex,cursor,antigravity")
-    adapter = (t / ".claude/hooks/agent_guard_adapter.py").read_text()
+    adapter = (t / ".agents/hooks/agent_guard_adapter.py").read_text()
     assert 'dialect == "cursor"' in adapter
     assert 'dialect == "antigravity"' in adapter

@@ -12,8 +12,8 @@ not this one.
 ## The contract
 
 The authoritative record is the `memory:` block in each project's
-`.claude/config.yaml` (machine-read by `upgrade` and any orchestrator). The same
-facts are surfaced for humans / non-Claude surfaces in `.claude/CAPABILITIES.md`
+`.agents/config.yaml` (machine-read by `upgrade` and any orchestrator). The same
+facts are surfaced for humans / non-Claude surfaces in `.agents/CAPABILITIES.md`
 (regenerated every run, ADR-017).
 
 ```yaml
@@ -22,8 +22,8 @@ project:
 memory:
   tier: 3                                  # 0 auto | 1 obsidian-only | 2 obsidian-graphify | 3 obsidian-graphify-rag
   stack: obsidian-graphify-rag
-  memory_path: .claude/memory              # anchor — always present when memory is on
-  vault_path: .claude/vault                # present at tier >= 1
+  memory_path: .agents/memory              # anchor — always present when memory is on
+  vault_path: .agents/vault                # present at tier >= 1
   graph_path: graphify-out/graph.json      # present at tier >= 2
   rag_endpoint:                            # present at tier 3 (ADR-024 §4); empty until a tool is wired (#495)
 ```
@@ -40,10 +40,10 @@ v0** by the reader's rule below.
 | tier | stack | memory_path | vault_path | graph_path | rag_endpoint |
 |---|---|---|---|---|---|
 | — | none | (absent) | — | — | — |
-| 0 | auto | `.claude/memory` | — | — | — |
-| 1 | obsidian-only | `.claude/memory` | `.claude/vault` | — | — |
-| 2 | obsidian-graphify | `.claude/memory` | `.claude/vault` | `graphify-out/graph.json` | — |
-| 3 | obsidian-graphify-rag | `.claude/memory` | `.claude/vault` | `graphify-out/graph.json` | present (may be empty — engine not bundled, #495) |
+| 0 | auto | `.agents/memory` | — | — | — |
+| 1 | obsidian-only | `.agents/memory` | `.agents/vault` | — | — |
+| 2 | obsidian-graphify | `.agents/memory` | `.agents/vault` | `graphify-out/graph.json` | — |
+| 3 | obsidian-graphify-rag | `.agents/memory` | `.agents/vault` | `graphify-out/graph.json` | present (may be empty — engine not bundled, #495) |
 
 ## Reader rules (orchestrator-side, ADR-025)
 
@@ -56,8 +56,8 @@ v0** by the reader's rule below.
 
 ## Invariants (ADR-024)
 
-- **Anchors never move.** `.claude/memory/MEMORY.md`, `.claude/docs/adr/`, and
-  (when present) `.claude/vault/` are at the same path on every tier. Higher tiers
+- **Anchors never move.** `.agents/memory/MEMORY.md`, `.agents/docs/adr/`, and
+  (when present) `.agents/vault/` are at the same path on every tier. Higher tiers
   only *add* retrieval surfaces (the right-hand columns); they never relocate an
   anchor. An orchestrator can therefore assume the anchors and feature-detect the
   rest.
@@ -76,7 +76,7 @@ read the JSON scaffold-record block project-init writes to the same file (its
 ```python
 import json, re
 
-config_text = (project / ".claude" / "config.yaml").read_text(encoding="utf-8")
+config_text = (project / ".agents" / "config.yaml").read_text(encoding="utf-8")
 m = re.search(r"^  variables: (\{.*\})$", config_text, re.MULTILINE)
 descriptor = json.loads(m.group(1)) if m else {}
 tier, stack = descriptor.get("memory_tier"), descriptor.get("memory_stack")

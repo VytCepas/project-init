@@ -24,8 +24,8 @@ import re
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_LIFECYCLE_SCRIPTS = _REPO_ROOT / "templates/lifecycle/dot_claude/scripts"
-_ROOT_SCRIPTS = _REPO_ROOT / ".claude/scripts"
+_LIFECYCLE_SCRIPTS = _REPO_ROOT / "templates/lifecycle/dot_agents/scripts"
+_ROOT_SCRIPTS = _REPO_ROOT / ".agents/scripts"
 
 
 class TestStartIssueErrorPath:
@@ -55,7 +55,7 @@ class TestCreateIssueTempFile:
 class TestPreCommitGateFailOpen:
     def test_uv_branch_probes_ruff_before_linting(self):
         for rel in (
-            "templates/fallback/dot_claude/hooks/pre_commit_gate.sh",
+            "templates/fallback/dot_agents/hooks/pre_commit_gate.sh",
             "plugins/project-init-workflow/hooks/pre_commit_gate.sh",
         ):
             s = (_REPO_ROOT / rel).read_text()
@@ -115,8 +115,8 @@ class TestGuardHookBudget:
         raise AssertionError("github_command_guard hook not wired")
 
     def test_repo_settings_budget_exceeds_subprocess_timeout(self):
-        cfg = json.loads((_REPO_ROOT / ".claude/settings.json").read_text())
-        dag = (_REPO_ROOT / ".claude/hooks/dag_workflow.py").read_text()
+        cfg = json.loads((_REPO_ROOT / ".agents/settings.json").read_text())
+        dag = (_REPO_ROOT / ".agents/hooks/dag_workflow.py").read_text()
         m = self._SUBPROCESS_TIMEOUT_RE.search(dag)
         assert m, "dag_workflow.py subprocess timeout not found"
         assert self._guard_timeout(cfg) >= 4 * int(m.group(1)), (
@@ -131,7 +131,7 @@ class TestGuardHookBudget:
         assert self._guard_timeout(cfg) == 60
 
     def test_scaffolded_settings_template_budget_matches(self):
-        s = (_REPO_ROOT / "templates/base/dot_claude/settings.json.tmpl").read_text()
+        s = (_REPO_ROOT / "templates/base/dot_agents/settings.json.tmpl").read_text()
         m = re.search(r'github_command_guard\.sh",\s*\n\s*"timeout": (\d+)', s)
         assert m, "guard hook entry not found in settings.json.tmpl"
         assert int(m.group(1)) == 60
@@ -143,8 +143,8 @@ class TestNojiraPrStateCheck:
         # CLOSED/MERGED PR for a reused branch name — the "already exists"
         # short-circuit must check the state like check_pr_opened does.
         for rel in (
-            ".claude/hooks/dag_workflow.py",
-            "templates/lifecycle/dot_claude/hooks/dag_workflow.py",
+            ".agents/hooks/dag_workflow.py",
+            "templates/lifecycle/dot_agents/hooks/dag_workflow.py",
             "plugins/project-init-lifecycle/hooks/dag_workflow.py",
         ):
             s = (_REPO_ROOT / rel).read_text()

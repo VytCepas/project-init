@@ -28,11 +28,11 @@ logs/
 
 # Local agent runtime state — committed: skills/, hooks/, scripts/, settings.json
 # gitignored: vault/, settings.local.json, scheduled_tasks.lock (personal/runtime)
-.claude/*
-!.claude/skills
-!.claude/hooks
-!.claude/scripts
-!.claude/settings.json
+.agents/*
+!.agents/skills
+!.agents/hooks
+!.agents/scripts
+!.agents/settings.json
 .codex
 
 # coverage data

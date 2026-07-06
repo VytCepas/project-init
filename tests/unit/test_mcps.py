@@ -111,7 +111,7 @@ class TestMCPsNonInteractive:
             "--mcps", "context7",
         ])
         assert rc == 0
-        config = (target / ".claude" / "config.yaml").read_text()
+        config = (target / ".agents" / "config.yaml").read_text()
         assert "context7" in config
 
     def test_db_flag_removed(self):
@@ -134,7 +134,7 @@ class TestMCPsNonInteractive:
             "--browser",
         ])
         assert rc == 0
-        config = (target / ".clone" / "config.yaml") if False else (target / ".claude" / "config.yaml")
+        config = (target / ".clone" / "config.yaml") if False else (target / ".agents" / "config.yaml")
         assert "playwright" in config.read_text()
 
     def test_no_mcps_gives_none(self, tmp_path: Path):
@@ -148,7 +148,7 @@ class TestMCPsNonInteractive:
             "--language", "python",
         ])
         assert rc == 0
-        config = (target / ".claude" / "config.yaml").read_text()
+        config = (target / ".agents" / "config.yaml").read_text()
         assert "installed: []" in config
 
     def test_unknown_mcp_id_is_rejected(self, tmp_path: Path):

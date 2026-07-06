@@ -93,13 +93,13 @@ jobs:
             --no-plugin \
             --strict
           # Verify essentials exist
-          test -f /tmp/smoke-target/.claude/config.yaml
-          test -f /tmp/smoke-target/.claude/project-init.md
+          test -f /tmp/smoke-target/.agents/config.yaml
+          test -f /tmp/smoke-target/.agents/project-init.md
           test -f /tmp/smoke-target/CLAUDE.md
           test -f /tmp/smoke-target/AGENTS.md
           # --no-plugin copies the hook payload; exec bits must survive packaging
-          test -x /tmp/smoke-target/.claude/hooks/post_edit_lint.sh
-          test -x /tmp/smoke-target/.claude/hooks/pre_commit_gate.sh
+          test -x /tmp/smoke-target/.agents/hooks/post_edit_lint.sh
+          test -x /tmp/smoke-target/.agents/hooks/pre_commit_gate.sh
           # Git-level enforcement hooks (ADR-007) survived packaging
           test -x /tmp/smoke-target/.github/hooks/pre-commit
           test -x /tmp/smoke-target/.github/hooks/pre-push
@@ -215,8 +215,8 @@ jobs:
         run: |
           cd /tmp/macos-target
           # Force the stock bash 3.2; the hook must never exit non-zero.
-          /bin/bash .claude/hooks/session_setup.sh
-          test -f .claude/.session_setup_stamp
+          /bin/bash .agents/hooks/session_setup.sh
+          test -f .agents/.session_setup_stamp
 
       - name: Commit gate runs under bash 3.2 against a staged file
         run: |
@@ -228,13 +228,13 @@ jobs:
           git add sample.py
           # PreToolUse hook: reads tool JSON on stdin, must exit 0 for a clean file.
           printf '%s' '{"tool_input":{"command":"git commit -m test"}}' \
-            | /bin/bash .claude/hooks/pre_commit_gate.sh
+            | /bin/bash .agents/hooks/pre_commit_gate.sh
           echo "pre_commit_gate.sh exit: $?"
 
       - name: _py.sh resolves an interpreter on macOS
         run: |
           cd /tmp/macos-target
-          out=$(/bin/bash .claude/hooks/_py.sh -c "print('resolver-ok')")
+          out=$(/bin/bash .agents/hooks/_py.sh -c "print('resolver-ok')")
           test "$out" = "resolver-ok"
 
   # PI-463: native Windows (non-WSL) runs hooks through Git Bash when Git for
@@ -279,8 +279,8 @@ jobs:
         run: |
           cd "$WIN_TARGET"
           # CLAUDE_PROJECT_DIR is what Claude Code itself sets on every hook fire.
-          CLAUDE_PROJECT_DIR="$WIN_TARGET" bash .claude/hooks/session_setup.sh
-          test -f .claude/.session_setup_stamp
+          CLAUDE_PROJECT_DIR="$WIN_TARGET" bash .agents/hooks/session_setup.sh
+          test -f .agents/.session_setup_stamp
 
       - name: Commit gate runs under Git Bash against a staged file
         run: |
@@ -292,11 +292,11 @@ jobs:
           git add sample.py
           # PreToolUse hook: reads tool JSON on stdin, must exit 0 for a clean file.
           printf '%s' '{"tool_input":{"command":"git commit -m test"}}' \
-            | CLAUDE_PROJECT_DIR="$WIN_TARGET" bash .claude/hooks/pre_commit_gate.sh
+            | CLAUDE_PROJECT_DIR="$WIN_TARGET" bash .agents/hooks/pre_commit_gate.sh
           echo "pre_commit_gate.sh exit: $?"
 
       - name: _py.sh resolves an interpreter on Windows
         run: |
           cd "$WIN_TARGET"
-          out=$(bash .claude/hooks/_py.sh -c "print('resolver-ok')")
+          out=$(bash .agents/hooks/_py.sh -c "print('resolver-ok')")
           test "$out" = "resolver-ok"

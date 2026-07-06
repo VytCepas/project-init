@@ -21,7 +21,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 # Both trees that ship the always-on hooks: the --no-plugin fallback source of
 # truth and the default plugin payload derived from it.
 _HOOK_DIRS = (
-    _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "hooks",
+    _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "hooks",
     _REPO_ROOT / "plugins" / "project-init-workflow" / "hooks",
 )
 _ALWAYS_ON = ("pre_commit_gate.sh", "session_setup.sh")
@@ -114,7 +114,7 @@ def test_scaffolded_settings_hooks_pin_bash_shell(tmp_path: Path):
     shell:bash for the same native-Windows reason (PI-463)."""
     target = tmp_path / "proj"
     scaffold(target, fallback_preset(), fallback_variables())
-    settings = json.loads((target / ".claude" / "settings.json").read_text())
+    settings = json.loads((target / ".agents" / "settings.json").read_text())
     cmds = _command_hooks(settings.get("hooks", {}))
     assert cmds, "no-plugin settings.json must wire command hooks"
     for hook in cmds:
@@ -133,7 +133,7 @@ def test_lint_hooks_do_not_leak_ruff_stdout():
         Path(__file__).resolve().parents[2]
         / "templates"
         / "fallback"
-        / "dot_claude"
+        / "dot_agents"
         / "hooks"
     )
     for name in ("pre_commit_gate.sh", "post_edit_lint.sh"):

@@ -68,7 +68,7 @@ class TestTranscriptParse:
         assert agg.tool_calls == 2
         assert agg.turns == 2  # two assistant messages
         assert agg.models == ["claude-opus-4-8"]
-        assert agg.claude_version == "2.1.181"
+        assert agg.agents_version == "2.1.181"
         assert agg.first_ts == "2026-06-23T10:00:00Z"
         assert agg.last_ts == "2026-06-23T10:00:09Z"
 
@@ -83,7 +83,7 @@ class TestRecord:
     def test_jsonl_round_trip(self, tmp_path: Path):
         rec = RunRecord(
             task="feat", target="bare", run_index=0, model="claude-opus-4-8",
-            claude_version="2.1.181", session_id="s1", transcript_path="/t.jsonl",
+            agents_version="2.1.181", session_id="s1", transcript_path="/t.jsonl",
             input_tokens=120, output_tokens=60, cache_read_tokens=800,
             cache_creation_tokens=200, total_tokens=1180, tool_calls=2, turns=2,
             wall_clock_s=9.0, first_ts="a", last_ts="b",
@@ -100,7 +100,7 @@ class TestRecord:
         # Unknown keys ignored, missing optional keys default — forward/backward compat.
         rec = RunRecord.from_dict({
             "task": "qa", "target": "bare", "run_index": 1, "model": "m",
-            "claude_version": "v", "session_id": "", "transcript_path": "/t",
+            "agents_version": "v", "session_id": "", "transcript_path": "/t",
             "input_tokens": 1, "output_tokens": 2, "cache_read_tokens": 3,
             "cache_creation_tokens": 4, "total_tokens": 10, "tool_calls": 0, "turns": 1,
             "wall_clock_s": None, "first_ts": None, "last_ts": None,
@@ -125,7 +125,7 @@ class TestBuildRecord:
         )
         assert rec.task == "feat" and rec.target == "obsidian-only" and rec.run_index == 2
         assert rec.total_tokens == 1180 and rec.tool_calls == 2 and rec.turns == 2
-        assert rec.wall_clock_s == 12.3 and rec.claude_version == "2.1.181"
+        assert rec.wall_clock_s == 12.3 and rec.agents_version == "2.1.181"
         assert rec.cost_usd is None and rec.success is None  # later issues
 
     def test_empty_model_falls_back_to_transcript(self, tmp_path: Path):
@@ -171,7 +171,7 @@ class TestTargetSetup:
     def test_bare_has_no_claude(self, tmp_path: Path):
         target = harness.setup_bare_target(tmp_path / "bare")
         assert (target / "pyproject.toml").is_file()
-        assert not (target / ".claude").exists()
+        assert not (target / ".agents").exists()
 
     def test_bare_target_has_pytest_for_checks(self, tmp_path: Path):
         """The deterministic check runner must be available on the bare arm too,
@@ -181,8 +181,8 @@ class TestTargetSetup:
 
     def test_scaffolded_has_claude(self, tmp_path: Path):
         target = harness.setup_scaffolded_target(tmp_path / "scaf", "obsidian-only")
-        assert (target / ".claude").is_dir()
-        assert (target / ".claude" / "config.yaml").is_file()
+        assert (target / ".agents").is_dir()
+        assert (target / ".agents" / "config.yaml").is_file()
 
     def test_fix_task_seeds_failing_fixture(self, tmp_path: Path):
         """The fix task must arrive with a real failing+passing baseline, not an
@@ -243,7 +243,7 @@ class TestAuth:
         monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cfg"))
         assert harness.default_config_dir() == tmp_path / "cfg"
         monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
-        assert harness.default_config_dir() == Path.home() / ".claude"
+        assert harness.default_config_dir() == Path.home() / ".agents"
 
     def test_seed_credentials_copies_subscription_token(self, tmp_path: Path):
         source = tmp_path / "real"

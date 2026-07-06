@@ -12,7 +12,7 @@ Confidence (from the #365 spike, `docs/development/non-cli-surface-matrix.md`):
   emitted hooks are **best-effort and fail-open** — git/CI remain the real
   enforcement boundary (ADR-007). Antigravity is flagged experimental.
 
-Surfaces that read `.claude/` natively (Claude CLI, Claude VS Code extension)
+Surfaces that read `.agents/` natively (Claude CLI, Claude VS Code extension)
 need no emission; Codex/Gemini already have overlays. This module adds the
 cross-surface MCP files and the GUI hook configs (Cursor, Antigravity).
 """
@@ -29,14 +29,14 @@ def _guard_command(surface: str) -> str:
     """Command-guard invocation that resolves from the git repo root (PI-537).
 
     Agent surfaces run hooks in the session's working directory, which may be a
-    subdirectory of the project; a bare relative ``.claude/hooks/_py.sh …`` then
+    subdirectory of the project; a bare relative ``.agents/hooks/_py.sh …`` then
     exits 127 from there and fails open. Wrap it so it ``cd``s to the git toplevel
     first (falling back to the current dir outside a repo — the old behavior),
     then ``exec``s the guard so stdin (the tool-call JSON) is inherited.
     """
     return (
         "sh -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && "
-        f"exec .claude/hooks/_py.sh .claude/hooks/agent_guard_adapter.py {surface}'"
+        f"exec .agents/hooks/_py.sh .agents/hooks/agent_guard_adapter.py {surface}'"
     )
 
 # --- canonical MCP rendering -------------------------------------------------
@@ -181,7 +181,7 @@ SURFACES: dict[str, dict] = {
         "hooks_render": render_cursor_hooks,
         "mcp_file": ".cursor/mcp.json",
         "mcp_render": ("json", "mcpServers"),
-        # skills cross-read from .claude/skills — no emission needed.
+        # skills cross-read from .agents/skills — no emission needed.
     },
     "antigravity": {
         "label": "Antigravity",

@@ -128,7 +128,7 @@ class TestLifecycleNoneScaffold:
         )
 
     def test_no_lifecycle_scripts(self):
-        scripts = self.target / ".claude" / "scripts"
+        scripts = self.target / ".agents" / "scripts"
         for s in (
             "create_issue.sh",
             "start_issue.sh",
@@ -146,7 +146,7 @@ class TestLifecycleNoneScaffold:
         assert (scripts / "gh_host.sh").is_file()
 
     def test_no_dag_or_guard_hooks(self):
-        hooks = self.target / ".claude" / "hooks"
+        hooks = self.target / ".agents" / "hooks"
         assert not (hooks / "dag_workflow.py").exists()
         assert not (hooks / "github_command_guard.sh").exists()
         assert not (hooks / "workflow_state_reminder.sh").exists()
@@ -171,14 +171,14 @@ class TestLifecycleNoneScaffold:
         assert (gh / "workflows" / "ci.yml").is_file()
 
     def test_no_lifecycle_skills(self):
-        skills = self.target / ".claude" / "skills"
+        skills = self.target / ".agents" / "skills"
         for sk in ("create_issue", "start_task", "github_workflow", "request_review", "audit"):
             assert not (skills / sk).exists(), f"lifecycle skill leaked: {sk}"
         # A general skill stays (plan is the always-rendered base skill).
         assert (skills / "plan" / "SKILL.md").is_file()
 
     def test_settings_valid_and_no_lifecycle_hooks(self):
-        settings = json.loads((self.target / ".claude" / "settings.json").read_text())
+        settings = json.loads((self.target / ".agents" / "settings.json").read_text())
         commands = [
             h["command"]
             for entries in settings["hooks"].values()
@@ -202,7 +202,7 @@ class TestLifecycleNoneScaffold:
     def test_no_dangling_lifecycle_links(self):
         """No markdown link points at a missing lifecycle file."""
         link_re = re.compile(
-            r"\]\((?:\./)?(?:\.claude/(?:scripts|hooks)/(?:create_issue|start_issue|finish_pr|"
+            r"\]\((?:\./)?(?:\.agents/(?:scripts|hooks)/(?:create_issue|start_issue|finish_pr|"
             r"monitor_pr|push_branch|setup_github|promote_review|create_nojira_pr|push_wiki|"
             r"dag_workflow|github_command_guard|workflow_state_reminder)"
             r"|\.github/(?:workflows/(?:board-automation|issue-validation|review-status|validate-pr|"
@@ -236,7 +236,10 @@ class TestLifecycleNoneScaffold:
         # The guard hooks and gh_host carry internal design comments that mention
         # dag_workflow.py / start_issue.sh as examples — not user-facing paths and
         # not present as wired hooks in a lifecycle-off scaffold. Allowed.
-        allowed = {".claude/hooks/_usage_log.sh", ".claude/scripts/gh_host.sh"}
+        allowed = {
+            ".agents/hooks/_usage_log.sh", ".agents/scripts/gh_host.sh",
+            ".claude/hooks/_usage_log.sh", ".claude/scripts/gh_host.sh",
+        }
         offenders = {}
         for p in self.target.rglob("*"):
             if not p.is_file():
@@ -255,8 +258,8 @@ class TestLifecycleNoneScaffold:
 
     def test_base_layer_intact(self):
         assert (self.target / "AGENTS.md").is_file()
-        assert (self.target / ".claude" / "settings.json").is_file()
-        assert (self.target / ".claude" / "project-init.md").is_file()
+        assert (self.target / ".agents" / "settings.json").is_file()
+        assert (self.target / ".agents" / "project-init.md").is_file()
 
 
 class TestPluginSplit:
@@ -268,7 +271,7 @@ class TestPluginSplit:
         extra = overlay_layers([], no_plugin=False, memory_stack="obsidian-only", lifecycle=lifecycle == "github")
         preset = {**preset, "layers": [*preset["layers"], *extra]}
         scaffold(target, preset, make_variables(lifecycle_tier=lifecycle), strict=True)
-        return json.loads((target / ".claude" / "settings.json").read_text())
+        return json.loads((target / ".agents" / "settings.json").read_text())
 
     def test_lifecycle_plugin_enabled_when_on(self, tmp_path: Path):
         plugins = self._settings(tmp_path, "github")["enabledPlugins"]
@@ -281,7 +284,7 @@ class TestPluginSplit:
         assert "project-init-lifecycle@project-init" not in plugins
 
     def test_both_plugins_registered_in_marketplace(self):
-        mp = json.loads((_REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text())
+        mp = json.loads((_REPO_ROOT / ".agents-plugin" / "marketplace.json").read_text())
         names = {p["name"] for p in mp["plugins"]}
         assert {"project-init-workflow", "project-init-lifecycle"} <= names
         for entry in mp["plugins"]:
@@ -307,7 +310,7 @@ class TestPluginSplit:
 class TestAgentSurfaceLifecycleSkills:
     """PI-537 #5: the per-agent skill layers (codex/antigravity) gate lifecycle
     skills on {{#if lifecycle}}, so `--lifecycle none` drops them from
-    `.agents/skills` just as it does from `.claude/skills` — previously they
+    `.agents/skills` just as it does from `.agents/skills` — previously they
     leaked, referencing scripts the declined concern never scaffolds."""
 
     _LIFECYCLE = ("create_issue", "start_task", "github_workflow", "request_review", "audit")

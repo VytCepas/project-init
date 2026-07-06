@@ -102,7 +102,7 @@ class TestProfileRecorded:
             make_variables(profile="standalone"),
             strict=True,
         )
-        cfg = (target / ".claude" / "config.yaml").read_text()
+        cfg = (target / ".agents" / "config.yaml").read_text()
         assert "profile: standalone" in cfg
 
     def test_record_variables_include_profile(self, tmp_path: Path):
@@ -131,6 +131,6 @@ class TestUpgradeBackfill:
         write_scaffold_record(target, "obsidian-only", legacy, created)
         # The record stores variables as JSON; a legacy record has no "profile" key
         # (the human section uses `profile:`, the record JSON would use `"profile":`).
-        assert '"profile":' not in (target / ".claude" / "config.yaml").read_text()
+        assert '"profile":' not in (target / ".agents" / "config.yaml").read_text()
         # Upgrade must not crash on the strict re-render (profile is backfilled).
         assert run_upgrade(target, apply=False) == 0

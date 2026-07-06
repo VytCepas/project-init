@@ -6,7 +6,7 @@
 
 ## Context
 
-The scaffolder copies ~30 `.claude/` files into every target project.
+The scaffolder copies ~30 `.agents/` files into every target project.
 Copies drift: a hook fix here never reaches already-scaffolded projects.
 The Claude Code plugin ecosystem solves exactly this — plugins update
 centrally, and a trusted marketplace offers them to every teammate.
@@ -16,7 +16,7 @@ scaffolder stops copying files the moment the plugin exists.
 
 ## Decision Outcome
 
-**Marketplace lives in this repo.** `.claude-plugin/marketplace.json` at
+**Marketplace lives in this repo.** `.agents-plugin/marketplace.json` at
 the repo root lists `project-init-workflow` with a relative source
 (`./plugins/project-init-workflow`). No second repo to maintain; relative
 sources resolve for git-based marketplace adds, which is how scaffolded

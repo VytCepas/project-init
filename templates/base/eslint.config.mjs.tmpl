@@ -19,7 +19,7 @@ export default tseslint.config(
     // Agent infrastructure and build output are not project code and are not
     // covered by tsconfig.json's `include`, so type-aware linting can't parse
     // them anyway.
-    ignores: [".claude/**", "node_modules/**", "dist/**", "_site/**"],
+    ignores: [".agents/**", "node_modules/**", "dist/**", "_site/**"],
   },
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,

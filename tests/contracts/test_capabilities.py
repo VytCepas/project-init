@@ -13,7 +13,7 @@ from project_init import capabilities
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
-_REL = ".claude/CAPABILITIES.md"
+_REL = ".agents/CAPABILITIES.md"
 
 
 def _scaffold(target: Path, **overrides: str) -> Path:

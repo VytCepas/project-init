@@ -18,7 +18,7 @@ import pytest
 from project_init.scaffold import scaffold
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_HOOK = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "package_guard.py"
+_HOOK = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "package_guard.py"
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
@@ -213,14 +213,14 @@ class TestWiring:
         from tests.helpers import fallback_preset, fallback_variables
 
         scaffold(tmp_target, fallback_preset(), fallback_variables(), strict=True)
-        settings = json.loads((tmp_target / ".claude" / "settings.json").read_text())
+        settings = json.loads((tmp_target / ".agents" / "settings.json").read_text())
         commands = [
             h["command"]
             for entry in settings["hooks"]["PreToolUse"]
             for h in entry["hooks"]
         ]
         assert any("package_guard.py" in c for c in commands)
-        assert (tmp_target / ".claude" / "hooks" / "package_guard.py").is_file()
+        assert (tmp_target / ".agents" / "hooks" / "package_guard.py").is_file()
 
     def test_plugin_ships_the_guard(self):
         plugin_hooks = json.loads(
@@ -243,5 +243,5 @@ class TestWiring:
             fallback_variables(multi_agent="true"),
             strict=True,
         )
-        adapter = (tmp_target / ".claude" / "hooks" / "agent_guard_adapter.py").read_text()
+        adapter = (tmp_target / ".agents" / "hooks" / "agent_guard_adapter.py").read_text()
         assert "package_guard.py" in adapter

@@ -55,7 +55,7 @@ trees, from the actual standards:
 ## Relationship to the observability overlay (Track A)
 
 Track A of this epic shipped a **scaffolded** observability overlay (ADR-019,
-#404–#407): `templates/observability/dot_claude/observability/usage_report.py`
+#404–#407): `templates/observability/dot_agents/observability/usage_report.py`
 parses the **same** Claude Code transcript JSONL described below, over the same
 local sources, into the same cost/adoption/reliability signals. Track B reuses
 that **parsing method**, not the code:
@@ -86,7 +86,7 @@ Verified against Claude Code 2.1.181.
 | Tool calls / redundant reads / turns | transcript JSONL | tool-use entries |
 | Session id (→ transcript path) | `claude -p --output-format json` | `session_id` |
 
-Transcripts live at `~/.claude/projects/<project>/<session-id>.jsonl`; isolate
+Transcripts live at `~/.agents/projects/<project>/<session-id>.jsonl`; isolate
 each run by setting `CLAUDE_CONFIG_DIR` to a temp dir so runs don't pollute the
 user's history and fixed-overhead stays clean.
 
@@ -126,7 +126,7 @@ Three small, reproducible tasks plus a probe. Each has a **fixed prompt** and a
 
 ## Bare-vs-scaffolded protocol
 
-- **Bare target** = a temp project with **no** `.claude/`.
+- **Bare target** = a temp project with **no** `.agents/`.
 - **Scaffolded target** = the same temp project + `project-init` output, run
   per-preset (`obsidian-only`, then `obsidian-graphify`) to expose diminishing returns.
 - **Comparability rules:** same task, same **pinned** `--model`, identical temp

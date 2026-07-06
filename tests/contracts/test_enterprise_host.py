@@ -15,10 +15,10 @@ from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_SCRIPTS = _REPO_ROOT / "templates/base/dot_claude/scripts"
+_SCRIPTS = _REPO_ROOT / "templates/base/dot_agents/scripts"
 # Lifecycle scripts moved to the lifecycle overlay (#476); gh_host.sh stays in
 # base (shared host resolver also sourced by the deploy scripts).
-_LIFECYCLE_SCRIPTS = _REPO_ROOT / "templates/lifecycle/dot_claude/scripts"
+_LIFECYCLE_SCRIPTS = _REPO_ROOT / "templates/lifecycle/dot_agents/scripts"
 _GH_HOST = _SCRIPTS / "gh_host.sh"
 _SETUP_GITHUB = _LIFECYCLE_SCRIPTS / "setup_github.sh"
 _PUSH_WIKI = _LIFECYCLE_SCRIPTS / "push_wiki.sh"
@@ -73,7 +73,7 @@ class TestHostHelperIsScaffolded:
     def test_gh_host_ships_into_projects(self, tmp_path: Path):
         target = tmp_path / "p"
         scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
-        assert (target / ".claude" / "scripts" / "gh_host.sh").exists()
+        assert (target / ".agents" / "scripts" / "gh_host.sh").exists()
 
 
 def _run_bash(snippet: str, *, cwd: Path | None = None, env_extra: dict | None = None) -> str:

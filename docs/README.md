@@ -1,7 +1,7 @@
 # project-init documentation
 
 **project-init** scaffolds agentic-development infrastructure: one command
-drops a `.claude/` layout (memory, docs, hooks, skills, curated MCPs, a
+drops a `.agents/` layout (memory, docs, hooks, skills, curated MCPs, a
 GitHub lifecycle) into any project so Claude Code — and other agents — are
 productive and governed from the first prompt.
 

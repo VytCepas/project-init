@@ -62,19 +62,19 @@ Legend: ✅ supported · ⚠️ conditional / caveats · 🔻 restricted/blocked
 - Claude Code resolves git-based marketplace sources by **shelling out to `git clone`** and
   **reusing local git credential helpers** (HTTPS via `gh auth login`/credential store, SSH via
   `ssh-agent`). Enterprise auth therefore works *through git* and is host-aware — but
-  **`GH_HOST` is never consulted** by the resolver. _(high — [plugin-marketplaces](https://code.claude.com/docs/en/plugin-marketplaces))_
+  **`GH_HOST` is never consulted** by the resolver. _(high — [plugin-marketplaces](https://code.agents.com/docs/en/plugin-marketplaces))_
 - The **`owner/repo` shorthand always resolves to github.com**. Any non-github.com host needs a
   **full git URL** (`https://HOST/owner/repo.git` or `git@…`). `github` sources default to SSH;
-  HTTPS via `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1`. _(high — [github-enterprise-server](https://code.claude.com/docs/en/github-enterprise-server))_
+  HTTPS via `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1`. _(high — [github-enterprise-server](https://code.agents.com/docs/en/github-enterprise-server))_
 - **GHES is officially supported** for local `/plugin marketplace add` via full git URL. **GHE.com**
   local marketplace is plain `git clone` (works if clone works — _inference, low_); cloud **Code
   Review is not supported** on GHE.com (only GHES + github.com). **EMU** cloud features need a
   Claude OAuth app authorized at enterprise level _(medium)_; local marketplace via full URL is
-  _inference, low_. _([code-review setup](https://support.claude.com/en/articles/14233555))_
+  _inference, low_. _([code-review setup](https://support.agents.com/en/articles/14233555))_
 - **No-egress controls** live in `managed-settings.json` (highest precedence, non-overridable):
   `strictKnownMarketplaces` (allowlist; `[]` blocks all additions), `blockedMarketplaces`,
   `hostPattern` source type (allowlist a whole GHES host), `allowManagedHooksOnly` + `enabledPlugins`
-  to lock the supply chain — enforced **before download**. _(high — [settings](https://code.claude.com/docs/en/settings) · [manage plugins for your org](https://support.claude.com/en/articles/13837433))_
+  to lock the supply chain — enforced **before download**. _(high — [settings](https://code.agents.com/docs/en/settings) · [manage plugins for your org](https://support.agents.com/en/articles/13837433))_
 
 ### Q2 — EMU: fork vs import/mirror
 
@@ -166,7 +166,7 @@ exactly the spike-decision the plan anticipated.
 
 - **#248** (re-pointable marketplace/fork + pin): **confirmed + sharpened.** The current schema
   `"source": { "source": "github", "repo": "{{project_init_repo}}" }`
-  (`templates/base/dot_claude/settings.json.tmpl`) is github.com-only, and
+  (`templates/base/dot_agents/settings.json.tmpl`) is github.com-only, and
   `{{project_init_repo}} = __repo_url__.removeprefix("https://github.com/")`
   (`src/project_init/__main__.py:514`, `upgrade.py:324`) silently no-ops on non-github.com URLs. Fix:
   emit a **full git URL** (a `git`/`url`-type source) for non-github.com hosts, or force `--no-plugin`.
@@ -198,11 +198,11 @@ exactly the spike-decision the plan anticipated.
 
 ## Sources
 
-Claude Code: [plugin-marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) ·
-[github-enterprise-server](https://code.claude.com/docs/en/github-enterprise-server) ·
-[settings](https://code.claude.com/docs/en/settings) ·
-[code-review setup](https://support.claude.com/en/articles/14233555) ·
-[manage plugins for your org](https://support.claude.com/en/articles/13837433).
+Claude Code: [plugin-marketplaces](https://code.agents.com/docs/en/plugin-marketplaces) ·
+[github-enterprise-server](https://code.agents.com/docs/en/github-enterprise-server) ·
+[settings](https://code.agents.com/docs/en/settings) ·
+[code-review setup](https://support.agents.com/en/articles/14233555) ·
+[manage plugins for your org](https://support.agents.com/en/articles/13837433).
 GitHub: [EMU abilities & restrictions](https://docs.github.com/en/enterprise-cloud@latest/admin/managing-iam/understanding-iam-for-enterprises/abilities-and-restrictions-of-managed-user-accounts) ·
 [REST getting started](https://docs.github.com/en/enterprise-cloud@latest/rest/using-the-rest-api/getting-started-with-the-rest-api) ·
 [GHES REST quickstart](https://docs.github.com/en/enterprise-server@3.17/rest/quickstart) ·

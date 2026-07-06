@@ -1,6 +1,6 @@
 """Sync shared skill/hook payloads derived from templates.
 
-Source of truth after the PI-165 cutover: templates/fallback/dot_claude
+Source of truth after the PI-165 cutover: templates/fallback/dot_agents
 (shared skills + hook scripts; rendered into projects only with --no-plugin),
 plus the GitHub-lifecycle overlays (#476/ADR-021): templates/lifecycle (the
 dag_workflow.py library) and templates/lifecycle_fallback (the lifecycle guard
@@ -39,10 +39,10 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TEMPLATE_CLAUDE = REPO_ROOT / "templates" / "base" / "dot_claude"
-FALLBACK_CLAUDE = REPO_ROOT / "templates" / "fallback" / "dot_claude"
-LIFECYCLE_CLAUDE = REPO_ROOT / "templates" / "lifecycle" / "dot_claude"
-LIFECYCLE_FALLBACK_CLAUDE = REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude"
+TEMPLATE_CLAUDE = REPO_ROOT / "templates" / "base" / "dot_agents"
+FALLBACK_CLAUDE = REPO_ROOT / "templates" / "fallback" / "dot_agents"
+LIFECYCLE_CLAUDE = REPO_ROOT / "templates" / "lifecycle" / "dot_agents"
+LIFECYCLE_FALLBACK_CLAUDE = REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents"
 WORKFLOW_PLUGIN = REPO_ROOT / "plugins" / "project-init-workflow"
 LIFECYCLE_PLUGIN = REPO_ROOT / "plugins" / "project-init-lifecycle"
 CODEX_SKILLS = REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
@@ -188,7 +188,7 @@ def _sync_agent_skills() -> list[str]:
 
     Lifecycle skills are shipped gated on ``{{#if lifecycle}}`` (PI-537 #5) so a
     `--lifecycle none` scaffold drops them from `.agents/skills` just as it does
-    from `.claude/skills`.
+    from `.agents/skills`.
     """
     synced = []
     lifecycle_names = {d.name for d in lifecycle_skill_dirs()}

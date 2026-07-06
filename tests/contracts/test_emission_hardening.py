@@ -76,7 +76,7 @@ def test_new_siblings_not_recorded_in_manifest(tmp_path: Path):
     must never enter the scaffold manifest (else upgrade reports spurious
     `removed` drift for it)."""
     target = tmp_path / "p"
-    cfg = target / ".claude" / "config.yaml"
+    cfg = target / ".agents" / "config.yaml"
     cfg.parent.mkdir(parents=True)
     cfg.write_text("project_init_version: 0.0.0\n")
 
@@ -101,7 +101,7 @@ def test_new_siblings_not_recorded_in_manifest(tmp_path: Path):
 
 
 def test_read_preserve_globs_tolerates_non_utf8_config(tmp_path: Path):
-    cfg = tmp_path / ".claude" / "config.yaml"
+    cfg = tmp_path / ".agents" / "config.yaml"
     cfg.parent.mkdir(parents=True)
     cfg.write_bytes(b'preserve: ["keep/*"]\n\xff\xfe garbage \x80')
     # Must not raise UnicodeDecodeError; the readable prefix still yields the glob.
@@ -115,7 +115,7 @@ def test_capabilities_first_scaffold_preserves_pre_existing_file(tmp_path: Path)
     """A pre-existing user CAPABILITIES.md is preserved as a .new sibling on the
     first scaffold, not clobbered by the generated inventory."""
     target = tmp_path / "p"
-    dest = target / ".claude" / "CAPABILITIES.md"
+    dest = target / ".agents" / "CAPABILITIES.md"
     dest.parent.mkdir(parents=True)
     dest.write_text("# my own notes\n")
 
@@ -123,7 +123,7 @@ def test_capabilities_first_scaffold_preserves_pre_existing_file(tmp_path: Path)
     capabilities.emit(target, make_variables(), first_scaffold=True, conflicts=conflicts)
 
     assert dest.read_text() == "# my own notes\n"  # untouched
-    assert (target / ".claude" / "CAPABILITIES.md.new").is_file()
+    assert (target / ".agents" / "CAPABILITIES.md.new").is_file()
     assert conflicts  # recorded for review
 
 
@@ -131,14 +131,14 @@ def test_capabilities_re_run_overwrites_generated_file(tmp_path: Path):
     """On a re-run (not first scaffold) the generated inventory is overwritten —
     it is project-init-owned, not user-editable."""
     target = tmp_path / "p"
-    dest = target / ".claude" / "CAPABILITIES.md"
+    dest = target / ".agents" / "CAPABILITIES.md"
     dest.parent.mkdir(parents=True)
     dest.write_text("# stale generated content\n")
 
     capabilities.emit(target, make_variables(), first_scaffold=False, conflicts=[])
 
     assert dest.read_text() != "# stale generated content\n"
-    assert not (target / ".claude" / "CAPABILITIES.md.new").exists()
+    assert not (target / ".agents" / "CAPABILITIES.md.new").exists()
 
 
 def test_generated_file_protected_while_new_sibling_pending(tmp_path: Path):
@@ -146,14 +146,14 @@ def test_generated_file_protected_while_new_sibling_pending(tmp_path: Path):
     file as ``.new``, a later run (first_scaffold=False) must keep protecting the
     original until the user merges the sibling — not silently overwrite it."""
     target = tmp_path / "p"
-    dest = target / ".claude" / "CAPABILITIES.md"
+    dest = target / ".agents" / "CAPABILITIES.md"
     dest.parent.mkdir(parents=True)
     dest.write_text("# my own notes\n")
 
     # Run 1: first scaffold — original preserved, render parked as .new.
     capabilities.emit(target, make_variables(), first_scaffold=True, conflicts=[])
     assert dest.read_text() == "# my own notes\n"
-    assert (target / ".claude" / "CAPABILITIES.md.new").is_file()
+    assert (target / ".agents" / "CAPABILITIES.md.new").is_file()
 
     # Run 2: NOT first scaffold, but the .new is still unmerged — original kept.
     capabilities.emit(target, make_variables(), first_scaffold=False, conflicts=[])
@@ -162,7 +162,7 @@ def test_generated_file_protected_while_new_sibling_pending(tmp_path: Path):
 
 def test_governance_first_scaffold_preserves_pre_existing_file(tmp_path: Path):
     target = tmp_path / "p"
-    dest = target / ".claude" / "governance" / "ai-bom.generated.md"
+    dest = target / ".agents" / "governance" / "ai-bom.generated.md"
     dest.parent.mkdir(parents=True)
     dest.write_text("# hand-written\n")
 
@@ -175,15 +175,15 @@ def test_governance_first_scaffold_preserves_pre_existing_file(tmp_path: Path):
     )
 
     assert dest.read_text() == "# hand-written\n"
-    assert (target / ".claude" / "governance" / "ai-bom.generated.md.new").is_file()
+    assert (target / ".agents" / "governance" / "ai-bom.generated.md.new").is_file()
 
 
 def test_full_scaffold_into_dir_with_pre_existing_capabilities(tmp_path: Path):
     """End-to-end: scaffolding into a dir that already holds a CAPABILITIES.md
     never destroys it (the core never-clobber invariant, generated-file path)."""
     target = tmp_path / "p"
-    (target / ".claude").mkdir(parents=True)
-    (target / ".claude" / "CAPABILITIES.md").write_text("# pre-existing\n")
+    (target / ".agents").mkdir(parents=True)
+    (target / ".agents" / "CAPABILITIES.md").write_text("# pre-existing\n")
 
     conflicts: list[tuple[Path, Path]] = []
     scaffold(
@@ -192,8 +192,8 @@ def test_full_scaffold_into_dir_with_pre_existing_capabilities(tmp_path: Path):
         make_variables(),
         conflicts=conflicts,
     )
-    assert (target / ".claude" / "CAPABILITIES.md").read_text() == "# pre-existing\n"
-    assert (target / ".claude" / "CAPABILITIES.md.new").is_file()
+    assert (target / ".agents" / "CAPABILITIES.md").read_text() == "# pre-existing\n"
+    assert (target / ".agents" / "CAPABILITIES.md.new").is_file()
 
 
 # --- canonical_hooks surfaces a broken settings.json instead of going empty (A3)

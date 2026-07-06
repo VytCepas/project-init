@@ -19,7 +19,7 @@ class TestWikiSkillStructure:
     @pytest.fixture
     def skill_file(self) -> Path:
         """Return the wiki skill file."""
-        return Path(".claude/skills/wiki/SKILL.md")
+        return Path(".agents/skills/wiki/SKILL.md")
 
     def test_skill_file_exists(self, skill_file: Path):
         """Verify wiki skill file exists."""
@@ -88,7 +88,7 @@ class TestWikiTemplates:
     @pytest.fixture
     def templates_dir(self) -> Path:
         """Return the wiki templates directory."""
-        return Path(".claude/skills/wiki/templates")
+        return Path(".agents/skills/wiki/templates")
 
     def test_templates_directory_exists(self, templates_dir: Path):
         """Verify templates directory exists."""
@@ -142,9 +142,9 @@ class TestWikiSkillIndexing:
 
     def test_wiki_skill_in_index(self):
         """Verify wiki skill is registered in INDEX.md."""
-        index_file = Path(".claude/skills/INDEX.md")
+        index_file = Path(".agents/skills/INDEX.md")
         assert index_file.exists(), "INDEX.md not found"
 
         content = index_file.read_text()
         assert "wiki" in content, "Wiki skill not found in INDEX.md"
-        assert ".claude/skills/wiki/SKILL.md" in content, "Wiki skill path not in INDEX.md"
+        assert ".agents/skills/wiki/SKILL.md" in content, "Wiki skill path not in INDEX.md"

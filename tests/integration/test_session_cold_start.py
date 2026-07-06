@@ -15,7 +15,7 @@ from pathlib import Path
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
 
-_STAMP = ".claude/.session_setup_stamp"
+_STAMP = ".agents/.session_setup_stamp"
 
 
 def _scaffold_python(target: Path) -> Path:
@@ -47,7 +47,7 @@ def _run_hook(target: Path, bin_dir: Path) -> subprocess.CompletedProcess:
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["CLAUDE_PROJECT_DIR"] = str(target)
     return subprocess.run(
-        ["bash", str(target / ".claude" / "hooks" / "session_setup.sh")],
+        ["bash", str(target / ".agents" / "hooks" / "session_setup.sh")],
         capture_output=True,
         text=True,
         env=env,

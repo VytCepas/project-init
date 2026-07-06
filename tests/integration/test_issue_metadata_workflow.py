@@ -117,13 +117,13 @@ class TestIssueMetadataScaffold:
         assert "any(.labels[].name" in content
 
     def test_issue_metadata_docs_created(self):
-        doc = self.target / ".claude" / "docs" / "guides" / "issue-metadata.md"
+        doc = self.target / ".agents" / "docs" / "guides" / "issue-metadata.md"
         content = doc.read_text()
         assert "GitHub labels" in content
         assert "markdown body" in content
 
     def test_setup_github_script_created(self):
-        script = self.target / ".claude" / "scripts" / "setup_github.sh"
+        script = self.target / ".agents" / "scripts" / "setup_github.sh"
         content = script.read_text()
         assert "branches/main/protection" in content
         assert "Copilot code review" in content
@@ -132,8 +132,8 @@ class TestIssueMetadataScaffold:
         assert "Check PR title, branch, and linked issue" in content
 
     def test_project_init_references_github_setup(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
-        assert ".claude/scripts/setup_github.sh" in content
+        content = (self.target / ".agents" / "project-init.md").read_text()
+        assert ".agents/scripts/setup_github.sh" in content
 
 
 class TestCreateIssueScript:
@@ -142,7 +142,7 @@ class TestCreateIssueScript:
         self.target = tmp_target
         preset = fallback_preset()
         scaffold(tmp_target, preset, fallback_variables())
-        self.script = self.target / ".claude" / "scripts" / "create_issue.sh"
+        self.script = self.target / ".agents" / "scripts" / "create_issue.sh"
 
     def test_help_documents_metadata_flags(self):
         result = subprocess.run(
@@ -217,30 +217,30 @@ class TestCreateIssueSkill:
         scaffold(tmp_target, preset, fallback_variables())
 
     def test_create_issue_skill_scaffolded(self):
-        skill = self.target / ".claude" / "skills" / "create_issue" / "SKILL.md"
+        skill = self.target / ".agents" / "skills" / "create_issue" / "SKILL.md"
         content = skill.read_text()
         assert "priority" in content.lower()
-        assert ".claude/scripts/create_issue.sh" in content
+        assert ".agents/scripts/create_issue.sh" in content
         assert "Definition of Ready/Done defaults" in content
 
     def test_skill_index_references_create_issue_skill(self):
-        content = (self.target / ".claude" / "skills" / "INDEX.md").read_text()
+        content = (self.target / ".agents" / "skills" / "INDEX.md").read_text()
         assert "create_issue" in content
 
     def test_start_task_delegates_issue_creation_to_skill(self):
         content = (
-            self.target / ".claude" / "skills" / "start_task" / "SKILL.md"
+            self.target / ".agents" / "skills" / "start_task" / "SKILL.md"
         ).read_text()
         assert "`create_issue` skill" in content, "must delegate to the create_issue skill"
 
     def test_nojira_pr_script_scaffolded(self):
-        script = self.target / ".claude" / "scripts" / "create_nojira_pr.sh"
+        script = self.target / ".agents" / "scripts" / "create_nojira_pr.sh"
         shim = script.read_text()
         assert script.stat().st_mode & 0o111, "create_nojira_pr.sh must be executable"
         # Shim delegates to dag_workflow.py create-pr-nojira; the scopeless
         # conventional PR title and gh pr create call live in the Python module.
         assert "dag_workflow.py" in shim and "create-pr-nojira" in shim
-        dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
+        dag = (self.target / ".agents" / "hooks" / "dag_workflow.py").read_text()
         assert 'pr_title = f"{type_}: {title}"' in dag
         assert 'pr", "create"' in dag or "pr_create" in dag
 
@@ -262,7 +262,7 @@ class TestGitHubWorkflowHooks:
         scaffold(tmp_target, preset, fallback_variables())
 
     def _run_hook(self, name: str, command: str) -> dict[str, str] | None:
-        hook = self.target / ".claude" / "hooks" / name
+        hook = self.target / ".agents" / "hooks" / name
         payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
         result = subprocess.run(
             [str(hook)],
@@ -329,12 +329,12 @@ class TestGitHubWorkflowHooks:
     def test_github_command_guard_allows_monitor_pr_merge(self):
         out = self._run_hook(
             "github_command_guard.sh",
-            ".claude/scripts/monitor_pr.sh 42 --merge",
+            ".agents/scripts/monitor_pr.sh 42 --merge",
         )
         assert out is None
 
     def test_settings_wire_workflow_hooks(self):
-        data = json.loads((self.target / ".claude" / "settings.json").read_text())
+        data = json.loads((self.target / ".agents" / "settings.json").read_text())
         pre_commands = [
             hook["command"]
             for group in data["hooks"]["PreToolUse"]
@@ -344,7 +344,7 @@ class TestGitHubWorkflowHooks:
         assert "UserPromptSubmit" in data["hooks"]
 
     def test_monitor_pr_queries_review_decision_directly(self):
-        content = (self.target / ".claude" / "scripts" / "monitor_pr.sh").read_text()
+        content = (self.target / ".agents" / "scripts" / "monitor_pr.sh").read_text()
         assert "reviewDecision" in content
         assert "_get_review_decision" in content
         assert "Waiting for reviewer" in content
@@ -355,7 +355,7 @@ class TestGitHubWorkflowHooks:
 
     def test_github_workflow_skill_documents_nonzero_monitor_exit(self):
         content = (
-            self.target / ".claude" / "skills" / "github_workflow" / "SKILL.md"
+            self.target / ".agents" / "skills" / "github_workflow" / "SKILL.md"
         ).read_text()
         assert "exits **1** for CI or merge failures" in content
         assert "Do not report a PR as merged unless the script exits 0" in content
@@ -387,7 +387,7 @@ exit 2
         )
         fake_gh.chmod(0o755)
 
-        script = self.target / ".claude" / "scripts" / "monitor_pr.sh"
+        script = self.target / ".agents" / "scripts" / "monitor_pr.sh"
         env = {"PATH": f"{fake_bin}:{os.environ['PATH']}"}
         result = subprocess.run(
             [str(script), "42", "--merge"],
@@ -423,7 +423,7 @@ exit 2
         )
         fake_gh.chmod(0o755)
 
-        script = self.target / ".claude" / "scripts" / "monitor_pr.sh"
+        script = self.target / ".agents" / "scripts" / "monitor_pr.sh"
         env = {"PATH": f"{fake_bin}:{os.environ['PATH']}"}
         result = subprocess.run(
             [str(script), "42", "--merge", "--no-review"],
@@ -463,7 +463,7 @@ exit 2
         )
         fake_gh.chmod(0o755)
 
-        script = self.target / ".claude" / "scripts" / "monitor_pr.sh"
+        script = self.target / ".agents" / "scripts" / "monitor_pr.sh"
         env = {**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"}
         with pytest.raises(subprocess.TimeoutExpired) as exc:
             subprocess.run(
@@ -478,7 +478,7 @@ exit 2
         assert "MERGED" not in (exc.value.stdout or "")
 
     def test_workflow_state_reminder_reads_prompt_stdin(self):
-        hook = self.target / ".claude" / "hooks" / "workflow_state_reminder.sh"
+        hook = self.target / ".agents" / "hooks" / "workflow_state_reminder.sh"
         payload = json.dumps({"prompt": "please finish this PR"})
         result = subprocess.run(
             [str(hook)],

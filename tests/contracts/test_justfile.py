@@ -235,7 +235,7 @@ class TestRecipesAreTheSingleCallsite:
 
     def test_pre_commit_gate_uses_just_lint(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")
-        hook = (target / ".claude" / "hooks" / "pre_commit_gate.sh").read_text()
+        hook = (target / ".agents" / "hooks" / "pre_commit_gate.sh").read_text()
         assert "just lint" in hook
         assert "command -v just" in hook, "must fall back when just is not installed"
         assert "just --show lint" in hook, (

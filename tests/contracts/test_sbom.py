@@ -96,5 +96,5 @@ class TestSbomDocumented:
     def test_rules_mention_sbom(self, tmp_path: Path, language: str, rules_file: str):
         flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
         target = _scaffold(tmp_path / language, language=language, **flags)
-        rules = (target / ".claude" / "rules" / rules_file).read_text()
+        rules = (target / ".agents" / "rules" / rules_file).read_text()
         assert "sbom" in rules.lower() or "cyclonedx" in rules.lower()

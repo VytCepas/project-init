@@ -1,7 +1,7 @@
 """ADR-019 / #406: guarded hook self-log (_usage_log.sh + prod_guard.py).
 
 Shipped-always-dormant: the helper and the five always-on shell hooks carry the
-self-log, but it no-ops unless the overlay marker (.claude/observability/)
+self-log, but it no-ops unless the overlay marker (.agents/observability/)
 exists. Asserts: marker gating in both directions, JSON validity, the
 never-reads-stdin invariant, every hook wiring (fallback + plugin copies), and
 that prod_guard logs while STILL blocking a destructive command (regression).
@@ -17,15 +17,15 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "hooks"
+_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "hooks"
 _PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-workflow" / "hooks"
 # The lifecycle guard hooks moved to the lifecycle_fallback overlay + the
 # project-init-lifecycle plugin (#476).
-_LIFECYCLE_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "hooks"
+_LIFECYCLE_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents" / "hooks"
 _LIFECYCLE_PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-lifecycle" / "hooks"
 _LIFECYCLE_HOOK_NAMES = {"github_command_guard.sh", "workflow_state_reminder.sh"}
 _HELPER = _FALLBACK_HOOKS / "_usage_log.sh"
-_PROD_GUARD = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks" / "prod_guard.py"
+_PROD_GUARD = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "prod_guard.py"
 
 
 def _source_dir(hook: str) -> Path:
@@ -64,12 +64,12 @@ def _call_helper(root: Path, *args: str, stdin: str | None = None) -> subprocess
 class TestHelperGating:
     def test_dormant_without_marker(self, tmp_path: Path):
         _call_helper(tmp_path, "session_setup", "SessionStart")
-        assert not (tmp_path / ".claude" / "observability" / "usage.jsonl").exists()
+        assert not (tmp_path / ".agents" / "observability" / "usage.jsonl").exists()
 
     def test_writes_valid_json_with_marker(self, tmp_path: Path):
-        (tmp_path / ".claude" / "observability").mkdir(parents=True)
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
         _call_helper(tmp_path, "github_command_guard", "PreToolUse")
-        log = tmp_path / ".claude" / "observability" / "usage.jsonl"
+        log = tmp_path / ".agents" / "observability" / "usage.jsonl"
         assert log.is_file()
         rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
         assert len(rows) == 1
@@ -82,7 +82,7 @@ class TestHelperGating:
         assert "session" not in row
 
     def test_session_emitted_when_env_present(self, tmp_path: Path):
-        (tmp_path / ".claude" / "observability").mkdir(parents=True)
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
         script = f'. "{_HELPER}"\nusage_log pre_commit_gate PreToolUse\n'
         subprocess.run(
             ["bash", "-c", script],
@@ -96,14 +96,14 @@ class TestHelperGating:
             cwd=str(tmp_path),
             timeout=30,
         )
-        log = tmp_path / ".claude" / "observability" / "usage.jsonl"
+        log = tmp_path / ".agents" / "observability" / "usage.jsonl"
         row = json.loads(log.read_text().splitlines()[0])
         assert row["session"] == "sess-42"
 
     def test_control_chars_stay_single_valid_json_line(self, tmp_path: Path):
         """A tab/newline in a field must be escaped, not split the JSONL line
         or produce invalid JSON (Copilot review)."""
-        (tmp_path / ".claude" / "observability").mkdir(parents=True)
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
         script = f". {shlex.quote(str(_HELPER))}\nusage_log pre_commit_gate PreToolUse\n"
         subprocess.run(
             ["bash", "-c", script],
@@ -117,7 +117,7 @@ class TestHelperGating:
             cwd=str(tmp_path),
             timeout=30,
         )
-        raw = (tmp_path / ".claude" / "observability" / "usage.jsonl").read_text()
+        raw = (tmp_path / ".agents" / "observability" / "usage.jsonl").read_text()
         # Exactly one physical line — the embedded newline did not split it.
         assert len([line for line in raw.splitlines() if line.strip()]) == 1
         row = json.loads(raw)  # valid JSON despite the control chars
@@ -126,7 +126,7 @@ class TestHelperGating:
     def test_never_consumes_stdin(self, tmp_path: Path):
         """usage_log must not read stdin — the payload belongs to the real hook
         body. Source it, call it, then `cat`: stdin must still be intact."""
-        (tmp_path / ".claude" / "observability").mkdir(parents=True)
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
         script = (
             f'. "{_HELPER}"\n'
             "usage_log github_command_guard PreToolUse </dev/null\n"
@@ -185,13 +185,13 @@ def _run_prod_guard(payload: dict, root: Path) -> tuple[dict | None, Path]:
     )
     assert result.returncode == 0, "guard must always exit 0 (fail-open)"
     verdict = json.loads(result.stdout) if result.stdout.strip() else None
-    return verdict, root / ".claude" / "observability" / "usage.jsonl"
+    return verdict, root / ".agents" / "observability" / "usage.jsonl"
 
 
 class TestProdGuardSelfLog:
     def test_blocks_destructive_and_logs_with_observability_on(self, tmp_path: Path):
         """Regression: enabling observability must not weaken the guard."""
-        (tmp_path / ".claude" / "observability").mkdir(parents=True)
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
         payload = {
             "tool_input": {"command": "terraform destroy"},
             "permission_mode": "bypassPermissions",
@@ -213,7 +213,7 @@ class TestProdGuardSelfLog:
         assert not log.exists()
 
     def test_logs_even_when_command_is_safe(self, tmp_path: Path):
-        (tmp_path / ".claude" / "observability").mkdir(parents=True)
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
         payload = {"tool_input": {"command": "ls -la"}, "cwd": str(tmp_path)}
         verdict, log = _run_prod_guard(payload, tmp_path)
         assert verdict is None  # safe command → no verdict

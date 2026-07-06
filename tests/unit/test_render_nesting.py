@@ -57,8 +57,8 @@ class TestNestedConditionals:
         import project_init.scaffold as sm
 
         fake_dir = tmp_path / "mismatch-layer"
-        (fake_dir / "dot_claude").mkdir(parents=True)
-        (fake_dir / "dot_claude" / "typo.md.tmpl").write_text(
+        (fake_dir / "dot_agents").mkdir(parents=True)
+        (fake_dir / "dot_agents" / "typo.md.tmpl").write_text(
             "{{#if python}}body{{/if node}}\n"
         )
         original = sm._TEMPLATES_DIR

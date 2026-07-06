@@ -83,7 +83,7 @@ routing (the `background → cheap model` rule is the high-leverage cost saver).
 ### 3. Boundary & interaction model
 
 - The scaffolder calls **no LLM** at runtime (ADR-001). CCR is **machine-level**
-  (`~/.claude-code-router/config.json`, proxy on `127.0.0.1:3456`); project-init
+  (`~/.agents-code-router/config.json`, proxy on `127.0.0.1:3456`); project-init
   only scaffolds the config + installer (the graphify setup-script pattern).
 - **Config stays global** (no per-project variant — no need foreseen).
 - **Launch entrypoint stays `claude`**: setup wires `eval "$(ccr activate)"` so

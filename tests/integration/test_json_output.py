@@ -67,7 +67,7 @@ class TestScaffoldResult:
         assert data["contract_version"] == "1"
         assert data["files_created"] > 0
         assert data["memory"]["tier"] == "1"
-        assert data["memory"]["vault_path"] == ".claude/vault"
+        assert data["memory"]["vault_path"] == ".agents/vault"
         assert "graph_path" not in data["memory"]
 
     def test_tier3_exposes_rag_endpoint(self, tmp_path, capsys):

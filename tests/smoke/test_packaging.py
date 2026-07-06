@@ -98,7 +98,7 @@ class TestInstalledWheel:
         )
 
         # Essentials present.
-        assert (scaffold_target / ".claude" / "config.yaml").is_file()
+        assert (scaffold_target / ".agents" / "config.yaml").is_file()
         assert (scaffold_target / "CLAUDE.md").is_file()
         # --no-plugin copies the hook payload; the exec bit must survive
         # wheel packaging (plugin-mode scaffolds copy only dag_workflow.py).
@@ -106,7 +106,7 @@ class TestInstalledWheel:
             "post_edit_lint.sh",
             "pre_commit_gate.sh",
         ]:
-            hook_path = scaffold_target / ".claude" / "hooks" / hook
+            hook_path = scaffold_target / ".agents" / "hooks" / hook
             assert hook_path.is_file()
             assert hook_path.stat().st_mode & 0o111, (
                 f"{hook} lost executable bit"

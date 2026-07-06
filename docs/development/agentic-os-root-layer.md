@@ -16,7 +16,7 @@ this note is the buildable picture for when it is greenlit. **Not built yet.**
                 └───────▲──────────────────▲───────────────┘
                         │ reads descriptor │  (pull-only, non-mutating)
         ┌───────────────┴───┐   ┌──────────┴────────┐   ┌─────────────────┐
-        │ repoA/.claude/    │   │ repoB/.claude/    │   │ pkgs/c/.claude/ │
+        │ repoA/.agents/    │   │ repoB/.agents/    │   │ pkgs/c/.agents/ │
         │ config.yaml(memory)│   │ config.yaml       │   │ config.yaml     │
         │ MEMORY.md, CAPS.md │   │ MEMORY.md, CAPS.md│   │ ...             │
         └────────────────────┘   └───────────────────┘   └─────────────────┘
@@ -25,7 +25,7 @@ this note is the buildable picture for when it is greenlit. **Not built yet.**
                         │ project_init scaffolds each (one-way: produce → consume)
 ```
 
-*(In the diagram `CAPS.md` is the generated `.claude/CAPABILITIES.md`, abbreviated
+*(In the diagram `CAPS.md` is the generated `.agents/CAPABILITIES.md`, abbreviated
 to fit the box; `config.yaml(memory)` is its `memory:` descriptor block.)*
 
 `project_init` only *produces* the descriptor; `agentic-os` only *consumes* it.
@@ -33,15 +33,15 @@ The arrow never reverses — no callback/registration hook back into a child rep
 
 ## The aggregation contract (what the root reads per project)
 
-Source of truth = `.claude/config.yaml` `memory:` block (#498 / ADR-024);
-`.claude/CAPABILITIES.md` is the human mirror. All anchors invariant across tiers:
+Source of truth = `.agents/config.yaml` `memory:` block (#498 / ADR-024);
+`.agents/CAPABILITIES.md` is the human mirror. All anchors invariant across tiers:
 
 | Field | Always? | Meaning to the orchestrator |
 |---|---|---|
 | `tier` | yes (if memory) | 0–3 — selects the retrieval path (degrade-by-tier) |
 | `stack` | yes | `auto` / `obsidian-only` / `obsidian-graphify` / `obsidian-graphify-rag` |
-| `memory_path` | yes | `.claude/memory` — grep anchor; `MEMORY.md` is the index |
-| `vault_path` | tier ≥ 1 | `.claude/vault` — human notes |
+| `memory_path` | yes | `.agents/memory` — grep anchor; `MEMORY.md` is the index |
+| `vault_path` | tier ≥ 1 | `.agents/vault` — human notes |
 | `graph_path` | tier ≥ 2 | `graphify-out/graph.json` — code structure |
 | `rag_endpoint` | tier 3 | per-project RAG engine, or empty (seam only — #495/#505) |
 
@@ -55,7 +55,7 @@ no memory: block                → project opted out; skip retrieval
 ```
 
 A reader written against tier 0 keeps working at tier 3 (higher tiers only add
-surfaces). **Discovery = glob for `.claude/config.yaml`** — its presence is the
+surfaces). **Discovery = glob for `.agents/config.yaml`** — its presence is the
 registration breadcrumb; no daemon, no write-back.
 
 ## MVP (three read-only capabilities, then RAG)
@@ -77,8 +77,8 @@ exactly which strategy to apply per project.
 
 | Tier | Per-project artifact | OS cross-project strategy | Cost | Engine |
 |---|---|---|---|---|
-| **0 auto** | `.claude/memory/MEMORY.md` (flat facts) | **direct-merge** — read + union each `MEMORY.md`; may cross-link facts between projects | cheapest | deterministic, no LLM |
-| **1 obsidian** | `.claude/vault/` (human prose) | **grep** for cheap recall, **or agent-synthesis** to summarize the "why" across projects | grep cheap / synthesis costly | LLM only for synthesis |
+| **0 auto** | `.agents/memory/MEMORY.md` (flat facts) | **direct-merge** — read + union each `MEMORY.md`; may cross-link facts between projects | cheapest | deterministic, no LLM |
+| **1 obsidian** | `.agents/vault/` (human prose) | **grep** for cheap recall, **or agent-synthesis** to summarize the "why" across projects | grep cheap / synthesis costly | LLM only for synthesis |
 | **2 graphify** | `graphify-out/graph.json` | **federate** — read each project's `graph_path`, union the code graphs | moderate | graphify CLI (per-repo) |
 | **3 rag** | `rag_endpoint` (present at tier 3; may be empty until a tool is wired) | **federated** (query each project's engine, merge) **or central** (one OS index over all corpora) | highest | a RAG tool (#495) |
 
@@ -105,7 +105,7 @@ and the **OS** federates/aggregates them.
 Three distinct edges, three different answers — only one is a network protocol:
 
 - **OS ↔ child projects — filesystem pull, no live connection.** The OS globs for
-  `.claude/config.yaml`, reads the descriptor + `MEMORY.md`/`graph.json`/vault.
+  `.agents/config.yaml`, reads the descriptor + `MEMORY.md`/`graph.json`/vault.
   Projects are passive file trees: **no daemon, no server, no write-back** in a
   child (ADR-025 pull-only). The lone exception is **tier-3 *federated* RAG**,
   where a project may expose a `rag_endpoint` the OS *queries* (that endpoint is
@@ -150,6 +150,6 @@ bake-off (incl. comparing its AST-graph depth against Graphify) before any build
 
 ## Open questions for the build decision (not now)
 
-- Registry format: a hand-maintained `~/.claude/projects.toml` vs. discovery-only glob.
+- Registry format: a hand-maintained `~/.agents/projects.toml` vs. discovery-only glob.
 - Does the orchestrator ship as a CLI, an MCP server, or both?
 - RAG A-vs-B (#495): provisionally **B** (one tool replaces Graphify) — confirm on the bake-off.

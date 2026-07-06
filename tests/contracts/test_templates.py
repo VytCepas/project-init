@@ -28,24 +28,24 @@ class TestNodeTemplate:
         scaffold(self.target, preset, variables)
 
     def test_node_rule_file_present(self):
-        rule = self.target / ".claude" / "rules" / "node.md"
+        rule = self.target / ".agents" / "rules" / "node.md"
         assert rule.exists()
         content = rule.read_text()
         assert "bun install" in content
         assert "bunx" in content
 
     def test_node_rule_has_globs(self):
-        content = (self.target / ".claude" / "rules" / "node.md").read_text()
+        content = (self.target / ".agents" / "rules" / "node.md").read_text()
         assert "globs" in content
         assert "package.json" in content
 
     def test_python_rule_not_contaminated_in_node(self):
         # python rule file still ships (it's in base), but project-init.md has no uv sync
-        content = (self.target / ".claude" / "project-init.md").read_text()
+        content = (self.target / ".agents" / "project-init.md").read_text()
         assert "uv sync" not in content
 
     def test_no_npm_commands_in_node_template(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
+        content = (self.target / ".agents" / "project-init.md").read_text()
         # "npm" may appear in a "don't use npm" note — that's fine.
         # What must NOT appear are npm invocations as commands.
         assert "npm install" not in content
@@ -54,7 +54,7 @@ class TestNodeTemplate:
 
     def test_hooks_use_bunx_not_node_modules(self):
         for hook in ["post_edit_lint.sh", "pre_commit_gate.sh"]:
-            content = (self.target / ".claude" / "hooks" / hook).read_text()
+            content = (self.target / ".agents" / "hooks" / hook).read_text()
             assert "node_modules/.bin/eslint" not in content
             assert "bunx eslint" in content
 
@@ -92,7 +92,7 @@ class TestTemplateIdentifiers:
         assert "Claude Code specifics" in content
 
     def test_project_init_md_uses_template_url(self):
-        content = (self.target / ".claude" / "project-init.md").read_text()
+        content = (self.target / ".agents" / "project-init.md").read_text()
         assert "VytCepas" not in content
         assert "github.com/example/project-init" in content
 
@@ -211,7 +211,7 @@ class TestScaffoldGitHubFiles:
         assert "if: always()" in content
 
     def test_board_automation_reads_project_number_from_config(self):
-        """PI #556: the board number is read from .claude/config.yaml (the single
+        """PI #556: the board number is read from .agents/config.yaml (the single
         source of truth shared with create_issue.sh / setup_github.sh), not a
         hardcoded `PROJECT_NUMBER: 1` that drifts from a real (non-#1) board."""
         content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
@@ -223,20 +223,20 @@ class TestScaffoldGitHubFiles:
     def test_setup_github_reads_project_number_from_config(self):
         """PI #556: setup_github.sh resolves the board number from config.yaml
         too, so all three consumers agree."""
-        content = (self.target / ".claude" / "scripts" / "setup_github.sh").read_text()
+        content = (self.target / ".agents" / "scripts" / "setup_github.sh").read_text()
         assert "github_project_number" in content
 
     def test_gitleaks_config_shipped(self):
         """PI #554: the gitleaks secret-scan job ships in base CI, so a matching
         .gitleaks.toml must ship too — otherwise a fresh scaffold fails its first
         CI run when gitleaks flags the high-entropy hashes in the generated
-        .claude/config.yaml scaffold record."""
+        .agents/config.yaml scaffold record."""
         cfg = self.target / ".gitleaks.toml"
         assert cfg.is_file(), ".gitleaks.toml must ship alongside the gitleaks CI job"
         content = cfg.read_text()
         assert "useDefault = true" in content
-        # The scaffold record (.claude/config.yaml) must be allowlisted.
-        assert "config" in content and "claude" in content
+        # The scaffold record (.agents/config.yaml) must be allowlisted.
+        assert "config" in content and "agents" in content
 
     def test_ci_does_not_hardcode_python_version(self):
         """PI-208: a pinned Python version drifts below requires-python; let uv
@@ -296,7 +296,7 @@ class TestScaffoldGitHubFiles:
         assert not (self.target / "GEMINI.md").exists()
 
     def test_monitor_pr_can_merge_when_clean(self):
-        script = self.target / ".claude" / "scripts" / "monitor_pr.sh"
+        script = self.target / ".agents" / "scripts" / "monitor_pr.sh"
         assert script.is_file()
         content = script.read_text()
         assert "--merge" in content
@@ -307,7 +307,7 @@ class TestScaffoldGitHubFiles:
     def test_monitor_pr_ci_wait_is_bounded(self):
         """PI-186: the CI-wait loop must time out and fail closed, not hang
         forever on a required check that never registers."""
-        content = (self.target / ".claude" / "scripts" / "monitor_pr.sh").read_text()
+        content = (self.target / ".agents" / "scripts" / "monitor_pr.sh").read_text()
         assert "CI_TIMEOUT=" in content, "CI_TIMEOUT must be assigned a value"
         # Assert the real bounding logic, not just the variable names — the loop
         # must compare elapsed vs timeout and increment elapsed, so the test fails
@@ -323,23 +323,23 @@ class TestScaffoldGitHubFiles:
 
     def test_finish_pr_wraps_push_ready_monitor_flow(self):
         # finish_pr.sh is a shim; the chain logic lives in dag_workflow.py.
-        script = self.target / ".claude" / "scripts" / "finish_pr.sh"
+        script = self.target / ".agents" / "scripts" / "finish_pr.sh"
         assert script.is_file()
         assert script.stat().st_mode & 0o111, "finish_pr.sh must be executable"
         shim = script.read_text()
         assert "dag_workflow.py" in shim and "finish" in shim
-        dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
+        dag = (self.target / ".agents" / "hooks" / "dag_workflow.py").read_text()
         assert "monitor_pr.sh" in dag
         assert "cmd_push" in dag and "cmd_promote" in dag
         assert "--review-cycle" in dag
 
     def test_create_nojira_pr_wraps_branch_push_pr_flow(self):
-        script = self.target / ".claude" / "scripts" / "create_nojira_pr.sh"
+        script = self.target / ".agents" / "scripts" / "create_nojira_pr.sh"
         assert script.is_file()
         assert script.stat().st_mode & 0o111, "create_nojira_pr.sh must be executable"
         shim = script.read_text()
         assert "dag_workflow.py" in shim and "create-pr-nojira" in shim
-        dag = (self.target / ".claude" / "hooks" / "dag_workflow.py").read_text()
+        dag = (self.target / ".agents" / "hooks" / "dag_workflow.py").read_text()
         # ADR-006: no-issue PRs use conventional title without a scope
         assert 'pr_title = f"{type_}: {title}"' in dag
         assert "pr_create" in dag or 'pr", "create"' in dag

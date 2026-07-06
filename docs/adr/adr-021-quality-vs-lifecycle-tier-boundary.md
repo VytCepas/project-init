@@ -23,7 +23,7 @@ The hard question the issue poses: which files are a forge-agnostic **quality ti
 
 ## Decision — the two tiers
 
-Every file under `templates/base/dot_github/`, `.claude/scripts/`, `.claude/hooks/`,
+Every file under `templates/base/dot_github/`, `.agents/scripts/`, `.agents/hooks/`,
 and the workflow skills is classified below. Three buckets: **Quality** (always-on
 core, forge-agnostic), **Lifecycle** (GitHub-only, the opt-out overlay), and
 **Separate** (already gated by another flag/ADR — not part of this cut).
@@ -34,22 +34,22 @@ core, forge-agnostic), **Lifecycle** (GitHub-only, the opt-out overlay), and
 | `dot_github/hooks/commit-msg` | Conventional-Commits validation (ADR-006); pure git hook, runs on any forge |
 | `dot_github/hooks/pre-commit` | gitleaks secret scan (ADR-007); git hook, forge-independent |
 | `dot_github/hooks/pre-push` — **main/master block only** | "no direct push to main/master" is universal git hygiene. The branch-type-prefix check is **split off to the lifecycle tier** (Codex review): it rejects `<type>/…` mismatches and points to `start_issue.sh`/`create_nojira_pr.sh`, which are lifecycle-gated — leaving it in core would orphan-block ordinary branches in a lifecycle-off scaffold |
-| `dot_claude/scripts/install_hooks.sh` | installs the three git hooks above |
-| `dot_claude/hooks/pre_commit_gate.sh` | lint/format/secret quality gate (Claude PreToolUse) |
-| `dot_claude/hooks/post_edit_lint.sh` | lint-on-edit feedback (Claude PostToolUse) |
-| `dot_claude/hooks/prod_guard.py` | destructive-command **safety** guard (ADR-012) — not lifecycle; stays core regardless |
-| `dot_claude/hooks/_py.sh`, `session_setup.sh`, `agent_guard_adapter.py.tmpl` | base hook plumbing |
+| `dot_agents/scripts/install_hooks.sh` | installs the three git hooks above |
+| `dot_agents/hooks/pre_commit_gate.sh` | lint/format/secret quality gate (Claude PreToolUse) |
+| `dot_agents/hooks/post_edit_lint.sh` | lint-on-edit feedback (Claude PostToolUse) |
+| `dot_agents/hooks/prod_guard.py` | destructive-command **safety** guard (ADR-012) — not lifecycle; stays core regardless |
+| `dot_agents/hooks/_py.sh`, `session_setup.sh`, `agent_guard_adapter.py.tmpl` | base hook plumbing |
 | `dot_github/workflows/ci.yml.tmpl` | lint/test/build/secret-scan. **Logic is forge-portable**; the YAML is GitHub-Actions-specific (see portability) |
 
 ### Lifecycle tier — GitHub-only, the opt-out overlay
 | File | Why lifecycle |
 |---|---|
 | `dot_github/hooks/pre-push` — **branch-type-prefix check** | split from the quality main/master block (Codex review): `^(feat\|fix\|chore\|docs\|test)/…` enforcement is a lifecycle naming convention tied to the gated lifecycle scripts |
-| `dot_claude/hooks/dag_workflow.py` | the PR DAG state machine (issue→branch→PR→merge) |
-| `dot_claude/hooks/github_command_guard.sh` | DAG guard shim → `dag_workflow.py guard` |
-| `dot_claude/hooks/workflow_state_reminder.sh` | injects the lifecycle DAG into context |
-| `dot_claude/scripts/{create_issue,start_issue,create_nojira_pr,promote_review,monitor_pr,finish_pr,push_branch}.sh` | DAG-driven wrappers (`gh issue/pr …`) |
-| `dot_claude/scripts/{setup_github,push_wiki,gh_host}.sh` | board/protection setup, wiki, gh-host resolution |
+| `dot_agents/hooks/dag_workflow.py` | the PR DAG state machine (issue→branch→PR→merge) |
+| `dot_agents/hooks/github_command_guard.sh` | DAG guard shim → `dag_workflow.py guard` |
+| `dot_agents/hooks/workflow_state_reminder.sh` | injects the lifecycle DAG into context |
+| `dot_agents/scripts/{create_issue,start_issue,create_nojira_pr,promote_review,monitor_pr,finish_pr,push_branch}.sh` | DAG-driven wrappers (`gh issue/pr …`) |
+| `dot_agents/scripts/{setup_github,push_wiki,gh_host}.sh` | board/protection setup, wiki, gh-host resolution |
 | `dot_github/workflows/board-automation.yml` | Projects-v2 board moves |
 | `dot_github/workflows/issue-validation.yml` | GitHub Issues form validation |
 | `dot_github/workflows/review-status.yml` | review-decision gate |

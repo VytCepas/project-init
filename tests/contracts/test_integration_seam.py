@@ -16,7 +16,7 @@ def _scaffold(target: Path, **overrides: str) -> Path:
 
 
 def _seam(t: Path) -> Path:
-    return t / ".claude" / "docs" / "guides" / "cloud-integration.md"
+    return t / ".agents" / "docs" / "guides" / "cloud-integration.md"
 
 
 class TestIntegrationSeam:

@@ -206,12 +206,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Memory backend (#466, #497, ADR-024) — a superset ladder: none (no memory — "
-            "the vault-free `core` preset), auto (flat agent-fact files in .claude/memory/, "
+            "the vault-free `core` preset), auto (flat agent-fact files in .agents/memory/, "
             "no vault — pure files, installs nothing), obsidian (auto PLUS a human "
             "Obsidian vault; alias for obsidian-only), obsidian-graphify (obsidian "
             "PLUS a derived code knowledge graph for agents), or obsidian-graphify-rag "
             "(tier 3 — graphify PLUS a keyless on-device semantic/vector recall surface; "
-            "run .claude/scripts/setup_rag.sh to install cocoindex-code — no API key, no "
+            "run .agents/scripts/setup_rag.sh to install cocoindex-code — no API key, no "
             "container; worth it only at multi-project / monorepo scale). Overrides the "
             "preset's default."
         ),
@@ -596,17 +596,17 @@ def _resolve_mcps_non_interactive(
 # obsidian-graphify needs a one-time install; the rest are pure files.
 _MEMORY_NEXT_STEPS = {
     "none": "",
-    "auto": "Memory: flat agent facts in .claude/memory/ — nothing to install.",
-    "obsidian-only": "Memory: .claude/memory/ + Obsidian vault — open .claude/vault/ in Obsidian (optional).",
+    "auto": "Memory: flat agent facts in .agents/memory/ — nothing to install.",
+    "obsidian-only": "Memory: .agents/memory/ + Obsidian vault — open .agents/vault/ in Obsidian (optional).",
     "obsidian-graphify": (
         "Memory: build the code graph — run "
-        "[bold]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/bold]"
+        "[bold]uv tool install graphifyy && .agents/scripts/setup_graphify.sh[/bold]"
     ),
     "obsidian-graphify-rag": (
         "Memory: code graph + semantic RAG — run "
-        "[bold]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/bold], "
-        "then [bold].claude/scripts/setup_rag.sh[/bold] (installs cocoindex-code — "
-        "keyless, on-device; see .claude/docs/guides/using-rag.md)"
+        "[bold]uv tool install graphifyy && .agents/scripts/setup_graphify.sh[/bold], "
+        "then [bold].agents/scripts/setup_rag.sh[/bold] (installs cocoindex-code — "
+        "keyless, on-device; see .agents/docs/guides/using-rag.md)"
     ),
 }
 
@@ -643,7 +643,7 @@ def _scaffold_result_payload(
     """Machine-readable scaffold result for an orchestrator (#510).
 
     Carries the resolved memory descriptor (the same fields a root layer reads
-    from `.claude/config.yaml`, #498) so the caller can register the new project
+    from `.agents/config.yaml`, #498) so the caller can register the new project
     without a second read. Path fields are present only at the tiers that ship
     them; `rag_endpoint` is null until a tool is wired (tier 3).
     """
@@ -652,10 +652,10 @@ def _scaffold_result_payload(
         memory = {
             "tier": variables.get("memory_tier", ""),
             "stack": variables.get("memory_stack", "none"),
-            "memory_path": ".claude/memory",
+            "memory_path": ".agents/memory",
         }
         if variables.get("obsidian"):
-            memory["vault_path"] = ".claude/vault"
+            memory["vault_path"] = ".agents/vault"
         if variables.get("graphify"):
             memory["graph_path"] = "graphify-out/graph.json"
         if variables.get("rag"):
@@ -665,7 +665,7 @@ def _scaffold_result_payload(
         "preset": preset_name,
         "contract_version": variables.get("project_init_contract_version", ""),
         "memory": memory,
-        "config": ".claude/config.yaml",
+        "config": ".agents/config.yaml",
         "files_created": len(created),
     }
 
@@ -744,7 +744,7 @@ def _print_summary(
 
     body += (
         "\n[bold]Start:[/bold] cd into the project and run [bold]claude[/bold] — "
-        "it picks up CLAUDE.md and .claude/ automatically.\n"
+        "it picks up CLAUDE.md and .agents/ automatically.\n"
     )
 
     console.print()
@@ -927,20 +927,20 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
         "Each rung is a [bold]superset[/bold] of the one above.\n\n"
         "[bold]1. none[/bold]      [dim]no memory — leanest; bring your own docs[/dim]\n"
         "            [dim]Installs now: nothing · You run later: nothing[/dim]\n"
-        "[bold]2. auto[/bold]      [dim].claude/memory (flat agent facts) — no vault[/dim]\n"
+        "[bold]2. auto[/bold]      [dim].agents/memory (flat agent facts) — no vault[/dim]\n"
         "            [dim]Installs now: files only · You run later: nothing[/dim]\n"
-        "[bold]3. obsidian[/bold]  [dim]auto PLUS .claude/vault (markdown notes,[/dim]\n"
+        "[bold]3. obsidian[/bold]  [dim]auto PLUS .agents/vault (markdown notes,[/dim]\n"
         "            [dim]browsable in Obsidian)[/dim]\n"
         "            [dim]Installs now: files only · You run later: nothing[/dim]\n"
         "[bold]4. obsidian-graphify[/bold]  [dim]obsidian PLUS a derived knowledge[/dim]\n"
         "            [dim]graph agents can query (Graphify)[/dim]\n"
         "            [dim]Installs now: files only · You run later:[/dim]\n"
-        "            [dim]uv tool install graphifyy && .claude/scripts/setup_graphify.sh[/dim]\n"
+        "            [dim]uv tool install graphifyy && .agents/scripts/setup_graphify.sh[/dim]\n"
         "            [dim](the package name really has two y's)[/dim]\n"
         "[bold]5. obsidian-graphify-rag[/bold]  [dim]graphify PLUS search-by-meaning[/dim]\n"
         "            [dim]over all notes+code, not just exact words (RAG)[/dim]\n"
         "            [dim]Installs now: files only · You run later:[/dim]\n"
-        "            [dim].claude/scripts/setup_rag.sh (cocoindex-code —[/dim]\n"
+        "            [dim].agents/scripts/setup_rag.sh (cocoindex-code —[/dim]\n"
         "            [dim]keyless, on-device; no container, no API key)[/dim]\n\n"
         "[cyan]Helps:[/cyan] agents recall why a decision was made weeks later;\n"
         "the RAG rung (option 5) is worth it only at [bold]multi-project /\n"
@@ -1407,19 +1407,17 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     # GitHub lifecycle tier (#476). The --lifecycle flag wins; otherwise the
     # wizard explains it and asks, defaulting to the chosen preset's tier.
     resolved_lifecycle = lifecycle_flag or _choose_lifecycle_interactive(default=preset_lifecycle)
-    while True:
-        agents_raw = _prompt(
-            "Agents/surfaces (claude always; add codex/ollama/cursor/antigravity/"
-            "vscode/amp/junie, comma-separated)",
-            default=cli_agents or "claude",
-        )
+    if cli_agents and cli_agents != "claude":
         try:
-            agents = resolve_agents(agents_raw)
-            break
+            agents = resolve_agents(cli_agents)
         except ValueError as e:
             from rich.console import Console
 
             Console().print(f"[red]{e}[/red]")
+            agents = _choose_agents_interactive()
+    else:
+        agents = _choose_agents_interactive()
+
     return ScaffoldInputs(
         project_name=project_name,
         project_description=project_description,
@@ -1610,6 +1608,65 @@ _VALID_AGENTS = (
     "amp",
     "junie",
 )
+
+_AGENT_SURFACES = (
+    ("vscode", "VS Code (MCP config for the editor)"),
+    ("cursor", "Cursor (generated hooks + MCP)"),
+    ("antigravity", "Antigravity (skills layer + generated hooks/MCP)"),
+    ("codex", "Codex (native overlay)"),
+    ("amp", "Amp (skills layer + generated MCP config)"),
+    ("junie", "Junie (skills layer + generated MCP config)"),
+    ("ollama", "Ollama (instructions-level only)"),
+)
+
+def _choose_agents_interactive() -> list[str]:
+    """Present the agent/editor surfaces to scaffold for (ADR-017, #616)."""
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.prompt import Prompt
+
+    console = Console()
+    body = (
+        "Project-init configures [bold]agent and editor surfaces[/bold] so they "
+        "know your rules and hooks. [bold]Claude[/bold] is always supported.\n\n"
+        "[cyan]Helps:[/cyan] pick only the tools you actually use to keep the "
+        "generated config clean and focused.\n"
+        "[dim]Default: vscode only (plus claude).[/dim]\n\n"
+    )
+    for i, (name, desc) in enumerate(_AGENT_SURFACES, 1):
+        body += f"  [cyan]{i}[/cyan]. {name:<11} — [dim]{desc}[/dim]\n"
+
+    console.print(Panel(body.rstrip(), title="Agent and Editor Surfaces", border_style="cyan"))
+
+    while True:
+        raw = Prompt.ask(
+            "Choose surfaces (comma-separated numbers, or Enter for default)",
+            default="1",
+        )
+        if not raw.strip():
+            return ["claude", "vscode"]
+
+        selected = ["claude"]
+        invalid = []
+        for part in raw.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            idx = int(part) - 1 if part.isdigit() else -1
+            if 0 <= idx < len(_AGENT_SURFACES):
+                selected.append(_AGENT_SURFACES[idx][0])
+            else:
+                invalid.append(part)
+
+        if invalid:
+            console.print(
+                f"[red]Invalid selection(s): {', '.join(invalid)}. "
+                f"Enter numbers 1-{len(_AGENT_SURFACES)}.[/red]"
+            )
+            continue
+        
+        # Keep list unique but stable
+        return list(dict.fromkeys(selected))
 
 
 def resolve_agents(raw: str) -> list[str]:
@@ -1890,7 +1947,7 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
     return rc
 
 
-def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
+def _build_variables(preset: dict, inputs: ScaffoldInputs, target: Path | None = None) -> dict[str, str]:
     """Assemble the template render context from the resolved inputs."""
     project_name = inputs.project_name
     project_description = inputs.project_description
@@ -1921,7 +1978,24 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs) -> dict[str, str]:
     # set (PI-189); _backfill_variables / _migrate_semantic_config emit it too.
     has_lifecycle = inputs.lifecycle != "none"
     lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(language, ("", "", ""))
+
+    python_floor = "3.11"
+    if target and (target / "pyproject.toml").exists():
+        try:
+            import tomllib
+            with (target / "pyproject.toml").open("rb") as f:
+                data = tomllib.load(f)
+                req = data.get("project", {}).get("requires-python", "")
+                if req:
+                    import re
+                    m = re.search(r'>=?\s*(\d+\.\d+)', req)
+                    if m:
+                        python_floor = m.group(1)
+        except Exception:
+            pass
+
     return {
+        "python_floor": python_floor,
         "project_name": project_name,
         # Kebab-cased name for identifier-ish slots (deploy app-name stubs);
         # a name with no ASCII alphanumerics falls back to a generic slug.
@@ -2221,7 +2295,7 @@ def _validate_text_inputs(inputs: ScaffoldInputs, parser: argparse.ArgumentParse
 
 
 def _validate_existing_config(target: Path, parser: argparse.ArgumentParser) -> None:
-    """Reject a pre-existing, undecodable ``.claude/config.yaml`` before any writes.
+    """Reject a pre-existing, undecodable ``.agents/config.yaml`` before any writes.
 
     The scaffold/upgrade readers tolerate non-UTF-8 bytes (errors="ignore") so
     they don't crash mid-run, but ``write_scaffold_record`` rewrites the config
@@ -2229,7 +2303,7 @@ def _validate_existing_config(target: Path, parser: argparse.ArgumentParser) -> 
     after files are written — a partial-write state. Decode-check up front so the
     run aborts cleanly with nothing changed (PI-535, Codex review).
     """
-    config = target / ".claude" / "config.yaml"
+    config = target / ".agents" / "config.yaml"
     if not config.is_file():
         return
     try:
@@ -2314,13 +2388,13 @@ def _record_scaffold(target: Path, preset: dict, variables: dict, created: list[
     """Write the scaffold record and keep the created-list honest.
 
     The record lets a later `project-init upgrade` re-render faithfully and
-    detect drift. Writing it can create .claude/config.yaml itself; count that
+    detect drift. Writing it can create .agents/config.yaml itself; count that
     so the summary matches what is actually on disk (2026-07 QA).
     """
     from project_init.upgrade import write_scaffold_record
 
     write_scaffold_record(target, preset["name"], variables, created)
-    config_rel = Path(".claude/config.yaml")
+    config_rel = Path(".agents/config.yaml")
     if config_rel not in created and (target / config_rel).exists():
         created.append(config_rel)
 
@@ -2456,7 +2530,7 @@ def _cli(argv: list[str]) -> int:
     if extra_layers:
         preset = {**preset, "layers": list(preset["layers"]) + extra_layers}
 
-    variables = _build_variables(preset, inputs)
+    variables = _build_variables(preset, inputs, target)
 
     # Overwrite protection (PI-179): scaffold() decides per file whether it is
     # user-owned (first scaffold, an unresolved `.new` sibling still pending, or
