@@ -1,0 +1,20 @@
+{
+  "name": "project-init",
+  "description": "Plugins extracted from the project-init scaffolder: forge-agnostic quality and safety hooks plus general skills (project-init-workflow), and GitHub issue->branch->PR->review->merge lifecycle automation (project-init-lifecycle).",
+  "owner": {
+    "name": "Vytautas Čepas",
+    "url": "https://github.com/VytCepas"
+  },
+  "plugins": [
+    {
+      "name": "project-init-workflow",
+      "source": "./plugins/project-init-workflow",
+      "description": "Forge-agnostic quality + safety hooks and general skills for projects scaffolded by project-init — the always-on core payload (commit gate, lint-on-edit, prod-safety, session bootstrap). --no-plugin scaffolds copy the same files locally instead (ADR-010)."
+    },
+    {
+      "name": "project-init-lifecycle",
+      "source": "./plugins/project-init-lifecycle",
+      "description": "GitHub lifecycle automation (#476, ADR-021): the issue->branch->PR->review->merge DAG guard + workflow-state hooks and the lifecycle skills. Enabled only when the lifecycle tier is on; declined by a --lifecycle none scaffold."
+    }
+  ]
+}
