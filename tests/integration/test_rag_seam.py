@@ -40,7 +40,7 @@ def _scaffold_rag(target: Path) -> None:
 
 
 def _claude(target: Path) -> Path:
-    return target / ".claude"
+    return target / ".agents"
 
 
 class TestTierDerivation:
@@ -75,7 +75,7 @@ class TestSeamScaffolded:
         assert "stack: obsidian-graphify-rag" in block
         assert "rag_endpoint:" in block
         # superset anchors still present
-        assert "memory_path: .claude/memory" in block
+        assert "memory_path: .agents/memory" in block
         assert "graph_path: graphify-out/graph.json" in block
 
     def test_capabilities_lists_rag_endpoint(self, tmp_path):

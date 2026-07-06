@@ -78,7 +78,7 @@ max-complexity = 10
 "tests/**" = ["D"]
 # Agent infrastructure (hooks/scripts), not project code — the quality gates
 # target the code a project ships. Scaffolded ruff.toml mirrors this.
-".claude/**" = ["D", "C901", "PLR0912", "PLR0913", "PLR0915"]
+".agents/**" = ["D", "C901", "PLR0912", "PLR0913", "PLR0915"]
 "templates/**" = ["D", "C901", "PLR0912", "PLR0913", "PLR0915"]
 # Synced byte-for-byte from templates/ by tools/sync_plugin.py (ADR-010).
 "plugins/**" = ["D", "C901", "PLR0912", "PLR0913", "PLR0915"]

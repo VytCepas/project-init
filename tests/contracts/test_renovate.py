@@ -77,6 +77,6 @@ class TestScaffoldedRenovateConfig:
     def test_onboarding_documents_org_preset(self, tmp_path: Path):
         target = tmp_path / "p"
         scaffold(target, load_preset("obsidian-only"), make_variables())
-        guide = (target / ".claude" / "docs" / "guides" / "developer-onboarding.md").read_text()
+        guide = (target / ".agents" / "docs" / "guides" / "developer-onboarding.md").read_text()
         assert "renovate-config" in guide
         assert "github>your-org" in guide

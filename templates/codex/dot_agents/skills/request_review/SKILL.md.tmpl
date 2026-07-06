@@ -3,7 +3,7 @@ name: request_review
 description: Marks a draft PR ready for review, moving it Draft → In Review and triggering board automation. Use when a draft PR is finished and ready for reviewers.
 when_to_use: Use when the user says "request review", "mark the PR ready", "this PR is ready", or a draft PR is ready to move from Draft to In Review.
 argument-hint: "[pr-number]"
-allowed-tools: Bash(.claude/scripts/*) Read
+allowed-tools: Bash(.agents/scripts/*) Read
 ---
 
 Mark PR $ARGUMENTS (or current branch's PR if omitted) ready for review.
@@ -12,7 +12,7 @@ Mark PR $ARGUMENTS (or current branch's PR if omitted) ready for review.
 
 1. **Promote to ready**:
    ```bash
-   .claude/scripts/promote_review.sh $ARGUMENTS
+   .agents/scripts/promote_review.sh $ARGUMENTS
    ```
    `board-automation.yml` moves the board card to **In Review** automatically.
 

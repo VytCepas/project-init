@@ -25,14 +25,14 @@ from tools.benchmark.record import RunRecord, read_records
 # Token cost is approximated (chars / 4) — labelled approximate; exact counts
 # need a tokenizer we won't add (no network, no tiktoken). This is the
 # "which files cost the most context" attribution, not a billing figure.
-# Includes the start-here files AGENTS.md points agents at — .claude/project-init.md
+# Includes the start-here files AGENTS.md points agents at — .agents/project-init.md
 # is typically the *largest* always-loaded artifact, so omitting it undercounts
 # the fixed context (Codex review).
 _OVERHEAD_CANDIDATES = (
     "CLAUDE.md",
     "AGENTS.md",
-    ".claude/project-init.md",
-    ".claude/memory/MEMORY.md",
+    ".agents/project-init.md",
+    ".agents/memory/MEMORY.md",
 )
 _CHARS_PER_TOKEN = 4
 
@@ -189,7 +189,7 @@ def fixed_overhead(target_dir: Path) -> list[tuple[str, int]]:
         path = target_dir / name
         if path.is_file():
             rows.append((name, len(path.read_text(encoding="utf-8", errors="replace")) // _CHARS_PER_TOKEN))
-    for skill in sorted((target_dir / ".claude" / "skills").glob("*/SKILL.md")):
+    for skill in sorted((target_dir / ".agents" / "skills").glob("*/SKILL.md")):
         rel = skill.relative_to(target_dir)
         rows.append((str(rel), len(skill.read_text(encoding="utf-8", errors="replace")) // _CHARS_PER_TOKEN))
     rows.sort(key=lambda r: -r[1])

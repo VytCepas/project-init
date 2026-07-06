@@ -1,0 +1,22 @@
+---
+title: ADR-000 Project setup
+date: {{created_date}}
+status: accepted
+tags: [setup, scaffolding]
+---
+
+# ADR-000: Project setup with project-init
+
+## Context
+
+This project was scaffolded using [project-init]({{project_init_url}}).
+
+## Decision
+
+Preset: `{{memory_stack}}`
+
+## Consequences
+
+- Memory files live in `.agents/memory/` (agent-curated facts)
+- Vault notes live in `.agents/vault/` (human-authored, Obsidian-compatible)
+{{#if graphify}}- Graphify provides a queryable code knowledge graph alongside both layers{{/if graphify}}

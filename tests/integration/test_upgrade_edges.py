@@ -11,7 +11,7 @@ import pytest
 from project_init.__main__ import main
 from project_init.upgrade import UpgradeError, _three_way_merge, read_scaffold_record, run_upgrade
 
-_CONFIG = Path(".claude/config.yaml")
+_CONFIG = Path(".agents/config.yaml")
 
 
 def _scaffold(target: Path) -> None:

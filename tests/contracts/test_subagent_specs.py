@@ -1,4 +1,4 @@
-"""PI-395: the scaffolder ships reusable `.claude/agents/` subagent specs."""
+"""PI-395: the scaffolder ships reusable `.agents/agents/` subagent specs."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def _split_spec(text: str) -> tuple[dict[str, str], str]:
 def test_ships_reusable_subagent_specs(tmp_path: Path):
     target = tmp_path / "p"
     scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
-    agents = target / ".claude" / "agents"
+    agents = target / ".agents" / "agents"
     for name in ("code-reviewer", "explore"):
         spec = agents / f"{name}.md"
         assert spec.is_file(), f"{name}.md must be scaffolded"

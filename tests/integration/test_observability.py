@@ -1,5 +1,5 @@
 """PI-259: local observability record — profile/source/host/plugin-version/
-enforcement surfaced in .claude/config.yaml, including injection into existing
+enforcement surfaced in .agents/config.yaml, including injection into existing
 configs on upgrade (ADR-013). Closes the two deferred P2s from #247/#248.
 """
 
@@ -33,7 +33,7 @@ class TestFreshScaffoldRecordsObservability:
     def test_visible_fields_present(self, tmp_path: Path):
         target = tmp_path / "p"
         scaffold(target, memory_preset("obsidian-only"), make_variables(), strict=True)
-        config_text = (target / ".claude" / "config.yaml").read_text()
+        config_text = (target / ".agents" / "config.yaml").read_text()
         human = _human_section(config_text)
         assert "profile:" in human
         assert "enforcement:" in human
@@ -48,7 +48,7 @@ class TestUpgradeInjectsObservability:
         v = make_variables()
         created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
-        cfg = target / ".claude" / "config.yaml"
+        cfg = target / ".agents" / "config.yaml"
 
         # Simulate a pre-#259 human config: drop the visible enforcement/host lines.
         text = cfg.read_text()
@@ -75,7 +75,7 @@ class TestUpgradeInjectsObservability:
         created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
         assert run_upgrade(target, apply=True) == 0
-        human = _human_section((target / ".claude" / "config.yaml").read_text())
+        human = _human_section((target / ".agents" / "config.yaml").read_text())
         # Fields are present exactly once (no duplicate injection on a current config).
         assert human.count("\n  profile:") == 1
         assert human.count("\n  enforcement:") == 1
@@ -85,7 +85,7 @@ class TestUpgradeInjectsObservability:
         v = make_variables()
         created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
-        cfg = target / ".claude" / "config.yaml"
+        cfg = target / ".agents" / "config.yaml"
         # Simulate a config predating the updates section (strip the whole block).
         text = re.sub(
             r"\nupdates:\n(?:  #.*\n)*  declined_additions: \{\}\n",

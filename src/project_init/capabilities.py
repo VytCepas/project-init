@@ -1,6 +1,6 @@
 """Deterministic capabilities inventory (PI-374, ADR-017).
 
-Generates ``.claude/CAPABILITIES.md`` — a surface-independent list of what the
+Generates ``.agents/CAPABILITIES.md`` — a surface-independent list of what the
 scaffold gave the agent (skills, hooks, MCP servers) plus the exact options
 chosen, derived from the canonical sources (the shared skill set, the scaffolded
 ``settings.json`` hooks, the MCP catalog) and the config record. No LLM
@@ -22,7 +22,7 @@ _NAME_RE = re.compile(r"^name:\s*(.+)$", re.MULTILINE)
 _DESC_RE = re.compile(r"^description:\s*(.+)$", re.MULTILINE)
 _SCRIPT_RE = re.compile(r'([\w./$"{}-]+\.(?:sh|py))')
 
-_OUTPUT_REL = Path(".claude/CAPABILITIES.md")
+_OUTPUT_REL = Path(".agents/CAPABILITIES.md")
 
 
 def _skill_meta(skill_md: Path) -> tuple[str, str]:
@@ -46,11 +46,11 @@ def canonical_skills(variables: dict[str, str] | None = None) -> list[tuple[str,
     sorted.
     """
     dirs = [
-        _TEMPLATES_DIR / "base" / "dot_claude" / "skills",
-        _TEMPLATES_DIR / "fallback" / "dot_claude" / "skills",
+        _TEMPLATES_DIR / "base" / "dot_agents" / "skills",
+        _TEMPLATES_DIR / "fallback" / "dot_agents" / "skills",
     ]
     if variables is None or variables.get("lifecycle"):
-        dirs.append(_TEMPLATES_DIR / "lifecycle_fallback" / "dot_claude" / "skills")
+        dirs.append(_TEMPLATES_DIR / "lifecycle_fallback" / "dot_agents" / "skills")
     seen: dict[str, tuple[str, str]] = {}
     for skills_dir in dirs:
         if not skills_dir.exists():
@@ -84,7 +84,7 @@ def canonical_hooks(variables: dict[str, str]) -> list[tuple[str, str]]:
     """
     from project_init.scaffold import _render
 
-    tmpl = _TEMPLATES_DIR / "base" / "dot_claude" / "settings.json.tmpl"
+    tmpl = _TEMPLATES_DIR / "base" / "dot_agents" / "settings.json.tmpl"
     rendered = _render(
         tmpl.read_text(encoding="utf-8"),
         {**variables, "no_plugin": "true", "plugin_mode": ""},
@@ -177,16 +177,16 @@ def _memory_descriptor(variables: dict[str, str]) -> list[tuple[str, str]]:
     rows = [
         ("Tier", variables.get("memory_tier", "") or "?"),
         ("Stack", stack),
-        ("memory_path", ".claude/memory"),
+        ("memory_path", ".agents/memory"),
     ]
     if variables.get("obsidian"):
-        rows.append(("vault_path", ".claude/vault"))
+        rows.append(("vault_path", ".agents/vault"))
     if variables.get("graphify"):
         rows.append(("graph_path", "graphify-out/graph.json"))
     if variables.get("rag"):
         # Tier 3 (ADR-024 §4, ADR-026): the overlay is scaffolded; the endpoint is
         # empty until the user runs setup_rag.sh (cocoindex-code, keyless/on-device).
-        rows.append(("rag_endpoint", "(unset — run .claude/scripts/setup_rag.sh)"))
+        rows.append(("rag_endpoint", "(unset — run .agents/scripts/setup_rag.sh)"))
     return rows
 
 
@@ -271,7 +271,7 @@ def emit(
     first_scaffold: bool = True,
     conflicts: list[tuple[Path, Path]] | None = None,
 ) -> list[Path]:
-    """Write .claude/CAPABILITIES.md.
+    """Write .agents/CAPABILITIES.md.
 
     A generated inventory (not user-editable), overwritten on every re-run and
     upgrade — except that a pre-existing user file at this path is never clobbered

@@ -11,13 +11,13 @@ from project_init.scaffold import scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_MARKETPLACE = _REPO_ROOT / ".claude-plugin" / "marketplace.json"
+_MARKETPLACE = _REPO_ROOT / ".agents-plugin" / "marketplace.json"
 _PLUGIN_ROOT = _REPO_ROOT / "plugins" / "project-init-workflow"
 _LIFECYCLE_PLUGIN_ROOT = _REPO_ROOT / "plugins" / "project-init-lifecycle"
-_TEMPLATE_CLAUDE = _REPO_ROOT / "templates" / "base" / "dot_claude"
-_FALLBACK_CLAUDE = _REPO_ROOT / "templates" / "fallback" / "dot_claude"
-_LIFECYCLE_FALLBACK_CLAUDE = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude"
-_LIFECYCLE_CLAUDE = _REPO_ROOT / "templates" / "lifecycle" / "dot_claude"
+_TEMPLATE_CLAUDE = _REPO_ROOT / "templates" / "base" / "dot_agents"
+_FALLBACK_CLAUDE = _REPO_ROOT / "templates" / "fallback" / "dot_agents"
+_LIFECYCLE_FALLBACK_CLAUDE = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents"
+_LIFECYCLE_CLAUDE = _REPO_ROOT / "templates" / "lifecycle" / "dot_agents"
 
 
 class TestMarketplaceManifest:
@@ -38,7 +38,7 @@ class TestMarketplaceManifest:
 class TestPluginManifest:
     def test_plugin_json_valid(self):
         manifest = json.loads(
-            (_PLUGIN_ROOT / ".claude-plugin" / "plugin.json").read_text()
+            (_PLUGIN_ROOT / ".agents-plugin" / "plugin.json").read_text()
         )
         assert manifest["name"] == "project-init-workflow"
         assert re.match(r"^\d+\.\d+\.\d+$", manifest["version"])
@@ -137,7 +137,7 @@ class TestScaffoldedSettingsWiring:
         # memory_preset appends the lifecycle overlay (#476) so dag_workflow.py
         # (scaffolded in both modes) is present, as a real default scaffold is.
         scaffold(target, memory_preset("obsidian-only"), make_variables(), strict=True)
-        settings = json.loads((target / ".claude" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text())
         assert (
             settings["extraKnownMarketplaces"]["project-init"]["source"]["repo"]
             == "example/project-init"
@@ -147,9 +147,9 @@ class TestScaffoldedSettingsWiring:
         assert settings["enabledPlugins"]["project-init-lifecycle@project-init"] is True
         assert "hooks" not in settings, "plugin provides the hook wiring"
         # No payload copies in plugin mode (dag_workflow.py stays: scripts exec it).
-        assert not (target / ".claude" / "skills" / "github_workflow").exists()
-        assert not (target / ".claude" / "hooks" / "pre_commit_gate.sh").exists()
-        assert (target / ".claude" / "hooks" / "dag_workflow.py").is_file()
+        assert not (target / ".agents" / "skills" / "github_workflow").exists()
+        assert not (target / ".agents" / "hooks" / "pre_commit_gate.sh").exists()
+        assert (target / ".agents" / "hooks" / "dag_workflow.py").is_file()
 
     def test_no_plugin_restores_copies_and_wiring(self, tmp_path: Path):
         """--no-plugin: full copies + settings wiring, plugin not enabled."""
@@ -157,7 +157,7 @@ class TestScaffoldedSettingsWiring:
 
         target = tmp_path / "p"
         scaffold(target, fallback_preset(), fallback_variables(), strict=True)
-        settings = json.loads((target / ".claude" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text())
         assert "project-init-workflow@project-init" not in settings["enabledPlugins"]
         commands = [
             h["command"]
@@ -166,8 +166,8 @@ class TestScaffoldedSettingsWiring:
             for h in entry["hooks"]
         ]
         assert any("pre_commit_gate.sh" in c for c in commands)
-        assert (target / ".claude" / "skills" / "github_workflow" / "SKILL.md").is_file()
-        assert (target / ".claude" / "hooks" / "prod_guard.py").is_file()
+        assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert (target / ".agents" / "hooks" / "prod_guard.py").is_file()
 
 
 class TestSyncTool:
@@ -177,13 +177,13 @@ class TestSyncTool:
         import shutil
 
         fake_root = tmp_path / "repo"
-        fake_templates = fake_root / "templates" / "base" / "dot_claude"
+        fake_templates = fake_root / "templates" / "base" / "dot_agents"
         shutil.copytree(_TEMPLATE_CLAUDE, fake_templates)
-        fake_fallback = fake_root / "templates" / "fallback" / "dot_claude"
+        fake_fallback = fake_root / "templates" / "fallback" / "dot_agents"
         shutil.copytree(_FALLBACK_CLAUDE, fake_fallback)
-        fake_lifecycle = fake_root / "templates" / "lifecycle" / "dot_claude"
+        fake_lifecycle = fake_root / "templates" / "lifecycle" / "dot_agents"
         shutil.copytree(_LIFECYCLE_CLAUDE, fake_lifecycle)
-        fake_lifecycle_fallback = fake_root / "templates" / "lifecycle_fallback" / "dot_claude"
+        fake_lifecycle_fallback = fake_root / "templates" / "lifecycle_fallback" / "dot_agents"
         shutil.copytree(_LIFECYCLE_FALLBACK_CLAUDE, fake_lifecycle_fallback)
         fake_plugin = fake_root / "plugins" / "project-init-workflow"
         shutil.copytree(_PLUGIN_ROOT, fake_plugin)

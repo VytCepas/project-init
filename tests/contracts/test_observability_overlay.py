@@ -21,7 +21,7 @@ from project_init.scaffold import load_preset, overlay_layers, scaffold
 from project_init.upgrade import read_scaffold_record
 from tests.helpers import make_variables
 
-_OBS_README = Path(".claude") / "observability" / "README.md"
+_OBS_README = Path(".agents") / "observability" / "README.md"
 
 
 def _scaffold(target: Path, *, observability: bool) -> Path:
@@ -87,7 +87,7 @@ class TestObservabilityOn:
 
     def test_guides_scaffold(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p", observability=True)
-        guides = target / ".claude" / "docs" / "guides"
+        guides = target / ".agents" / "docs" / "guides"
         using = guides / "using-observability.md"
         upgrading = guides / "upgrading-observability.md"
         assert using.is_file() and upgrading.is_file()
@@ -104,7 +104,7 @@ class TestObservabilityOn:
 class TestObservabilityOff:
     def test_no_layer_dir(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p", observability=False)
-        assert not (target / ".claude" / "observability").exists()
+        assert not (target / ".agents" / "observability").exists()
 
 
 class TestFlagResolution:
@@ -121,7 +121,7 @@ class TestFlagResolution:
     def test_off_by_default(self, tmp_path: Path):
         target = tmp_path / "p"
         assert _scaffold_cli(target, "--preset", "obsidian-only") == 0
-        assert not (target / ".claude" / "observability").exists()
+        assert not (target / ".agents" / "observability").exists()
         _, variables, _, _ = read_scaffold_record(target)
         assert variables["observability"] == ""
 

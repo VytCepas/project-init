@@ -1,7 +1,7 @@
 {{#if deploy_container}}# Deploy ({{deploy_target}}) — build once, promote the SAME image digest through
 # environments (ADR-015). Staging deploys automatically on merge to
 # {{base_branch}}; production is gated by the `production` GitHub Environment
-# (arm its protection rules with `.claude/scripts/setup_env_protection.sh`).
+# (arm its protection rules with `.agents/scripts/setup_env_protection.sh`).
 # The model is declared in deploy/environments.yaml.
 name: Deploy
 

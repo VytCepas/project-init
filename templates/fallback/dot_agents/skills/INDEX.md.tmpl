@@ -1,0 +1,29 @@
+# Skills index
+
+Load the relevant skill file when the trigger applies. Do not load all skills at once.
+
+| When you need to... | Load this skill |
+|---|---|
+{{#if lifecycle}}| Create a GitHub Issue | `.agents/skills/create_issue/SKILL.md` |
+| Start a new task (branch + draft PR) | `.agents/skills/start_task/SKILL.md` |
+{{/if lifecycle}}| Plan work before implementing | `.agents/skills/plan/SKILL.md` |
+| Review code for bugs and style | `.agents/skills/review/SKILL.md` |
+{{#if lifecycle}}| Request review on a draft PR | `.agents/skills/request_review/SKILL.md` |
+| Push, review, or merge a PR | `.agents/skills/github_workflow/SKILL.md` |
+{{/if lifecycle}}| Show project status and open items | `.agents/skills/status/SKILL.md` |
+{{#if obsidian}}| Summarize the session | `.agents/skills/session_summary/SKILL.md` |
+{{/if obsidian}}{{#if memory}}| Save something to project memory | `.agents/skills/save_memory/SKILL.md` |
+{{/if memory}}| Record an architectural decision (ADR) | `.agents/skills/add_adr/SKILL.md` |
+| Report / file a bug or issue | `.agents/skills/report_upstream_issue/SKILL.md` |
+| Add a hook | `.agents/skills/add_hook/SKILL.md` |
+| Add a slash command | `.agents/skills/add_command/SKILL.md` |
+{{#if lifecycle}}| Audit project health | `.agents/skills/audit/SKILL.md` |
+{{/if lifecycle}}
+## How to use this index
+
+1. Identify which action you are about to take.
+2. Check the table above for a matching skill.
+3. Read that skill file fully before acting.
+4. Follow the skill's steps exactly — do not improvise the workflow.
+
+Skills that say "if present" may not exist in every scaffolded project. If the file is missing, fall back to the instruction noted in the same row.

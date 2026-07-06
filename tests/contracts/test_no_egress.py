@@ -23,7 +23,7 @@ def _settings(tmp_path: Path, **overrides: str) -> dict:
     scaffold(
         target, memory_preset("obsidian-only"), make_variables(**overrides), strict=True
     )
-    return json.loads((target / ".claude" / "settings.json").read_text())
+    return json.loads((target / ".agents" / "settings.json").read_text())
 
 
 class TestNoEgressFlag:
@@ -93,6 +93,6 @@ class TestNoEgressUpgradeBackfill:
         write_scaffold_record(target, "obsidian-only", legacy, created)
 
         assert run_upgrade(target, apply=True) == 0
-        data = json.loads((target / ".claude" / "settings.json").read_text())
+        data = json.loads((target / ".agents" / "settings.json").read_text())
         assert "claude-plugins-official" in data["extraKnownMarketplaces"]
         assert "security-guidance@claude-plugins-official" in data["enabledPlugins"]

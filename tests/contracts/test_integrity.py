@@ -63,8 +63,8 @@ class TestStrictMode:
         # file that references something not in the variables dict.
         # We achieve this via a custom template layer.
         fake_dir = tmp_path / "fake-layer"
-        (fake_dir / "dot_claude").mkdir(parents=True)
-        (fake_dir / "dot_claude" / "stale.md.tmpl").write_text(
+        (fake_dir / "dot_agents").mkdir(parents=True)
+        (fake_dir / "dot_agents" / "stale.md.tmpl").write_text(
             "value: {{undefined_variable_xyz}}"
         )
         # Patch the templates dir for this test only.
@@ -85,8 +85,8 @@ class TestStrictMode:
         not an unrendered placeholder — strict mode must not reject it."""
         target = tmp_path / "p"
         fake_dir = tmp_path / "data-layer"
-        (fake_dir / "dot_claude").mkdir(parents=True)
-        (fake_dir / "dot_claude" / "about.md.tmpl").write_text(
+        (fake_dir / "dot_agents").mkdir(parents=True)
+        (fake_dir / "dot_agents" / "about.md.tmpl").write_text(
             "desc: {{description}}\n"
         )
         import project_init.scaffold as sm
@@ -95,7 +95,7 @@ class TestStrictMode:
         try:
             variables = make_variables(description="literal {{ evil }} braces")
             scaffold(target, {"name": "fake", "layers": ["data-layer"]}, variables, strict=True)
-            rendered = (target / ".claude" / "about.md").read_text()
+            rendered = (target / ".agents" / "about.md").read_text()
             assert "literal {{ evil }} braces" in rendered
         finally:
             sm._TEMPLATES_DIR = original
@@ -107,8 +107,8 @@ class TestStrictMode:
         variables = make_variables()
         # Create a broken layer that will fail strict validation.
         fake_dir = tmp_path / "broken-layer"
-        (fake_dir / "dot_claude").mkdir(parents=True)
-        (fake_dir / "dot_claude" / "bad.md.tmpl").write_text(
+        (fake_dir / "dot_agents").mkdir(parents=True)
+        (fake_dir / "dot_agents" / "bad.md.tmpl").write_text(
             "# Config\nvalue: {{undefined_var}}"
         )
         import project_init.scaffold as sm
@@ -136,7 +136,7 @@ class TestStrictMode:
         scaffold(target, preset, make_variables(), strict=True)
 
         assert user_file.read_text(encoding="utf-8") == "keep me\n"
-        assert (target / ".claude" / "settings.json").is_file()
+        assert (target / ".agents" / "settings.json").is_file()
 
     def test_strict_preserves_user_memory_files_on_rerun(self, tmp_path: Path):
         """Strict mode should honor the same memory/vault idempotency as default mode."""
@@ -145,7 +145,7 @@ class TestStrictMode:
         preset = memory_preset("obsidian-only")
         scaffold(target, preset, make_variables(), strict=True)
 
-        memory_file = target / ".claude" / "memory" / "project_context.md"
+        memory_file = target / ".agents" / "memory" / "project_context.md"
         memory_file.write_text("custom project context\n", encoding="utf-8")
         scaffold(target, preset, make_variables(project_name="changed"), strict=True)
 

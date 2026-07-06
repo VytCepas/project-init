@@ -8,7 +8,7 @@ from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_SKILLS_DIR = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills"
+_SKILLS_DIR = _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "skills"
 # INDEX.md became a template (#476) so its lifecycle skill rows can be gated.
 _INDEX_PATH = _SKILLS_DIR / "INDEX.md.tmpl"
 
@@ -17,7 +17,7 @@ class TestSkillIndex:
     """Verify INDEX.md exists and covers every skill directory."""
 
     def test_index_file_exists(self):
-        assert _INDEX_PATH.exists(), "templates/fallback/dot_claude/skills/INDEX.md.tmpl missing"
+        assert _INDEX_PATH.exists(), "templates/fallback/dot_agents/skills/INDEX.md.tmpl missing"
 
     def test_every_skill_dir_mentioned_in_index(self):
         index_text = _INDEX_PATH.read_text()
@@ -35,14 +35,14 @@ class TestSkillIndex:
         target = tmp_path / "proj"
         preset = fallback_preset()
         scaffold(target, preset, fallback_variables())
-        index = target / ".claude" / "skills" / "INDEX.md"
-        assert index.exists(), ".claude/skills/INDEX.md not scaffolded into project"
+        index = target / ".agents" / "skills" / "INDEX.md"
+        assert index.exists(), ".agents/skills/INDEX.md not scaffolded into project"
 
     def test_index_content_in_scaffolded_project(self, tmp_path: Path):
         target = tmp_path / "proj"
         preset = fallback_preset()
         scaffold(target, preset, fallback_variables())
-        content = (target / ".claude" / "skills" / "INDEX.md").read_text()
+        content = (target / ".agents" / "skills" / "INDEX.md").read_text()
         assert "start_task" in content
         assert "session_summary" in content
         assert "add_hook" in content
@@ -53,7 +53,7 @@ class TestSkillIndex:
         target = tmp_path / "proj"
         preset = fallback_preset()
         scaffold(target, preset, fallback_variables())
-        skill = target / ".claude" / "skills" / "github_workflow" / "SKILL.md"
+        skill = target / ".agents" / "skills" / "github_workflow" / "SKILL.md"
         assert skill.exists(), "github_workflow/SKILL.md not scaffolded"
         content = skill.read_text()
         assert "finish_pr.sh" in content
@@ -91,7 +91,7 @@ class TestSkillFrontmatter:
         raise AssertionError(f"{path}: frontmatter never closed")
 
     # Template skills and this repo's own skills both follow the standard.
-    _SKILL_ROOTS = (_SKILLS_DIR, _REPO_ROOT / ".claude" / "skills")
+    _SKILL_ROOTS = (_SKILLS_DIR, _REPO_ROOT / ".agents" / "skills")
 
     def _skill_files(self):
         for root in self._SKILL_ROOTS:
@@ -130,6 +130,6 @@ class TestSkillFrontmatter:
     def test_audit_runs_in_forked_context(self):
         """Heavyweight scan isolates its context; findings land in a GitHub issue."""
         # audit moved to the lifecycle_fallback overlay (#476).
-        audit = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills" / "audit"
+        audit = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents" / "skills" / "audit"
         fm = self._frontmatter(audit / "SKILL.md")
         assert fm.get("context") == "fork"

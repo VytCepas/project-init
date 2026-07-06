@@ -11,17 +11,19 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "hooks"
-_BASE_HOOKS = _REPO_ROOT / "templates" / "base" / "dot_claude" / "hooks"
+_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "hooks"
+_BASE_HOOKS = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks"
 
 
 def _run_hook(file_path: str, cwd: Path) -> dict | None:
     # post_edit_lint.sh resolves its sibling _py.sh at runtime — that file's
     # true source is templates/base/, only landing alongside post_edit_lint.sh
-    # once scaffold() copies both into a project's .claude/hooks/. Reproduce
+    # once scaffold() copies both into a project's .agents/hooks/. Reproduce
     # that layout rather than invoking the fallback template in place.
-    hooks_dir = cwd / ".claude" / "hooks"
+    hooks_dir = cwd / ".agents" / "hooks"
     hooks_dir.mkdir(parents=True, exist_ok=True)
     hook = hooks_dir / "post_edit_lint.sh"
     shutil.copy(_FALLBACK_HOOKS / "post_edit_lint.sh", hook)
@@ -29,14 +31,16 @@ def _run_hook(file_path: str, cwd: Path) -> dict | None:
 
     payload = json.dumps({"tool_input": {"file_path": file_path}})
     result = subprocess.run(
-        ["bash", str(hook)],
+        ["bash", "-x", str(hook)],
         input=payload,
         capture_output=True,
         text=True,
         cwd=cwd,
         timeout=120,
     )
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == 0, f"STDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+    print("STDOUT:", result.stdout)
+    print("STDERR:", result.stderr)
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
@@ -48,6 +52,7 @@ def _project(tmp_path: Path) -> Path:
     return tmp_path
 
 
+@pytest.mark.skipif(not shutil.which("mypy") and not shutil.which("uv"), reason="Needs mypy or uv")
 def test_absolute_path_under_src_triggers_mypy(tmp_path: Path):
     project = _project(tmp_path)
     verdict = _run_hook(str(project / "src" / "bad.py"), project)
@@ -55,6 +60,7 @@ def test_absolute_path_under_src_triggers_mypy(tmp_path: Path):
     assert "arg-type" in verdict["hookSpecificOutput"]["additionalContext"]
 
 
+@pytest.mark.skipif(not shutil.which("mypy") and not shutil.which("uv"), reason="Needs mypy or uv")
 def test_repo_relative_path_under_src_triggers_mypy(tmp_path: Path):
     """The bug: a relative "src/bad.py" (no $ROOT prefix) used to fall through
     IN_SRC=false, so mypy never ran and the type error went unflagged."""

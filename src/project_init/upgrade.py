@@ -1,9 +1,9 @@
 """`project-init upgrade` — re-render from recorded config with a drift report.
 
 Deterministic, stdlib-only (PI-142). The scaffold record appended to
-``.claude/config.yaml`` stores the preset, the exact template variables, and a
+``.agents/config.yaml`` stores the preset, the exact template variables, and a
 manifest of content hashes for the files the scaffolder rendered; the rendered
-*text* of each UTF-8 file is kept in the ``.claude/.upgrade-base.json`` sidecar
+*text* of each UTF-8 file is kept in the ``.agents/.upgrade-base.json`` sidecar
 (#240) as the base leg for a 3-way merge (binary/non-UTF-8 renders are omitted
 and fall back to the ``.new`` path on conflict). On upgrade the same preset is
 re-rendered at the current template version into a staging directory and
@@ -24,7 +24,7 @@ compared against the project:
   never deletes)
 
 ``memory/`` and ``vault/`` are never compared or touched, matching the
-scaffolder's preservation rules. ``.claude/config.yaml`` is owned by the
+scaffolder's preservation rules. ``.agents/config.yaml`` is owned by the
 user (project_key etc.); on apply only the tool-managed parts are refreshed —
 the ``project_init_version`` value, the visible project fields, the memory
 descriptor block, the updates/declined-additions block, and the scaffold
@@ -63,7 +63,7 @@ from project_init.scaffold import (
     slugify,
 )
 
-_CONFIG_REL = Path(".claude/config.yaml")
+_CONFIG_REL = Path(".agents/config.yaml")
 _VERSION_LINE_RE = re.compile(r"^(\s*project_init_version:\s*).*$", re.MULTILINE)
 # A never-clobber sibling: `<file>.new` or `<file>.new.N` (see scaffold._new_sibling).
 _SIBLING_RE = re.compile(r"\.new(\.\d+)?$")
@@ -147,6 +147,7 @@ def _overlay_off_defaults() -> dict[str, str]:
         "license_mit": "",
         "license_apache": "",
         "license_proprietary": "",
+        "python_floor": "3.11",
     }
 
 
@@ -192,7 +193,7 @@ _hash_bytes = hash_bytes
 # single pretty-printed JSON file gives per-file granularity in an upgrade diff
 # (#241). Text only — files that don't decode as UTF-8 are omitted and fall back
 # to the ``.new`` sibling path on conflict.
-_BASE_REL = Path(".claude/.upgrade-base.json")
+_BASE_REL = Path(".agents/.upgrade-base.json")
 
 
 def read_base(target: Path) -> dict[str, str]:
@@ -388,7 +389,7 @@ def write_scaffold_record(
     *,
     write_merge_base: bool = True,
 ) -> None:
-    """Append/replace the scaffold record block in .claude/config.yaml.
+    """Append/replace the scaffold record block in .agents/config.yaml.
 
     The manifest hashes the on-disk content of every rendered file so a later
     ``upgrade`` can tell user edits apart from upstream template changes.
@@ -482,7 +483,7 @@ def _parse_record_block(text: str) -> tuple[str, dict, dict] | None:
         preset, variables, manifest = _record_fields(text[idx:].splitlines())
     except json.JSONDecodeError as e:
         msg = (
-            "scaffold record in .claude/config.yaml is corrupted "
+            "scaffold record in .agents/config.yaml is corrupted "
             f"({e}). Fix the block or delete everything from the "
             f"'{_RECORD_MARKER}' line down to fall back to migration."
         )
@@ -491,7 +492,7 @@ def _parse_record_block(text: str) -> tuple[str, dict, dict] | None:
     if preset and isinstance(variables, dict) and isinstance(manifest, dict):
         return preset, variables, manifest
     msg = (
-        "scaffold record in .claude/config.yaml is incomplete or malformed "
+        "scaffold record in .agents/config.yaml is incomplete or malformed "
         "(needs preset, plus variables and manifest as JSON objects). Fix the "
         f"block or delete everything from the '{_RECORD_MARKER}' line down to "
         "fall back to migration."
@@ -758,19 +759,41 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
     parsed = _parse_record_block(text)
     if parsed is not None:
         preset_name, variables, manifest = parsed
-        return preset_name, _migrate_agents(_backfill_variables(variables)), manifest, False
-    # No record marker: either a genuine pre-record scaffold (expected) or a
-    # config.yaml whose record block was destroyed. Migration mode handles
-    # both, but the latter deserves a signal instead of a silent guess
-    # (2026-07 QA) — the record is recoverable from git.
-    sys.stderr.write(
-        f"note: {config_path} carries no scaffold record marker — inferring the "
-        "config from the file's contents (migration mode). If this project was "
-        "scaffolded by a recent project-init, the record may have been "
-        "corrupted; restore .claude/config.yaml from git instead.\n"
-    )
-    preset_name, variables, manifest = _migrate_semantic_config(text.splitlines())
-    return preset_name, _migrate_agents(_backfill_variables(variables)), manifest, True
+        variables = _migrate_agents(_backfill_variables(variables))
+        migrated = False
+    else:
+        # No record marker: either a genuine pre-record scaffold (expected) or a
+        # config.yaml whose record block was destroyed. Migration mode handles
+        # both, but the latter deserves a signal instead of a silent guess
+        # (2026-07 QA) — the record is recoverable from git.
+        sys.stderr.write(
+            f"note: {config_path} carries no scaffold record marker — inferring the "
+            "config from the file's contents (migration mode). If this project was "
+            "scaffolded by a recent project-init, the record may have been "
+            "corrupted; restore .agents/config.yaml from git instead.\n"
+        )
+        preset_name, variables, manifest = _migrate_semantic_config(text.splitlines())
+        variables = _migrate_agents(_backfill_variables(variables))
+        migrated = True
+
+    if "python_floor" not in variables:
+        python_floor = "3.11"
+        if (target / "pyproject.toml").exists():
+            try:
+                import tomllib
+                with (target / "pyproject.toml").open("rb") as f:
+                    data = tomllib.load(f)
+                    req = data.get("project", {}).get("requires-python", "")
+                    if req:
+                        import re
+                        m = re.search(r'>=?\s*(\d+\.\d+)', req)
+                        if m and m.group(1):
+                            python_floor = m.group(1)
+            except Exception:
+                pass
+        variables["python_floor"] = python_floor
+
+    return preset_name, variables, manifest, migrated
 
 
 def read_recorded_manifest(target: Path) -> dict[str, str]:
@@ -1223,11 +1246,11 @@ _ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
     ((".vscode",), "vscode", "Shared VS Code config"),
     ((".github", "workflows"), "github-workflows", "CI / CD workflows"),
     ((".github",), "github", "GitHub repo config (templates, CODEOWNERS, …)"),
-    ((".claude", "skills"), "claude-skills", "Claude Code skills"),
-    ((".claude", "hooks"), "claude-hooks", "Claude Code hooks"),
-    ((".claude", "agents"), "claude-agents", "Claude Code agent specs"),
-    ((".claude", "docs"), "claude-docs", "In-repo docs (.claude/docs)"),
-    ((".claude",), "claude-core", "Claude Code core config"),
+    ((".agents", "skills"), "claude-skills", "Claude Code skills"),
+    ((".agents", "hooks"), "claude-hooks", "Claude Code hooks"),
+    ((".agents", "agents"), "claude-agents", "Claude Code agent specs"),
+    ((".agents", "docs"), "claude-docs", "In-repo docs (.agents/docs)"),
+    ((".agents",), "claude-core", "Claude Code core config"),
     ((".codex",), "codex-agent", "Codex agent wiring"),
     ((".agents",), "agents-dir", "Agent skills/hooks (.agents/ — Codex, Antigravity)"),
     (("docs",), "docs", "Project documentation site"),

@@ -52,7 +52,7 @@ class TestMultiModelOn:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_path: Path):
         self.target = _scaffold(tmp_path / "p", multi_model=True)
-        self.mm = self.target / ".claude" / "multi-model"
+        self.mm = self.target / ".agents" / "multi-model"
 
     def test_config_is_valid_ccr_json(self):
         cfg = json.loads((self.mm / "config.json").read_text())
@@ -74,7 +74,7 @@ class TestMultiModelOn:
         assert "sk-" not in text, "no real API keys may be committed"
 
     def test_installer_present_executable_and_pinned(self):
-        script = self.target / ".claude" / "scripts" / "setup_models.sh"
+        script = self.target / ".agents" / "scripts" / "setup_models.sh"
         assert script.is_file()
         assert os.access(script, os.X_OK)
         content = script.read_text()
@@ -90,7 +90,7 @@ class TestMultiModelOn:
         assert 'mv "$tmp" "$GLOBAL_CONFIG"' in content
 
     def test_day2_helper_present_executable_and_documented(self):
-        helper = self.target / ".claude" / "scripts" / "models.sh"
+        helper = self.target / ".agents" / "scripts" / "models.sh"
         assert helper.is_file()
         assert os.access(helper, os.X_OK)
         content = helper.read_text(encoding="utf-8")
@@ -110,7 +110,7 @@ class TestMultiModelOn:
         assert (self.mm / "README.md").is_file()
 
     def test_guide_renders_with_key_content(self):
-        guide = self.target / ".claude" / "docs" / "guides" / "using-multi-model.md"
+        guide = self.target / ".agents" / "docs" / "guides" / "using-multi-model.md"
         assert guide.is_file()
         text = guide.read_text(encoding="utf-8")
         # The guide must carry the load-bearing decisions: the two architectures,
@@ -130,10 +130,10 @@ class TestDay2HelperRuntime:
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p", multi_model=True)
-        self.helper = target / ".claude" / "scripts" / "models.sh"
+        self.helper = target / ".agents" / "scripts" / "models.sh"
         self.cfg = tmp_path / "ccr.json"
         self.cfg.write_text(
-            (target / ".claude" / "multi-model" / "config.json").read_text(encoding="utf-8"),
+            (target / ".agents" / "multi-model" / "config.json").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
 
@@ -174,7 +174,7 @@ class TestMultiModelOff:
         self.target = _scaffold(tmp_path / "p", multi_model=False)
 
     def test_no_overlay_dir(self):
-        assert not (self.target / ".claude" / "multi-model").exists()
+        assert not (self.target / ".agents" / "multi-model").exists()
 
     def test_no_installer(self):
-        assert not (self.target / ".claude" / "scripts" / "setup_models.sh").exists()
+        assert not (self.target / ".agents" / "scripts" / "setup_models.sh").exists()

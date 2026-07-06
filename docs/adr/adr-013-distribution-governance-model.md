@@ -49,7 +49,7 @@ The upstream reference is re-pointable by design (#248): a fork can back any pro
 but only `org` *requires* one. This makes graduation `individual → standalone → org`
 zero-rework — the config records the upstream and you flip the reference. We do **not**
 force a fork on `individual`/`standalone`, to keep the default install frictionless;
-the ownership those users want is over their copied-in `.claude/` payload, which they
+the ownership those users want is over their copied-in `.agents/` payload, which they
 already have.
 
 ### 3. Host-adaptive delivery for `org` (from spike #254)
@@ -100,7 +100,7 @@ secondary.
 
 ### 7. One shared config schema
 
-`.claude/config.yaml` records the governance state — local only, **no external
+`.agents/config.yaml` records the governance state — local only, **no external
 telemetry**: profile, source repo, host, delivery mode, plugin version, enforcement
 mode, and declined-addition IDs. Ownership is split to avoid drift: **#259 owns the
 choice/audit fields, #248 owns the version fields**, and this ADR is the single home

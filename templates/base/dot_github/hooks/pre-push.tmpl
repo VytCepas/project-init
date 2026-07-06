@@ -7,7 +7,7 @@
 #      where the linked issue can actually be checked.{{/if lifecycle}}{{#if lifecycle_off}}quality gate.
 #   Prevent direct pushes to main/master — universal git hygiene. (The branch
 #   naming + issue-key rules are part of the GitHub lifecycle, declined here.){{/if lifecycle_off}}
-# Install: .claude/scripts/install_hooks.sh
+# Install: .agents/scripts/install_hooks.sh
 
 set -e
 
@@ -34,10 +34,10 @@ while read -r _ local_sha remote_ref _; do
     echo ""
     echo "To contribute:"
 {{#if lifecycle}}    echo "  1. Create a new branch with the project key: git checkout -b <issue_type>/<project_abbr>-<issue_number>-<slug>"
-    echo "  2. Make your changes and push: .claude/scripts/push_branch.sh"
+    echo "  2. Make your changes and push: .agents/scripts/push_branch.sh"
     echo "  3. Open a PR on GitHub"
     echo ""
-    echo "For more details, see .claude/project-init.md"
+    echo "For more details, see .agents/project-init.md"
 {{/if lifecycle}}{{#if lifecycle_off}}    echo "  1. Create a feature branch: git checkout -b my-change"
     echo "  2. Make your changes, then push and open a pull request"
 {{/if lifecycle_off}}    exit 1
@@ -51,7 +51,7 @@ while read -r _ local_sha remote_ref _; do
     echo "  Issue-linked:  feat/PI-42-add-oauth-login"
     echo "  No issue:      chore/nojira-bump-dev-dependency"
     echo ""
-    echo "Use .claude/scripts/start_issue.sh or create_nojira_pr.sh to create branches."
+    echo "Use .agents/scripts/start_issue.sh or create_nojira_pr.sh to create branches."
     exit 1
   fi
 {{/if lifecycle}}done

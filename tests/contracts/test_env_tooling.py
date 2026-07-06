@@ -73,7 +73,7 @@ class TestEnvPattern:
 
     def test_secrets_guide_documents_escalation_without_deps(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
-        guide = (target / ".claude" / "docs" / "guides" / "secrets.md").read_text()
+        guide = (target / ".agents" / "docs" / "guides" / "secrets.md").read_text()
         for manager in ("sops", "1Password CLI", "Doppler"):
             assert manager in guide
         assert "installs **none**" in guide, "manager choice stays org-specific"
@@ -100,7 +100,7 @@ class TestVscodeOverlay:
         assert settings["[python]"]["editor.defaultFormatter"] == "charliermarsh.ruff"
         extensions = json.loads((target / ".vscode" / "extensions.json").read_text())
         assert "charliermarsh.ruff" in extensions["recommendations"]
-        assert "anthropic.claude-code" in extensions["recommendations"]
+        assert "anthropic.agents-code" in extensions["recommendations"]
 
     def test_go_recommends_go_extension(self, tmp_path: Path):
         target = _scaffold_vscode(

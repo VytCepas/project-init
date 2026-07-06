@@ -78,14 +78,14 @@ always overwritten (Codex r1 #4/#5, r2 #2):
 ### 4. Presence-triggered, multi-field CI gate (CI-first)
 
 `governance_gate.sh` (+ `governance_gate.py`, stdlib via `_py.sh`) validates every
-*real* `SYSTEM_CARD.md` (only the top-level `.claude/governance/examples/`
+*real* `SYSTEM_CARD.md` (only the top-level `.agents/governance/examples/`
 directory is excluded) and fails on:
 missing/placeholder fields; out-of-range `role`/`classification`/`allowed`/
 `human_oversight`/`logging`; the `prohibited`+`allowed:true` combo; a
 `models_declared` reference that is absolute, contains `..`, escapes
-`.claude/governance/`, is missing, or is still a placeholder; a `last_reviewed`
+`.agents/governance/`, is missing, or is still a placeholder; a `last_reviewed`
 that is in the future or older than the staleness window (180-day default,
-overridable only via a flat `staleness_days` in `.claude/governance/config.json`,
+overridable only via a flat `staleness_days` in `.agents/governance/config.json`,
 which is user-created — the overlay ships `config.example.json` only). **No real
 card ⇒ pass**, so a fresh project (shipping only the example/template) is a
 genuine opt-in. The CI `governance` job is the enforcement boundary; any local
@@ -110,7 +110,7 @@ keeps refreshing.
   drive it (Codex r1 #11). It also depended on an observability overlay that does
   not exist (epic #269 Track A is unbuilt; Codex r1 #12). Classification stays
   plain metadata; any future runtime use must read a recorded deterministic
-  config (`.claude/config.yaml`), not a markdown card, and is a separate issue.
+  config (`.agents/config.yaml`), not a markdown card, and is a separate issue.
 - **Bucket 2 (cloud-IaC governance fork)** and **Bucket 3 (org AI-system
   registry)** — boundaries only. A registry is a thin reader over the artifacts
   emitted here, built elsewhere (ADR-013 owns the fork/org machinery).

@@ -149,29 +149,29 @@ class TestCoreScaffold:
         )
 
     def test_no_vault_or_memory_dirs(self):
-        assert not (self.target / ".claude" / "vault").exists()
-        assert not (self.target / ".claude" / "memory").exists()
+        assert not (self.target / ".agents" / "vault").exists()
+        assert not (self.target / ".agents" / "memory").exists()
 
     def test_no_memory_specific_docs(self):
-        assert not (self.target / ".claude" / "docs" / "guides" / "using-memory.md").exists()
-        assert not (self.target / ".claude" / "docs" / "adr" / "adr-001-memory-stack.md").exists()
+        assert not (self.target / ".agents" / "docs" / "guides" / "using-memory.md").exists()
+        assert not (self.target / ".agents" / "docs" / "adr" / "adr-001-memory-stack.md").exists()
         # the rest of docs/adr is still there
-        assert (self.target / ".claude" / "docs" / "adr" / "adr-002-mcp-choices.md").is_file()
+        assert (self.target / ".agents" / "docs" / "adr" / "adr-002-mcp-choices.md").is_file()
 
     def test_config_has_no_memory_block(self):
-        cfg = (self.target / ".claude" / "config.yaml").read_text()
+        cfg = (self.target / ".agents" / "config.yaml").read_text()
         assert "memory:" not in cfg
         assert "vault_path" not in cfg
         assert "mcps:" in cfg  # the block that followed the memory block survives
 
     def test_gitignore_has_no_vault_or_memory_lines(self):
         gi = (self.target / ".gitignore").read_text()
-        assert ".claude/vault" not in gi
-        assert ".claude/memory" not in gi
+        assert ".agents/vault" not in gi
+        assert ".agents/memory" not in gi
 
     def test_no_dangling_memory_links(self):
-        """No markdown link points at a missing .claude/vault|memory path."""
-        link_re = re.compile(r"\]\((?:\./)?\.claude/(?:vault|memory)\b")
+        """No markdown link points at a missing .agents/vault|memory path."""
+        link_re = re.compile(r"\]\((?:\./)?\.agents/(?:vault|memory)\b")
         offenders = []
         for p in self.target.rglob("*"):
             if not p.is_file():
@@ -186,10 +186,10 @@ class TestCoreScaffold:
 
     def test_base_layer_intact(self):
         assert (self.target / "AGENTS.md").is_file()
-        assert (self.target / ".claude" / "settings.json").is_file()
-        assert (self.target / ".claude" / "skills" / "plan" / "SKILL.md").is_file()
+        assert (self.target / ".agents" / "settings.json").is_file()
+        assert (self.target / ".agents" / "skills" / "plan" / "SKILL.md").is_file()
 
     def test_capabilities_does_not_claim_a_vault(self):
-        cap = (self.target / ".claude" / "CAPABILITIES.md").read_text()
-        assert ".claude/vault" not in cap
+        cap = (self.target / ".agents" / "CAPABILITIES.md").read_text()
+        assert ".agents/vault" not in cap
         assert "obsidian-only" not in cap and "obsidian-graphify" not in cap

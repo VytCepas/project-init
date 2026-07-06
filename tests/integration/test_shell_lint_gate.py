@@ -2,7 +2,7 @@
 project.
 
 `just lint` (and the CI `Lint` step) runs `shellcheck -S error -x` and
-`shfmt -d -i 2` over every `.claude/**/*.sh` a scaffold emits. Those tools are
+`shfmt -d -i 2` over every `.agents/**/*.sh` a scaffold emits. Those tools are
 installed unconditionally in CI, so a single un-formatted emitted script turns a
 brand-new project red on its first push — regardless of language or whether the
 user has added a pyproject yet.
@@ -79,7 +79,7 @@ def _service_deploy_lifecycle(target: Path) -> Path:
 
 
 def _claude_scripts(target: Path) -> list[Path]:
-    return sorted((target / ".claude").rglob("*.sh"))
+    return sorted((target / ".agents").rglob("*.sh"))
 
 
 def test_emitted_claude_scripts_are_shfmt_clean(tmp_target: Path):
@@ -98,14 +98,14 @@ def test_emitted_claude_scripts_are_shfmt_clean(tmp_target: Path):
         )
         if result.stdout.strip() or result.returncode != 0:
             dirty.append(f"{p.relative_to(tmp_target)}:\n{result.stdout}{result.stderr}")
-    assert not dirty, "emitted .claude scripts fail `shfmt -d -i 2`:\n" + "\n".join(dirty)
+    assert not dirty, "emitted .agents scripts fail `shfmt -d -i 2`:\n" + "\n".join(dirty)
 
 
 def test_emitted_claude_scripts_pass_shellcheck(tmp_target: Path):
     shellcheck = _require(_SHELLCHECK, "shellcheck")
     _service_deploy_lifecycle(tmp_target)
     scripts = _claude_scripts(tmp_target)
-    assert scripts, "no .claude/**/*.sh emitted — test guards nothing"
+    assert scripts, "no .agents/**/*.sh emitted — test guards nothing"
 
     failures = []
     for p in scripts:
@@ -114,6 +114,6 @@ def test_emitted_claude_scripts_pass_shellcheck(tmp_target: Path):
         )
         if result.returncode != 0:
             failures.append(f"{p.relative_to(tmp_target)}:\n{result.stdout}{result.stderr}")
-    assert not failures, "emitted .claude scripts fail `shellcheck -S error -x`:\n" + "\n".join(
+    assert not failures, "emitted .agents scripts fail `shellcheck -S error -x`:\n" + "\n".join(
         failures
     )

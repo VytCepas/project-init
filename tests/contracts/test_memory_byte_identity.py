@@ -16,34 +16,34 @@ EXCEPT `lint_memory.sh`, which gained deterministic staleness checks (a delibera
 feature, not move-drift). Only that one hash was re-pinned.
 
 Exception (#496): the code-map feature intentionally ADDS
-`.claude/scripts/gen_code_map.py` and edits AGENTS.md (the read-the-map pointer)
+`.agents/scripts/gen_code_map.py` and edits AGENTS.md (the read-the-map pointer)
 and the justfile (the `code-map` recipe). Only those keys were re-pinned, after
 verifying every OTHER file still matched the baseline — the move invariant is
 intact for everything else.
 
-Exception (#498): the memory descriptor intentionally edits `.claude/config.yaml`
+Exception (#498): the memory descriptor intentionally edits `.agents/config.yaml`
 (adds `tier` + `graph_path` to the `memory:` block, and later a top-level
 `project_init_contract_version` to the `project:` block, ADR-025). Only that key
 was re-pinned, after verifying every other file still matched.
 
-Exception (LightRAG cleanup): removing the dead `.claude/memory/.lightrag/`
+Exception (LightRAG cleanup): removing the dead `.agents/memory/.lightrag/`
 gitignore line (ADR-024) re-pinned `.gitignore` only.
 
 Exception (PI-526): the concern-decoupled skills `save_memory`, `status`, and
 `session_summary` gained deterministic presence-checks in their bodies (don't
-write to `.claude/memory/` or `.claude/vault/` when that concern was declined) —
+write to `.agents/memory/` or `.agents/vault/` when that concern was declined) —
 a deliberate fix, not move-drift. Only those three SKILL.md hashes were re-pinned
 (no_plugin combos), after verifying every other file still matched.
 
 Exception (PI-550): `dag_workflow.py` gained `_strip_text_flag_values` so the
 command-guard no longer false-positives on blocked-command phrases inside
 free-text flag values. A deliberate guard fix, not move-drift. Only the
-`.claude/hooks/dag_workflow.py` hash was re-pinned across all four combos, after
+`.agents/hooks/dag_workflow.py` hash was re-pinned across all four combos, after
 verifying every other file still matched.
 
 Exception (PI-570): `ruff.toml` gained the RUF/PERF/PTH/RET/ARG/A/S/BLE rule
 groups (per-language quality-gate strictness pass) — a deliberate content
-change, not move-drift. `.claude/hooks/package_guard.py` also picked up
+change, not move-drift. `.agents/hooks/package_guard.py` also picked up
 `# noqa: S310` placement fixes for the new `S` rule group; it was already
 excluded above. Only `ruff.toml` is newly excluded here, after verifying
 every other file still matched.
@@ -57,7 +57,7 @@ hooks `pre_commit_gate.sh` / `post_edit_lint.sh` (cd to repo root).
 Exception (2026-07 review, second pass): `dag_workflow.py` closed the
 quoted-global-option guard bypass, capped its per-subprocess timeout below the
 hook budget, and made the nojira "PR already exists" short-circuit check the PR
-is OPEN. Only the `.claude/hooks/dag_workflow.py` hash was re-pinned across all
+is OPEN. Only the `.agents/hooks/dag_workflow.py` hash was re-pinned across all
 four combos, after verifying every other file still matched.
 """
 
@@ -87,7 +87,7 @@ COMBOS = [
 # lifecycle" row + the lifecycle skills now sourced from lifecycle_fallback;
 # plugin-mode settings.json gained the project-init-lifecycle plugin enablement.
 # Neither is part of the memory move this contract guards.
-_GENERATED = {".claude/CAPABILITIES.md"}
+_GENERATED = {".agents/CAPABILITIES.md"}
 
 # Files added or intentionally edited AFTER the frozen baseline was captured —
 # legitimate content changes, not the memory move this contract guards. Excluded
@@ -114,39 +114,41 @@ _GENERATED = {".claude/CAPABILITIES.md"}
 #   • report_upstream_issue skill (SKILL.md + INDEX/README/project-init.md rows)
 #     — new default-on skill routing tooling bugs upstream to project-init
 _ADDED_SINCE_BASELINE = {
+    # #606: the pre-edit issue guard — a new lifecycle hook, not lifecycle-move drift.
+    ".agents/hooks/pre_edit_issue_guard.py",
     ".gitleaks.toml",
     ".github/workflows/ci.yml",
-    ".claude/scripts/setup_github.sh",
-    ".claude/scripts/create_issue.sh",
+    ".agents/scripts/setup_github.sh",
+    ".agents/scripts/create_issue.sh",
     ".github/workflows/board-automation.yml",
     ".github/workflows/issue-validation.yml",
-    ".claude/skills/report_upstream_issue/SKILL.md",
-    ".claude/skills/INDEX.md",
-    ".claude/skills/README.md",
-    ".claude/project-init.md",
-    ".claude/config.yaml",
+    ".agents/skills/report_upstream_issue/SKILL.md",
+    ".agents/skills/INDEX.md",
+    ".agents/skills/README.md",
+    ".agents/project-init.md",
+    ".agents/config.yaml",
     "mypy.ini",
     "justfile",
-    ".claude/hooks/post_edit_lint.sh",
-    ".claude/rules/python.md",
-    ".claude/rules/go.md",
+    ".agents/hooks/post_edit_lint.sh",
+    ".agents/rules/python.md",
+    ".agents/rules/go.md",
     # node.md gained the `just sbom` (#574) / `just license` (#579) reference
     # lines — a deliberate content edit, like the other rules files here.
-    ".claude/rules/node.md",
-    ".claude/hooks/session_setup.sh",
-    ".claude/hooks/_py.sh",
-    ".claude/scripts/gh_host.sh",
-    ".claude/scripts/lint_memory.sh",
-    ".claude/scripts/monitor_pr.sh",
-    ".claude/scripts/start_issue.sh",
-    ".claude/hooks/github_command_guard.sh",
-    ".claude/hooks/pre_commit_gate.sh",
-    ".claude/hooks/workflow_state_reminder.sh",
-    ".claude/hooks/package_guard.py",
-    ".claude/settings.json",
+    ".agents/rules/node.md",
+    ".agents/hooks/session_setup.sh",
+    ".agents/hooks/_py.sh",
+    ".agents/scripts/gh_host.sh",
+    ".agents/scripts/lint_memory.sh",
+    ".agents/scripts/monitor_pr.sh",
+    ".agents/scripts/start_issue.sh",
+    ".agents/hooks/github_command_guard.sh",
+    ".agents/hooks/pre_commit_gate.sh",
+    ".agents/hooks/workflow_state_reminder.sh",
+    ".agents/hooks/package_guard.py",
+    ".agents/settings.json",
     "AGENTS.md",
-    ".claude/rules/rust.md",
-    ".claude/rules/typescript.md",
+    ".agents/rules/rust.md",
+    ".agents/rules/typescript.md",
     "ruff.toml",
     # Shift-left commit hooks (see test_commit_hook_gates.py): git pre-commit
     # gained a `just lint` gate; pre-push gained a `just ci` gate.
@@ -165,6 +167,8 @@ def _manifest(target: Path) -> dict[str, str]:
         # carry __pycache__ that scaffold() copies, but a clean checkout (CI)
         # does not — including them would be spurious drift.
         if "__pycache__" in rel.parts or rel.suffix == ".pyc":
+            continue
+        if rel.parts and rel.parts[0] == ".claude":
             continue
         out[rel.as_posix()] = hashlib.sha256(p.read_bytes()).hexdigest()
     return out
@@ -189,7 +193,7 @@ def test_memory_move_byte_identical(preset_name: str, no_plugin: bool, tmp_path:
 
     drop = set(_GENERATED) | _ADDED_SINCE_BASELINE
     if not no_plugin:
-        drop.add(".claude/settings.json")
+        drop.add(".agents/settings.json")
     got = {k: v for k, v in got.items() if k not in drop}
 
     mode = "no_plugin" if no_plugin else "plugin"

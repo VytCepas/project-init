@@ -56,7 +56,7 @@ class TestPythonToolchain:
         ignores = config["lint"]["per-file-ignores"]
         assert "D" in ignores["tests/**"]
         assert "S" in ignores["tests/**"], "plain assert must not be flagged as insecure"
-        assert "C901" in ignores[".claude/**"]
+        assert "C901" in ignores[".agents/**"]
 
     def test_mypy_config_rendered_and_parseable(self):
         import configparser
@@ -168,7 +168,7 @@ class TestNodeToolchain:
     def test_ts_only_policy_documented(self):
         """TypeScript is mandatory; the rule doc must state no plain JS and warn
         against re-opening the hole via allowJs."""
-        rule = (self.target / ".claude" / "rules" / "typescript.md").read_text()
+        rule = (self.target / ".agents" / "rules" / "typescript.md").read_text()
         assert "TypeScript only" in rule
         assert "allowJs" in rule
 
@@ -433,7 +433,7 @@ class TestAdrToolchain:
         self.target = _scaffold_language(tmp_target, "python")
 
     def test_madr_template_scaffolded(self):
-        content = (self.target / ".claude" / "docs" / "adr" / "adr-template.md").read_text()
+        content = (self.target / ".agents" / "docs" / "adr" / "adr-template.md").read_text()
         for section in (
             "Context and Problem Statement",
             "Considered Options",
@@ -443,10 +443,10 @@ class TestAdrToolchain:
             assert section in content
 
     def test_add_adr_skill_scaffolded_and_indexed(self):
-        skill = self.target / ".claude" / "skills" / "add_adr" / "SKILL.md"
+        skill = self.target / ".agents" / "skills" / "add_adr" / "SKILL.md"
         assert skill.is_file()
         assert "adr-template.md" in skill.read_text()
-        index = (self.target / ".claude" / "skills" / "INDEX.md").read_text()
+        index = (self.target / ".agents" / "skills" / "INDEX.md").read_text()
         assert "add_adr" in index
 
 
@@ -549,7 +549,7 @@ class TestVulnerabilityScanGate:
 
 
 class TestBashLintGate:
-    """PI-562: shellcheck + shfmt gate .claude/**/*.sh regardless of language —
+    """PI-562: shellcheck + shfmt gate .agents/**/*.sh regardless of language —
     bash agent infra always ships, so the gate isn't tied to any one language."""
 
     @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
@@ -625,7 +625,7 @@ class TestSemgrepGate:
 class TestQualityPlugins:
     def test_pr_review_toolkit_enabled(self, tmp_target: Path):
         target = _scaffold_language(tmp_target, "python")
-        settings = json.loads((target / ".claude" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text())
         assert settings["enabledPlugins"]["pr-review-toolkit@claude-plugins-official"] is True
 
     def test_agents_md_recommends_review_plugins(self, tmp_target: Path):

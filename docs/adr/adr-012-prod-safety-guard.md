@@ -27,7 +27,7 @@ plugin):
 - Permission-mode-aware: interactive sessions get `permissionDecision:
   "ask"` (a human confirms); fully autonomous sessions
   (`bypassPermissions`) get a hard `block` — there is no human to ask.
-- Escape hatch: `safety.allow` in `.claude/config.yaml` — a JSON list of
+- Escape hatch: `safety.allow` in `.agents/config.yaml` — a JSON list of
   regex patterns for known-safe contexts, audited in git like any config.
 - Fail-open on internal errors: a guardrail must never brick a session.
 

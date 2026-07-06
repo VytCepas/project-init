@@ -53,14 +53,14 @@ class TestFirstScaffoldProtectsExistingFiles:
         is treated as unrecorded, so a pre-existing user file is preserved with a
         .new sibling rather than clobbered (PI-196 review)."""
         target = tmp_path / "proj"
-        (target / ".claude").mkdir(parents=True)
-        (target / ".claude" / "config.yaml").write_text("safety:\n  allow: []\n")
+        (target / ".agents").mkdir(parents=True)
+        (target / ".agents" / "config.yaml").write_text("safety:\n  allow: []\n")
         (target / "CLAUDE.md").write_text("# KEEP ME\n")
 
         real_read_text = Path.read_text
 
         def flaky_read_text(self, *args, **kwargs):
-            if self.name == "config.yaml" and self.parent.name == ".claude":
+            if self.name == "config.yaml" and self.parent.name == ".agents":
                 raise PermissionError("simulated unreadable config")
             return real_read_text(self, *args, **kwargs)
 
@@ -80,21 +80,21 @@ class TestFirstScaffoldProtectsExistingFiles:
 
     def test_existing_settings_json_is_preserved(self, tmp_path: Path):
         target = tmp_path / "proj"
-        (target / ".claude").mkdir(parents=True)
-        (target / ".claude" / "settings.json").write_text('{"MY": "PRECIOUS SETTINGS"}\n')
+        (target / ".agents").mkdir(parents=True)
+        (target / ".agents" / "settings.json").write_text('{"MY": "PRECIOUS SETTINGS"}\n')
 
         assert _run(target) == 0
 
-        assert "PRECIOUS SETTINGS" in (target / ".claude" / "settings.json").read_text()
-        assert (target / ".claude" / "settings.json.new").is_file()
+        assert "PRECIOUS SETTINGS" in (target / ".agents" / "settings.json").read_text()
+        assert (target / ".agents" / "settings.json.new").is_file()
 
     def test_pre_existing_config_without_record_still_protects(self, tmp_path: Path):
-        """PI-196: a .claude/config.yaml lacking the scaffold record marker
+        """PI-196: a .agents/config.yaml lacking the scaffold record marker
         (hand-written or left by another tool) must not be mistaken for a prior
         project-init run — the first scaffold must still protect user files."""
         target = tmp_path / "proj"
-        (target / ".claude").mkdir(parents=True)
-        (target / ".claude" / "config.yaml").write_text("project_key: MINE\n")
+        (target / ".agents").mkdir(parents=True)
+        (target / ".agents" / "config.yaml").write_text("project_key: MINE\n")
         (target / "CLAUDE.md").write_text("# MY CUSTOM INSTRUCTIONS - DO NOT LOSE\n")
 
         assert _run(target) == 0
@@ -124,7 +124,7 @@ class TestFirstScaffoldProtectsExistingFiles:
     def test_rerun_refreshes_managed_files_without_conflicts(self, tmp_path: Path):
         target = tmp_path / "proj"
         assert _run(target) == 0
-        assert (target / ".claude" / "config.yaml").is_file()
+        assert (target / ".agents" / "config.yaml").is_file()
         # Second run: config is recorded, so it is a managed re-run, not a
         # first scaffold — no spurious .new siblings.
         assert _run(target) == 0
@@ -181,7 +181,7 @@ class TestReScaffoldPreservesConfig:
     def test_hand_edits_survive_a_re_scaffold(self, tmp_path: Path):
         target = tmp_path / "proj"
         assert _run(target) == 0
-        config = target / ".claude" / "config.yaml"
+        config = target / ".agents" / "config.yaml"
 
         # Hand-edit the fields the issue calls out, in the human section.
         text = config.read_text()
@@ -204,7 +204,7 @@ class TestReScaffoldPreservesConfig:
         assert 'declined_additions: {"docs": "abc123"}' in result
         assert 'preserve: ["ci.yml", "justfile"]' in result
         # No .new sibling — preservation is silent, not a conflict.
-        assert not (target / ".claude" / "config.yaml.new").exists()
+        assert not (target / ".agents" / "config.yaml.new").exists()
         # The scaffold record is still present (updated in place by
         # write_scaffold_record), so a later `upgrade` still works.
         from project_init.scaffold import _RECORD_MARKER
@@ -216,7 +216,7 @@ class TestReScaffoldPreservesConfig:
         template — preservation only kicks in once a record exists."""
         target = tmp_path / "proj"
         assert _run(target) == 0
-        config = target / ".claude" / "config.yaml"
+        config = target / ".agents" / "config.yaml"
         text = config.read_text()
         # Template placeholders are resolved and the name we passed is present.
         assert "{{" not in text
@@ -308,13 +308,13 @@ class TestReScaffoldProtectsEditedFiles:
     def test_edited_file_survives_strict_rerun(self, tmp_path: Path):
         target = tmp_path / "proj"
         assert _run(target) == 0
-        managed = target / ".claude" / "settings.json"
+        managed = target / ".agents" / "settings.json"
         managed.write_text('{"my": "custom hooks"}\n')
 
         assert _run(target, "--strict") == 0
 
         assert managed.read_text() == '{"my": "custom hooks"}\n'
-        assert (target / ".claude" / "settings.json.new").is_file()
+        assert (target / ".agents" / "settings.json.new").is_file()
 
     def test_rerun_record_keeps_kept_file_out_of_manifest(self, tmp_path: Path):
         """The refreshed record must not hash the user's kept bytes as if they
@@ -345,7 +345,7 @@ class TestPreserveGlobParsing:
 
     @staticmethod
     def _prepend_preserve_line(target: Path, line: str) -> None:
-        config = target / ".claude" / "config.yaml"
+        config = target / ".agents" / "config.yaml"
         config.write_text(line + "\n" + config.read_text())
 
     def test_trailing_comment_ending_in_bracket_keeps_globs(self, tmp_path: Path):
@@ -369,7 +369,7 @@ class TestPreserveGlobParsing:
     def test_user_glob_outranks_readme_refresh(self, tmp_path: Path):
         target = tmp_path / "proj"
         assert _run(target) == 0
-        readme = target / ".claude" / "docs" / "README.md"
+        readme = target / ".agents" / "docs" / "README.md"
         assert readme.is_file()
         self._prepend_preserve_line(target, 'preserve: ["README.md"]')
         readme.write_text("# my customized readme\n")

@@ -54,6 +54,6 @@ def test_install_sh_writes_slash_command_with_stubs(tmp_path: Path):
     # The clone branch must have run (not the "update existing clone" path).
     assert (tmp_path / "install" / ".git").is_dir(), "install.sh must clone into INSTALL_DIR"
 
-    cmd = home / ".claude" / "commands" / "project-init.md"
+    cmd = home / ".agents" / "commands" / "project-init.md"
     assert cmd.is_file(), "install.sh must write the /project-init slash command"
     assert "project-init" in cmd.read_text()

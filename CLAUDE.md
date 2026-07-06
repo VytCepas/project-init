@@ -1,8 +1,8 @@
 # project-init — agent notes
 
-This repo is a **scaffolder**. It produces a `.claude/` layout inside *other* projects. Nothing here runs as a long-lived service.
+This repo is a **scaffolder**. It produces a `.agents/` layout inside *other* projects. Nothing here runs as a long-lived service.
 
-**Scaffolder source ≠ scaffolded project.** The hooks and scripts under `.claude/` here are development infrastructure *for this repo*. A project produced by running `project-init` (the output) gets a richer set of hooks from `templates/` — including `pre_commit_gate.sh` and git-level enforcement (gitleaks pre-commit secret scan, lifecycle pre-push gate; ADR-007) that are absent here. If you see a script or skill referenced in `templates/` that does not exist under `.claude/` in this repo, that is expected.
+**Scaffolder source ≠ scaffolded project.** The hooks and scripts under `.agents/` here are development infrastructure *for this repo*. A project produced by running `project-init` (the output) gets a richer set of hooks from `templates/` — including `pre_commit_gate.sh` and git-level enforcement (gitleaks pre-commit secret scan, lifecycle pre-push gate; ADR-007) that are absent here. If you see a script or skill referenced in `templates/` that does not exist under `.agents/` in this repo, that is expected.
 
 This is the canonical instruction file for agents working in this repository. [AGENTS.md](AGENTS.md) intentionally redirects here to avoid duplicated rules.
 
@@ -35,7 +35,7 @@ Before doing any GitHub issue, branch, push, PR, review, CI, or merge work, read
 └── tests/                  # focused pytest modules by behavior area (unit/contract/integration/smoke)
 ```
 
-Template naming convention: directories stored as `dot_claude/`, `dot_gitignore` etc. The scaffolder renames them to `.claude/`, `.gitignore` on copy. This keeps templates visible in GitHub and avoids this repo being auto-loaded as a Claude Code config for itself.
+Template naming convention: directories stored as `dot_agents/`, `dot_gitignore` etc. The scaffolder renames them to `.agents/`, `.gitignore` on copy. This keeps templates visible in GitHub and avoids this repo being auto-loaded as a Claude Code config for itself.
 
 ## Conventions for agents working on this repo
 
@@ -49,7 +49,7 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 
 ## Settings
 
-`.claude/settings.json` wires deterministic hooks to Claude Code events. Active hooks in this repo:
+`.agents/settings.json` wires deterministic hooks to Claude Code events. Active hooks in this repo:
 
 | Event | Script | Purpose |
 |---|---|---|
@@ -57,19 +57,19 @@ Template naming convention: directories stored as `dot_claude/`, `dot_gitignore`
 | UserPromptSubmit | `workflow_state_reminder.sh` | Injects the full lifecycle DAG, banned-command → wrapper-script map, and naming rules into context when a workflow keyword is mentioned. |
 | (library) | `dag_workflow.py` | Stdlib DAG state machine. `check <node>` walks prerequisites for lifecycle scripts; `guard` is the hook entrypoint. Adding a banned command means editing `COMMAND_RULES` there, not the shell shim. |
 
-`.claude/settings.local.json` pre-approves tool calls for development work (Bash, WebFetch, test paths). It is a convenience file — not a security boundary. Entries are auto-added by Claude Code when you approve a prompt; stale entries can be removed safely.
+`.agents/settings.local.json` pre-approves tool calls for development work (Bash, WebFetch, test paths). It is a convenience file — not a security boundary. Entries are auto-added by Claude Code when you approve a prompt; stale entries can be removed safely.
 
 `$CLAUDE_PROJECT_DIR` in hook commands expands to the project root at runtime. To add a new hook, use the `add_hook` skill or edit `settings.json` directly following the existing pattern.
 
 ## GitHub workflow
 
-For any push, PR, review, or merge work: load `.claude/skills/github_workflow/SKILL.md`.
+For any push, PR, review, or merge work: load `.agents/skills/github_workflow/SKILL.md`.
 
 Quick ref: branch = `<type>/PI-<n>-<slug>` | PR title = `type(PI-N): desc` (no scope = no issue) | body includes `Closes #N`.
 
-Root `.claude/scripts/` lifecycle scripts exist here but may not cover every variant — they are scaffolded-project artifacts. If a script is missing, the skill documents the `git`/`gh` fallback.
+Root `.agents/scripts/` lifecycle scripts exist here but may not cover every variant — they are scaffolded-project artifacts. If a script is missing, the skill documents the `git`/`gh` fallback.
 
-Template skills (in `templates/base/dot_claude/skills/`) reference scripts like `create_issue.sh` and `start_issue.sh` that live in scaffolded projects, not in this source repo. The source `.claude/skills/INDEX.md` documents what's available here.
+Template skills (in `templates/base/dot_agents/skills/`) reference scripts like `create_issue.sh` and `start_issue.sh` that live in scaffolded projects, not in this source repo. The source `.agents/skills/INDEX.md` documents what's available here.
 
 ## CI Optimizations
 
@@ -87,12 +87,12 @@ Use this table when adding new capabilities to this repo or its templates:
 
 | You want to… | Add a… | Where |
 |---|---|---|
-| Automate a repeatable multi-step workflow | **Skill** (`SKILL.md` with frontmatter) | `.claude/skills/<name>/SKILL.md` — register in `INDEX.md` |
-| Enforce a rule on every tool call or commit | **Hook** (bash/python script) | `.claude/hooks/` — wire in `settings.json`. Use the `add_hook` skill. |
-| Expose a shortcut as `/command` | **Skill** (`SKILL.md` with frontmatter) | `.claude/skills/<name>/SKILL.md` — register in `INDEX.md`. Use the `add_command` skill. |
-| Add a reusable sub-agent persona | **Agent spec** | `.claude/agents/<name>.md` |
+| Automate a repeatable multi-step workflow | **Skill** (`SKILL.md` with frontmatter) | `.agents/skills/<name>/SKILL.md` — register in `INDEX.md` |
+| Enforce a rule on every tool call or commit | **Hook** (bash/python script) | `.agents/hooks/` — wire in `settings.json`. Use the `add_hook` skill. |
+| Expose a shortcut as `/command` | **Skill** (`SKILL.md` with frontmatter) | `.agents/skills/<name>/SKILL.md` — register in `INDEX.md`. Use the `add_command` skill. |
+| Add a reusable sub-agent persona | **Agent spec** | `.agents/agents/<name>.md` |
 
-After creating a skill, add an entry to `.claude/skills/INDEX.md` so it is discoverable without reading every file.
+After creating a skill, add an entry to `.agents/skills/INDEX.md` so it is discoverable without reading every file.
 
 ## What this repo does NOT include
 
@@ -100,5 +100,5 @@ After creating a skill, add an entry to `.claude/skills/INDEX.md` so it is disco
 - No long-running service
 - No database (beyond what preset projects may install)
 - Graphify setup ships as a user-run script inside the graphify overlay
-  (`templates/graphify/dot_claude/scripts/`) — it runs inside scaffolded
+  (`templates/graphify/dot_agents/scripts/`) — it runs inside scaffolded
   projects, not as part of this repo's runtime.

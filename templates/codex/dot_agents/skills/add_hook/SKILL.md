@@ -15,7 +15,7 @@ allowed-tools: Read Write Bash
 The event names and output schema below are a snapshot and can lag Claude Code
 releases. **If** a docs-lookup tool is available to you — the Context7 MCP, or
 WebFetch when it's permitted — confirm the event name / output field against the
-current reference (<https://docs.claude.com/en/docs/claude-code/hooks>) before
+current reference (<https://docs.agents.com/en/docs/claude-code/hooks>) before
 relying on it. This skill's `allowed-tools` does not grant those tools, so skip
 this step cleanly whenever the tool is unavailable, unapproved, egress is
 disabled (`--no-egress` / air-gapped), or the lookup fails — fall back to the
@@ -53,7 +53,7 @@ Pick the event that matches when the hook should fire:
 
 ## Step 2 — Write the hook script
 
-Create `.claude/hooks/<name>.sh`:
+Create `.agents/hooks/<name>.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -90,11 +90,11 @@ fi
 exit 0
 ```
 
-Make it executable: `chmod +x .claude/hooks/<name>.sh`
+Make it executable: `chmod +x .agents/hooks/<name>.sh`
 
 ## Step 3 — Wire it in settings.json
 
-Add to `.claude/settings.json`:
+Add to `.agents/settings.json`:
 
 ```json
 {
@@ -102,7 +102,7 @@ Add to `.claude/settings.json`:
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/<name>.sh", "timeout": 10}]
+        "hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/<name>.sh", "timeout": 10}]
       }
     ]
   }
@@ -123,7 +123,7 @@ hooks:
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "./.claude/hooks/check.sh"
+          command: "./.agents/hooks/check.sh"
 ---
 ```
 

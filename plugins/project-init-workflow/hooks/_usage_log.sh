@@ -3,7 +3,7 @@
 # #406). Sourced by the always-on shell hooks; defines usage_log().
 #
 # SHIPPED-ALWAYS-DORMANT: every scaffold carries this helper, but it no-ops
-# unless the observability overlay's marker directory (.claude/observability/)
+# unless the observability overlay's marker directory (.agents/observability/)
 # exists — so it costs nothing until a project opts in by scaffolding the
 # overlay. The plugin hooks.json is static / non-gateable, hence this in-hook
 # guard rather than separate wiring.
@@ -16,7 +16,7 @@
 # the optional [cwd] arg, else $PWD — git/network are never required.
 #
 # Appends one JSON line {ts,hook,event,project[,session]} to
-# .claude/observability/usage.jsonl (the file usage_report.py reads). Session id
+# .agents/observability/usage.jsonl (the file usage_report.py reads). Session id
 # is emitted only when $CLAUDE_SESSION_ID is set; the analyzer otherwise joins
 # by timestamp + project. Fully fail-open: any error is swallowed.
 
@@ -51,7 +51,7 @@ usage_log() {
       [ -z "$root" ] && root="${cwd_arg:-$PWD}"
     fi
 
-    local obs="$root/.claude/observability"
+    local obs="$root/.agents/observability"
     # Marker gate: dormant unless the overlay is installed.
     [ -d "$obs" ] || return 0
 

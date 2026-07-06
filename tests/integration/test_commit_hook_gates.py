@@ -63,7 +63,7 @@ def test_git_pre_push_runs_ci(tmp_target: Path):
 def test_pre_commit_gate_has_per_file_shell_block(tmp_target: Path):
     """The agent commit gate must shellcheck/shfmt staged .sh without needing `just`."""
     scaffold(tmp_target, fallback_preset(), fallback_variables(language="python", python="true"))
-    gate = (tmp_target / ".claude" / "hooks" / "pre_commit_gate.sh").read_text()
+    gate = (tmp_target / ".agents" / "hooks" / "pre_commit_gate.sh").read_text()
     assert "shfmt -w -i 2" in gate
     assert "shellcheck -S error -x" in gate
     # A shfmt parse error (nonzero exit) is recorded as blocking, not swallowed,
@@ -76,7 +76,7 @@ def test_pre_commit_gate_autofixes_staged_shell(tmp_path: Path):
     """End-to-end: a badly-formatted staged .sh is shfmt-fixed and re-staged."""
     target = tmp_path / "proj"
     scaffold(target, fallback_preset(), fallback_variables(language="python", python="true"))
-    hook = target / ".claude" / "hooks" / "pre_commit_gate.sh"
+    hook = target / ".agents" / "hooks" / "pre_commit_gate.sh"
 
     subprocess.run(["git", "init", "-q"], cwd=target, check=True)
     subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=target, check=True)
@@ -108,7 +108,7 @@ def test_pre_commit_gate_blocks_a_broken_staged_shell(tmp_path: Path):
     """A staged .sh shfmt can't parse must block the commit (deny), not slip through."""
     target = tmp_path / "proj"
     scaffold(target, fallback_preset(), fallback_variables(language="python", python="true"))
-    hook = target / ".claude" / "hooks" / "pre_commit_gate.sh"
+    hook = target / ".agents" / "hooks" / "pre_commit_gate.sh"
     subprocess.run(["git", "init", "-q"], cwd=target, check=True)
     subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=target, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=target, check=True)

@@ -22,7 +22,7 @@ def _record(model: str = "claude-opus-4-8", **tok) -> RunRecord:
     total = sum(base.values())
     return RunRecord(
         task="feat", target="bare", run_index=0, model=model,
-        claude_version="v", session_id="", transcript_path="/t",
+        agents_version="v", session_id="", transcript_path="/t",
         total_tokens=total, tool_calls=0, turns=0, wall_clock_s=None,
         first_ts=None, last_ts=None, **base,
     )

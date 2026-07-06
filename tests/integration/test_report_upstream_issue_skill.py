@@ -17,12 +17,12 @@ from tests.helpers import fallback_preset, fallback_variables, make_variables
 
 class TestReportUpstreamIssueSkill:
     def test_present_and_default_on_no_plugin(self, tmp_target: Path):
-        """--no-plugin copies the skill in as a real .claude/skills file, on by
+        """--no-plugin copies the skill in as a real .agents/skills file, on by
         default (no opt-in flag), with the required frontmatter."""
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         skill = (
             tmp_target
-            / ".claude"
+            / ".agents"
             / "skills"
             / "report_upstream_issue"
             / "SKILL.md"
@@ -57,7 +57,7 @@ class TestReportUpstreamIssueSkill:
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         content = (
             tmp_target
-            / ".claude"
+            / ".agents"
             / "skills"
             / "report_upstream_issue"
             / "SKILL.md"
@@ -83,9 +83,9 @@ class TestReportUpstreamIssueSkill:
 
     def test_listed_in_skill_tables(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        index = (tmp_target / ".claude" / "skills" / "INDEX.md").read_text()
+        index = (tmp_target / ".agents" / "skills" / "INDEX.md").read_text()
         assert "report_upstream_issue" in index
-        readme = (tmp_target / ".claude" / "skills" / "README.md").read_text()
+        readme = (tmp_target / ".agents" / "skills" / "README.md").read_text()
         assert "report_upstream_issue" in readme
-        project_init = (tmp_target / ".claude" / "project-init.md").read_text()
+        project_init = (tmp_target / ".agents" / "project-init.md").read_text()
         assert "report_upstream_issue" in project_init

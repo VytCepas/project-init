@@ -8,7 +8,7 @@
 #      recipe is absent so a fresh clone without the toolchain still commits.
 #   2. Secrets: scan staged changes with gitleaks. Fail-OPEN if gitleaks is
 #      missing — the CI secret-scan job is the hard backstop.
-# Install: .claude/scripts/install_hooks.sh
+# Install: .agents/scripts/install_hooks.sh
 
 set -euo pipefail
 

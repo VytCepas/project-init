@@ -1,6 +1,6 @@
 ---
 name: add_adr
-description: Records an architectural decision as a new ADR in .claude/docs/adr/ using the MADR template. Use when a non-obvious design choice is made so future agents understand why.
+description: Records an architectural decision as a new ADR in .agents/docs/adr/ using the MADR template. Use when a non-obvious design choice is made so future agents understand why.
 when_to_use: Use when the user says "record this decision", "write an ADR", or when you make an architectural choice (library, pattern, boundary, trade-off) that a future session would otherwise re-litigate. Do not use for trivial or easily reversed choices.
 user-invocable: true
 effort: low
@@ -19,10 +19,10 @@ Not warranted: formatting choices, renames, anything fully explained by code.
 
 ## Steps
 
-1. Find the next free number: list `.claude/docs/adr/adr-*.md` and take the
+1. Find the next free number: list `.agents/docs/adr/adr-*.md` and take the
    highest `NNN` + 1.
-2. Copy `.claude/docs/adr/adr-template.md` to
-   `.claude/docs/adr/adr-NNN-<kebab-slug>.md`.
+2. Copy `.agents/docs/adr/adr-template.md` to
+   `.agents/docs/adr/adr-NNN-<kebab-slug>.md`.
 3. Fill every section. Keep it short — context (2-5 sentences), the options
    actually considered, the decision with its justification, and honest
    consequences (including the bad ones). Delete the template's comments.

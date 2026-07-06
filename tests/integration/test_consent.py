@@ -25,7 +25,7 @@ from tests.helpers import make_variables, memory_preset
 
 def _declined(target: Path) -> dict:
     m = re.search(
-        r"declined_additions:\s*(\{.*\})", (target / ".claude/config.yaml").read_text()
+        r"declined_additions:\s*(\{.*\})", (target / ".agents/config.yaml").read_text()
     )
     return json.loads(m.group(1)) if m else {}
 
@@ -55,7 +55,7 @@ class TestClassify:
     def test_known_areas(self):
         assert _classify_addition(Path(".devcontainer/devcontainer.json"))[0] == "devcontainer"
         assert _classify_addition(Path(".github/workflows/ci.yml"))[0] == "github-workflows"
-        assert _classify_addition(Path(".claude/skills/x/SKILL.md"))[0] == "claude-skills"
+        assert _classify_addition(Path(".agents/skills/x/SKILL.md"))[0] == "claude-skills"
         assert _classify_addition(Path("docs/guides/x.md"))[0] == "docs"
 
     def test_unknown_is_misc(self):
@@ -113,7 +113,7 @@ class TestConsentInternals:
         from project_init.upgrade import _read_declined
 
         target = _scaffolded(tmp_path)
-        cfg = target / ".claude/config.yaml"
+        cfg = target / ".agents/config.yaml"
         cfg.write_text(
             re.sub(
                 r"declined_additions:\s*\{.*\}",

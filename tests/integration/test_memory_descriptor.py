@@ -35,7 +35,7 @@ def _scaffold(target: Path, preset: str) -> None:
 
 
 def _memory_block(target: Path) -> str:
-    text = (target / ".claude" / "config.yaml").read_text()
+    text = (target / ".agents" / "config.yaml").read_text()
     # the memory: block ends at the next top-level key (mcps:)
     return text.partition("\nmemory:")[2].partition("\nmcps:")[0]
 
@@ -63,28 +63,28 @@ class TestConfigDescriptor:
         _scaffold(target, preset)
         block = _memory_block(target)
         assert f"tier: {tier}" in block
-        assert "memory_path: .claude/memory" in block  # anchor always present
-        assert ("vault_path: .claude/vault" in block) is has_vault
+        assert "memory_path: .agents/memory" in block  # anchor always present
+        assert ("vault_path: .agents/vault" in block) is has_vault
         assert ("graph_path: graphify-out/graph.json" in block) is has_graph
 
     def test_none_has_no_descriptor(self, tmp_path):
         target = tmp_path / "p"
         _scaffold(target, "core")
-        assert "\nmemory:" not in (target / ".claude" / "config.yaml").read_text()
+        assert "\nmemory:" not in (target / ".agents" / "config.yaml").read_text()
 
     def test_anchor_path_invariant_across_tiers(self, tmp_path):
         """memory_path is the same on every tier that has memory (ADR-024 anchor)."""
         for preset in ("auto", "obsidian-only", "obsidian-graphify"):
             target = tmp_path / preset
             _scaffold(target, preset)
-            assert "memory_path: .claude/memory" in _memory_block(target)
+            assert "memory_path: .agents/memory" in _memory_block(target)
 
 
 class TestCapabilitiesSurface:
     def test_capabilities_memory_section(self, tmp_path):
         target = tmp_path / "p"
         _scaffold(target, "obsidian-graphify")
-        caps = (target / ".claude" / "CAPABILITIES.md").read_text()
+        caps = (target / ".agents" / "CAPABILITIES.md").read_text()
         section = caps.partition("## Memory")[2].partition("## Skills")[0]
         assert "| Tier | 2 |" in section
         assert "| graph_path | graphify-out/graph.json |" in section
@@ -92,7 +92,7 @@ class TestCapabilitiesSurface:
     def test_capabilities_none_reports_no_backend(self, tmp_path):
         target = tmp_path / "p"
         _scaffold(target, "core")
-        caps = (target / ".claude" / "CAPABILITIES.md").read_text()
+        caps = (target / ".agents" / "CAPABILITIES.md").read_text()
         assert "no memory backend" in caps.partition("## Memory")[2].partition("## Skills")[0]
 
 
@@ -125,7 +125,7 @@ class TestContractVersion:
         # the exact opt-out case a nested version would have missed (Codex review).
         target = tmp_path / "p"
         _scaffold(target, "core")
-        text = (target / ".claude" / "config.yaml").read_text()
+        text = (target / ".agents" / "config.yaml").read_text()
         assert "project_init_contract_version: 1" in text
         assert "\nmemory:" not in text  # still no memory block
 
@@ -133,7 +133,7 @@ class TestContractVersion:
         target = tmp_path / "p"
         _scaffold(target, "obsidian-graphify")
         assert "project_init_contract_version: 1" in (
-            target / ".claude" / "config.yaml"
+            target / ".agents" / "config.yaml"
         ).read_text()
 
     def test_backfill_fills_absent_and_preserves_present(self):
@@ -176,7 +176,7 @@ class TestContractVersion:
         P1)."""
         target = tmp_path / "p"
         _scaffold(target, "obsidian-only")
-        config = target / ".claude" / "config.yaml"
+        config = target / ".agents" / "config.yaml"
         # Simulate a pre-field project: drop the visible line from the project:
         # block ONLY (above the record marker) — leave the hidden record's
         # variables JSON intact, exactly the state of a pre-field scaffold.

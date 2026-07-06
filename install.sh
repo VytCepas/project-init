@@ -7,7 +7,7 @@
 # What it does (deterministic, idempotent):
 #   1. Ensures `uv` is installed (installs via official installer if missing).
 #   2. Clones (or updates) the project-init repo to $INSTALL_DIR.
-#   3. Writes a user-level slash command at ~/.claude/commands/project-init.md
+#   3. Writes a user-level slash command at ~/.agents/commands/project-init.md
 #      so `/project-init` works in any Claude Code session on this machine.
 #   4. Prints next steps.
 
@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO_URL="${PROJECT_INIT_REPO:-https://github.com/VytCepas/project-init.git}"
 INSTALL_DIR="${PROJECT_INIT_HOME:-$HOME/.local/share/project-init}"
-COMMANDS_DIR="$HOME/.claude/commands"
+COMMANDS_DIR="$HOME/.agents/commands"
 # Pin a version with PROJECT_INIT_REF=vX.Y.Z, or track the development head
 # with PROJECT_INIT_REF=main. Default: the latest GitHub Release (ADR-008).
 # For non-github.com hosts (GHES / GHE.com), point PROJECT_INIT_REPO at the full
@@ -133,14 +133,14 @@ ensure_slash_command() {
     mkdir -p "$COMMANDS_DIR"
     cat >"$COMMANDS_DIR/project-init.md" <<CMD
 ---
-description: Scaffold agentic-dev infrastructure (.claude/) into the current project
+description: Scaffold agentic-dev infrastructure (.agents/) into the current project
 ---
 
 Run the project-init wizard inside the current working directory:
 
 !bash -lc 'cd "\$CLAUDE_PROJECT_DIR" && uvx --from "$INSTALL_DIR" project-init'
 
-After it finishes, read \`.claude/project-init.md\` to confirm the selected options.
+After it finishes, read \`.agents/project-init.md\` to confirm the selected options.
 CMD
     say "installed slash command -> $COMMANDS_DIR/project-init.md"
 }

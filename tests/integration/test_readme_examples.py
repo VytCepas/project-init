@@ -54,15 +54,15 @@ class TestREADMEExampleCommand:
         assert result.returncode == 0, f"CLI command failed:\n{result.stderr}"
 
         # Verify essential files exist (same checks as wheel smoke test)
-        assert (target / ".claude" / "config.yaml").is_file()
-        assert (target / ".claude" / "project-init.md").is_file()
+        assert (target / ".agents" / "config.yaml").is_file()
+        assert (target / ".agents" / "project-init.md").is_file()
         assert (target / "CLAUDE.md").is_file()
         assert (target / "AGENTS.md").is_file()
 
         # Plugin-first default (PI-165): payload comes from the plugin, only
         # the script-library hook is copied.
-        assert (target / ".claude" / "hooks" / "dag_workflow.py").is_file()
-        assert not (target / ".claude" / "hooks" / "post_edit_lint.sh").exists()
+        assert (target / ".agents" / "hooks" / "dag_workflow.py").is_file()
+        assert not (target / ".agents" / "hooks" / "post_edit_lint.sh").exists()
         assert (target / ".github" / "hooks" / "pre-commit").is_file()
 
 

@@ -16,7 +16,7 @@ def _rec(target: str, **over) -> RunRecord:
     """Build a RunRecord with sane defaults; `over` uses dataclass field names."""
     base = dict(
         task="feat", target=target, run_index=0, model="claude-opus-4-8",
-        claude_version="v", session_id="", transcript_path="/t",
+        agents_version="v", session_id="", transcript_path="/t",
         input_tokens=0, output_tokens=0, cache_read_tokens=0, cache_creation_tokens=0,
         total_tokens=0, tool_calls=0, turns=1, wall_clock_s=None, first_ts=None, last_ts=None,
         cost_usd=None, success=None, first_try=None, rework_cycles=None,
@@ -124,7 +124,7 @@ class TestDiminishingReturns:
 class TestFixedOverhead:
     def test_attributes_per_artifact_descending(self, tmp_path: Path):
         (tmp_path / "CLAUDE.md").write_text("x" * 400)  # ~100 tokens
-        skills = tmp_path / ".claude" / "skills" / "demo"
+        skills = tmp_path / ".agents" / "skills" / "demo"
         skills.mkdir(parents=True)
         (skills / "SKILL.md").write_text("y" * 40)  # ~10 tokens
         rows = report.fixed_overhead(tmp_path)
@@ -134,14 +134,14 @@ class TestFixedOverhead:
         assert [t for _, t in rows] == sorted((t for _, t in rows), reverse=True)
 
     def test_includes_start_here_files(self, tmp_path: Path):
-        """.claude/project-init.md is typically the heaviest always-loaded file
+        """.agents/project-init.md is typically the heaviest always-loaded file
         and must be attributed (Codex review)."""
-        pi = tmp_path / ".claude" / "project-init.md"
+        pi = tmp_path / ".agents" / "project-init.md"
         pi.parent.mkdir(parents=True)
         pi.write_text("z" * 800)  # ~200 tokens — the heaviest
         (tmp_path / "CLAUDE.md").write_text("x" * 400)  # ~100
         rows = report.fixed_overhead(tmp_path)
-        assert rows[0][0] == ".claude/project-init.md" and rows[0][1] == 200
+        assert rows[0][0] == ".agents/project-init.md" and rows[0][1] == 200
 
 
 class TestRenderAndCli:

@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions
 
-Full agent rules: [CLAUDE.md](../CLAUDE.md). For any push, PR, review, or merge action: load `.claude/skills/github_workflow/SKILL.md`.
+Full agent rules: [CLAUDE.md](../CLAUDE.md). For any push, PR, review, or merge action: load `.agents/skills/github_workflow/SKILL.md`.
 
 ## Quick reference
 
@@ -20,6 +20,6 @@ Full agent rules: [CLAUDE.md](../CLAUDE.md). For any push, PR, review, or merge 
 ## Repo rules
 - No LLM calls from the scaffolder; deterministic file ops only
 - Core dep is `rich`; stdlib (`tomllib`, `argparse`, `pathlib`) — don't add deps without justification
-- Templates use `dot_claude/` / `dot_gitignore` naming; scaffolder renames on copy
+- Templates use `dot_agents/` / `dot_gitignore` naming; scaffolder renames on copy
 - Template placeholders use `{{variable_name}}` syntax
 - Any change to `templates/` needs a test that scaffolds into a temp dir

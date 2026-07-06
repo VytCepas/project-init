@@ -1,8 +1,8 @@
 """PI-526: concern-decoupled skills must be gated by their concern.
 
 Three skills were advertised/shipped even when their concern was declined:
-- ``save_memory`` and ``status`` depend on the memory tier (``.claude/memory/``);
-- ``session_summary`` depends on the Obsidian vault (``.claude/vault/``), which
+- ``save_memory`` and ``status`` depend on the memory tier (``.agents/memory/``);
+- ``session_summary`` depends on the Obsidian vault (``.agents/vault/``), which
   exists only for ``obsidian-only`` and richer — NOT for ``none`` or ``auto``.
 
 These tests scaffold ``--no-plugin`` projects at each memory tier and assert the
@@ -40,12 +40,12 @@ def _read(target: Path, rel: str) -> str:
 class TestMemoryGating:
     def test_save_memory_not_advertised_without_memory(self, tmp_path: Path):
         target = _scaffold_no_plugin(tmp_path, "none")
-        index = _read(target, ".claude/skills/INDEX.md")
+        index = _read(target, ".agents/skills/INDEX.md")
         assert "save_memory" not in index
 
     def test_save_memory_advertised_with_memory(self, tmp_path: Path):
         target = _scaffold_no_plugin(tmp_path, "auto")
-        index = _read(target, ".claude/skills/INDEX.md")
+        index = _read(target, ".agents/skills/INDEX.md")
         assert "save_memory" in index
 
     def test_status_always_advertised(self, tmp_path: Path):
@@ -53,7 +53,7 @@ class TestMemoryGating:
         # in the catalog at every tier; only its memory READ is presence-guarded.
         for stack in ("none", "auto", "obsidian-only"):
             target = _scaffold_no_plugin(tmp_path / stack, stack)
-            assert "status" in _read(target, ".claude/skills/INDEX.md")
+            assert "status" in _read(target, ".agents/skills/INDEX.md")
 
 
 class TestVaultGating:
@@ -61,17 +61,17 @@ class TestVaultGating:
     def test_session_summary_absent_without_vault(self, tmp_path: Path, stack: str):
         target = _scaffold_no_plugin(tmp_path, stack)
         # Advertised in all three catalogs only when a vault exists.
-        assert "session_summary" not in _read(target, ".claude/skills/INDEX.md")
-        assert "session_summary" not in _read(target, ".claude/skills/README.md")
-        assert "session_summary" not in _read(target, ".claude/project-init.md")
-        assert not (target / ".claude/vault").exists()
+        assert "session_summary" not in _read(target, ".agents/skills/INDEX.md")
+        assert "session_summary" not in _read(target, ".agents/skills/README.md")
+        assert "session_summary" not in _read(target, ".agents/project-init.md")
+        assert not (target / ".agents/vault").exists()
 
     def test_session_summary_present_with_vault(self, tmp_path: Path):
         target = _scaffold_no_plugin(tmp_path, "obsidian-only")
-        assert "session_summary" in _read(target, ".claude/skills/INDEX.md")
-        assert "session_summary" in _read(target, ".claude/skills/README.md")
-        assert "session_summary" in _read(target, ".claude/project-init.md")
-        assert (target / ".claude/vault").is_dir()
+        assert "session_summary" in _read(target, ".agents/skills/INDEX.md")
+        assert "session_summary" in _read(target, ".agents/skills/README.md")
+        assert "session_summary" in _read(target, ".agents/project-init.md")
+        assert (target / ".agents/vault").is_dir()
 
 
 class TestDefensiveBodies:
@@ -80,15 +80,15 @@ class TestDefensiveBodies:
 
     def test_save_memory_body_guards_missing_dir(self, tmp_path: Path):
         target = _scaffold_no_plugin(tmp_path, "none")
-        body = _read(target, ".claude/skills/save_memory/SKILL.md")
-        assert ".claude/memory/` does not exist" in body
+        body = _read(target, ".agents/skills/save_memory/SKILL.md")
+        assert ".agents/memory/` does not exist" in body
 
     def test_session_summary_body_guards_missing_vault(self, tmp_path: Path):
         target = _scaffold_no_plugin(tmp_path, "none")
-        body = _read(target, ".claude/skills/session_summary/SKILL.md")
-        assert ".claude/vault/` does not exist" in body
+        body = _read(target, ".agents/skills/session_summary/SKILL.md")
+        assert ".agents/vault/` does not exist" in body
 
     def test_status_body_presence_checks_memory(self, tmp_path: Path):
         target = _scaffold_no_plugin(tmp_path, "none")
-        body = _read(target, ".claude/skills/status/SKILL.md")
-        assert "if `.claude/memory/MEMORY.md` exists" in body
+        body = _read(target, ".agents/skills/status/SKILL.md")
+        assert "if `.agents/memory/MEMORY.md` exists" in body

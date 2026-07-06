@@ -16,7 +16,7 @@ from pathlib import Path
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables
 
-_SCRIPT_REL = Path(".claude/scripts/gen_code_map.py")
+_SCRIPT_REL = Path(".agents/scripts/gen_code_map.py")
 
 
 def _scaffold(target: Path, language: str = "python") -> None:
@@ -69,7 +69,7 @@ class TestGeneratorOutput:
             check=True,
             text=True,
         )
-        return target / ".claude" / "docs" / "CODE_MAP.md"
+        return target / ".agents" / "docs" / "CODE_MAP.md"
 
     def test_map_lists_public_api_with_summaries(self, tmp_path: Path):
         target = tmp_path / "p"
@@ -109,7 +109,7 @@ class TestGeneratorOutput:
 
     def test_default_root_prefers_src_over_cwd(self, tmp_path: Path):
         """With no explicit root, scan `src/` when present so the map stays to
-        real source instead of traversing tests/.claude/etc. (review on #502)."""
+        real source instead of traversing tests/.agents/etc. (review on #502)."""
         target = tmp_path / "p"
         _scaffold(target, "python")
         (target / "src").mkdir()
@@ -123,7 +123,7 @@ class TestGeneratorOutput:
             check=True,
             text=True,
         )
-        text = (target / ".claude" / "docs" / "CODE_MAP.md").read_text()
+        text = (target / ".agents" / "docs" / "CODE_MAP.md").read_text()
         assert "The app." in text
         assert "Top-level noise." not in text  # cwd not scanned when src/ exists
 

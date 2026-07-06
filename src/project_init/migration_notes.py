@@ -106,7 +106,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "default ON (opt-out), so an upgrade scaffolds the same surface as "
             "before. Tier-3 RAG is opt-in: scaffold with "
             "--memory obsidian-graphify-rag, then run "
-            "`.claude/scripts/setup_rag.sh` in the project to install the "
+            "`.agents/scripts/setup_rag.sh` in the project to install the "
             "engine."
         ),
     },
@@ -120,7 +120,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
         "action_required": (
             "Branch-per-env was removed — if you used dev/staging branches, "
             "branch protection is now centralized: run "
-            "`.claude/scripts/setup_github.sh --protect`."
+            "`.agents/scripts/setup_github.sh --protect`."
         ),
     },
     "0.3.0": {

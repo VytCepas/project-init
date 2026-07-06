@@ -14,11 +14,11 @@ from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_TEMPLATE_SKILLS = _REPO_ROOT / "templates" / "fallback" / "dot_claude" / "skills"
+_TEMPLATE_SKILLS = _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "skills"
 # Lifecycle skills moved to the lifecycle_fallback overlay (#476); agent surfaces
 # carry the FULL set (core + lifecycle), synced together.
 _LIFECYCLE_FALLBACK_SKILLS = (
-    _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills"
+    _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents" / "skills"
 )
 _CODEX_SKILLS = _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
 _ANTIGRAVITY_SKILLS = _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills"
@@ -26,7 +26,7 @@ _AMP_SKILLS = _REPO_ROOT / "templates" / "amp" / "dot_agents" / "skills"
 _JUNIE_SKILLS = _REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
 
 
-_BASE_PLAN = _REPO_ROOT / "templates" / "base" / "dot_claude" / "skills" / "plan" / "SKILL.md.tmpl"
+_BASE_PLAN = _REPO_ROOT / "templates" / "base" / "dot_agents" / "skills" / "plan" / "SKILL.md.tmpl"
 
 # Lifecycle skills are shipped into the agent layers gated on {{#if lifecycle}}
 # as SKILL.md.tmpl (PI-537 #5) so `--lifecycle none` drops them; core skills
@@ -104,8 +104,10 @@ class TestAgentSelection:
         fall back to claude-only (PR #167 review)."""
         import project_init.__main__ as cli
 
-        answers = iter(["proj", "desc", "python", "@owner", "none", "codex,windsurf", "codex"])
-        monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
+        prompt_answers = iter(["proj", "desc", "python", "@owner", "none"])
+        ask_answers = iter(["4,10", "4"])
+        monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(prompt_answers))
+        monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: next(ask_answers))
         monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
         monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
         monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
@@ -118,7 +120,7 @@ class TestAgentSelection:
             default_name="proj", no_plugin=False, profile="individual"
         )
         assert result.agents == ["claude", "codex"], "valid retry must be honored"
-        assert "unknown agent(s): windsurf" in capsys.readouterr().out
+        assert "Invalid selection(s): 10." in capsys.readouterr().out
 
     def test_only_codex_and_antigravity_contribute_layers(self):
         assert agent_layers(["claude", "codex", "antigravity", "ollama"]) == [
@@ -152,16 +154,17 @@ class TestAgentSelection:
 class TestClaudeOnlyDefault:
     def test_no_agent_overlay_files(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p")
-        assert not (target / ".agents").exists()
+        # .agents is now the canonical tree, so it will always exist
+        assert (target / ".agents").exists()
         assert not (target / ".codex").exists()
         assert not (target / ".gemini-extension").exists()
-        assert not (target / ".claude" / "hooks" / "agent_guard_adapter.py").exists()
-        assert not (target / ".claude" / "scripts" / "setup_gemini.sh").exists()
+        assert not (target / ".agents" / "hooks" / "agent_guard_adapter.py").exists()
+        assert not (target / ".agents" / "scripts" / "setup_gemini.sh").exists()
 
 
 class TestCodexOverlay:
     def test_skills_byte_identical_to_shared_source(self, tmp_path: Path):
-        """Plugin-mode scaffolds have no .claude/skills copies — the .agents
+        """Plugin-mode scaffolds have no .agents/skills copies — the .agents
         copies are compared against the shared source of truth."""
         target = _scaffold_agents(tmp_path / "p", "codex")
         rendered = sorted((target / ".agents" / "skills").glob("*/SKILL.md"))
@@ -176,7 +179,7 @@ class TestCodexOverlay:
         (entry,) = config["hooks"]["PreToolUse"]
         command = entry["hooks"][0]["command"]
         assert "agent_guard_adapter.py codex" in command
-        assert (target / ".claude" / "hooks" / "agent_guard_adapter.py").is_file()
+        assert (target / ".agents" / "hooks" / "agent_guard_adapter.py").is_file()
 
 
 class TestAntigravityOverlay:
@@ -200,14 +203,14 @@ class TestAntigravityOverlay:
     def test_no_dead_gemini_cli_artifacts(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "antigravity")
         assert not (target / ".gemini-extension").exists()
-        assert not (target / ".claude" / "scripts" / "setup_gemini.sh").exists()
+        assert not (target / ".agents" / "scripts" / "setup_gemini.sh").exists()
 
 
 class TestOllamaTier:
     def test_instructions_level_only(self, tmp_path: Path):
         """Ollama adds documentation, never agent-specific wiring."""
         target = _scaffold_agents(tmp_path / "p", "ollama")
-        assert not (target / ".agents").exists()
+        assert (target / ".agents").exists()
         assert not (target / ".codex").exists()
         agents_md = (target / "AGENTS.md").read_text()
         assert "Ollama-based agents" in agents_md
@@ -219,7 +222,7 @@ class TestSupportTierDocs:
         agents_md = (target / "AGENTS.md").read_text()
         assert "only the Claude Code path is functionally CI-tested" in agents_md
         onboarding = (
-            target / ".claude" / "docs" / "guides" / "developer-onboarding.md"
+            target / ".agents" / "docs" / "guides" / "developer-onboarding.md"
         ).read_text()
         assert "Multi-agent support tiers" in onboarding
         # PI-384: phone/remote guidance is scaffolded and ties enforcement to
@@ -248,7 +251,7 @@ class TestSupportTierDocs:
         target = _scaffold_agents(tmp_path / "p", "codex")
         agents_md = (target / "AGENTS.md").read_text()
         onboarding = (
-            target / ".claude" / "docs" / "guides" / "developer-onboarding.md"
+            target / ".agents" / "docs" / "guides" / "developer-onboarding.md"
         ).read_text()
         # The Codex hook line must be qualified, not stated as plain enforcement.
         assert "advisory" in agents_md.lower()
@@ -280,7 +283,7 @@ class TestAmpJunieOverlay:
 
 class TestSyncedCopiesInRepo:
     """The overlay sources are derived files — `just sync-plugin` keeps them
-    aligned with templates/base/dot_claude/skills."""
+    aligned with templates/base/dot_agents/skills."""
 
     def test_codex_skill_sources_in_sync(self):
         template = _canonical_skill_map()
@@ -338,7 +341,7 @@ class TestAgentGuardAdapter:
     main` blocks unconditionally (no redirect script)."""
 
     def _run_adapter(self, target: Path, dialect: str, command: str) -> dict | None:
-        adapter = target / ".claude" / "hooks" / "agent_guard_adapter.py"
+        adapter = target / ".agents" / "hooks" / "agent_guard_adapter.py"
         # Each surface sends its own stdin shape (PI-385, confirmed from docs).
         surface_payloads = {
             "cursor": {"command": command},  # beforeShellExecution: top-level
@@ -385,7 +388,7 @@ class TestAgentGuardAdapter:
     def test_malformed_payload_is_fail_open(self, tmp_path: Path):
         """PI-385: non-dict JSON stdin must not crash the hook (stays fail-open)."""
         target = _scaffold_agents(tmp_path / "p", "codex")
-        adapter = target / ".claude" / "hooks" / "agent_guard_adapter.py"
+        adapter = target / ".agents" / "hooks" / "agent_guard_adapter.py"
         proc = subprocess.run(
             [sys.executable, str(adapter), "codex"],
             input="[]",
@@ -412,7 +415,7 @@ class TestAgentGuardAdapter:
         lifecycle rule — so a deny proves prod_guard ran. (Codex review: cover all
         three dialects, not just codex.)"""
         target = _scaffold_agents(tmp_path / "p", dialect)
-        assert (target / ".claude" / "hooks" / "prod_guard.py").is_file(), (
+        assert (target / ".agents" / "hooks" / "prod_guard.py").is_file(), (
             "prod_guard.py must ship to plugin-mode targets so the adapter can run it"
         )
         out = self._run_adapter(target, dialect, "terraform destroy -auto-approve")

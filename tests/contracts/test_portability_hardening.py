@@ -39,7 +39,7 @@ def test_gitattributes_enforces_lf(scaffolded: Path):
 def test_no_external_jq_in_scaffolded_scripts(scaffolded: Path):
     # `jq ` as a command (not gh's --jq/-q, not the word in a comment).
     jq_cmd = re.compile(r"(?<![\w-])jq\s")
-    for sh in (scaffolded / ".claude" / "scripts").glob("*.sh"):
+    for sh in (scaffolded / ".agents" / "scripts").glob("*.sh"):
         for ln in sh.read_text().splitlines():
             if ln.lstrip().startswith("#"):
                 continue
@@ -74,7 +74,7 @@ def test_every_shell_template_uses_env_bash(tmpl: Path):
 
 
 def test_gh_callers_have_presence_guard(scaffolded: Path):
-    scripts = scaffolded / ".claude" / "scripts"
+    scripts = scaffolded / ".agents" / "scripts"
     gh_call = re.compile(r"(?<![\w-])gh\s")
     for sh in scripts.glob("*.sh"):
         text = sh.read_text()
@@ -92,7 +92,7 @@ def test_audit_stat_guidance_is_portable():
         # copies (codex/antigravity) still carry it via the sync, now gated as
         # SKILL.md.tmpl ({{#if lifecycle}}, PI-537 #5) — the wrapped body keeps
         # the portable stat guidance.
-        _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_claude" / "skills" / "audit" / "SKILL.md",
+        _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents" / "skills" / "audit" / "SKILL.md",
         _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills" / "audit" / "SKILL.md.tmpl",
         _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills" / "audit" / "SKILL.md.tmpl",
     ):

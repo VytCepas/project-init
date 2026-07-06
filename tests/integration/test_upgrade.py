@@ -242,7 +242,7 @@ class TestScaffoldRecord:
         # — _ALWAYS_OVERWRITE — so they ARE tracked even inside preserved dirs.)
         assert _CONFIG_REL.as_posix() not in manifest
         assert not any(
-            k.startswith((".claude/memory", ".claude/vault")) and not k.endswith("README.md")
+            k.startswith((".agents/memory", ".agents/vault")) and not k.endswith("README.md")
             for k in manifest
         )
 
@@ -351,7 +351,7 @@ class TestUpgradeApply:
         `.new` sibling plus a spurious conflict — the refresh rule was dead."""
         target = tmp_path / "p"
         _scaffold(target)
-        rel = ".claude/vault/README.md"
+        rel = ".agents/vault/README.md"
         readme = target / rel
         assert readme.is_file()
         _, _, manifest, _ = read_scaffold_record(target)
@@ -425,7 +425,7 @@ class TestUpgradeApply:
         # test_vault_readme_is_managed_and_refreshed). Globbing memory/*.md and
         # taking [0] was order-dependent and could land on the now-managed
         # README, so probe an explicit user file instead.
-        probe = target / ".claude" / "memory" / "my-note.md"
+        probe = target / ".agents" / "memory" / "my-note.md"
         probe.write_text("hand-written agent memory\n")
 
         rc = main(["upgrade", str(target), "--apply"])
@@ -589,7 +589,7 @@ class TestMigration:
         config.write_text(text.split(_RECORD_MARKER)[0])
         # A genuinely pre-record config predates the #240 merge-base sidecar too,
         # so remove it — without a base there is nothing to 3-way merge against.
-        (target / ".claude" / ".upgrade-base.json").unlink()
+        (target / ".agents" / ".upgrade-base.json").unlink()
         (target / "justfile").write_bytes(b"# edited under old version\n")
 
         rc = main(["upgrade", str(target), "--apply", "--accept-new", "all"])
@@ -655,8 +655,8 @@ class TestPluginCutoverMigration:
         rc = main(["upgrade", str(target), "--apply"])
         assert rc == 0
         # The copied payload survives: still present, not flagged removed.
-        assert (target / ".claude" / "skills" / "github_workflow" / "SKILL.md").is_file()
-        assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
+        assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert (target / ".agents" / "hooks" / "pre_commit_gate.sh").is_file()
 
 
 class TestNoPluginSwitch:
@@ -665,13 +665,13 @@ class TestNoPluginSwitch:
         the copied-payload fallback (PR #175 review)."""
         target = tmp_path / "p"
         _scaffold(target)  # default: plugin mode, no copies
-        assert not (target / ".claude" / "hooks" / "pre_commit_gate.sh").exists()
+        assert not (target / ".agents" / "hooks" / "pre_commit_gate.sh").exists()
 
         rc = main(["upgrade", str(target), "--no-plugin", "--apply", "--accept-new", "all"])
         assert rc == 0
         assert "switching to the no-plugin fallback" in capsys.readouterr().err
-        assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
-        assert (target / ".claude" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert (target / ".agents" / "hooks" / "pre_commit_gate.sh").is_file()
+        assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()
         # The mode is recorded, so plain upgrades stay in fallback mode.
         _, variables, _, _ = read_scaffold_record(target)
         assert variables["no_plugin"] == "true"
@@ -706,8 +706,8 @@ class TestInteractiveNoPlugin:
         monkeypatch.setattr(cli, "_gather_inputs_interactive", _fake_gather)
         target = tmp_path / "p"
         assert cli.main([str(target), "--no-plugin", "--preset", "obsidian-only"]) == 0
-        assert (target / ".claude" / "hooks" / "pre_commit_gate.sh").is_file()
-        settings = (target / ".claude" / "settings.json").read_text()
+        assert (target / ".agents" / "hooks" / "pre_commit_gate.sh").is_file()
+        settings = (target / ".agents" / "settings.json").read_text()
         assert "project-init-workflow" not in settings
 
 
@@ -770,7 +770,7 @@ class TestThreeWayMergeApply:
 
         target = tmp_path / "p"
         _scaffold(target)
-        assert (target / ".claude" / ".upgrade-base.json").is_file()
+        assert (target / ".agents" / ".upgrade-base.json").is_file()
         base = read_base(target)
         assert base["justfile"] == (target / "justfile").read_text()
 
@@ -853,7 +853,7 @@ class TestThreeWayMergeApply:
         target = tmp_path / "p"
         _scaffold(target)
         # Simulate a pre-sidecar project: no base, but no template drift either.
-        (target / ".claude" / ".upgrade-base.json").unlink()
+        (target / ".agents" / ".upgrade-base.json").unlink()
         assert main(["upgrade", str(target), "--apply"]) == 0
 
         base = read_base(target)
@@ -880,14 +880,14 @@ class TestThreeWayMergeApply:
 
         target = tmp_path / "p"
         _scaffold(target)
-        script = target / ".claude" / "scripts" / "push_branch.sh"
+        script = target / ".agents" / "scripts" / "push_branch.sh"
         assert script.stat().st_mode & stat.S_IXUSR, "fixture script must be executable"
         # Force a genuine overlap so a conflict-marked .new is written.
-        _set_base(target, ".claude/scripts/push_branch.sh", "#!/usr/bin/env bash\n# base\n")
+        _set_base(target, ".agents/scripts/push_branch.sh", "#!/usr/bin/env bash\n# base\n")
         script.write_text("#!/usr/bin/env bash\n# my local edit\n")
 
         assert main(["upgrade", str(target), "--apply"]) == 0
-        sibling = target / ".claude" / "scripts" / "push_branch.sh.new"
+        sibling = target / ".agents" / "scripts" / "push_branch.sh.new"
         assert sibling.exists()
         assert sibling.stat().st_mode & stat.S_IXUSR, "the .new sibling must keep +x"
         assert os.access(sibling, os.X_OK)
@@ -899,7 +899,7 @@ class TestThreeWayMergeApply:
 
         target = tmp_path / "p"
         _scaffold(target)
-        (target / ".claude" / ".upgrade-base.json").write_text(
+        (target / ".agents" / ".upgrade-base.json").write_text(
             json.dumps({"justfile": "ok\n", "bad": 123, "alsobad": ["x"]})
         )
         base = read_base(target)
@@ -998,7 +998,7 @@ class TestInteractiveApply:
 
         # Drop the sidecar to mimic a binary/pre-sidecar file (no 3-way base):
         # the carried manifest hash alone must keep it a clean 'changed'.
-        (target / ".claude" / ".upgrade-base.json").unlink()
+        (target / ".agents" / ".upgrade-base.json").unlink()
         assert main(["upgrade", str(target), "--apply"]) == 0
         assert (target / "justfile").read_bytes() == rendered, "re-offered as a clean update"
         assert not (target / "justfile.new").exists(), "not downgraded to a conflict"

@@ -24,7 +24,7 @@ from project_init.scaffold import (
 )
 from tests.helpers import make_variables
 
-_GOV = Path(".claude") / "governance"
+_GOV = Path(".agents") / "governance"
 
 
 def _scaffold(target: Path, *, governance: bool = True, multi_model: bool = False) -> Path:
@@ -142,7 +142,7 @@ class TestAIBOM:
         created = scaffold(target, preset, variables, strict=True)
         write_scaffold_record(target, "obsidian-only", variables, created)
 
-        ccr = target / ".claude" / "multi-model" / "config.json"
+        ccr = target / ".agents" / "multi-model" / "config.json"
         data = json.loads(ccr.read_text(encoding="utf-8"))
         data["Router"]["think"] = "myprov,my-custom-model"
         ccr.write_text(json.dumps(data), encoding="utf-8")
@@ -167,10 +167,10 @@ class TestAIBOM:
         variables = make_variables(governance="true")
         created = scaffold(target, preset, variables, strict=True)
         write_scaffold_record(target, "obsidian-only", variables, created)
-        assert not (target / ".claude" / "multi-model" / "config.json").exists()
+        assert not (target / ".agents" / "multi-model" / "config.json").exists()
 
         assert apply_concern(target, "multi-model", enable=True, apply=True) == 0
-        assert (target / ".claude" / "multi-model" / "config.json").is_file()
+        assert (target / ".agents" / "multi-model" / "config.json").is_file()
         aibom = (target / _GOV / "ai-bom.generated.md").read_text(encoding="utf-8")
         assert "Detected CCR routes" in aibom
         assert "deepseek" in aibom, "AIBOM must show the routes just added, not an empty table"
@@ -185,11 +185,11 @@ class TestDeclarationsLifecycle:
         assert (target / _GOV / "ai-declarations.md").is_file()
         # Preserved intrinsically (not via config.yaml globs), so the lifecycle
         # holds even for projects that adopt governance after initial scaffold.
-        assert ".claude/governance/ai-declarations.md" in _GOVERNANCE_USER_FILES
-        assert ".claude/governance/SYSTEM_CARD.md" in _GOVERNANCE_USER_FILES
-        assert ".claude/governance/config.json" in _GOVERNANCE_USER_FILES
+        assert ".agents/governance/ai-declarations.md" in _GOVERNANCE_USER_FILES
+        assert ".agents/governance/SYSTEM_CARD.md" in _GOVERNANCE_USER_FILES
+        assert ".agents/governance/config.json" in _GOVERNANCE_USER_FILES
         # The generated AIBOM must NOT be preserved — it has to refresh.
-        assert ".claude/governance/ai-bom.generated.md" not in _GOVERNANCE_USER_FILES
+        assert ".agents/governance/ai-bom.generated.md" not in _GOVERNANCE_USER_FILES
 
     def test_user_edits_survive_rescaffold(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
@@ -374,7 +374,7 @@ class TestGate:
         card = _valid_card(target)
         card.write_text(
             card.read_text(encoding="utf-8").replace(
-                "models_declared: .claude/governance/ai-declarations.md",
+                "models_declared: .agents/governance/ai-declarations.md",
                 f"models_declared: {bad}",
             ),
             encoding="utf-8",

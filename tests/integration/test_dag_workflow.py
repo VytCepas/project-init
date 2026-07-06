@@ -15,8 +15,8 @@ from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_HOOK = REPO_ROOT / ".claude" / "hooks" / "dag_workflow.py"
-TEMPLATE_HOOK = REPO_ROOT / "templates" / "lifecycle" / "dot_claude" / "hooks" / "dag_workflow.py"
+SOURCE_HOOK = REPO_ROOT / ".agents" / "hooks" / "dag_workflow.py"
+TEMPLATE_HOOK = REPO_ROOT / "templates" / "lifecycle" / "dot_agents" / "hooks" / "dag_workflow.py"
 
 
 def _load_module(path: Path):
@@ -55,11 +55,11 @@ def _deny_reason(out: dict | None) -> str:
 
 
 def _project_with_hook(root: Path) -> Path:
-    """Install the guard hook into <root>/.claude/hooks/dag_workflow.py and
+    """Install the guard hook into <root>/.agents/hooks/dag_workflow.py and
     return its path. The hook anchors its wrapper-scripts dir on its own
-    location (#429), so running THIS copy makes <root>/.claude/scripts/ the
+    location (#429), so running THIS copy makes <root>/.agents/scripts/ the
     authoritative wrapper dir — independent of the process CWD."""
-    hooks = root / ".claude" / "hooks"
+    hooks = root / ".agents" / "hooks"
     hooks.mkdir(parents=True, exist_ok=True)
     dest = hooks / "dag_workflow.py"
     dest.write_bytes(SOURCE_HOOK.read_bytes())
@@ -92,7 +92,7 @@ def test_root_monitor_pr_checks_merge_exit_code():
     """PI-203: the repo's own monitor_pr.sh must check the merge exit code
     (via _run_gh) and not report false success — it had gone stale, piping the
     merge through `| grep -v "^$" || true` and echoing "Merged" unconditionally."""
-    content = (REPO_ROOT / ".claude" / "scripts" / "monitor_pr.sh").read_text()
+    content = (REPO_ROOT / ".agents" / "scripts" / "monitor_pr.sh").read_text()
     assert "_run_gh" in content, "root monitor_pr.sh is stale (missing _run_gh)"
     assert '--delete-branch 2>&1 | grep -v "^$" || true' not in content
     # Every merge must route through the _run_gh wrapper (which checks the exit
@@ -171,16 +171,16 @@ class TestGuardSteering:
         # The hook anchors its scripts dir on its own location, so install it
         # into the tmp project and provide the wrapper it redirects to.
         hook = _project_with_hook(tmp_path)
-        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
-        (tmp_path / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts").mkdir(parents=True)
+        (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard_hook(hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path)
         assert _denied(out)
         assert "monitor_pr.sh" in _deny_reason(out)
 
     def test_blocks_gh_api_merge(self, tmp_path: Path):
         hook = _project_with_hook(tmp_path)
-        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
-        (tmp_path / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts").mkdir(parents=True)
+        (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard_hook(
             hook,
             {"tool_input": {"command": "gh api repos/foo/bar/pulls/42/merge -X PUT"}},
@@ -191,8 +191,8 @@ class TestGuardSteering:
 
     def test_blocks_raw_git_push_when_wrapper_exists(self, tmp_path: Path):
         hook = _project_with_hook(tmp_path)
-        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
-        (tmp_path / ".claude" / "scripts" / "push_branch.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts").mkdir(parents=True)
+        (tmp_path / ".agents" / "scripts" / "push_branch.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard_hook(
             hook, {"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path
         )
@@ -200,7 +200,7 @@ class TestGuardSteering:
         assert "push_branch.sh" in _deny_reason(out)
 
     def test_no_redirect_when_wrapper_missing(self, tmp_path: Path):
-        # Hook installed but no .claude/scripts dir → suppress redirect.
+        # Hook installed but no .agents/scripts dir → suppress redirect.
         hook = _project_with_hook(tmp_path)
         out = _run_guard_hook(
             hook, {"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path
@@ -209,11 +209,11 @@ class TestGuardSteering:
 
     def test_redirect_applies_from_subdirectory(self, tmp_path: Path):
         """#429: the script-redirect rules must fire regardless of the process
-        CWD. Run the guard from a deep subdirectory that has no .claude/ of its
+        CWD. Run the guard from a deep subdirectory that has no .agents/ of its
         own — the wrapper is found via the hook's own location, not the CWD."""
         hook = _project_with_hook(tmp_path)
-        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
-        (tmp_path / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts").mkdir(parents=True)
+        (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         subdir = tmp_path / "src" / "pkg"
         subdir.mkdir(parents=True)
         out = _run_guard_hook(
@@ -225,7 +225,7 @@ class TestGuardSteering:
     def test_redirect_resolves_via_project_dir_in_plugin_mode(self, tmp_path: Path):
         """#447 review (P1): in the default plugin path the hook runs from the
         plugin root (``${CLAUDE_PLUGIN_ROOT}/hooks/``), not the project's
-        ``.claude/hooks/``. It must resolve wrapper scripts via
+        ``.agents/hooks/``. It must resolve wrapper scripts via
         $CLAUDE_PROJECT_DIR — anchoring on __file__ alone would point at the
         plugin dir (no scripts/ there) and silently skip every redirect rule."""
         # Hook installed at a plugin-style location with NO sibling scripts dir.
@@ -235,8 +235,8 @@ class TestGuardSteering:
         hook.write_bytes(SOURCE_HOOK.read_bytes())
         # The real project (with the wrapper) lives elsewhere.
         project = tmp_path / "project"
-        (project / ".claude" / "scripts").mkdir(parents=True)
-        (project / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (project / ".agents" / "scripts").mkdir(parents=True)
+        (project / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         env = {**os.environ, "CLAUDE_PROJECT_DIR": str(project)}
         out = _run_guard_hook(
             hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path, env=env
@@ -312,8 +312,8 @@ class TestGuardSteering:
         """2026-07 review: a `gh api graphql` mergePullRequest mutation bypasses
         the REST `/pulls/N/merge` rule and must be blocked in its own right."""
         hook = _project_with_hook(tmp_path)
-        (tmp_path / ".claude" / "scripts").mkdir(parents=True)
-        (tmp_path / ".claude" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts").mkdir(parents=True)
+        (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         cmd = 'gh api graphql -f query="mutation { mergePullRequest(input:{pullRequestId:1}){x} }"'
         out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
         assert _denied(out)
@@ -597,7 +597,7 @@ class TestScriptShims:
 
     @pytest.mark.parametrize("name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"])
     def test_source_script_is_shim(self, name: str):
-        path = REPO_ROOT / ".claude" / "scripts" / name
+        path = REPO_ROOT / ".agents" / "scripts" / name
         assert path.is_file()
         text = path.read_text()
         assert "dag_workflow.py" in text
@@ -607,7 +607,7 @@ class TestScriptShims:
 
     @pytest.mark.parametrize("name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"])
     def test_template_script_is_shim(self, name: str):
-        path = REPO_ROOT / "templates" / "lifecycle" / "dot_claude" / "scripts" / name
+        path = REPO_ROOT / "templates" / "lifecycle" / "dot_agents" / "scripts" / name
         assert path.is_file()
         text = path.read_text()
         assert "dag_workflow.py" in text
@@ -627,21 +627,21 @@ class TestScaffoldedTemplate:
         scaffold(tmp_target, fallback_preset(), fallback_variables())
 
     def test_dag_workflow_py_in_scaffolded_hooks(self):
-        assert (self.target / ".claude" / "hooks" / "dag_workflow.py").is_file()
+        assert (self.target / ".agents" / "hooks" / "dag_workflow.py").is_file()
 
     def test_github_command_guard_delegates(self):
-        text = (self.target / ".claude" / "hooks" / "github_command_guard.sh").read_text()
+        text = (self.target / ".agents" / "hooks" / "github_command_guard.sh").read_text()
         assert "dag_workflow.py" in text
         assert "guard" in text
 
     def test_workflow_reminder_includes_full_rules(self):
-        text = (self.target / ".claude" / "hooks" / "workflow_state_reminder.sh").read_text()
+        text = (self.target / ".agents" / "hooks" / "workflow_state_reminder.sh").read_text()
         assert "DAG" in text or "dag" in text
         assert "monitor_pr.sh" in text
         assert "push_branch.sh" in text
 
     def test_settings_json_wires_hooks(self):
-        path = self.target / ".claude" / "settings.json"
+        path = self.target / ".agents" / "settings.json"
         assert path.is_file()
         data = json.loads(path.read_text())
         commands = []

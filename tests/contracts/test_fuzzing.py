@@ -75,7 +75,7 @@ class TestFuzzDocumented:
         ],
     )
     def test_rules_document_pattern(self, tmp_path: Path, language: str, rules_file: str, tool: str):
-        rules = (_scaffold(tmp_path / language, language) / ".claude" / "rules" / rules_file).read_text()
+        rules = (_scaffold(tmp_path / language, language) / ".agents" / "rules" / rules_file).read_text()
         assert tool in rules
         # Explicitly scoped as pattern/tooling, not a blocking gate.
         assert "not** a blocking gate" in rules or "not a blocking gate" in rules

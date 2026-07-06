@@ -30,7 +30,7 @@ class TranscriptAggregates:
     tool_errors: int = 0  # tool_result blocks flagged is_error (rework proxy, #273)
     turns: int = 0  # assistant messages
     models: list[str] = field(default_factory=list)
-    claude_version: str = ""
+    agents_version: str = ""
     first_ts: str | None = None
     last_ts: str | None = None
 
@@ -110,10 +110,10 @@ def parse(path: Path) -> TranscriptAggregates:
             if agg.first_ts is None:
                 agg.first_ts = ts
             agg.last_ts = ts
-        if not agg.claude_version:
+        if not agg.agents_version:
             version = obj.get("version")
             if isinstance(version, str):
-                agg.claude_version = version
+                agg.agents_version = version
         msg = obj.get("message")
         etype = obj.get("type")
         if etype == "assistant" and isinstance(msg, dict):

@@ -14,12 +14,12 @@ Three-tier documentation system with strict separation of concerns:
 | Layer | Location | Audience | AI access |
 |---|---|---|---|
 | System of record | `docs/adr/`, `docs/development/` | Agents + developers | Native markdown |
-| Human workspace | `.claude/vault/` | Humans | None needed |
+| Human workspace | `.agents/vault/` | Humans | None needed |
 | ~~Public docs~~ | ~~MkDocs → GitHub Pages~~ — retired (PI-343); github.com renders `docs/`, `mkdocs.yml` kept for local preview | End users | — |
 
 **Key rules:**
 - `docs/` is authoritative — agents read it, not vault
-- `.claude/vault/` is exploratory — humans write here, agents don't read it
+- `.agents/vault/` is exploratory — humans write here, agents don't read it
 - One-way flow: vault notes → `docs/adr/` when a decision solidifies
 - No duplication: if it's in `docs/adr/`, delete the vault note
 
@@ -27,7 +27,7 @@ Three-tier documentation system with strict separation of concerns:
 
 ## Consequences
 
-- Scaffolded projects receive `.claude/docs/` with ADR and development templates
+- Scaffolded projects receive `.agents/docs/` with ADR and development templates
 - `session_end.sh` hook writes session logs to `vault/sessions/` (human review later)
 - Agents instructed to read `docs/adr/` before starting tasks
 - `CLAUDE.md.tmpl` updated to explain the two-layer system

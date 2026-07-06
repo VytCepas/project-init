@@ -1,6 +1,6 @@
 # Using project-init in Your Project
 
-project-init scaffolds a `.claude/` folder into any project so that Claude Code (and other agents) have memory, documentation, hooks, and GitHub workflow infrastructure ready from day one.
+project-init scaffolds a `.agents/` folder into any project so that Claude Code (and other agents) have memory, documentation, hooks, and GitHub workflow infrastructure ready from day one.
 
 ---
 
@@ -10,7 +10,7 @@ project-init scaffolds a `.claude/` folder into any project so that Claude Code 
 curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
 ```
 
-Installs `uv` if missing, clones the repo to `~/.local/share/project-init`, and writes a `/project-init` slash command into `~/.claude/commands/`.
+Installs `uv` if missing, clones the repo to `~/.local/share/project-init`, and writes a `/project-init` slash command into `~/.agents/commands/`.
 
 ---
 
@@ -24,7 +24,7 @@ In any Claude Code session, run:
 /project-init
 ```
 
-The wizard asks for project name, language, memory stack, and MCPs — then scaffolds `.claude/` in the current project directory.
+The wizard asks for project name, language, memory stack, and MCPs — then scaffolds `.agents/` in the current project directory.
 
 ### Option 2 — From a shell (non-interactive, for CI or scripting)
 
@@ -66,7 +66,7 @@ added individually at the prompts (or later, see §7).
 | Preset | When to use |
 |--------|-------------|
 | **core** | Leanest: the agentic base layer with **no memory backend** and no vault. |
-| **auto** | Flat agent-memory files in `.claude/memory/` — no Obsidian vault. |
+| **auto** | Flat agent-memory files in `.agents/memory/` — no Obsidian vault. |
 | **obsidian-only** | Small to medium projects. Plain markdown vault, no external APIs needed. Human-friendly and agent-readable. **Recommended default.** |
 | **obsidian-graphify** | Code-heavy projects. Adds a Graphify code knowledge graph agents query before grepping. No API keys for IDE use (ADR-009). |
 | **governed** | obsidian-only plus the AI-governance policy layer (for projects that build/operate an AI system). |
@@ -85,7 +85,7 @@ vault content.
 your-project/
 ├── AGENTS.md                    # Canonical agent instructions (most agents read this)
 ├── CLAUDE.md                    # Claude Code entry point — redirects to AGENTS.md
-└── .claude/
+└── .agents/
     ├── project-init.md          # Workflow and conventions
     ├── config.yaml              # Record of wizard answers
     ├── settings.json            # Claude Code hooks
@@ -118,15 +118,15 @@ Plus `.github/` additions: CI workflows, issue templates, PR template, board aut
 
 Agents read `CLAUDE.md` first. It links to:
 
-- `.claude/project-init.md` — workflow conventions, GitHub issue/PR patterns
-- `.claude/memory/MEMORY.md` — memory index (context without loading every file)
-- `.claude/docs/` — ADRs and development guides
+- `.agents/project-init.md` — workflow conventions, GitHub issue/PR patterns
+- `.agents/memory/MEMORY.md` — memory index (context without loading every file)
+- `.agents/docs/` — ADRs and development guides
 
 Keep `CLAUDE.md` updated with project-specific rules as conventions emerge.
 
 ### Memory System
 
-Memory lives in `.claude/memory/`. Four types:
+Memory lives in `.agents/memory/`. Four types:
 
 | Type | What goes here |
 |------|---------------|
@@ -141,7 +141,7 @@ Run `/session_summary` at the end of each session to record what was done and up
 
 ### Obsidian Vault
 
-Open `.claude/vault/` as the vault root in Obsidian to get wikilinks, graph view, and Templater templates for ADRs, session notes, design notes, and knowledge entries.
+Open `.agents/vault/` as the vault root in Obsidian to get wikilinks, graph view, and Templater templates for ADRs, session notes, design notes, and knowledge entries.
 
 Session notes land in `vault/sessions/` via `/session_summary` — a running operational log.
 
@@ -149,7 +149,7 @@ Write an ADR for every non-obvious architectural decision. Future agents will un
 
 ### Hooks
 
-Wired in `.claude/settings.json`:
+Wired in `.agents/settings.json`:
 
 | Hook | Trigger | Purpose |
 |------|---------|---------|
@@ -159,7 +159,7 @@ Wired in `.claude/settings.json`:
 Security enforcement is agent-agnostic (ADR-007): a gitleaks `pre-commit`
 git hook scans staged changes for secrets, `commit-msg`/`pre-push` git hooks
 gate the lifecycle (install once per clone with
-`.claude/scripts/install_hooks.sh`), and CI mirrors both with a
+`.agents/scripts/install_hooks.sh`), and CI mirrors both with a
 `secret-scan` job and the `validate-pr` workflow. Claude-side guidance comes
 from the official `security-guidance` plugin, enabled in `settings.json`.
 
@@ -184,19 +184,19 @@ Use `/start_task` before any non-trivial work — one issue, one branch, one PR 
 If you chose `obsidian-graphify`, run the one-time setup and build the graph:
 
 ```bash
-.claude/scripts/setup_graphify.sh   # installs the CLI, skill, and post-commit hook
+.agents/scripts/setup_graphify.sh   # installs the CLI, skill, and post-commit hook
 # then inside your agent: /graphify .
 ```
 
-The graph rebuilds incrementally per commit; agents query `graphify-out/graph.json` before grepping (see `.claude/rules/graphify.md`). No API keys needed for IDE use.
+The graph rebuilds incrementally per commit; agents query `graphify-out/graph.json` before grepping (see `.agents/rules/graphify.md`). No API keys needed for IDE use.
 
 ---
 
 ## 7. Common Customization
 
-**Add a hook**: run `/add_hook` or edit `.claude/settings.json` directly. Scripts go in `.claude/hooks/`.
+**Add a hook**: run `/add_hook` or edit `.agents/settings.json` directly. Scripts go in `.agents/hooks/`.
 
-**Add a slash command**: run `/add_command`. Creates a `SKILL.md` in `.claude/skills/<name>/`. Register it in `.claude/skills/INDEX.md`.
+**Add a slash command**: run `/add_command`. Creates a `SKILL.md` in `.agents/skills/<name>/`. Register it in `.agents/skills/INDEX.md`.
 
 **Upgrade to current templates**: `project-init upgrade .` reports drift between
 your project and the current templates (nothing is touched); `project-init
@@ -207,7 +207,7 @@ anytime — it never overwrites `memory/` or `vault/` content.
 **Plugin vs `--no-plugin`**: by default a scaffold is *plugin-first* — its
 `settings.json` references the `project-init-workflow` / `project-init-lifecycle`
 plugins, so hook/skill updates arrive through the plugin marketplace. Pass
-`--no-plugin` to copy everything into `.claude/` instead (offline or
+`--no-plugin` to copy everything into `.agents/` instead (offline or
 no-marketplace-trust environments).
 
 **Add or remove a whole concern later**: to opt into a tier you declined at init —
@@ -240,10 +240,10 @@ project-init remove memory --target . --apply --purge
 
 ```bash
 # Verify hooks are in place
-ls .claude/hooks/
+ls .agents/hooks/
 
 # Lint memory index integrity
-bash .claude/scripts/lint_memory.sh
+bash .agents/scripts/lint_memory.sh
 
 # Confirm pre_commit_gate fires
 git commit --allow-empty -m "test: verify hooks"
@@ -255,7 +255,7 @@ git commit --allow-empty -m "test: verify hooks"
 
 | Problem | Fix |
 |---------|-----|
-| `/project-init` not found | Re-run install script; check `~/.claude/commands/project-init.md` exists |
+| `/project-init` not found | Re-run install script; check `~/.agents/commands/project-init.md` exists |
 | `uv: command not found` | Add `export PATH="$HOME/.local/bin:$PATH"` to shell profile |
 | `bunx: command not found` when adding MCPs | `curl -fsSL https://bun.sh/install \| bash` |
 | Hooks don't fire on commit | Check `python3 --version`; hooks need `python3` on PATH |

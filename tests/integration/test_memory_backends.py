@@ -35,7 +35,7 @@ def _scaffold(target: Path, *extra: str) -> None:
 
 
 def _has_vault(target: Path) -> bool:
-    return (target / ".claude" / "vault").exists()
+    return (target / ".agents" / "vault").exists()
 
 
 class TestMemoryPrecedence:
@@ -45,14 +45,14 @@ class TestMemoryPrecedence:
         target = tmp_path / "p"
         _scaffold(target, "--preset", "obsidian-only", "--memory", "none")
         assert not _has_vault(target)
-        assert not (target / ".claude" / "memory").exists()
-        assert "memory:" not in (target / ".claude" / "config.yaml").read_text()
+        assert not (target / ".agents" / "memory").exists()
+        assert "memory:" not in (target / ".agents" / "config.yaml").read_text()
 
     def test_flag_obsidian_overrides_core_preset(self, tmp_path: Path):
         target = tmp_path / "p"
         _scaffold(target, "--preset", "core", "--memory", "obsidian")
         assert _has_vault(target)
-        assert (target / ".claude" / "memory").is_dir()
+        assert (target / ".agents" / "memory").is_dir()
 
     def test_core_preset_default_is_vault_free(self, tmp_path: Path):
         target = tmp_path / "p"
@@ -63,25 +63,25 @@ class TestMemoryPrecedence:
         target = tmp_path / "p"
         _scaffold(target, "--preset", "core", "--memory", "obsidian-graphify")
         assert _has_vault(target)
-        assert (target / ".claude" / "scripts" / "setup_graphify.sh").is_file()
+        assert (target / ".agents" / "scripts" / "setup_graphify.sh").is_file()
 
     def test_governed_preset_with_memory_none(self, tmp_path: Path):
         """Governance inheritance is independent of memory removal (#466)."""
         target = tmp_path / "p"
         _scaffold(target, "--preset", "governed", "--memory", "none")
-        assert (target / ".claude" / "governance").is_dir()  # governance preserved
+        assert (target / ".agents" / "governance").is_dir()  # governance preserved
         assert not _has_vault(target)  # memory removed
 
     def test_flag_auto_gives_memory_without_vault(self, tmp_path: Path):
         """Tier-0 `auto` (#497): memory facts, no vault — a strict subset of obsidian."""
         target = tmp_path / "p"
         _scaffold(target, "--preset", "core", "--memory", "auto")
-        assert (target / ".claude" / "memory").is_dir()
+        assert (target / ".agents" / "memory").is_dir()
         assert not _has_vault(target)
-        config = (target / ".claude" / "config.yaml").read_text()
+        config = (target / ".agents" / "config.yaml").read_text()
         assert "stack: auto" in config
         assert "vault_path" not in config  # vault_path is obsidian-gated
-        assert "memory_path: .claude/memory" in config
+        assert "memory_path: .agents/memory" in config
 
 
 class TestAutoUpgradeRoundTrip:
@@ -163,13 +163,13 @@ class TestPreservedPathExclusion:
         # READMEs are the one exception: template-owned (_ALWAYS_OVERWRITE),
         # so they are recorded/refreshed even inside preserved dirs.
         assert not any(
-            k.startswith((".claude/memory", ".claude/vault")) and not k.endswith("README.md")
+            k.startswith((".agents/memory", ".agents/vault")) and not k.endswith("README.md")
             for k in manifest
         )
-        assert ".claude/vault/README.md" in manifest
+        assert ".agents/vault/README.md" in manifest
 
         # A user-authored vault note is never reported as drift or an addition.
-        note = target / ".claude" / "vault" / "knowledge" / "my-note.md"
+        note = target / ".agents" / "vault" / "knowledge" / "my-note.md"
         note.write_text("mine\n", encoding="utf-8")
         capsys.readouterr()
         assert main(["upgrade", str(target)]) == 0

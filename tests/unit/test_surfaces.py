@@ -157,5 +157,5 @@ def test_no_mcp_files_when_no_servers_selected():
 
 
 def test_no_surface_files_for_native_only_selection():
-    # Claude only (native .claude/) with no MCPs → nothing generated.
+    # Claude only (native .agents/) with no MCPs → nothing generated.
     assert surfaces.planned_files(["claude"], {}) == {}

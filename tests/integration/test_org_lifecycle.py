@@ -32,7 +32,7 @@ def _scaffold_org(target: Path, *extra: str) -> None:
 
 
 def _record_vars(target: Path) -> dict:
-    text = (target / ".claude" / "config.yaml").read_text()
+    text = (target / ".agents" / "config.yaml").read_text()
     m = re.search(r"variables:\s*(\{.*\})", text)
     assert m, "scaffold record not found"
     return json.loads(m.group(1))
@@ -47,21 +47,21 @@ class TestOrgEndToEnd:
         assert rec["enforcement"] == "hard"
         assert "project_init_host" in rec
         # The human-readable section surfaces the governance state (#259).
-        human = (target / ".claude" / "config.yaml").read_text().split("# ---")[0]
+        human = (target / ".agents" / "config.yaml").read_text().split("# ---")[0]
         assert "profile: org" in human
         assert "enforcement: hard" in human
 
     def test_no_egress_omits_official_marketplace(self, tmp_path: Path):
         target = tmp_path / "p"
         _scaffold_org(target, "--no-egress")
-        settings = json.loads((target / ".claude" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text())
         assert "claude-plugins-official" not in settings["extraKnownMarketplaces"]
         assert "project-init" in settings["extraKnownMarketplaces"]  # org's own kept
 
     def test_enforcement_scripts_bind_under_org(self, tmp_path: Path):
         target = tmp_path / "p"
         _scaffold_org(target)
-        setup = (target / ".claude" / "scripts" / "setup_github.sh").read_text()
+        setup = (target / ".agents" / "scripts" / "setup_github.sh").read_text()
         assert '"bypass_actors": []' in setup  # ruleset binds everyone
-        monitor = (target / ".claude" / "scripts" / "monitor_pr.sh").read_text()
+        monitor = (target / ".agents" / "scripts" / "monitor_pr.sh").read_text()
         assert "admin-merge is refused under the org profile" in monitor

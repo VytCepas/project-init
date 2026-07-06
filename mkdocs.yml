@@ -1,6 +1,6 @@
 site_name: project-init
 site_url: https://vytcepas.github.io/project-init/
-site_description: Scaffold a production-ready .claude/ layout into any project
+site_description: Scaffold a production-ready .agents/ layout into any project
 repo_url: https://github.com/VytCepas/project-init
 repo_name: VytCepas/project-init
 
@@ -23,6 +23,7 @@ nav:
   - Positioning: positioning.md
   - Guide:
     - Using project-init: guides/using-project-init.md
+    - Preset gallery: guides/preset-gallery.md
     - Org fork lifecycle (runbook): guides/org-fork-lifecycle.md
     - Phone / remote access: development/mobile-remote-access.md
   - Architecture Decisions:
@@ -61,4 +62,9 @@ nav:
     - Build reproducibility: development/build-reproducibility.md
     - Enterprise GitHub support matrix: development/enterprise-github-support-matrix.md
     - Enforcement classification: development/enforcement-classification.md
+    - Agentic-OS root layer (WIP): development/agentic-os-root-layer.md
     - Contributing: development/contributing.md
+  - Research:
+    - Model-agnostic switching: research/model-agnostic-switching.md
+  - Reviews:
+    - 2026-07 Project Review: reviews/2026-07-project-review.md

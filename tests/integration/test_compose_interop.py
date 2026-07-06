@@ -8,7 +8,7 @@ project-init on top, and asserts that
 
   * every pre-existing file is byte-for-byte unchanged, and
   * any path project-init also emits lands as a `<file>.new` sibling — never an
-    overwrite — while its own additive payload (`.claude/`) still appears.
+    overwrite — while its own additive payload (`.agents/`) still appears.
 
 Interop, not integration: we do not vendor those tools' methodologies.
 """
@@ -112,8 +112,8 @@ class TestComposeNeverClobbers:
         _scaffold_over(target)
 
         # project-init actually scaffolded (its own dir is additive, no collision).
-        assert (target / ".claude").is_dir()
-        assert (target / ".claude/config.yaml").is_file()
+        assert (target / ".agents").is_dir()
+        assert (target / ".agents/config.yaml").is_file()
 
 
 def test_no_foreign_file_is_ever_overwritten_across_all_fixtures(tmp_path: Path):

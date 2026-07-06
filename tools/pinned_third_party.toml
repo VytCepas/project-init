@@ -14,5 +14,5 @@ pinned = "2.0.0"
 # The shell variable carrying this version in each used_in file (kept in lockstep
 # with `pinned` by `check_third_party_updates.py apply`).
 version_var = "CCR_VERSION"
-used_in = ["templates/multi_model/dot_claude/scripts/setup_models.sh"]
+used_in = ["templates/multi_model/dot_agents/scripts/setup_models.sh"]
 changelog = "https://github.com/musistudio/claude-code-router/releases"

@@ -22,7 +22,7 @@ from project_init.scaffold import load_preset, overlay_layers, scaffold
 from project_init.upgrade import read_scaffold_record
 from tests.helpers import make_variables
 
-_GOV_README = Path(".claude") / "governance" / "README.md"
+_GOV_README = Path(".agents") / "governance" / "README.md"
 
 
 def _scaffold(target: Path, *, governance: bool) -> Path:
@@ -103,7 +103,7 @@ class TestGovernanceOn:
 class TestUsageTrackDocs:
     """#411: the policy layer scaffolds with its load-bearing content."""
 
-    _GOV = Path(".claude") / "governance"
+    _GOV = Path(".agents") / "governance"
     _DOCS = (
         "AI_USAGE_POLICY.md",
         "approved-tools.md",
@@ -140,7 +140,7 @@ class TestUsageTrackDocs:
 class TestGovernanceOff:
     def test_no_layer_dir(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p", governance=False)
-        assert not (target / ".claude" / "governance").exists()
+        assert not (target / ".agents" / "governance").exists()
 
 
 class TestGovernedPreset:
@@ -168,7 +168,7 @@ class TestFlagAndPresetResolution:
     def test_off_by_default(self, tmp_path: Path):
         target = tmp_path / "p"
         assert _scaffold_cli(target, "--preset", "obsidian-only") == 0
-        assert not (target / ".claude" / "governance").exists()
+        assert not (target / ".agents" / "governance").exists()
         _, variables, _, _ = read_scaffold_record(target)
         assert variables["governance"] == ""
 
@@ -202,6 +202,7 @@ class TestInteractiveResolution:
         monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
         monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
         monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
+        monkeypatch.setattr(cli, "_choose_agents_interactive", lambda *a, **k: ["claude", "vscode"])
         # Every Confirm.ask (devcontainer/mise/vscode/multi-model/governance) → decline.
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
         return cli

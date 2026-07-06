@@ -101,5 +101,5 @@ class TestLicenseDocumented:
         [("python", "python.md"), ("node", "node.md"), ("go", "go.md"), ("rust", "rust.md")],
     )
     def test_rules_mention_license(self, tmp_path: Path, language: str, rules_file: str):
-        rules = (_scaffold(tmp_path / language, language) / ".claude" / "rules" / rules_file).read_text()
+        rules = (_scaffold(tmp_path / language, language) / ".agents" / "rules" / rules_file).read_text()
         assert "license" in rules.lower()
