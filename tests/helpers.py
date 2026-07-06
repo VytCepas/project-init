@@ -100,7 +100,6 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "graphify": "",
         "obsidian": "true",
         "rag": "",
-        "python_floor": "3.11",
         "project_owner": "",
         "license": "none",
         "license_holder": "my-project",

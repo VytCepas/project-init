@@ -1049,12 +1049,12 @@ def _emit_generated_files(
 def _generate_claude_projection(target: Path) -> None:
     """Generate the .agents projection from the canonical .agents tree."""
     import shutil
-    
+
     agents_dir = target / ".agents"
     claude_dir = target / ".claude"
     if not agents_dir.exists():
         return
-        
+
     shutil.copytree(agents_dir, claude_dir, dirs_exist_ok=True)
 
 

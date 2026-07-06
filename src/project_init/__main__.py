@@ -1664,7 +1664,7 @@ def _choose_agents_interactive() -> list[str]:
                 f"Enter numbers 1-{len(_AGENT_SURFACES)}.[/red]"
             )
             continue
-        
+
         # Keep list unique but stable
         return list(dict.fromkeys(selected))
 
