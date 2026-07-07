@@ -34,9 +34,11 @@ import os
 import re
 import shlex
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 # (pattern matched at the START of a command segment, ecosystem)
 _INSTALL_VERBS: list[tuple[re.Pattern[str], str]] = [
@@ -214,6 +216,53 @@ _VALUE_TAKING_FLAGS: dict[str, set[str]] = {
 _AUTONOMOUS_MODES = {"bypassPermissions", "dangerouslySkipPermissions"}
 
 
+def _find_obs_dir(start: Path) -> Path | None:
+    """Locate the overlay marker dir (.agents/observability/), or None.
+
+    Prefers ``$CLAUDE_PROJECT_DIR``; otherwise walks up from *start* (the Bash
+    cwd, which may be a subdirectory after ``cd``), mirroring ``_find_config``.
+    """
+    env = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env:
+        obs = Path(env) / ".agents" / "observability"
+        return obs if obs.is_dir() else None
+    for candidate in (start, *start.parents):
+        obs = candidate / ".agents" / "observability"
+        if obs.is_dir():
+            return obs
+    return None
+
+
+def usage_log(payload: dict, root: Path, decision: str, command: str) -> None:
+    """Append a self-log line iff the observability overlay is installed (#406).
+
+    Shipped-always-dormant: no-ops unless ``.agents/observability/`` exists.
+    Uses the *already-parsed* ``payload`` (no second stdin read) and is fully
+    fail-open — it must never raise or block the guard.
+    """
+    try:
+        obs = _find_obs_dir(root)
+        if obs is None:
+            return
+        line = {
+            # time.gmtime keeps this portable across every Python 3 (no
+            # datetime.UTC, which is 3.11+) — scaffolded projects may run older.
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "hook": "package_guard",
+            "event": "PreToolUse",
+            "project": str(obs.parent.parent),
+            "decision": decision,
+            "command": command,
+        }
+        session = payload.get("session_id") or os.environ.get("CLAUDE_SESSION_ID")
+        if session:
+            line["session"] = session
+        with (obs / "usage.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(line) + "\n")
+    except Exception:  # noqa: BLE001 — logging must never break the guard
+        return
+
+
 def _extract_packages(remainder: str, ecosystem: str) -> list[str]:
     """Pull candidate package names out of the args after the install verb.
 
@@ -357,10 +406,20 @@ def main() -> int:
     if not command:
         return 0
     mode = payload.get("permission_mode") or payload.get("permissionMode") or ""
+    root = Path(payload.get("cwd") or ".")
     try:
         verdict = evaluate(command, mode)
     except Exception:  # noqa: BLE001 — guardrail must never break the session
-        return 0
+        verdict = None
+
+    decision = "allow"
+    if verdict is not None:
+        decision = verdict.get("hookSpecificOutput", {}).get("permissionDecision", "allow")
+
+    # Self-log this firing from the same parsed payload (no second stdin read,
+    # #406). Dormant unless the observability overlay is installed; fail-open.
+    usage_log(payload, root, decision, command)
+
     if verdict is not None:
         sys.stdout.write(json.dumps(verdict))
     return 0
