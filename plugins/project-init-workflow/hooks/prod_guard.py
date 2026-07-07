@@ -170,8 +170,7 @@ def _redact_command(command: str) -> str:
     """Truncate to 500 chars and redact common secret patterns."""
     cmd = command[:500]
     cmd = re.sub(r"(?i)(token|key|secret|password|auth|api_key)=[\w-]+", r"\1=***", cmd)
-    cmd = re.sub(r"://[^@]+@", r"://***@", cmd)
-    return cmd
+    return re.sub(r"://[^@]+@", r"://***@", cmd)
 
 
 def usage_log(payload: dict, root: Path, decision: str, command: str) -> None:
