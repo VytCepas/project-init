@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -255,7 +256,8 @@ class TestCiSecretScanMirror:
 
     def test_secret_scan_job_present(self):
         assert "secret-scan:" in self.ci
-        assert "gitleaks/gitleaks-action@v3" in self.ci
+        # SHA-pinned with a `# v3` comment (#629).
+        assert re.search(r"gitleaks/gitleaks-action@[0-9a-f]{40} # v3\b", self.ci)
 
     def test_scans_full_history(self):
         assert "fetch-depth: 0" in self.ci

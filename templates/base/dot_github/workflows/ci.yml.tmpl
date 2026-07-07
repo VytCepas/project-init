@@ -35,10 +35,10 @@ jobs:
     outputs:
       versions: ${{ steps.resolve.outputs.versions }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.7"
 
@@ -100,11 +100,11 @@ jobs:
         python-version: ${{ fromJSON(needs.python-matrix.outputs.versions) }}
 {{/if python}}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
 {{#if python}}
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.7"
           # Pin this job to the matrix version (PI-214). Not the PI-208 drift:
@@ -118,7 +118,7 @@ jobs:
       # CI invokes the same justfile recipes agents and humans use (PI-139),
       # so the command surface is defined exactly once.
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
@@ -161,7 +161,7 @@ jobs:
 {{/if python}}
 {{#if node}}
       - name: Install Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
 
@@ -169,7 +169,7 @@ jobs:
       # (PI-139). Dependency install stays inline: the frozen-lockfile
       # fallback below is CI-specific logic that doesn't belong in a recipe.
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
@@ -215,7 +215,7 @@ jobs:
 {{/if node}}
 {{#if go}}
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
@@ -224,7 +224,7 @@ jobs:
       # v8+ of the action is required for golangci-lint v2 — v6 caps the tool
       # at v1.64.8, which rejects the scaffolded `version: "2"` config.
       - name: Lint (golangci-lint)
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
@@ -250,7 +250,7 @@ jobs:
       # Tests run via the justfile recipe agents and humans use (PI-139);
       # lint stays on the action above, which installs and caches the binary.
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       # Coverage-gated (PI-569) — go tool cover ships with the Go toolchain
       # the setup-go action just installed, nothing extra to provision.
@@ -271,7 +271,7 @@ jobs:
 {{#if rust}}
       # Bundles Swatinem/rust-cache internally — no separate cache step needed.
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
         with:
           # llvm-tools-preview: required by cargo-llvm-cov (PI-569).
           components: clippy, rustfmt, llvm-tools-preview
@@ -291,12 +291,12 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       # Prebuilt binaries — avoids a multi-minute `cargo install` compile per
       # run for either tool.
       - name: Install cargo-llvm-cov + cargo-audit
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@50414676f9f5d50a65992c6dd2ed02641263226c # v2
         with:
           tool: cargo-llvm-cov,cargo-audit
 
@@ -348,10 +348,10 @@ jobs:
     # Optional: Only run on main branch or when tests change significantly
     # if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.files[*].name, 'tests/')
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.7"
           enable-cache: true
@@ -397,8 +397,8 @@ jobs:
     runs-on: ubuntu-24.04
     if: github.event_name == 'schedule'
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v8.1.0
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.7"
       # Mutmut needs a pyproject.toml (its [tool.mutmut] config lives there);
@@ -453,10 +453,10 @@ jobs:
       actions: write          # required to save the type=gha build cache
       security-events: write  # upload the Trivy SARIF to code scanning (#577)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       # Static lowercase tag — ${{ github.repository }} may contain uppercase
       # (invalid in a Docker ref). The real registry name is set by the deploy
@@ -464,7 +464,7 @@ jobs:
       # load: true puts the image in the local daemon so Trivy scans the exact
       # bytes just built (not a re-pull) before anything is promoted.
       - name: Build the image (SHA-pinned, cached)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           push: false
@@ -479,7 +479,7 @@ jobs:
       # vulnerable base image can't be promoted dev → staging → prod.
       # ignore-unfixed: don't block on advisories with no upstream fix yet.
       - name: Scan image for CRITICAL/HIGH vulnerabilities (Trivy)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: app:${{ github.sha }}
           format: sarif
@@ -492,7 +492,7 @@ jobs:
       # under Security → Code scanning, not only in the failed job log.
       - name: Upload Trivy SARIF to code scanning
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3
         with:
           sarif_file: trivy-results.sarif
 {{/if delivery_service}}
@@ -506,9 +506,9 @@ jobs:
     name: Lint Dockerfile (hadolint)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Lint Dockerfile (hadolint)
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
         with:
           dockerfile: Dockerfile
 {{/if delivery_service}}
@@ -519,12 +519,12 @@ jobs:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           # Full history so leaked commits are caught, not just the latest diff
           fetch-depth: 0
 
-      - uses: gitleaks/gitleaks-action@v3
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ github.token }}
           # GITLEAKS_LICENSE is required only for organization-owned repos
@@ -542,7 +542,7 @@ jobs:
     name: Semgrep (semantic security scan)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           # Full history: --baseline-commit (PR-only, below) needs the base
           # commit reachable, not just the latest diff.
@@ -573,13 +573,13 @@ jobs:
     name: Dependency license scan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 {{#if python}}
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.7"
 
@@ -587,7 +587,7 @@ jobs:
         run: just license
 {{/if python}}{{#if node}}
       - name: Install Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
 
@@ -599,7 +599,7 @@ jobs:
         run: just license
 {{/if node}}{{#if go}}
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
@@ -612,11 +612,11 @@ jobs:
         run: just license
 {{/if go}}{{#if rust}}
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
 
       # Prebuilt binary — avoids a multi-minute cargo install compile per run.
       - name: Install cargo-deny
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@50414676f9f5d50a65992c6dd2ed02641263226c # v2
         with:
           tool: cargo-deny
 
@@ -635,15 +635,15 @@ jobs:
     name: Go fuzz (seed corpus replay)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       - name: Replay fuzz seed corpora
         run: just fuzz
@@ -670,14 +670,14 @@ jobs:
       contents: read
       actions: read            # Scorecard reads workflow/branch-protection state
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
 
       # Full version pin: ossf/scorecard-action publishes no floating `v2`
       # major tag (only exact vX.Y.Z tags), so `@v2` fails to resolve.
       - name: Run Scorecard analysis
-        uses: ossf/scorecard-action@v2.4.3
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
         with:
           results_file: results.sarif
           results_format: sarif
@@ -688,7 +688,7 @@ jobs:
       # In-repo visibility: the score shows up under the Security → Code scanning
       # tab without ever leaving the repository.
       - name: Upload SARIF to code scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3
         with:
           sarif_file: results.sarif
 
@@ -732,7 +732,7 @@ jobs:
     name: AI governance gate
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Validate system cards
         run: bash .agents/scripts/governance_gate.sh
 {{/if governance}}

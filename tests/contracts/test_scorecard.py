@@ -34,7 +34,7 @@ class TestScorecardJob:
         assert "scorecard:" in ci
         # Full X.Y.Z pin: ossf/scorecard-action publishes no floating `v2`
         # major tag, so a bare `@v2` fails to resolve on every scheduled run.
-        assert re.search(r"ossf/scorecard-action@v\d+\.\d+\.\d+", ci)
+        assert re.search(r"ossf/scorecard-action@[0-9a-f]{40} # v\d+\.\d+\.\d+", ci)
 
     def test_scheduled_not_per_pr(self, tmp_path: Path):
         ci = _ci(_scaffold_language(tmp_path / "p", "python"))

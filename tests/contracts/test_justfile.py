@@ -246,7 +246,7 @@ class TestRecipesAreTheSingleCallsite:
     def test_ci_workflow_calls_just(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "p", "python")
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
-        assert "extractions/setup-just@v4" in ci
+        assert re.search(r"extractions/setup-just@[0-9a-f]{40} # v4\b", ci)
         assert "just lint" in ci
         assert "just test-cov" in ci
 
