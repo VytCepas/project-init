@@ -14,10 +14,23 @@ from project_init.__main__ import main
 
 
 def _scaffold_json(target: Path, stack: str, capsys) -> dict:
-    rc = main([
-        str(target), "--non-interactive", "--name", "fx", "--description", "d",
-        "--language", "python", "--preset", "core", "--memory", stack, "--json",
-    ])
+    rc = main(
+        [
+            str(target),
+            "--non-interactive",
+            "--name",
+            "fx",
+            "--description",
+            "d",
+            "--language",
+            "python",
+            "--preset",
+            "core",
+            "--memory",
+            stack,
+            "--json",
+        ]
+    )
     assert rc == 0
     out = capsys.readouterr().out
     # stdout must be JSON ONLY — no rich panel / profile notice leaking in.
@@ -64,7 +77,7 @@ class TestScaffoldResult:
         data = _scaffold_json(tmp_path / "p", "obsidian-only", capsys)
         assert data["preset"] == "core"
         assert data["target"] == str((tmp_path / "p").resolve())
-        assert data["contract_version"] == "1"
+        assert data["contract_version"] == "2"
         assert data["files_created"] > 0
         assert data["memory"]["tier"] == "1"
         assert data["memory"]["vault_path"] == ".agents/vault"
@@ -79,11 +92,22 @@ class TestScaffoldResult:
         assert data["memory"]["rag_endpoint"] is None
 
     def test_none_has_empty_memory(self, tmp_path, capsys):
-        rc = main([
-            str(tmp_path / "p"), "--non-interactive", "--name", "fx",
-            "--description", "d", "--language", "python", "--preset", "core", "--json",
-        ])
+        rc = main(
+            [
+                str(tmp_path / "p"),
+                "--non-interactive",
+                "--name",
+                "fx",
+                "--description",
+                "d",
+                "--language",
+                "python",
+                "--preset",
+                "core",
+                "--json",
+            ]
+        )
         assert rc == 0
         data = json.loads(capsys.readouterr().out)
         assert data["memory"] == {}
-        assert data["contract_version"] == "1"  # still present for none
+        assert data["contract_version"] == "2"  # still present for none

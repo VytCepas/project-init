@@ -4,7 +4,7 @@
 project:
   name: "{{project_name}}"
   description: "{{project_description}}"
-  created: {{created_date}}
+  created: "{{created_date}}"
   project_init_version: {{project_init_version}}
   project_init_contract_version: {{project_init_contract_version}}  # descriptor-contract schema a root orchestrator reads (#498, ADR-025); absent ⇒ v0
   project_init_plugin_version: {{project_init_plugin_version}}  # plugin payload version (ADR-010)
@@ -17,8 +17,13 @@ project:
 language: {{language}}            # python | node | go | none
 
 delivery: {{delivery}}            # library | service | prototype — how this ships (ADR-015)
-deploy: {{deploy_target}}            # none | cloud-run | fly | k8s | registry | custom — service deploy overlay (ADR-015)
-iac: {{iac}}            # none | opentofu — infrastructure-as-code overlay (ADR-015)
+{{#if delivery_service}}deploy:
+  target: {{deploy_target}}
+  app: "{{project_name}}"
+  region: us-central1
+  health_url: ""
+{{/if delivery_service}}{{#if not_delivery_service}}deploy: {{deploy_target}}            # none | cloud-run | fly | k8s | registry | custom — service deploy overlay (ADR-015)
+{{/if not_delivery_service}}iac: {{iac}}            # none | opentofu — infrastructure-as-code overlay (ADR-015)
 
 {{#if memory}}memory:
   # Stable descriptor (#498): tier + resolved paths a root orchestrator reads to
@@ -44,6 +49,14 @@ tooling:
   lint_command: "{{lint_command}}"
   format_command: "{{format_command}}"
   test_command: "{{test_command}}"
+  run_command: "{{run_command}}"
+
+{{#if observability}}observability:
+  path: .agents/observability
+
+{{/if observability}}hooks:
+  expected: [pre-commit, commit-msg, pre-push]
+
 
 # Extra files never overwritten or reported as drift on `upgrade` (and on
 # `project-init` re-runs) (#243): a single-line JSON array of globs.

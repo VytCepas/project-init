@@ -593,6 +593,11 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
     }
     for flag in _LANGUAGE_FLAGS:
         variables[flag] = "true" if language == flag else ""
+    from project_init.__main__ import _LANGUAGE_COMMANDS
+
+    _, _, _, run_cmd = _LANGUAGE_COMMANDS.get(language, ("", "", "", ""))
+    variables["run_command"] = run_cmd.replace("{project_slug}", variables["project_slug"])
+    variables["not_delivery_service"] = "true"
     return preset_name, variables, {}
 
 
@@ -710,6 +715,11 @@ def _backfill_variables(variables: dict) -> dict:
     v["want_devcontainer"] = (
         "true" if (v.get("devcontainer") or v.get("delivery") == "service") else ""
     )
+    v["not_delivery_service"] = "" if v.get("delivery") == "service" else "true"
+    from project_init.__main__ import _LANGUAGE_COMMANDS
+
+    _, _, _, run_cmd = _LANGUAGE_COMMANDS.get(language, ("", "", "", ""))
+    v.setdefault("run_command", run_cmd.replace("{project_slug}", v.get("project_slug", "my-app")))
     return v
 
 
@@ -779,14 +789,21 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
     if (target / "pyproject.toml").exists():
         try:
             import tomllib
+
             with (target / "pyproject.toml").open("rb") as f:
                 data = tomllib.load(f)
                 req = data.get("project", {}).get("requires-python", "")
                 if not req:
-                    req = data.get("tool", {}).get("poetry", {}).get("dependencies", {}).get("python", "")
+                    req = (
+                        data.get("tool", {})
+                        .get("poetry", {})
+                        .get("dependencies", {})
+                        .get("python", "")
+                    )
                 if req:
                     import re
-                    m = re.search(r'(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)', req)
+
+                    m = re.search(r"(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)", req)
                     if m and m.group(1):
                         variables["python_floor"] = m.group(1)
         except Exception:

@@ -245,7 +245,7 @@ _AGENT_LAYERS = ("codex", "antigravity", "amp", "junie")
 # descriptor fields. Bumped only when that contract changes shape — independent
 # of project_init_version (the tool version). A child config that PREDATES this
 # field is contract v0 by the reader's rule; the scaffolder always stamps current.
-CONTRACT_VERSION = "1"
+CONTRACT_VERSION = "2"
 
 _MEMORY_TIERS = {
     "auto": "0",
@@ -965,9 +965,7 @@ def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
                 # {{...}} inside a variable value (user data) is not a defect.
                 placeholder_offenders += [
                     f"{rel_path}: {marker}"
-                    for marker in _unrendered_markers(
-                        src.read_text(encoding="utf-8"), variables
-                    )
+                    for marker in _unrendered_markers(src.read_text(encoding="utf-8"), variables)
                 ]
             # Later layers legitimately re-write the same path; report it once.
             if rel_path not in written:
@@ -1045,6 +1043,7 @@ def _emit_generated_files(
 
     _generate_claude_projection(target)
     return created
+
 
 def _generate_claude_projection(target: Path) -> None:
     """Generate the .agents projection from the canonical .agents tree."""

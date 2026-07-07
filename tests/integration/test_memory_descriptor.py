@@ -126,15 +126,15 @@ class TestContractVersion:
         target = tmp_path / "p"
         _scaffold(target, "core")
         text = (target / ".agents" / "config.yaml").read_text()
-        assert "project_init_contract_version: 1" in text
+        assert "project_init_contract_version: 2" in text
         assert "\nmemory:" not in text  # still no memory block
 
     def test_present_for_memory_project(self, tmp_path):
         target = tmp_path / "p"
         _scaffold(target, "obsidian-graphify")
-        assert "project_init_contract_version: 1" in (
-            target / ".agents" / "config.yaml"
-        ).read_text()
+        assert (
+            "project_init_contract_version: 2" in (target / ".agents" / "config.yaml").read_text()
+        )
 
     def test_backfill_fills_absent_and_preserves_present(self):
         """Backward-compat: a pre-field record backfills to current (so strict
@@ -142,7 +142,7 @@ class TestContractVersion:
         from project_init.upgrade import _backfill_variables
 
         absent = _backfill_variables({"memory_stack": "obsidian-only", "language": "python"})
-        assert absent["project_init_contract_version"] == "1"
+        assert absent["project_init_contract_version"] == "2"
         present = _backfill_variables(
             {
                 "memory_stack": "obsidian-only",
@@ -161,13 +161,13 @@ class TestContractVersion:
         lines = [
             "project:\n",
             '  name: "x"\n',
-            "  project_init_contract_version: 2\n",
+            "  project_init_contract_version: 3\n",
             "language: python\n",
             "memory:\n",
             "  stack: obsidian-only\n",
         ]
         _preset, variables, _manifest = _migrate_semantic_config(lines)
-        assert variables["project_init_contract_version"] == "2"
+        assert variables["project_init_contract_version"] == "3"
 
     def test_upgrade_injects_visible_line_for_pre_field_project(self, tmp_path, capsys):
         """A project whose visible config predates the field must GAIN the line on
@@ -185,11 +185,12 @@ class TestContractVersion:
             ln for ln in head.splitlines() if "project_init_contract_version" not in ln
         )
         config.write_text(head + "\n" + sep + tail)
-        assert "project_init_contract_version" not in config.read_text().partition(
-            "# --- scaffold record"
-        )[0]
+        assert (
+            "project_init_contract_version"
+            not in config.read_text().partition("# --- scaffold record")[0]
+        )
         capsys.readouterr()
         assert main(["upgrade", str(target), "--apply"]) == 0
         # The visible project: block (above the record marker) now carries it.
         head = config.read_text().partition("# --- scaffold record")[0]
-        assert "project_init_contract_version: 1" in head
+        assert "project_init_contract_version: 2" in head
