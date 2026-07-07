@@ -2009,7 +2009,7 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs, target: Path | None =
                     req = data.get("tool", {}).get("poetry", {}).get("dependencies", {}).get("python", "")
                 if req:
                     import re
-                    m = re.search(r'(?:>=?|==|~=|\^|^\s*)\s*(\d+\.\d+)', req)
+                    m = re.search(r'(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)', req)
                     if m and m.group(1):
                         python_floor = m.group(1)
         except Exception:

@@ -786,7 +786,7 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
                     req = data.get("tool", {}).get("poetry", {}).get("dependencies", {}).get("python", "")
                 if req:
                     import re
-                    m = re.search(r'(?:>=?|==|~=|\^|^\s*)\s*(\d+\.\d+)', req)
+                    m = re.search(r'(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)', req)
                     if m and m.group(1):
                         variables["python_floor"] = m.group(1)
         except Exception:
