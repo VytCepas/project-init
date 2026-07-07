@@ -29,7 +29,7 @@ format:
 
 # run the test suite (xdist pulled in on demand so -n works without declaring it)
 test:
-    uv run --with pytest-xdist pytest -n auto --tb=short -q
+    sh -c 'if find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run --with pytest-xdist pytest -n auto --tb=short -q; else echo "No test files yet — nothing to test."; fi'
 
 # tests with the coverage gate (CI always runs this, not `test` — PI-569).
 # without src/ yet, still run the plain test suite (tests/ may exist before
@@ -38,7 +38,7 @@ test:
 # code exists. Silently skipping pytest entirely here would let a real test
 # failure through `just ci` unnoticed.
 test-cov:
-    if [ -d src ]; then uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov=src --cov-fail-under=70; else uv run --with pytest-xdist pytest -n auto --tb=short -q; fi
+    sh -c 'if [ -d src ]; then uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov=src --cov-fail-under=70; elif find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run --with pytest-xdist pytest -n auto --tb=short -q; else echo "No src/ or test files yet — nothing to test."; fi'
 
 # mutation testing on core logic (slow; requires [tool.mutmut] source_paths
 # in your own pyproject.toml, scoped to deterministic pure-logic modules —
@@ -52,7 +52,7 @@ test-mutation:
 # doesn't exist or looks typosquatted — this catches a real, correctly-
 # spelled dependency with a known vulnerability already in the lockfile.
 audit:
-    uv run --with pip-audit pip-audit
+    sh -c 'if [ -f pyproject.toml ] || [ -f requirements.txt ] || [ -f uv.lock ]; then uv run --with pip-audit pip-audit; else echo "No Python dependency manifest yet — nothing to audit."; fi'
 
 # generate a CycloneDX SBOM of the runtime dependency tree (#574). release.yml
 # attaches this to GitHub Releases; run locally on demand. --no-dev so it
@@ -74,7 +74,7 @@ fuzz:
     uv run --with hypothesis --with pytest-xdist pytest -n auto --tb=short -q
 
 # what CI runs
-ci: lint typecheck test-cov audit
+ci: setup lint typecheck test-cov audit
 
 # serve the docs site locally
 docs:
@@ -124,7 +124,7 @@ docs:
 
 # dependency vulnerability scan against known CVEs/advisories (PI-568)
 audit:
-    bun audit
+    sh -c 'if [ -f package.json ] || [ -f bun.lock ] || [ -f bun.lockb ]; then bun audit; else echo "No Node dependency manifest yet — nothing to audit."; fi'
 
 # generate a CycloneDX SBOM of the dependency tree (#574). release.yml attaches
 # this to GitHub Releases. cdxgen reads bun's lockfile (cyclonedx-npm rejects bun).
@@ -148,7 +148,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint typecheck test audit
+ci: setup lint typecheck test audit
 {{/if node}}{{#if go}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.

@@ -251,7 +251,7 @@ class TestInvariants:
             elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
                 roots.add(node.module.split(".")[0])
         stdlib = {
-            "argparse", "json", "subprocess", "sys", "html", "pathlib", "__future__",
+            "argparse", "json", "shutil", "subprocess", "sys", "html", "pathlib", "__future__",
         }
         assert roots <= stdlib, f"non-stdlib imports: {roots - stdlib}"
 

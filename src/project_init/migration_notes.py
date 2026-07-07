@@ -15,6 +15,23 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.0.1": {
+        "summary": (
+            "Patch release from live E2E testing against real mini-projects. "
+            "Fresh Python and Node scaffolds now pass day-one `just ci` before "
+            "application sources/tests exist; the interactive wizard can finish "
+            "with Enter defaults by deriving a description from the project "
+            "name; generated observability and multi-agent hook adapter files "
+            "satisfy the scaffolded ruff gates; and the pre-push hook resolves "
+            "the scaffolded project root when run outside an initialized git "
+            "repo."
+        ),
+        "action_required": (
+            "Re-run `project-init upgrade` to pick up the day-one justfile, "
+            "observability, multi-agent hook, and pre-push fixes. No breaking "
+            "changes."
+        ),
+    },
     "1.0.0": {
         "summary": (
             "First stable release, following a full QA sweep (~180 scaffolder "

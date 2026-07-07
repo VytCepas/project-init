@@ -65,14 +65,14 @@ This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to 
 Pin a specific version, or opt into the unreleased development head:
 
 ```bash
-PROJECT_INIT_REF=v1.0.0 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
+PROJECT_INIT_REF=v1.0.1 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 PROJECT_INIT_REF=main   bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 ```
 
 Direct tool install without the slash command (any pinned tag):
 
 ```bash
-uv tool install git+https://github.com/VytCepas/project-init@v1.0.0
+uv tool install git+https://github.com/VytCepas/project-init@v1.0.1
 ```
 
 Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
@@ -454,7 +454,7 @@ project-init/
 
 ## Status
 
-Actively developed and published to [PyPI](https://pypi.org/project/project-init/) (current release: v1.0.0). Contributions welcome — track and propose work in [GitHub Issues](https://github.com/VytCepas/project-init/issues), and use [GitHub Discussions](https://github.com/VytCepas/project-init/discussions) for questions, ideas, and feedback. Forks and pull requests are encouraged.
+Actively developed and published to [PyPI](https://pypi.org/project/project-init/) (current release: v1.0.1). Contributions welcome — track and propose work in [GitHub Issues](https://github.com/VytCepas/project-init/issues), and use [GitHub Discussions](https://github.com/VytCepas/project-init/discussions) for questions, ideas, and feedback. Forks and pull requests are encouraged.
 
 ## License
 

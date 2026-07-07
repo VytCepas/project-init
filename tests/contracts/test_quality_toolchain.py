@@ -73,7 +73,7 @@ class TestPythonToolchain:
         justfile = (self.target / "justfile").read_text()
         assert "typecheck:" in justfile
         assert "mypy" in justfile
-        assert "ci: lint typecheck test" in justfile
+        assert "ci: setup lint typecheck test" in justfile
 
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just typecheck" in ci
@@ -192,7 +192,7 @@ class TestNodeToolchain:
         justfile = (self.target / "justfile").read_text()
         assert "typecheck:" in justfile
         assert "tsc --noEmit" in justfile
-        assert "ci: lint typecheck test" in justfile
+        assert "ci: setup lint typecheck test" in justfile
 
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just typecheck" in ci
@@ -506,7 +506,7 @@ class TestVulnerabilityScanGate:
         justfile = (target / "justfile").read_text()
         assert "audit:" in justfile
         assert "pip-audit" in justfile
-        assert "ci: lint typecheck test-cov audit" in justfile
+        assert "ci: setup lint typecheck test-cov audit" in justfile
 
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just audit" in ci
@@ -516,7 +516,7 @@ class TestVulnerabilityScanGate:
         justfile = (target / "justfile").read_text()
         assert "audit:" in justfile
         assert "bun audit" in justfile
-        assert "ci: lint typecheck test audit" in justfile
+        assert "ci: setup lint typecheck test audit" in justfile
 
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just audit" in ci

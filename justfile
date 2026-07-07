@@ -18,7 +18,7 @@ format:
 
 # run the test suite
 test:
-    uv run pytest -n auto --tb=short -q
+    uv run pytest --tb=short -q
 
 # serve the docs site locally
 docs:

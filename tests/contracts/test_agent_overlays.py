@@ -181,6 +181,14 @@ class TestCodexOverlay:
         assert "agent_guard_adapter.py codex" in command
         assert (target / ".agents" / "hooks" / "agent_guard_adapter.py").is_file()
 
+    def test_adapter_satisfies_scaffolded_ruff_gates(self, tmp_path: Path):
+        """Multi-agent Python scaffolds lint .agents/** with S/BLE still active;
+        the generated adapter must not fail the first commit/CI run."""
+        target = _scaffold_agents(tmp_path / "p", "codex")
+        text = (target / ".agents" / "hooks" / "agent_guard_adapter.py").read_text()
+        assert "# noqa: S603" in text
+        assert "except (OSError, subprocess.SubprocessError, json.JSONDecodeError)" in text
+
 
 class TestAntigravityOverlay:
     """PI-386: Antigravity is the Google surface — ships .agents/skills (layer) +
