@@ -42,6 +42,14 @@ usage_log() {
     local hook=${1:-unknown}
     local event=${2:-}
     local cwd_arg=${3:-}
+    local decision=${4:-}
+    local command=${5:-}
+
+    if [ -n "$command" ]; then
+      command="${command:0:500}"
+      # Redact basic auth in URLs (replaces longest match between :// and @)
+      command="${command//:\/\/*@/:\/\/***@}"
+    fi
 
     local root
     if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
@@ -64,6 +72,12 @@ usage_log() {
     line="$line,\"hook\":\"$(_usage_log_json_escape "$hook")\""
     line="$line,\"event\":\"$(_usage_log_json_escape "$event")\""
     line="$line,\"project\":\"$(_usage_log_json_escape "$root")\""
+    if [ -n "$decision" ]; then
+      line="$line,\"decision\":\"$(_usage_log_json_escape "$decision")\""
+    fi
+    if [ -n "$command" ]; then
+      line="$line,\"command\":\"$(_usage_log_json_escape "$command")\""
+    fi
     if [ -n "${CLAUDE_SESSION_ID:-}" ]; then
       line="$line,\"session\":\"$(_usage_log_json_escape "$CLAUDE_SESSION_ID")\""
     fi

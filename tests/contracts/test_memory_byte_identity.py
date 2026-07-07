@@ -114,6 +114,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #   • report_upstream_issue skill (SKILL.md + INDEX/README/project-init.md rows)
 #     — new default-on skill routing tooling bugs upstream to project-init
 _ADDED_SINCE_BASELINE = {
+    # #605: Guards log the governance signal (decision + command)
+    ".agents/hooks/_usage_log.sh",
+    ".agents/hooks/prod_guard.py",
     # #606: the pre-edit issue guard — a new lifecycle hook, not lifecycle-move drift.
     ".agents/hooks/pre_edit_issue_guard.py",
     ".gitleaks.toml",

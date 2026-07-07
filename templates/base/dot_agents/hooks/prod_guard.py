@@ -166,7 +166,14 @@ def _find_obs_dir(start: Path) -> Path | None:
     return None
 
 
-def usage_log(payload: dict, root: Path) -> None:
+def _redact_command(command: str) -> str:
+    """Truncate to 500 chars and redact common secret patterns."""
+    cmd = command[:500]
+    cmd = re.sub(r"(?i)(token|key|secret|password|auth|api_key)=[\w-]+", r"\1=***", cmd)
+    return re.sub(r"://[^@]+@", r"://***@", cmd)
+
+
+def usage_log(payload: dict, root: Path, decision: str, command: str) -> None:
     """Append a self-log line iff the observability overlay is installed (#406).
 
     Shipped-always-dormant: no-ops unless ``.agents/observability/`` exists.
@@ -184,6 +191,8 @@ def usage_log(payload: dict, root: Path) -> None:
             "hook": "prod_guard",
             "event": "PreToolUse",
             "project": str(obs.parent.parent),
+            "decision": decision,
+            "command": _redact_command(command),
         }
         session = payload.get("session_id") or os.environ.get("CLAUDE_SESSION_ID")
         if session:
@@ -234,13 +243,20 @@ def main() -> int:
         return 0
     mode = payload.get("permission_mode") or payload.get("permissionMode") or ""
     root = Path(payload.get("cwd") or ".")
-    # Self-log this firing from the same parsed payload (no second stdin read,
-    # #406). Dormant unless the observability overlay is installed; fail-open.
-    usage_log(payload, root)
     try:
         verdict = evaluate(command, mode, _allow_patterns(root))
     except Exception:  # noqa: BLE001 — guardrail must never break the session
-        return 0
+        verdict = None
+
+    decision = "allow"
+    if verdict is not None:
+        raw_decision = verdict.get("hookSpecificOutput", {}).get("permissionDecision", "allow")
+        decision = "block" if raw_decision == "deny" else raw_decision
+
+    # Self-log this firing from the same parsed payload (no second stdin read,
+    # #406). Dormant unless the observability overlay is installed; fail-open.
+    usage_log(payload, root, decision, command)
+
     if verdict is not None:
         sys.stdout.write(json.dumps(verdict))
     return 0

@@ -122,6 +122,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     the --no-plugin combos copy the skill in (plugin mode ships it via the
 #     workflow plugin), and the INDEX gains its row
 _ADDED_SINCE_BASELINE = {
+    # #605: Guards log the governance signal (decision + command)
+    ".agents/hooks/_usage_log.sh",
+    ".agents/hooks/prod_guard.py",
     # #606: the pre-edit issue guard — a new lifecycle hook, not lifecycle-move drift.
     ".agents/hooks/pre_edit_issue_guard.py",
     ".agents/skills/report_upstream_issue/SKILL.md",
