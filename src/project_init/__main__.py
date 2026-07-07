@@ -1284,6 +1284,24 @@ def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict]:
     return selected
 
 
+def _print_wizard_guidance() -> None:
+    """Frame the interactive path so defaults feel intentional, not mysterious."""
+    from rich.console import Console
+    from rich.panel import Panel
+
+    Console().print(
+        Panel(
+            "[bold]Recommended path:[/bold] answer the identity questions, then "
+            "press [bold]Enter[/bold] to accept each default unless you already "
+            "know you need the extra capability.\n\n"
+            "Each optional concern explains what it ships, how it helps, and its "
+            "cost before asking.",
+            title="Project-init wizard",
+            border_style="cyan",
+        )
+    )
+
+
 def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map to prompts
     default_name: str,
     *,
@@ -1331,6 +1349,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     store_true toggles (browser/devcontainer/mise/vscode) skip their prompt when
     set.
     """
+    _print_wizard_guidance()
     resolved_profile = profile or _choose_profile_interactive()
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
     project_name = _prompt_validated("Project name", default=cli_name or default_name, flag="name")
@@ -1986,10 +2005,12 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs, target: Path | None =
             with (target / "pyproject.toml").open("rb") as f:
                 data = tomllib.load(f)
                 req = data.get("project", {}).get("requires-python", "")
+                if not req:
+                    req = data.get("tool", {}).get("poetry", {}).get("dependencies", {}).get("python", "")
                 if req:
                     import re
-                    m = re.search(r'>=?\s*(\d+\.\d+)', req)
-                    if m:
+                    m = re.search(r'(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)', req)
+                    if m and m.group(1):
                         python_floor = m.group(1)
         except Exception:
             pass

@@ -154,7 +154,7 @@ After the **git install** (`install.sh`), a `/project-init` slash command is ava
 /project-init
 ```
 
-This runs the interactive wizard in the current project directory. It asks for project name, language, delivery model, memory stack, and MCPs — then scaffolds `.agents/` for you.
+This runs the interactive wizard in the current project directory. It asks for project name, language, delivery model, memory stack, and MCPs — then scaffolds `.agents/` for you. The recommended path is to answer the identity questions, then press Enter to accept each default unless you already know you need the extra capability.
 
 ### Option 2: From a shell (non-interactive, for CI / scripts)
 
