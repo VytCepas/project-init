@@ -784,9 +784,11 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
                 with (target / "pyproject.toml").open("rb") as f:
                     data = tomllib.load(f)
                     req = data.get("project", {}).get("requires-python", "")
+                    if not req:
+                        req = data.get("tool", {}).get("poetry", {}).get("dependencies", {}).get("python", "")
                     if req:
                         import re
-                        m = re.search(r'>=?\s*(\d+\.\d+)', req)
+                        m = re.search(r'(?:>=?|==|~=|\^|^\s*)\s*(\d+\.\d+)', req)
                         if m and m.group(1):
                             python_floor = m.group(1)
             except Exception:
