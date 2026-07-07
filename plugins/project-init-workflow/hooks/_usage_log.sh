@@ -45,6 +45,12 @@ usage_log() {
     local decision=${4:-}
     local command=${5:-}
 
+    if [ -n "$command" ]; then
+      command="${command:0:500}"
+      # Redact basic auth in URLs (replaces longest match between :// and @)
+      command="${command//:\/\/*@/:\/\/***@}"
+    fi
+
     local root
     if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
       root="$CLAUDE_PROJECT_DIR"

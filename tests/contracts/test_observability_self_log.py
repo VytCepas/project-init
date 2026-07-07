@@ -26,6 +26,7 @@ _LIFECYCLE_PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-lifecycle" / "h
 _LIFECYCLE_HOOK_NAMES = {"github_command_guard.sh", "workflow_state_reminder.sh"}
 _HELPER = _FALLBACK_HOOKS / "_usage_log.sh"
 _PROD_GUARD = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "prod_guard.py"
+_PACKAGE_GUARD = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "package_guard.py"
 
 
 def _source_dir(hook: str) -> Path:
@@ -143,6 +144,28 @@ class TestHelperGating:
         )
         assert result.stdout == "PAYLOAD_STILL_HERE"
 
+    def test_governance_fields_and_escaping(self, tmp_path: Path):
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
+        decision = "block"
+        command = 'echo "hello\nworld" && curl https://user:pass@example.com'
+        quoted_decision = shlex.quote(decision)
+        quoted_command = shlex.quote(command)
+        script = f". {shlex.quote(str(_HELPER))}\nusage_log pre_commit_gate PreToolUse \"\" {quoted_decision} {quoted_command}\n"
+        subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            env={"PATH": "/usr/bin:/bin", "CLAUDE_PROJECT_DIR": str(tmp_path)},
+            cwd=str(tmp_path),
+            timeout=30,
+        )
+        raw = (tmp_path / ".agents" / "observability" / "usage.jsonl").read_text()
+        assert len([line for line in raw.splitlines() if line.strip()]) == 1
+        row = json.loads(raw)
+        assert row["decision"] == "block"
+        # ensure redaction occurred
+        assert row["command"] == 'echo "hello\nworld" && curl https://***@example.com'
+
 
 class TestHookWiring:
     @pytest.mark.parametrize("hook,expected", _WIRED_HOOKS.items())
@@ -216,5 +239,51 @@ class TestProdGuardSelfLog:
         (tmp_path / ".agents" / "observability").mkdir(parents=True)
         payload = {"tool_input": {"command": "ls -la"}, "cwd": str(tmp_path)}
         verdict, log = _run_prod_guard(payload, tmp_path)
+        assert verdict is None  # safe command → no verdict
+        assert log.is_file()  # but the firing is still recorded
+
+
+def _run_package_guard(payload: dict, root: Path) -> tuple[dict | None, Path]:
+    result = subprocess.run(
+        ["python3", str(_PACKAGE_GUARD)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin", "CLAUDE_PROJECT_DIR": str(root)},
+        cwd=str(root),
+        timeout=30,
+    )
+    assert result.returncode == 0, "guard must always exit 0 (fail-open)"
+    verdict = json.loads(result.stdout) if result.stdout.strip() else None
+    return verdict, root / ".agents" / "observability" / "usage.jsonl"
+
+
+class TestPackageGuardSelfLog:
+    def test_blocks_destructive_and_logs_with_observability_on(self, tmp_path: Path):
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
+        payload = {
+            "tool_input": {"command": "npm install totally-nonexistent-package-name-1234"},
+            "permission_mode": "bypassPermissions",
+            "cwd": str(tmp_path),
+            "session_id": "sess-pkg",
+        }
+        verdict, log = _run_package_guard(payload, tmp_path)
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+        rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
+        assert len(rows) == 1
+        assert rows[0]["hook"] == "package_guard"
+        assert rows[0]["session"] == "sess-pkg"
+        assert rows[0]["decision"] == "block"
+        assert rows[0]["command"] == "npm install totally-nonexistent-package-name-1234"
+
+    def test_dormant_without_marker(self, tmp_path: Path):
+        payload = {"tool_input": {"command": "npm install totally-nonexistent-package-name-1234"}, "cwd": str(tmp_path)}
+        _, log = _run_package_guard(payload, tmp_path)
+        assert not log.exists()
+
+    def test_logs_even_when_command_is_safe(self, tmp_path: Path):
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
+        payload = {"tool_input": {"command": "npm run build"}, "cwd": str(tmp_path)}
+        verdict, log = _run_package_guard(payload, tmp_path)
         assert verdict is None  # safe command → no verdict
         assert log.is_file()  # but the firing is still recorded

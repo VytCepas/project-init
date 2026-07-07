@@ -166,6 +166,14 @@ def _find_obs_dir(start: Path) -> Path | None:
     return None
 
 
+def _redact_command(command: str) -> str:
+    """Truncate to 500 chars and redact common secret patterns."""
+    cmd = command[:500]
+    cmd = re.sub(r"(?i)(token|key|secret|password|auth|api_key)=[\w-]+", r"\1=***", cmd)
+    cmd = re.sub(r"://[^@]+@", r"://***@", cmd)
+    return cmd
+
+
 def usage_log(payload: dict, root: Path, decision: str, command: str) -> None:
     """Append a self-log line iff the observability overlay is installed (#406).
 
@@ -185,7 +193,7 @@ def usage_log(payload: dict, root: Path, decision: str, command: str) -> None:
             "event": "PreToolUse",
             "project": str(obs.parent.parent),
             "decision": decision,
-            "command": command,
+            "command": _redact_command(command),
         }
         session = payload.get("session_id") or os.environ.get("CLAUDE_SESSION_ID")
         if session:
@@ -243,7 +251,8 @@ def main() -> int:
 
     decision = "allow"
     if verdict is not None:
-        decision = verdict.get("hookSpecificOutput", {}).get("permissionDecision", "allow")
+        raw_decision = verdict.get("hookSpecificOutput", {}).get("permissionDecision", "allow")
+        decision = "block" if raw_decision == "deny" else raw_decision
 
     # Self-log this firing from the same parsed payload (no second stdin read,
     # #406). Dormant unless the observability overlay is installed; fail-open.
