@@ -400,7 +400,9 @@ def _prompt_menu_index(question: str, count: int, *, default: int) -> int:
         choice = IntPrompt.ask(question, default=default)
         if 1 <= choice <= count:
             return choice
-        Console().print(f"[red]Invalid choice {choice}. Enter a number between 1 and {count}.[/red]")
+        Console().print(
+            f"[red]Invalid choice {choice}. Enter a number between 1 and {count}.[/red]"
+        )
 
 
 def _prompt_validated(label: str, *, default: str, flag: str, allow_empty: bool = False) -> str:
@@ -453,7 +455,7 @@ def _choose_preset_interactive(presets: list[dict]) -> dict:
             "overlays (memory, lifecycle, toolchain).\n\n"
             "[cyan]Helps:[/cyan] pick the closest fit, then the prompts below let "
             "you still decline or add individual pieces.\n"
-            "[dim]Default: the recommended obsidian-only preset. \"core\" is the "
+            '[dim]Default: the recommended obsidian-only preset. "core" is the '
             "leanest (no memory backend).[/dim]",
             title="Preset",
             border_style="cyan",
@@ -845,8 +847,8 @@ def _choose_governance_interactive() -> bool:
         "  [dim]ai-bom.generated.md[/dim]     [dim]# AI bill of materials (AIBOM), "
         "regenerated each run[/dim]\n"
         "  [dim]governance_gate.py[/dim]      [dim]# presence-triggered CI gate (in the merge gate)[/dim]\n\n"
-        "[cyan]Helps:[/cyan] answer \"what AI runs here, on what data, under whose "
-        "sign-off\" for reviewers, customers, and regulators.\n"
+        '[cyan]Helps:[/cyan] answer "what AI runs here, on what data, under whose '
+        'sign-off" for reviewers, customers, and regulators.\n'
         "[cyan]Adopts:[/cyan] NIST AI RMF, ISO/IEC 42001, EU AI Act, OWASP LLM/Agentic "
         "Top 10 — referenced, not re-authored.\n"
         "[cyan]Gate:[/cyan] validates every real SYSTEM_CARD.md and fails on missing/"
@@ -993,7 +995,9 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
     )
     console.print(Panel(body, title="GitHub lifecycle (issue → PR → merge)", border_style="cyan"))
     default_idx = _LIFECYCLE_TIERS.index(default) + 1 if default in _LIFECYCLE_TIERS else 1
-    choice = _prompt_menu_index("Choose a lifecycle tier", len(_LIFECYCLE_TIERS), default=default_idx)
+    choice = _prompt_menu_index(
+        "Choose a lifecycle tier", len(_LIFECYCLE_TIERS), default=default_idx
+    )
     return _LIFECYCLE_TIERS[choice - 1]
 
 
@@ -1171,7 +1175,11 @@ def _require_non_interactive_args(
     """Fail fast when --non-interactive is missing one of its required flags."""
     missing = []
     empty = []
-    for value, flag in ((args.preset, "--preset"), (args.name, "--name"), (args.description, "--description")):
+    for value, flag in (
+        (args.preset, "--preset"),
+        (args.name, "--name"),
+        (args.description, "--description"),
+    ):
         if value is None:
             missing.append(flag)
         elif not value.strip():
@@ -1539,9 +1547,7 @@ _DEPLOY_SUMMARY = {
     "cloud-run": "Google Cloud Run (build one image, ship that exact image to prod)",
     "fly": "Fly.io (build one image, ship that exact image to prod)",
     "k8s": "Kubernetes (kubectl/helm set image to the built image)",
-    "registry": (
-        "publish the image to GitHub Container Registry (GHCR) only — not a deployment"
-    ),
+    "registry": ("publish the image to GitHub Container Registry (GHCR) only — not a deployment"),
     "custom": "container deploy with a TODO ship step you fill in",
 }
 
@@ -1637,6 +1643,7 @@ _AGENT_SURFACES = (
     ("junie", "Junie (skills layer + generated MCP config)"),
     ("ollama", "Ollama (instructions-level only)"),
 )
+
 
 def _choose_agents_interactive() -> list[str]:
     """Present the agent/editor surfaces to scaffold for (ADR-017, #616)."""
@@ -1743,17 +1750,23 @@ def _profile_enforcement(profile: str) -> str:
 # Per-language tooling commands (PI-16): (lint, format, test). Empty strings
 # when no convention applies — templates should wrap usages in
 # {{#if python}}/{{#if node}}/etc.
-_LANGUAGE_COMMANDS: dict[str, tuple[str, str, str]] = {
-    "python": ("uv run ruff check .", "uv run ruff format .", "uv run pytest"),
+_LANGUAGE_COMMANDS: dict[str, tuple[str, str, str, str]] = {
+    "python": (
+        "uv run ruff check .",
+        "uv run ruff format .",
+        "uv run pytest",
+        "uv run python -m {project_slug}",
+    ),
     # node recipes call the tools directly (PI-180): a freshly scaffolded
     # project has no package.json scripts to back `bun run lint`/`format`.
-    "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test"),
-    "go": ("golangci-lint run", "golangci-lint fmt", "go test ./..."),
+    "node": ("bunx eslint .", "bunx @biomejs/biome format --write .", "bun test", "bun run start"),
+    "go": ("golangci-lint run", "golangci-lint fmt", "go test ./...", "go run ."),
     "rust": (
         "cargo clippy -- -D warnings -D clippy::pedantic "
         "-D clippy::cognitive_complexity -D missing_docs",
         "cargo fmt",
         "cargo test",
+        "cargo run",
     ),
 }
 
@@ -1923,10 +1936,7 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
     if value is not None and args.concern != "memory":
         # Only `add memory` takes a value; anything else here is almost always
         # a target path passed positionally (the old, wrong --help synopsis).
-        p.error(
-            f"concern '{args.concern}' takes no value — "
-            f"did you mean --target {value}?"
-        )
+        p.error(f"concern '{args.concern}' takes no value — did you mean --target {value}?")
     if value is not None and args.concern == "memory" and value not in MEMORY_STACKS:
         # Same mistake for `add memory`: a path-looking non-stack value is a
         # mis-placed target, not a typo'd stack (Codex review, PR #601).
@@ -1966,7 +1976,9 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
     return rc
 
 
-def _build_variables(preset: dict, inputs: ScaffoldInputs, target: Path | None = None) -> dict[str, str]:
+def _build_variables(
+    preset: dict, inputs: ScaffoldInputs, target: Path | None = None
+) -> dict[str, str]:
     """Assemble the template render context from the resolved inputs."""
     project_name = inputs.project_name
     project_description = inputs.project_description
@@ -1996,20 +2008,29 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs, target: Path | None =
     # rule, AGENTS/project-init prose). Recorded so `upgrade` re-derives the same
     # set (PI-189); _backfill_variables / _migrate_semantic_config emit it too.
     has_lifecycle = inputs.lifecycle != "none"
-    lint_command, format_command, test_command = _LANGUAGE_COMMANDS.get(language, ("", "", ""))
+    lint_command, format_command, test_command, run_command = _LANGUAGE_COMMANDS.get(
+        language, ("", "", "", "")
+    )
 
     python_floor = "3.11"
     if target and (target / "pyproject.toml").exists():
         try:
             import tomllib
+
             with (target / "pyproject.toml").open("rb") as f:
                 data = tomllib.load(f)
                 req = data.get("project", {}).get("requires-python", "")
                 if not req:
-                    req = data.get("tool", {}).get("poetry", {}).get("dependencies", {}).get("python", "")
+                    req = (
+                        data.get("tool", {})
+                        .get("poetry", {})
+                        .get("dependencies", {})
+                        .get("python", "")
+                    )
                 if req:
                     import re
-                    m = re.search(r'(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)', req)
+
+                    m = re.search(r"(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)", req)
                     if m and m.group(1):
                         python_floor = m.group(1)
         except Exception:
@@ -2040,6 +2061,7 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs, target: Path | None =
         "delivery": inputs.delivery,
         "delivery_library": "true" if inputs.delivery == "library" else "",
         "delivery_service": "true" if inputs.delivery == "service" else "",
+        "not_delivery_service": "" if inputs.delivery == "service" else "true",
         # Deploy overlay (ADR-015, opt-in): the deploy.yml / environments.yaml
         # templates gate on these. deploy_container = build-once-by-digest graph;
         # deploy_registry = publish-image-only; both imply deploy_enabled.
@@ -2071,6 +2093,7 @@ def _build_variables(preset: dict, inputs: ScaffoldInputs, target: Path | None =
         "lint_command": lint_command,
         "format_command": format_command,
         "test_command": test_command,
+        "run_command": run_command.replace("{project_slug}", slugify(project_name) or "my-app"),
         # Docs tooling axis + Renovate gate (#477, ADR-022). Default-ON opt-outs;
         # recorded so `upgrade` re-derives the same set (PI-189). The mkdocs/typedoc
         # gates AND want_docs; renovate.json gates on renovate alone.
