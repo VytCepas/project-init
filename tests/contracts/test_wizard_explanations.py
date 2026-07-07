@@ -72,6 +72,18 @@ def test_calls_cover_every_concern():
     )
 
 
+def test_wizard_guidance_frames_defaults(capsys):
+    cli._print_wizard_guidance()
+    out = capsys.readouterr().out
+
+    assert "Recommended path" in out
+    assert "Enter" in out
+    assert "accept" in out
+    assert "default" in out
+    assert "cost" in out
+    assert "asking" in out
+
+
 @pytest.mark.parametrize("concern", sorted(cli.WIZARD_CONCERN_FLAGS))
 def test_concern_renders_value_explanation(concern, monkeypatch, capsys):
     """Each concern's chooser must print a non-trivial explanation that states
