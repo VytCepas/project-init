@@ -206,6 +206,13 @@ class TestAntigravityOverlay:
         assert not (target / ".agents" / "scripts" / "setup_gemini.sh").exists()
 
 
+    def test_scaffolds_agents_md(self, tmp_path: Path):
+        target = _scaffold_agents(tmp_path / "p", "antigravity")
+        agents_md = target / ".agents" / "AGENTS.md"
+        assert agents_md.exists(), ".agents/AGENTS.md must be scaffolded for Antigravity"
+        assert "[AGENTS.md](../AGENTS.md)" in agents_md.read_text()
+
+
 class TestOllamaTier:
     def test_instructions_level_only(self, tmp_path: Path):
         """Ollama adds documentation, never agent-specific wiring."""
