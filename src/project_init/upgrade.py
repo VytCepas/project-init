@@ -776,24 +776,21 @@ def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
         variables = _migrate_agents(_backfill_variables(variables))
         migrated = True
 
-    if "python_floor" not in variables:
-        python_floor = "3.11"
-        if (target / "pyproject.toml").exists():
-            try:
-                import tomllib
-                with (target / "pyproject.toml").open("rb") as f:
-                    data = tomllib.load(f)
-                    req = data.get("project", {}).get("requires-python", "")
-                    if not req:
-                        req = data.get("tool", {}).get("poetry", {}).get("dependencies", {}).get("python", "")
-                    if req:
-                        import re
-                        m = re.search(r'(?:>=?|==|~=|\^|^\s*)\s*(\d+\.\d+)', req)
-                        if m and m.group(1):
-                            python_floor = m.group(1)
-            except Exception:
-                pass
-        variables["python_floor"] = python_floor
+    if (target / "pyproject.toml").exists():
+        try:
+            import tomllib
+            with (target / "pyproject.toml").open("rb") as f:
+                data = tomllib.load(f)
+                req = data.get("project", {}).get("requires-python", "")
+                if not req:
+                    req = data.get("tool", {}).get("poetry", {}).get("dependencies", {}).get("python", "")
+                if req:
+                    import re
+                    m = re.search(r'(?:>=?|==|~=|\^|^\s*)\s*(\d+\.\d+)', req)
+                    if m and m.group(1):
+                        variables["python_floor"] = m.group(1)
+        except Exception:
+            pass
 
     return preset_name, variables, manifest, migrated
 
