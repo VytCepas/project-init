@@ -100,6 +100,17 @@ class TestObservabilityOn:
         assert "OTEL" in gtext or "OpenTelemetry" in gtext
         assert "documentation only" in gtext.lower()
 
+    def test_usage_report_satisfies_scaffolded_ruff_gates(self, tmp_path: Path):
+        """The generated analyzer is committed into Python projects, so it must
+        satisfy the scaffold's own PERF/S/BLE ruff gates on day one."""
+        target = _scaffold(tmp_path / "p", observability=True)
+        text = (target / ".agents" / "observability" / "usage_report.py").read_text(
+            encoding="utf-8"
+        )
+        assert "candidates.extend(" in text
+        assert "shutil.which(\"git\")" in text
+        assert "# noqa: S603" in text
+
 
 class TestObservabilityOff:
     def test_no_layer_dir(self, tmp_path: Path):

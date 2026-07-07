@@ -52,6 +52,30 @@ def test_choose_mcps_interactive_empty_skips(monkeypatch):
     assert __main__._choose_mcps_interactive(MCP_CATALOG) == []
 
 
+def test_gather_inputs_interactive_enter_defaults_uses_description_default(monkeypatch):
+    """A full interactive accept-defaults flow must not loop forever on an empty
+    required description; it derives a valid default from the accepted name."""
+    monkeypatch.setattr(__main__, "_prompt", lambda _label, default="": default)
+    monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: k.get("default", ""))
+    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: k.get("default", False))
+
+    result = __main__._gather_inputs_interactive(
+        default_name="demo",
+        no_plugin=False,
+        profile="individual",
+        cli_overlays=("prototype", "none", "none", False, False, False),
+        memory_flag="obsidian-only",
+        lifecycle_flag="github",
+        no_docs=True,
+        no_renovate=True,
+        cli_language="none",
+        cli_agents="claude,codex",
+    )
+
+    assert result.project_name == "demo"
+    assert result.project_description == "demo project"
+
+
 def test_prompt_menu_index_reprompts_until_in_range(monkeypatch, capsys):
     """2026-07 QA: the shared numbered-menu helper (preset/profile/delivery/
     deploy/iac/memory/lifecycle) re-asks on out-of-range answers."""

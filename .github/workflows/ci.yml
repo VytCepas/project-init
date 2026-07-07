@@ -46,17 +46,10 @@ jobs:
       - name: Lint (ruff)
         run: uv run ruff check .
 
-      - name: Tests (pytest) — parallel mode
-        # Use xdist when importable, else single-threaded — decided by an
-        # explicit capability check, not `|| retry`, so a genuinely failing
-        # suite is not run twice with its first-pass stderr hidden (2026-07
-        # review).
-        run: |
-          if uv run python -c "import xdist" 2>/dev/null; then
-            uv run pytest -n auto --tb=short -q
-          else
-            uv run pytest --tb=short -q
-          fi
+      - name: Tests (pytest)
+        # Serial execution avoids xdist cross-test interference in upgrade
+        # drift checks while preserving the same assertions CI enforces.
+        run: uv run pytest --tb=short -q
 
   wheel-smoke:
     name: Wheel smoke test

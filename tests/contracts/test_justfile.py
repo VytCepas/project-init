@@ -68,18 +68,20 @@ class TestJustfilePerLanguage:
         assert "gitleaks git --pre-commit" in _recipe_body(text, "scan")
 
     def test_ci_recipe_is_pure_dependency(self, tmp_path: Path):
-        """`ci: lint typecheck test-cov audit` — recipes referencing recipes,
-        no duplicated commands. `test-cov`, not `test` (PI-569): CI must
-        always run the coverage-gated variant. `audit` (PI-568): CI must
-        always run the dependency vulnerability scan too."""
+        """`ci` is recipe-only and day-one self-contained.
+
+        `setup` first seeds whatever dependency/toolchain files exist, then
+        `test-cov` (not `test`, PI-569) and `audit` (PI-568) run through their
+        guarded recipes.
+        """
         target = _scaffold_language(tmp_path / "p", "python")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint typecheck test-cov audit\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: setup lint typecheck test-cov audit\s*$", text, re.MULTILINE)
 
     def test_node_ci_recipe_includes_typecheck(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "node")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint typecheck test audit\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: setup lint typecheck test audit\s*$", text, re.MULTILINE)
         assert "tsc --noEmit" in _recipe_body(text, "typecheck")
         assert "bun audit" in _recipe_body(text, "audit")
 
@@ -169,12 +171,26 @@ class TestJustfilePerLanguage:
         """PI-569 review fix: a project can have tests/ before src/ exists —
         the missing-src/ guard must drop only the coverage flags, not skip
         pytest entirely (that would let a real test failure through `just
-        ci`/`test-cov` silently)."""
+        ci`/`test-cov` silently). If neither src/ nor tests/ exists yet, it
+        skips cleanly so a fresh scaffold's first `just ci` is green."""
         target = _scaffold_language(tmp_path / "p", "python")
         body = _recipe_body((target / "justfile").read_text(), "test-cov")
         assert "if [ -d src ]" in body
-        else_branch = body.split("else", 1)[1]
-        assert "pytest" in else_branch, "the no-src/ branch must still invoke pytest"
+        assert "elif find tests" in body
+        assert "pytest" in body, "the tests-present branch must still invoke pytest"
+        assert "No src/ or test files yet" in body
+
+    def test_python_test_recipe_tolerates_zero_tests(self, tmp_path: Path):
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "test")
+        assert "find tests" in body
+        assert "No test files yet" in body
+
+    def test_python_audit_tolerates_missing_manifest(self, tmp_path: Path):
+        target = _scaffold_language(tmp_path / "p", "python")
+        body = _recipe_body((target / "justfile").read_text(), "audit")
+        assert "pyproject.toml" in body
+        assert "No Python dependency manifest yet" in body
 
     def test_python_setup_uses_dependency_group(self, tmp_path: Path):
         """PI-209: dev deps live in [dependency-groups] (what `uv add --dev`
@@ -201,6 +217,19 @@ class TestJustfilePerLanguage:
         assert "bun add" in body
         for pkg in ("eslint", "typescript", "typescript-eslint", "@biomejs/biome"):
             assert pkg in body, f"setup must install {pkg}"
+
+    def test_node_ci_runs_setup_before_lint(self, tmp_path: Path):
+        """A fresh node scaffold has package.json but no node_modules. `just ci`
+        must seed the eslint import deps before `bunx eslint .` runs."""
+        target = _scaffold_language(tmp_path / "n", "node")
+        text = (target / "justfile").read_text()
+        assert re.search(r"^ci: setup lint typecheck test audit\s*$", text, re.MULTILINE)
+
+    def test_node_audit_tolerates_missing_manifest(self, tmp_path: Path):
+        target = _scaffold_language(tmp_path / "n", "node")
+        body = _recipe_body((target / "justfile").read_text(), "audit")
+        assert "package.json" in body
+        assert "No Node dependency manifest yet" in body
 
     def test_no_justfile_for_language_none(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "none")

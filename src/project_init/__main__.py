@@ -735,9 +735,9 @@ def _print_summary(
 
     # The emitted git hooks, lifecycle scripts, and CI workflows all assume a
     # git repo; say so instead of scaffolding into a bare dir silently
-    # (2026-07 QA). Checked structurally (.git up the tree — a dir, or a file
-    # for worktrees/submodules) — the scaffolder never shells out to git.
-    if not any((p / ".git").exists() for p in (target, *target.resolve().parents)):
+    # (2026-07 QA). Checked structurally (.git up the tree — a valid dir, or a
+    # file for worktrees/submodules) — the scaffolder never shells out to git.
+    if not any(_is_git_marker(p / ".git") for p in (target, *target.resolve().parents)):
         body += (
             "\n[yellow]Note:[/yellow] this directory is not a git repository — "
             "the scaffolded git hooks and CI workflows assume one.\n"
@@ -752,6 +752,15 @@ def _print_summary(
     console.print()
     console.print(Panel(body.rstrip(), title="project-init", border_style="green"))
     console.print()
+
+
+def _is_git_marker(path: Path) -> bool:
+    """Return whether *path* is a real .git marker, not a stray empty dir."""
+    if path.is_file():
+        return True
+    if not path.is_dir():
+        return False
+    return (path / "HEAD").exists() or (path / "commondir").exists()
 
 
 def _print_profile_notice(profile: str, *, no_plugin: bool, no_egress: bool) -> None:
@@ -1361,12 +1370,14 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     resolved_profile = profile or _choose_profile_interactive()
     no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
     project_name = _prompt_validated("Project name", default=cli_name or default_name, flag="name")
-    # No usable default exists for the description, so say it's required up
-    # front — otherwise an accept-all-defaults user loops on a bare "Description"
-    # prompt with no hint why Enter doesn't advance (2026-07 QA).
+    # Interactive accept-default flows need a usable description. The
+    # non-interactive path still requires --description; here we derive a plain
+    # day-one default from the accepted project name so Enter can complete the
+    # wizard without producing an empty config field.
+    default_description = cli_description or f"{project_name} project"
     project_description = _prompt_validated(
-        "Description" if cli_description else "Description (required)",
-        default=cli_description or "",
+        "Description",
+        default=default_description,
         flag="description",
     )
     language = _prompt_choice(

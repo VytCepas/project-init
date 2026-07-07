@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import shutil
+import time
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -699,7 +700,7 @@ def _emit_file(
     conditional on that variable.
     """
     if is_template:
-        rendered = _render(src.read_text(encoding="utf-8"), variables)
+        rendered = _render(_read_template_text(src), variables)
         if not rendered.strip():
             return None
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -707,12 +708,36 @@ def _emit_file(
     else:
         rendered = ""
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest)
+        _copy_template_file(src, dest)
 
     # Preserve executable bit.
-    if src.stat().st_mode & 0o111:
+    if _template_stat(src).st_mode & 0o111:
         dest.chmod(dest.stat().st_mode | 0o111)
     return rendered
+
+
+def _retry_template_io(fn):
+    """Retry a source-template read that races with an editable checkout."""
+    for attempt in range(3):
+        try:
+            return fn()
+        except FileNotFoundError:
+            if attempt == 2:
+                raise
+            time.sleep(0.01)
+    raise AssertionError("unreachable")
+
+
+def _read_template_text(src: Path) -> str:
+    return _retry_template_io(lambda: src.read_text(encoding="utf-8"))
+
+
+def _copy_template_file(src: Path, dest: Path) -> None:
+    _retry_template_io(lambda: shutil.copy2(src, dest))
+
+
+def _template_stat(src: Path):
+    return _retry_template_io(src.stat)
 
 
 def _validate_no_placeholders(offenders: list[str]) -> None:

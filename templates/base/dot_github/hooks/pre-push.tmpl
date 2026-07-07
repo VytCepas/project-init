@@ -63,7 +63,7 @@ while read -r _ local_sha remote_ref _; do
 # present (block the push, bypassable with `git push --no-verify`); fail-open
 # when the toolchain is absent — CI stays the hard backstop.
 if [[ "$PUSHING_BRANCH" == "1" ]]; then
-  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/../.." && pwd))"
   if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
     (cd "$REPO_ROOT" && just --show ci >/dev/null 2>&1); then
     # `just ci` runs against the working tree, but the push ships the committed

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from html import escape
@@ -102,9 +103,9 @@ def discover_transcript(
     candidates: list[tuple[float, Path]] = []
     root = _projects_root()
     if root.is_dir():
-        for f in root.glob("*/*.jsonl"):
-            if _transcript_cwd(f) == target:
-                candidates.append((f.stat().st_mtime, f))
+        candidates.extend(
+            (f.stat().st_mtime, f) for f in root.glob("*/*.jsonl") if _transcript_cwd(f) == target
+        )
     if candidates:
         return max(candidates)[1]
 
@@ -270,13 +271,18 @@ def load_usage_log(obs_dir: Path) -> dict[str, int]:
 def _git_counts(project_dir: Path) -> dict[str, int | None]:
     """Local-git-only productivity signals — no ``gh``, no network."""
 
+    git = shutil.which("git")
+    if git is None:
+        return {"commits": None, "merge_commits": None}
+
     def _run(*args: str) -> str | None:
         try:
-            out = subprocess.run(
-                ["git", "-C", str(project_dir), *args],
+            out = subprocess.run(  # noqa: S603 - local git subcommands are fixed by this module.
+                [git, "-C", str(project_dir), *args],
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
         except (OSError, subprocess.SubprocessError):
             return None
@@ -397,12 +403,14 @@ def render_text(report: dict, transcript: Path) -> str:
         f"  Total: ${c['total_cost_usd']:.4f} over {c['total_tokens']:,} tokens",
         f"  Cache-read ratio: {c['cache_read_ratio']:.1%}",
     ]
-    for row in c["models"]:
-        lines.append(
+    lines.extend(
+        [
             f"    {row['model']}: ${row['cost_usd']:.4f} "
             f"(in {row['input']:,} / out {row['output']:,} / "
             f"cache {row['cache_read']:,}r {row['cache_creation']:,}w)"
-        )
+            for row in c["models"]
+        ]
+    )
     lines += [
         "",
         "== Productivity ==",
