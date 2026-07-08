@@ -10,6 +10,13 @@ from datetime import date
 from pathlib import Path
 
 from project_init import __plugin_version__, __repo_url__, __version__
+from project_init.console import (
+    console,
+    is_interactive,
+    option_line,
+    render_presets,
+    scaffolding,
+)
 from project_init.mcps import (
     MCP_CATALOG,
     PLAYWRIGHT_MCP,
@@ -385,13 +392,11 @@ def _prompt_choice(label: str, valid: tuple[str, ...], *, default: str) -> str:
     must not silently coerce to ``none`` — normalize case and re-prompt with the
     valid set instead (PI review 2026-07).
     """
-    from rich.console import Console
-
     while True:
         value = _prompt(label, default=default).strip().lower()
         if value in valid:
             return value
-        Console().print(f"[red]Invalid choice {value!r}. Valid: {', '.join(valid)}[/red]")
+        console.print(f"[red]Invalid choice {value!r}. Valid: {', '.join(valid)}[/red]")
 
 
 def _prompt_menu_index(question: str, count: int, *, default: int) -> int:
@@ -401,14 +406,13 @@ def _prompt_menu_index(question: str, count: int, *, default: int) -> int:
     number must not silently become the default selection (2026-07 QA) —
     re-prompt with the valid range instead.
     """
-    from rich.console import Console
     from rich.prompt import IntPrompt
 
     while True:
         choice = IntPrompt.ask(question, default=default)
         if 1 <= choice <= count:
             return choice
-        Console().print(
+        console.print(
             f"[red]Invalid choice {choice}. Enter a number between 1 and {count}.[/red]"
         )
 
@@ -420,9 +424,6 @@ def _prompt_validated(label: str, *, default: str, flag: str, allow_empty: bool 
     at the field so the user fixes it in place instead of completing the whole
     wizard only to hit ``parser.error`` and lose every answer (PI review).
     """
-    from rich.console import Console
-
-    console = Console()
     while True:
         value = _prompt(label, default=default)
         err = _text_field_error(flag, value, allow_empty=allow_empty)
@@ -451,10 +452,8 @@ def _default_preset_index(presets: list[dict]) -> int:
 
 
 def _choose_preset_interactive(presets: list[dict]) -> dict:
-    from rich.console import Console
     from rich.panel import Panel
 
-    console = Console()
     # Value framing (#472, ADR-023): say what a preset *is* and that it's only a
     # starting point, so the choice is informed rather than blind.
     console.print(
@@ -469,11 +468,8 @@ def _choose_preset_interactive(presets: list[dict]) -> dict:
             border_style="cyan",
         )
     )
-    console.print("[bold]Available presets:[/bold]")
     default_idx = _default_preset_index(presets)
-    for i, p in enumerate(presets, 1):
-        marker = "  [green](recommended)[/green]" if i == default_idx else ""
-        console.print(f"  [cyan]{i}[/cyan]. {p['name']} — {p['description']}{marker}")
+    render_presets(presets, default_idx)
     console.print()
 
     choice = _prompt_menu_index("Choose a preset", len(presets), default=default_idx)
@@ -481,16 +477,14 @@ def _choose_preset_interactive(presets: list[dict]) -> dict:
 
 
 def _choose_mcps_interactive(catalog: list[dict]) -> list[dict]:
-    from rich.console import Console
     from rich.prompt import Prompt
 
-    console = Console()
     console.print(
         "\n[bold]MCP servers[/bold] — optional plug-in tool servers your agent "
         "can call (Model Context Protocol):"
     )
     for i, m in enumerate(catalog, 1):
-        console.print(f"  [cyan]{i}[/cyan]. {m['name']} — {m['description']}")
+        console.print(option_line(i, m['name'], m['description']))
     console.print()
 
     while True:
@@ -544,10 +538,8 @@ def _choose_browser_interactive() -> bool:
 
 def _choose_profile_interactive() -> str:
     """Present the three distribution profiles and what each bundles (#247, ADR-023)."""
-    from rich.console import Console
     from rich.panel import Panel
 
-    console = Console()
     console.print(
         Panel(
             "A [bold]profile[/bold] sets how this project receives project-init "
@@ -560,7 +552,7 @@ def _choose_profile_interactive() -> str:
         )
     )
     for i, name in enumerate(_PROFILES, 1):
-        console.print(f"  [cyan]{i}[/cyan]. {name} — {_PROFILE_SUMMARY[name]}")
+        console.print(option_line(i, name, _PROFILE_SUMMARY[name]))
     console.print()
     choice = _prompt_menu_index("Choose a profile", len(_PROFILES), default=1)
     return _PROFILES[choice - 1]
@@ -720,46 +712,119 @@ def _emit_preset_list(presets: list[dict], *, as_json: bool) -> None:
 def _print_summary(
     target: Path, created: list[Path], preset_name: str, memory_stack: str = "none"
 ) -> None:
-    from rich.console import Console
-    from rich.panel import Panel
-
-    console = Console()
-
     dirs = sorted({str(p.parent) for p in created if str(p.parent) != "."})
     files_count = len(created)
-
-    body = f"[bold]Preset:[/bold] {preset_name}\n"
-    body += f"[bold]Files:[/bold] {files_count} created/updated\n"
-    body += f"[bold]Target:[/bold] {target.resolve()}\n\n"
-    body += "[bold]Directories:[/bold]\n"
-    for d in dirs[:15]:
-        body += f"  {d}/\n"
-    if len(dirs) > 15:
-        body += f"  ... and {len(dirs) - 15} more\n"
-
     next_step = _MEMORY_NEXT_STEPS.get(memory_stack, "")
-    if next_step:
-        body += f"\n[bold]Next:[/bold] {next_step}\n"
-
     # The emitted git hooks, lifecycle scripts, and CI workflows all assume a
     # git repo; say so instead of scaffolding into a bare dir silently
     # (2026-07 QA). Checked structurally (.git up the tree — a valid dir, or a
     # file for worktrees/submodules) — the scaffolder never shells out to git.
-    if not any(_is_git_marker(p / ".git") for p in (target, *target.resolve().parents)):
-        body += (
-            "\n[yellow]Note:[/yellow] this directory is not a git repository — "
-            "the scaffolded git hooks and CI workflows assume one.\n"
-            "  Run: [bold]git init && git add -A && git commit -m 'scaffold'[/bold]\n"
-        )
-
-    body += (
-        "\n[bold]Start:[/bold] cd into the project and run [bold]claude[/bold] — "
-        "it picks up CLAUDE.md and .agents/ automatically.\n"
+    git_missing = not any(
+        _is_git_marker(p / ".git") for p in (target, *target.resolve().parents)
     )
 
+    # Off a TTY (piped/captured/CI) render plain, unwrapped text — no borders to
+    # word-wrap mid-phrase, and nothing decorative to bloat a transcript.
+    if not is_interactive():
+        _print_summary_plain(
+            target, dirs, files_count, preset_name, next_step, git_missing=git_missing
+        )
+        return
+
+    from rich.panel import Panel
+    from rich.rule import Rule
+    from rich.table import Table
+
+    facts = Table.grid(padding=(0, 2))
+    facts.add_column(style="key", justify="right")
+    facts.add_column()
+    facts.add_row("Preset", preset_name)
+    facts.add_row("Files", f"[success]{files_count}[/success] created/updated")
+    facts.add_row("Target", str(target.resolve()))
+
+    rows: list = [facts, Rule(style="muted"), _directory_tree(dirs)]
+    if next_step:
+        rows.append(f"[heading]Next[/heading]  {next_step}")
+    if git_missing:
+        rows.append(
+            "[warning]⚠ Not a git repository[/warning] — the scaffolded git hooks and "
+            "CI workflows assume one.\n"
+            "  Run [heading]git init && git add -A && git commit -m 'scaffold'[/heading]"
+        )
+    rows.append(
+        "[heading]Start[/heading]  cd into the project and run [key]claude[/key] — "
+        "it picks up CLAUDE.md and .agents/ automatically."
+    )
+
+    body = Table.grid(padding=(1, 0))
+    body.add_column()
+    for row in rows:
+        body.add_row(row)
+
     console.print()
-    console.print(Panel(body.rstrip(), title="project-init", border_style="green"))
+    console.print(
+        Panel(
+            body,
+            title="[success]✔ project-init — scaffold complete[/success]",
+            border_style="success",
+            padding=(1, 2),
+        )
+    )
     console.print()
+
+
+def _print_summary_plain(  # noqa: PLR0913 — one arg per rendered summary field
+    target: Path,
+    dirs: list[str],
+    files_count: int,
+    preset_name: str,
+    next_step: str,
+    *,
+    git_missing: bool,
+    limit: int = 24,
+) -> None:
+    """Colourless, unwrapped summary for non-TTY runs (uses builtin print)."""
+    print()
+    print("project-init — scaffold complete")
+    print(f"  Preset: {preset_name}")
+    print(f"  Files:  {files_count} created/updated")
+    print(f"  Target: {target.resolve()}")
+    for d in dirs[:limit]:
+        print(f"    {d}/")
+    if len(dirs) > limit:
+        print(f"    ... and {len(dirs) - limit} more")
+    if next_step:
+        print(f"  Next: {next_step}")
+    if git_missing:
+        print(
+            "  Note: this directory is not a git repository — the scaffolded git "
+            "hooks and CI workflows assume one."
+        )
+        print("    Run: git init && git add -A && git commit -m 'scaffold'")
+    print(
+        "  Start: cd into the project and run claude — it picks up CLAUDE.md and "
+        ".agents/ automatically."
+    )
+    print()
+
+
+def _directory_tree(dirs: list[str], *, limit: int = 24):
+    """A nested rich Tree of the created directories (flat list was fragile)."""
+    from rich.tree import Tree
+
+    root = Tree("[heading].[/heading]", guide_style="muted")
+    nodes: dict[str, object] = {"": root}
+    for d in dirs[:limit]:
+        path = ""
+        parent = root
+        for part in d.split("/"):
+            path = f"{path}/{part}" if path else part
+            if path not in nodes:
+                nodes[path] = parent.add(f"[info]{part}/[/info]")
+            parent = nodes[path]
+    if len(dirs) > limit:
+        root.add(f"[muted]… and {len(dirs) - limit} more[/muted]")
+    return root
 
 
 def _is_git_marker(path: Path) -> bool:
@@ -777,8 +842,6 @@ def _print_profile_notice(profile: str, *, no_plugin: bool, no_egress: bool) -> 
     Called on the non-interactive path so a default is never applied silently:
     it states the profile, the delivery, the egress posture, and enforcement.
     """
-    from rich.console import Console
-
     delivery = "project-init copied in locally" if no_plugin else "plugin-first"
     # --no-plugin only copies project-init's own payload; the external official
     # marketplace stays enabled until no-egress mode (#258) omits it.
@@ -787,7 +850,7 @@ def _print_profile_notice(profile: str, *, no_plugin: bool, no_egress: bool) -> 
         if no_egress
         else "external official marketplace enabled (network egress)"
     )
-    Console().print(
+    console.print(
         f"[cyan]Profile:[/cyan] {profile} — {_PROFILE_SUMMARY[profile]}\n"
         f"[cyan]Delivery:[/cyan] {delivery}; {egress}; "
         f"[cyan]enforcement:[/cyan] {_profile_enforcement(profile)}"
@@ -804,11 +867,9 @@ def _choose_multi_model_interactive() -> bool:
     pre-accepts via the flag and skips this; only an interactive run without the
     flag reaches here.
     """
-    from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Confirm
 
-    console = Console()
     body = (
         "Run other models [bold]through the Claude Code harness[/bold] via "
         "claude-code-router (CCR) — one terminal, live switching, and automatic "
@@ -844,11 +905,9 @@ def _choose_governance_interactive() -> bool:
     pre-accepts via the flag and skips this. Most projects are not AI products,
     so it is strictly opt-in and off by default.
     """
-    from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Confirm
 
-    console = Console()
     body = (
         "Ship [bold]governance-as-code[/bold] — versioned, reviewed policy that "
         "travels with the repo — for projects that build or operate an AI "
@@ -887,11 +946,9 @@ def _choose_observability_interactive() -> bool:
     informed choice or declines; declining leaves a clean project. Passing
     --observability pre-accepts via the flag and skips this. Off by default.
     """
-    from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Confirm
 
-    console = Console()
     body = (
         "Get a [bold]file-based usage report[/bold] for your agent sessions — "
         "tokens, tool calls, and activity — with [bold]no Docker, no OTEL, and "
@@ -934,10 +991,8 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
     project). Passing --memory pre-selects and skips this. The default follows
     the chosen preset's memory stack.
     """
-    from rich.console import Console
     from rich.panel import Panel
 
-    console = Console()
     default_idx = _MEMORY_STACKS.index(default) + 1 if default in _MEMORY_STACKS else 3
     body = (
         "A [bold]memory backend[/bold] gives your agents a place to persist "
@@ -989,10 +1044,8 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
     --lifecycle pre-selects and skips this. The default follows the chosen
     preset's lifecycle tier.
     """
-    from rich.console import Console
     from rich.panel import Panel
 
-    console = Console()
     body = (
         "The [bold]GitHub lifecycle[/bold] tier ships project-init's flagship "
         "workflow — [bold]issue → branch → PR → review → merge[/bold], enforced "
@@ -1027,11 +1080,10 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
 # new concern can't ship without an explanation.
 def _explain_and_confirm(title: str, body: str, question: str, *, default: bool) -> bool:
     """Render a concise explanation Panel for a toolchain toggle, then ask."""
-    from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Confirm
 
-    Console().print(Panel(body, title=title, border_style="cyan"))
+    console.print(Panel(body, title=title, border_style="cyan"))
     return Confirm.ask(question, default=default)
 
 
@@ -1152,10 +1204,8 @@ WIZARD_MECHANICAL_FLAGS: frozenset[str] = frozenset(
 
 def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
     """Warn that user-owned files were kept; renders landed as .new siblings."""
-    from rich.console import Console
     from rich.panel import Panel
 
-    console = Console()
     body = (
         "Your existing files were [bold]not overwritten[/bold]. The new "
         "project-init version of each was written alongside as a sibling — "
@@ -1171,10 +1221,8 @@ def _print_mcp_commands(selected: list[dict]) -> None:
     if not selected:
         return
 
-    from rich.console import Console
     from rich.panel import Panel
 
-    console = Console()
     body = "\n".join(m["command"] for m in selected)
     console.print(
         Panel(
@@ -1236,9 +1284,8 @@ def _resolve_iac_interactive(iac: str | None) -> str:
         try:
             return resolve_iac(iac)
         except ValueError as e:
-            from rich.console import Console
 
-            Console().print(f"[red]{e}[/red]")
+            console.print(f"[red]{e}[/red]")
     return _choose_iac_interactive()
 
 
@@ -1252,14 +1299,12 @@ def _resolve_overlays_interactive(
     error into a parser.error). Deploy applies only to services; IaC is
     independent of delivery.
     """
-    from rich.console import Console
-
     resolved_delivery = None
     if delivery:
         try:
             resolved_delivery = resolve_delivery(delivery, language)
         except ValueError as e:
-            Console().print(f"[red]{e}[/red]")
+            console.print(f"[red]{e}[/red]")
     if resolved_delivery is None:
         resolved_delivery = _choose_delivery_interactive(language)
 
@@ -1267,7 +1312,7 @@ def _resolve_overlays_interactive(
 
     if resolved_delivery != "service":
         if deploy and deploy.strip().lower() not in ("", "none"):
-            Console().print(
+            console.print(
                 f"[yellow]--deploy {deploy} ignored: deploy targets apply only to "
                 f"delivery=service (this is {resolved_delivery}).[/yellow]"
             )
@@ -1277,7 +1322,7 @@ def _resolve_overlays_interactive(
         try:
             resolved_deploy = resolve_deploy(deploy, resolved_delivery)
         except ValueError as e:
-            Console().print(f"[red]{e}[/red]")
+            console.print(f"[red]{e}[/red]")
     if resolved_deploy is None:
         resolved_deploy = _choose_deploy_interactive()
     return resolved_delivery, resolved_deploy, resolved_iac
@@ -1293,9 +1338,8 @@ def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict]:
         try:
             selected = _resolve_mcps_non_interactive(cli_mcps, cli_browser)
         except ValueError as e:
-            from rich.console import Console
 
-            Console().print(f"[red]{e}[/red] — choose from the catalog instead.")
+            console.print(f"[red]{e}[/red] — choose from the catalog instead.")
         else:
             # --mcps pins the catalog picks, but browser automation is its own
             # concern (ADR-023) — still offer it when --browser was not given,
@@ -1311,10 +1355,9 @@ def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict]:
 
 def _print_wizard_guidance() -> None:
     """Frame the interactive path so defaults feel intentional, not mysterious."""
-    from rich.console import Console
     from rich.panel import Panel
 
-    Console().print(
+    console.print(
         Panel(
             "[bold]Recommended path:[/bold] answer the identity questions, then "
             "press [bold]Enter[/bold] to accept each default unless you already "
@@ -1460,9 +1503,8 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         try:
             agents = resolve_agents(cli_agents)
         except ValueError as e:
-            from rich.console import Console
 
-            Console().print(f"[red]{e}[/red]")
+            console.print(f"[red]{e}[/red]")
             agents = _choose_agents_interactive()
     else:
         agents = _choose_agents_interactive()
@@ -1540,12 +1582,9 @@ def _choose_delivery_interactive(language: str) -> str:
     Re-prompts if the choice is invalid for the chosen language (a service needs
     a language toolchain).
     """
-    from rich.console import Console
-
-    console = Console()
     console.print("\n[bold]How is this delivered?[/bold]")
     for i, name in enumerate(_DELIVERY, 1):
-        console.print(f"  {i}. [cyan]{name}[/cyan] — {_DELIVERY_SUMMARY[name]}")
+        console.print(option_line(i, name, _DELIVERY_SUMMARY[name]))
     while True:
         choice = _prompt_menu_index("Choose a delivery model", len(_DELIVERY), default=3)
         try:
@@ -1594,12 +1633,9 @@ def resolve_deploy(raw: str | None, delivery: str) -> str:
 
 def _choose_deploy_interactive() -> str:
     """Present the deploy options (ADR-015); default none. Shown only for services."""
-    from rich.console import Console
-
-    console = Console()
     console.print("\n[bold]How is this service deployed?[/bold]")
     for i, name in enumerate(_DEPLOY_TARGETS, 1):
-        console.print(f"  {i}. [cyan]{name}[/cyan] — {_DEPLOY_SUMMARY[name]}")
+        console.print(option_line(i, name, _DEPLOY_SUMMARY[name]))
     choice = _prompt_menu_index("Choose a deploy target", len(_DEPLOY_TARGETS), default=1)
     return _DEPLOY_TARGETS[choice - 1]
 
@@ -1631,12 +1667,9 @@ def resolve_iac(raw: str | None) -> str:
 
 def _choose_iac_interactive() -> str:
     """Present the IaC options (ADR-015); default none."""
-    from rich.console import Console
-
-    console = Console()
     console.print("\n[bold]Infrastructure-as-Code overlay?[/bold]")
     for i, name in enumerate(_IAC_OPTIONS, 1):
-        console.print(f"  {i}. [cyan]{name}[/cyan] — {_IAC_SUMMARY[name]}")
+        console.print(option_line(i, name, _IAC_SUMMARY[name]))
     choice = _prompt_menu_index("Choose an IaC overlay", len(_IAC_OPTIONS), default=1)
     return _IAC_OPTIONS[choice - 1]
 
@@ -1669,11 +1702,9 @@ _AGENT_SURFACES = (
 
 def _choose_agents_interactive() -> list[str]:
     """Present the agent/editor surfaces to scaffold for (ADR-017, #616)."""
-    from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Prompt
 
-    console = Console()
     body = (
         "Project-init configures [bold]agent and editor surfaces[/bold] so they "
         "know your rules and hooks. [bold]Claude[/bold] is always supported.\n\n"
@@ -2622,7 +2653,8 @@ def _cli(argv: list[str]) -> int:
     conflicts: list[tuple[Path, Path]] = []
 
     try:
-        created = scaffold(target, preset, variables, strict=args.strict, conflicts=conflicts)
+        with scaffolding():
+            created = scaffold(target, preset, variables, strict=args.strict, conflicts=conflicts)
         _record_scaffold(target, preset, variables, created)
     except TemplateRenderError as e:
         sys.stderr.write(f"error: {e}\n")
