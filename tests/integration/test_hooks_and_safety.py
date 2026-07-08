@@ -159,17 +159,30 @@ class TestPrePushLifecycleGate:
     """ADR-007: pre-push enforces branch naming with the same rule as dag_workflow.py."""
 
     @pytest.fixture(autouse=True)
-    def _scaffold(self, tmp_target: Path):
+    def _scaffold(self, tmp_target: Path, tmp_path: Path):
         self.target = tmp_target
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         self.hook = self.target / ".github" / "hooks" / "pre-push"
+        # Neutralize the hook's `just ci` gate: the hook runs from pytest's
+        # cwd (this repo), so with a real `just` on PATH and a CLEAN worktree
+        # the gate would run THIS repo's full suite — which re-runs this test,
+        # recursively, forever (PI-649 discovery; only the branch-naming rules
+        # are under test here). A stub `just` that exits nonzero makes the
+        # gate's `just --show ci` probe fail → deterministic fail-open.
+        stub_bin = tmp_path / "stub-bin"
+        stub_bin.mkdir(exist_ok=True)
+        stub = stub_bin / "just"
+        stub.write_text("#!/bin/sh\nexit 1\n")
+        stub.chmod(0o755)
+        self._gate_env = os.environ.copy()
+        self._gate_env["PATH"] = f"{stub_bin}:{self._gate_env['PATH']}"
 
     SHA = "a" * 40
     ZERO = "0" * 40
 
     def _push(self, remote_ref: str, local_sha: str | None = None):
         line = f"refs/heads/x {local_sha or self.SHA} {remote_ref} {self.ZERO}\n"
-        return _run_hook(self.hook, stdin=line)
+        return _run_hook(self.hook, stdin=line, env=self._gate_env)
 
     def test_blocks_push_to_main(self):
         result = self._push("refs/heads/main")
