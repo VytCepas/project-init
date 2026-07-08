@@ -1113,11 +1113,14 @@ def _generate_claude_projection(
 ) -> None:
     """Project the Claude-read subset of `.agents/` into `.claude/` (PI-627).
 
-    Claude Code reads project config (settings.json, hooks, skills, commands,
-    subagents) from `.claude/` only — it does NOT read a top-level `.agents/`
-    natively (verified empirically against the CLI: a hook defined only in
-    `.agents/settings.json` never fires; the same hook under `.claude/` does).
-    Every other surface reads `.agents/` directly.
+    Claude Code reads its config (settings.json — including hook *wiring* — plus
+    skills, commands, subagents) from `.claude/` only; it does NOT read a
+    top-level `.agents/` natively (verified empirically against the CLI: a hook
+    defined only in `.agents/settings.json` never fires; the same hook under
+    `.claude/settings.json` does). The hook *scripts* stay canonical — the
+    projected settings.json points hook commands at `.agents/hooks/…`, so
+    `.claude/hooks/` is never needed (and is excluded below). Every other surface
+    reads `.agents/` directly.
 
     Only the config surface Claude discovers is projected; project state,
     descriptors, and lifecycle machinery are excluded (see `_PROJECTION_EXCLUDE`)
@@ -1153,23 +1156,23 @@ def _generate_claude_projection(
     if not agents_dir.exists():
         return
 
-    # Clear any prior projection before rebuilding: a real dir (avoids a stale
-    # union), or a symlink / git-materialized symlink-file left by an earlier
-    # version (a symlink and a plain file are both removed with unlink()).
-    if claude_dir.is_symlink() or claude_dir.is_file():
+    # Clear any prior projection before rebuilding. On the first scaffold, ANY
+    # pre-existing `.claude/` — a non-empty directory, a custom symlink, or a
+    # plain file — is user-authored Claude config being adopted, so it is parked
+    # as a sibling and reported, never deleted. On a later run (or an empty dir)
+    # it is our own generated projection: a real dir is rebuilt, and a stale
+    # symlink / git-materialized symlink-file is removed with unlink().
+    real_dir = claude_dir.is_dir() and not claude_dir.is_symlink()
+    user_config = claude_dir.is_symlink() or claude_dir.is_file() or (real_dir and any(claude_dir.iterdir()))
+    if first_scaffold and user_config:
+        backup = _unique_backup_dir(claude_dir)
+        claude_dir.rename(backup)  # rename moves a dir, symlink, or file alike
+        if conflicts is not None:
+            conflicts.append((claude_dir.relative_to(target), backup.relative_to(target)))
+    elif claude_dir.is_symlink() or claude_dir.is_file():
         claude_dir.unlink()
-    elif claude_dir.is_dir():
-        if first_scaffold and any(claude_dir.iterdir()):
-            # Adoption: preserve the user's pre-existing Claude config instead of
-            # deleting it (route through conflict preservation, never clobber).
-            backup = _unique_backup_dir(claude_dir)
-            claude_dir.rename(backup)
-            if conflicts is not None:
-                conflicts.append(
-                    (claude_dir.relative_to(target), backup.relative_to(target))
-                )
-        else:
-            shutil.rmtree(claude_dir)
+    elif real_dir:
+        shutil.rmtree(claude_dir)
 
     agents_resolved = agents_dir.resolve()
 

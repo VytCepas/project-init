@@ -1,8 +1,11 @@
 """The `.claude` config projection (PI-627, #627).
 
-Claude Code reads project config (settings.json, hooks, skills, commands,
-subagents) from `.claude/` only — not from a top-level `.agents/` natively
-(verified empirically against the CLI). Every other surface reads `.agents/`.
+Claude Code reads its project config (settings.json — including hook *wiring* —
+plus skills, commands, subagents) from `.claude/` only, not from a top-level
+`.agents/` natively (verified empirically against the CLI). The hook *scripts*
+themselves are not projected: `.claude/settings.json` points hook commands at the
+canonical `.agents/hooks/…`, so `.claude/hooks/` is never needed. Every other
+surface reads `.agents/`.
 
 The projection copies only the config surface Claude discovers and EXCLUDES
 project state/descriptors (`memory/`, `vault/`, `docs/`, `governance/`,
@@ -119,20 +122,23 @@ def test_idempotent_and_reflects_edits(tmp_path: Path):
 
 
 def test_legacy_symlink_is_replaced_with_real_dir(tmp_path: Path):
+    # A re-run (first_scaffold=False): an interim-build .claude symlink is our
+    # own stale artifact, so it is replaced with a real dir in place.
     _mk_agents(tmp_path)
     (tmp_path / ".claude").symlink_to(".agents", target_is_directory=True)
-    _generate_claude_projection(tmp_path)
+    _generate_claude_projection(tmp_path, first_scaffold=False)
     claude = tmp_path / ".claude"
     assert claude.is_dir() and not claude.is_symlink()
     assert (claude / "settings.json").exists()
 
 
 def test_git_materialized_symlink_file_is_replaced(tmp_path: Path):
-    # On a Windows/macOS clone (core.symlinks=false) a committed symlink lands as
-    # a plain text file; a re-projection must replace it with a real dir.
+    # On a Windows/macOS clone (core.symlinks=false) a legacy committed symlink
+    # lands as a plain text file; re-projecting that project (first_scaffold=False)
+    # must replace it with a real dir.
     _mk_agents(tmp_path)
     (tmp_path / ".claude").write_text(".agents")
-    _generate_claude_projection(tmp_path)
+    _generate_claude_projection(tmp_path, first_scaffold=False)
     assert (tmp_path / ".claude").is_dir()
     assert (tmp_path / ".claude" / "settings.json").exists()
 
@@ -156,6 +162,44 @@ def test_first_scaffold_preserves_pre_existing_user_claude(tmp_path: Path):
     # Fresh projection written; conflict reported.
     assert (tmp_path / ".claude" / "settings.json").read_text() == '{"hooks": {}}'
     assert (Path(".claude"), Path(".claude.pre-project-init")) in conflicts
+
+
+def test_first_scaffold_preserves_pre_existing_claude_symlink(tmp_path: Path):
+    # Adoption can also present a user-authored .claude *symlink* (or file) — it
+    # must be parked, not unlinked, on the first scaffold.
+    _mk_agents(tmp_path)
+    (tmp_path / "my-config").mkdir()
+    (tmp_path / ".claude").symlink_to("my-config", target_is_directory=True)
+    conflicts: list = []
+
+    _generate_claude_projection(tmp_path, first_scaffold=True, conflicts=conflicts)
+
+    backup = tmp_path / ".claude.pre-project-init"
+    assert backup.is_symlink()  # the user's symlink preserved intact
+    assert (tmp_path / ".claude").is_dir() and not (tmp_path / ".claude").is_symlink()
+    assert (tmp_path / ".claude" / "settings.json").exists()
+    assert (Path(".claude"), Path(".claude.pre-project-init")) in conflicts
+
+
+def test_first_scaffold_preserves_pre_existing_claude_file(tmp_path: Path):
+    _mk_agents(tmp_path)
+    (tmp_path / ".claude").write_text("my hand-written config file")
+    conflicts: list = []
+
+    _generate_claude_projection(tmp_path, first_scaffold=True, conflicts=conflicts)
+
+    assert (tmp_path / ".claude.pre-project-init").read_text() == "my hand-written config file"
+    assert (tmp_path / ".claude").is_dir()
+
+
+def test_re_run_removes_stale_symlink_without_backup(tmp_path: Path):
+    # On a later run a .claude symlink is our own stale artifact → replaced, not
+    # backed up.
+    _mk_agents(tmp_path)
+    (tmp_path / ".claude").symlink_to(".agents", target_is_directory=True)
+    _generate_claude_projection(tmp_path, first_scaffold=False, conflicts=[])
+    assert not (tmp_path / ".claude.pre-project-init").exists()
+    assert (tmp_path / ".claude").is_dir() and not (tmp_path / ".claude").is_symlink()
 
 
 def test_backup_name_is_unique(tmp_path: Path):

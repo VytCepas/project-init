@@ -229,12 +229,16 @@ class TestRunCommandModuleName:
         assert render_run_command("uv run python -m {project_slug}", "") == "uv run python -m my_app"
 
     def test_upgrade_paths_call_the_shared_renderer(self):
-        # Both upgrade backfill sites route through render_run_command, so a
-        # hyphenated slug can't reintroduce `python -m my-app` on upgrade.
+        # Both upgrade backfill sites assign run_command via the shared renderer,
+        # so a hyphenated slug can't reintroduce `python -m my-app` on upgrade —
+        # and the raw kebab substitution is gone. Asserting the specific
+        # assignments (not a total occurrence count) stays robust to unrelated
+        # refactors that mention the function elsewhere.
         import inspect
 
         from project_init import upgrade
 
         src = inspect.getsource(upgrade)
-        assert src.count("render_run_command(") == 2
+        assert 'variables["run_command"] = render_run_command(' in src
+        assert 'v.setdefault("run_command", render_run_command(' in src
         assert 'run_cmd.replace("{project_slug}"' not in src
