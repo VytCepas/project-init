@@ -11,13 +11,15 @@
 useDefault = true
 
 [allowlist]
-description = "scaffold record (content hashes) + example/config templates (placeholder keys, not secrets)."
+description = "project-init scaffold record (content hashes, not secrets)."
+# Deliberately NARROW: allowlist only the specific generated file whose content
+# hashes trip the default rules (.agents/config.yaml, PI-554). We do NOT
+# allowlist whole example/config templates by path — that would create a blind
+# spot where a real credential later committed to a `.env.example` / `*.example.*`
+# file goes unscanned by both the pre-commit and CI gitleaks gates. Those example
+# files ship empty or "$VAR" placeholders that don't trip the default ruleset
+# anyway (verified against the governance + multi-model overlays), so no
+# example-path exemption is needed.
 paths = [
   '''\.agents/config\.yaml''',
-  # Example env files (.env.example) and *.example.<ext> config templates ship
-  # placeholder or "$VAR" keys, not real secrets — e.g. the governance and
-  # multi-model overlays. Without this a scaffold with those overlays can trip
-  # the generic-api-key / high-entropy rules on its first CI secret scan.
-  '''(^|/)\.env\.example$''',
-  '''\.example\.[^/]+$''',
 ]
