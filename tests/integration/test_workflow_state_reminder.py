@@ -66,10 +66,21 @@ class TestSessionScopedInjection:
         _run_hook(self.hook, "implement it", "sess-b", tmp_path)
         second = _run_hook(self.hook, "now push the branch", "sess-b", tmp_path)
         assert _STATIC_MARKER not in second
-        # Either dynamic-state-only (with pointer) or fully silent — never the
-        # static block again.
-        if second:
-            assert _REPEAT_MARKER in second
+        # The DAG state is unchanged between the two triggers, so the repeat
+        # is fully silent (the sentinel stores the state hash).
+        assert second == ""
+
+    def test_changed_dag_state_reinjects_dynamic_block_only(self, tmp_path: Path):
+        first = _run_hook(self.hook, "implement it", "sess-b2", tmp_path)
+        assert _STATIC_MARKER in first
+        # Simulate a DAG-state change by poking the stored hash.
+        sentinels = list(tmp_path.glob("pi_wsr_*"))
+        assert len(sentinels) == 1
+        sentinels[0].write_text("stale-hash")
+        second = _run_hook(self.hook, "now push the branch", "sess-b2", tmp_path)
+        assert _STATIC_MARKER not in second
+        assert _REPEAT_MARKER in second
+        assert "Current DAG nodes:" in second
 
     def test_new_session_reinjects_full_rules(self, tmp_path: Path):
         _run_hook(self.hook, "implement it", "sess-c", tmp_path)
@@ -92,6 +103,7 @@ class TestSessionScopedInjection:
         context = _run_hook(self.hook, "implement it", malicious, tmp_path)
         assert _STATIC_MARKER in context
         assert not (tmp_path / ".." / ".." / "etc").exists()
-        # The stripped id still dedups on repeat.
+        # The stripped id still dedups on repeat (silent: state unchanged).
         second = _run_hook(self.hook, "implement it", malicious, tmp_path)
         assert _STATIC_MARKER not in second
+        assert second == ""

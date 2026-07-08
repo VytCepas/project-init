@@ -50,11 +50,14 @@ if not trigger:
 dag_state = os.environ.get("DAG_STATE", "").strip()
 
 # Session-scoped dedup (ADR-028): the static rules are injected once per
-# session. The sentinel is keyed on the session_id from the hook payload plus
-# a project-dir hash (parallel sessions in different repos must not collide).
-# Any failure here falls back to first_time=True — the full block is safe,
-# just token-costly.
+# session, and the dynamic DAG state is re-injected only when it CHANGED
+# since the last injection (the sentinel stores its hash). The sentinel is
+# keyed on the session_id from the hook payload plus a project-dir hash
+# (parallel sessions in different repos must not collide). Any failure here
+# falls back to first_time=True — the full block is safe, just token-costly.
 first_time = True
+state_changed = True
+cur_hash = hashlib.sha256(dag_state.encode()).hexdigest()[:16]
 session_id = re.sub(r"[^A-Za-z0-9_-]", "", str(data.get("session_id") or ""))[:64]
 if session_id:
     proj = hashlib.sha256(
@@ -66,11 +69,14 @@ if session_id:
     try:
         if os.path.exists(sentinel):
             first_time = False
-        else:
-            with open(sentinel, "w"):
-                pass
+            with open(sentinel) as fh:
+                state_changed = fh.read().strip() != cur_hash
+        if first_time or state_changed:
+            with open(sentinel, "w") as fh:
+                fh.write(cur_hash)
     except OSError:
         first_time = True
+        state_changed = True
 
 state_block = f"\nCurrent DAG nodes:\n{dag_state}\n" if dag_state else ""
 
@@ -95,14 +101,15 @@ if first_time:
         "Details (review cycles, iterating before push): load the github_workflow skill.\n"
         f"{state_block}"
     )
-elif state_block:
+elif state_block and state_changed:
     context = (
         "Lifecycle reminder (full rules were injected earlier this session; "
         "load the github_workflow skill for details).\n"
         f"{state_block}"
     )
 else:
-    # Rules already shown and no DAG state to report — nothing new to say.
+    # Rules already shown and the DAG state is unchanged (or absent) —
+    # nothing new to say.
     sys.exit(0)
 
 print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": context}}))

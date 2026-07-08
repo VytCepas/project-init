@@ -37,10 +37,11 @@ AGENTS.md workflow quick-ref and the `github_workflow` skill.
    64-char cap) plus an 8-char SHA-256 hash of the project directory
    (parallel sessions in different repos must not collide):
    `$TMPDIR/pi_wsr_<proj-hash>_<session_id>`. First trigger of a session
-   injects the rules block and touches the sentinel; later triggers inject
-   only the dynamic `Current DAG nodes` state plus a one-line pointer to the
-   `github_workflow` skill. If there is no DAG state to report, later
-   triggers inject nothing at all.
+   injects the rules block and writes a 16-char hash of the current DAG
+   state into the sentinel; later triggers inject the dynamic `Current DAG
+   nodes` state (plus a one-line pointer to the `github_workflow` skill)
+   **only when that state changed** since the last injection. Unchanged or
+   absent state — the common case mid-session — injects nothing at all.
 2. **Trim the static block.** The wrapper-script map keeps every
    banned-command → wrapper mapping but drops the tutorial prose; naming
    rules collapse to one line; review-cycle/iteration details defer to the
