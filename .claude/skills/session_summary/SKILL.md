@@ -13,7 +13,9 @@ Summarize this session and save it to the vault:
    - Run `git diff --stat` for uncommitted changes
    - Review the conversation for key decisions and discoveries
 
-2. **Write the summary** to `.claude/vault/sessions/` with today's date:
+2. **Write the summary** to `.agents/vault/sessions/` with today's date (the
+   canonical, preserved state dir — never `.claude/`, which is a regenerated
+   projection and would be wiped on the next sync):
    ```
    # Session YYYY-MM-DD (manual)
 

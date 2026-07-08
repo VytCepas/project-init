@@ -2,7 +2,7 @@
 
 ## Overview
 
-The scaffolder is a deterministic tool that generates `.claude/` layouts and configuration for other projects.
+The scaffolder is a deterministic tool that generates a canonical `.agents/` layout and configuration for other projects. Claude Code reads its config from `.claude/`, so the scaffolder also writes a scoped `.claude/` projection of the Claude-read config surface (see ADR-027); `.agents/` is the single source of truth.
 
 ## Core Components
 
@@ -17,7 +17,7 @@ Templates are stored in `templates/` and copied into target projects:
 ### Template Naming
 
 Files are prefixed with `dot_` to remain visible in GitHub:
-- `dot_claude/` → `.claude/`
+- `dot_agents/` → `.agents/`
 - `dot_gitignore` → `.gitignore`
 - `dot_env` → `.env`
 
@@ -26,7 +26,9 @@ Files are prefixed with `dot_` to remain visible in GitHub:
 1. User runs `install.sh` (curl | bash)
 2. Wizard CLI prompts for configuration
 3. Templates are copied and variables substituted
-4. `.claude/` directory is initialized with skills, hooks, scripts
+4. `.agents/` is initialized with skills, hooks, scripts, rules; a scoped
+   `.claude/` projection of the Claude-read config surface is written for
+   Claude Code (state/machinery stay in `.agents/` only)
 5. Project is ready for Claude Code
 
 ## Key Design Principles
