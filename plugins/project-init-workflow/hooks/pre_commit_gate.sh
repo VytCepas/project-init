@@ -145,9 +145,12 @@ if command -v just >/dev/null 2>&1 && [ -f "$ROOT/justfile" ] &&
 fi
 
 if [ -n "$ERRORS" ]; then
-  "$PY" -c "
+  # $ERRORS travels via stdin, not argv: a single argv entry is capped by the
+  # OS (~128KB on Linux), so a huge lint report would fail the exec with E2BIG
+  # and the deny would never be emitted — a gate bypass (Codex review).
+  printf '%s' "$ERRORS" | "$PY" -c "
 import json, sys
-errors = sys.argv[1].replace('\\\\n', '\n')
+errors = sys.stdin.read().replace('\\\\n', '\n')
 # Token-efficiency (PI-651, epic #641): the deny reason persists in the
 # transcript and is re-sent every turn — cap the error text; the deny
 # decision itself is unchanged and 'just lint' has the full report.
@@ -158,7 +161,7 @@ if len(lines) > 40:
     )
 msg = 'Pre-commit lint check failed. Fix these errors before committing:\n\n' + errors
 print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny', 'permissionDecisionReason': msg}}))
-" "$ERRORS"
+"
 fi
 
 exit 0

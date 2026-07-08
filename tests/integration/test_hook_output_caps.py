@@ -112,6 +112,20 @@ class TestPreCommitGateCap:
         assert result.returncode == 0, result.stderr
         return json.loads(result.stdout)["hookSpecificOutput"]
 
+    def test_huge_report_exceeding_arg_limit_still_denies(self, tmp_path: Path):
+        """A report larger than the OS single-argv cap (~128KB on Linux) must
+        still produce the capped deny — passing $ERRORS as argv used to fail
+        the exec with E2BIG and silently skip the deny (gate bypass; Codex
+        review on PI-651). $ERRORS now travels via stdin."""
+        work = _make_workdir(tmp_path, "pre_commit_gate.sh")
+        subprocess.run(["git", "init", "-q"], cwd=work, check=True, capture_output=True)
+        bad = work / "bad.py"
+        _noisy_py(bad, 3000)  # ruff report comfortably exceeds 128KB
+        subprocess.run(["git", "add", "bad.py"], cwd=work, check=True, capture_output=True)
+        out = self._run_gate(work)
+        assert out["permissionDecision"] == "deny"
+        assert "output truncated" in out["permissionDecisionReason"]
+
     def test_oversized_deny_reason_is_capped_but_still_denies(self, tmp_path: Path):
         work = _make_workdir(tmp_path, "pre_commit_gate.sh")
         subprocess.run(["git", "init", "-q"], cwd=work, check=True, capture_output=True)
