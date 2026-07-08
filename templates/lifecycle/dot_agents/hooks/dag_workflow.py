@@ -162,10 +162,21 @@ def check_ci_green() -> tuple[bool, str]:
             continue
         status = (entry.get("status") or "").upper()
         conclusion = (entry.get("conclusion") or "").upper()
-        if conclusion in {"FAILURE", "TIMED_OUT", "CANCELLED", "ERROR", "ACTION_REQUIRED"}:
+        # StatusContext entries (classic commit statuses: Vercel/Netlify deploy
+        # previews, Codecov, legacy CI integrations) carry `state` and have no
+        # `status`/`conclusion`. Fold `state` in so a green commit status isn't
+        # miscounted as "still running" forever — and a red one as pending —
+        # while the CheckRun `conclusion`/`status` fields stay authoritative.
+        state = (entry.get("state") or "").upper()
+        if conclusion in {"FAILURE", "TIMED_OUT", "CANCELLED", "ERROR", "ACTION_REQUIRED"} or state in {
+            "FAILURE",
+            "ERROR",
+        }:
             failing += 1
-        elif status in {"PENDING", "QUEUED", "IN_PROGRESS", "WAITING"} or (
-            not conclusion and not status
+        elif (
+            status in {"PENDING", "QUEUED", "IN_PROGRESS", "WAITING"}
+            or state in {"PENDING", "EXPECTED"}
+            or (not conclusion and not status and not state)
         ):
             pending += 1
     if failing:

@@ -62,6 +62,10 @@ packages = ["src/project_init"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# `.claude/` is a generated, delete-aware mirror of `.agents/` (tools/sync_claude_dir.py)
+# so Claude Code — which reads `.claude/` only — loads this repo's own hooks/skills.
+# Lint the canonical `.agents/` source, never the derived copy.
+extend-exclude = [".claude"]
 
 [tool.ruff.lint]
 # D/C901/PLR091x dogfood the quality toolchain scaffolded into target

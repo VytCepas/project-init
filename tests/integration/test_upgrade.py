@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -452,6 +453,27 @@ class TestUpgradeApply:
         assert not migrated
         # Applied file is re-recorded with its fresh rendered hash.
         assert manifest["justfile"] == hashlib.sha256(justfile.read_bytes()).hexdigest()
+
+    def test_apply_regenerates_claude_projection_on_target(self, tmp_path: Path):
+        # #627 P1: apply_drift only writes the `rendered` set, which never
+        # includes the derived .claude/ projection. An upgrade from a pre-PI-627
+        # project (no .claude/) must still produce a current .claude/ on the
+        # target, or Claude Code loads no config after upgrade.
+        target = tmp_path / "p"
+        _scaffold(target)
+        shutil.rmtree(target / ".claude")  # simulate a project with no projection
+        assert not (target / ".claude").exists()
+
+        assert main(["upgrade", str(target), "--apply"]) == 0
+
+        # .claude/ is rebuilt and mirrors the target's canonical .agents/ config.
+        assert (target / ".claude" / "settings.json").read_bytes() == (
+            target / ".agents" / "settings.json"
+        ).read_bytes()
+        assert (target / ".claude" / "skills").is_dir()
+        # Scoped: state is not projected (#627).
+        assert not (target / ".claude" / "memory").exists()
+        assert not (target / ".claude").is_symlink()
 
     def test_in_progress_new_sibling_is_never_clobbered(self, tmp_path: Path):
         """A user-modified .new (manual merge in progress) survives re-apply

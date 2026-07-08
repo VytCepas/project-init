@@ -63,6 +63,13 @@ per-subprocess timeout below the hook budget, and made the nojira "PR already
 exists" short-circuit check the PR is OPEN. Deliberate guard fixes, not
 move-drift — only the `.agents/hooks/dag_workflow.py` hash was re-pinned across
 all four combos, after verifying every other file still matched.
+
+Exception (CI-status fix): `check_ci_green` now folds a StatusContext entry's
+`state` field (classic commit statuses — Vercel/Codecov/legacy CI — carry
+`state`, not `status`/`conclusion`) so a green commit status is no longer
+miscounted as "still running" forever, blocking the merge gate. Deliberate bug
+fix, not move-drift — only the `.agents/hooks/dag_workflow.py` hash was re-pinned
+across all four combos, after verifying every other file still matched.
 """
 
 from __future__ import annotations

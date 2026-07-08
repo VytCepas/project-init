@@ -18,7 +18,7 @@
   ".agents/hooks/README.md": "16a281118a540125c68fc7f4c215d866a948e6a6ef82692b873d1b48033dcef2",
   ".agents/hooks/_py.sh": "8e93087539398af2516ea4c697893a98987d4d91a969a10899503b136829db0e",
   ".agents/hooks/_usage_log.sh": "252e0bb9bca5565c19727ed758823e5aea643c0fbf351b18f7a5fd056d5f4729",
-  ".agents/hooks/dag_workflow.py": "0def15eba709e71ad6f4c9b9b93a4d93cb6a473bb91844e6f1341a6d69928b7e",
+  ".agents/hooks/dag_workflow.py": "b374fc7c73cc72adcc0c6f6b34664b9b6b22c56d415f61f286185658cc2add96",
   ".agents/hooks/github_command_guard.sh": "f95046b6bbbae9ad85ab2ff7aa69d5bc546e58da8f17a854f1fb850c847eb0c3",
   ".agents/hooks/package_guard.py": "44265b35420f46909e8bb63ae598c5fe626e39c5f0b00817c53c64917f28e09b",
   ".agents/hooks/post_edit_lint.sh": "60a5302e007db1b88d21f88c0a0f418e09d68700e5d83581f76ed549e61eb7fc",

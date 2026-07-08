@@ -17,7 +17,7 @@
   ".agents/docs/guides/using-memory.md": "96a7cd24433cff71e5c61c9ccff4f23aa1cb8019ca993aa1bb9b9989f08252f8",
   ".agents/hooks/README.md": "16a281118a540125c68fc7f4c215d866a948e6a6ef82692b873d1b48033dcef2",
   ".agents/hooks/_py.sh": "8e93087539398af2516ea4c697893a98987d4d91a969a10899503b136829db0e",
-  ".agents/hooks/dag_workflow.py": "0def15eba709e71ad6f4c9b9b93a4d93cb6a473bb91844e6f1341a6d69928b7e",
+  ".agents/hooks/dag_workflow.py": "b374fc7c73cc72adcc0c6f6b34664b9b6b22c56d415f61f286185658cc2add96",
   ".agents/hooks/package_guard.py": "44265b35420f46909e8bb63ae598c5fe626e39c5f0b00817c53c64917f28e09b",
   ".agents/hooks/prod_guard.py": "3307967eab36b44c88e7c74fdda3418f6cff98ffcd1843688f5c585dfbd774d5",
   ".agents/memory/MEMORY.md": "544dac81979cbe795cc55a020360c2569036381b62f879d10ce8dffdc0de0791",
