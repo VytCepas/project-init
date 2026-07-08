@@ -31,6 +31,11 @@ format:
 test:
     sh -c 'if find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run --with pytest-xdist pytest -n auto --tb=short -q; else echo "No test files yet — nothing to test."; fi'
 
+# fail-fast quiet run for the edit-test loop (token-efficiency; PI-641) —
+# stops at the first failure so agents ingest one traceback, not the suite's
+test-quick:
+    sh -c 'if find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run --with pytest pytest -x -q --tb=short; else echo "No test files yet — nothing to test."; fi'
+
 # tests with the coverage gate (CI always runs this, not `test` — PI-569).
 # without src/ yet, still run the plain test suite (tests/ may exist before
 # src/ does) — only the coverage instrumentation/threshold is skipped, since
@@ -118,6 +123,10 @@ format:
 test:
     sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bun test; else echo "No test files yet — nothing to test."; fi'
 
+# fail-fast run for the edit-test loop (token-efficiency; PI-641)
+test-quick:
+    sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bun test --bail; else echo "No test files yet — nothing to test."; fi'
+
 # build the API docs (TypeDoc)
 docs:
     bunx typedoc
@@ -171,6 +180,10 @@ format:
 # run the test suite
 test:
     go test ./...
+
+# fail-fast run for the edit-test loop (token-efficiency; PI-641)
+test-quick:
+    go test -failfast ./...
 
 # tests with the coverage gate (CI always runs this, not `test` — PI-569).
 # tune the "70" threshold to your project's baseline. Skips cleanly before any
@@ -248,6 +261,11 @@ format:
 # run the test suite
 test:
     cargo test
+
+# quiet run for the edit-test loop (token-efficiency; PI-641; cargo has no
+# stable fail-fast flag, so quiet output is the lever here)
+test-quick:
+    cargo test -q
 
 # tests with the coverage gate (CI always runs this, not `test` — PI-569).
 # requires cargo-llvm-cov: `cargo install cargo-llvm-cov` + `rustup component

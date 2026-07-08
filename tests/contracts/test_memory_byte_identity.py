@@ -121,7 +121,11 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     type label from the body "- Type:" for MCP/API-created issues
 #   • report_upstream_issue skill (SKILL.md + INDEX/README/project-init.md rows)
 #     — new default-on skill routing tooling bugs upstream to project-init
+#   • token_efficiency skill (PI-647) — new default-on skill with token-frugal
+#     working habits; INDEX/AGENTS.md/justfile rows already excluded above
 _ADDED_SINCE_BASELINE = {
+    # PI-647: token-efficiency conventions propagated to scaffolds
+    ".agents/skills/token_efficiency/SKILL.md",
     # #605: Guards log the governance signal (decision + command)
     ".agents/hooks/_usage_log.sh",
     ".agents/hooks/prod_guard.py",

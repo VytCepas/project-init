@@ -67,6 +67,22 @@ class TestJustfilePerLanguage:
         assert test_cmd in _recipe_body(text, "test")
         assert "gitleaks git --pre-commit" in _recipe_body(text, "scan")
 
+    @pytest.mark.parametrize(
+        ("language", "quick_cmd"),
+        [
+            ("python", "pytest -x -q --tb=short"),
+            ("node", "bun test --bail"),
+            ("go", "go test -failfast ./..."),
+            ("rust", "cargo test -q"),
+        ],
+    )
+    def test_quick_recipe_is_fail_fast(self, tmp_path: Path, language, quick_cmd):
+        """PI-647 (epic #641): every language gets a fail-fast/quiet `test-quick`
+        for the edit-test loop so agents ingest one failure, not the suite's."""
+        target = _scaffold_language(tmp_path / language, language)
+        text = (target / "justfile").read_text()
+        assert quick_cmd in _recipe_body(text, "test-quick")
+
     def test_ci_recipe_is_pure_dependency(self, tmp_path: Path):
         """`ci` is recipe-only and day-one self-contained.
 
