@@ -82,6 +82,7 @@ class TestPostEditLintCap:
         ctx = self._run(work, bad)
         assert "Lint errors in" in ctx
         assert "output truncated" in ctx
+        assert "just lint" in ctx  # the trailer's pointer to the full report
         # 40 capped lines + header + trailer, with generous slack — never the
         # full 60-error dump (ruff emits several lines per finding).
         assert len(ctx.splitlines()) < 50
