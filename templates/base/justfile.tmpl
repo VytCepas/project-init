@@ -34,7 +34,7 @@ test:
 # fail-fast quiet run for the edit-test loop (token-efficiency; PI-641) —
 # stops at the first failure so agents ingest one traceback, not the suite's
 test-quick:
-    sh -c 'if find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run pytest -x -q --tb=short; else echo "No test files yet — nothing to test."; fi'
+    sh -c 'if find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run --with pytest pytest -x -q --tb=short; else echo "No test files yet — nothing to test."; fi'
 
 # tests with the coverage gate (CI always runs this, not `test` — PI-569).
 # without src/ yet, still run the plain test suite (tests/ may exist before
