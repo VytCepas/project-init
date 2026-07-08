@@ -256,7 +256,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--agents",
-        default="claude",
+        # Default None (not "claude") so an explicit `--agents claude` is
+        # distinguishable from an absent flag: in interactive mode the former
+        # honors the claude-only request, the latter opens the surface chooser.
+        # Non-interactive resolution falls back to "claude" (claude is always
+        # included regardless).
+        default=None,
         help=(
             "Comma-separated agents/surfaces the project supports: claude "
             "(always included), codex, ollama, cursor, antigravity, vscode, amp, "
@@ -1349,7 +1354,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     cli_devcontainer: bool = False,
     cli_mise: bool = False,
     cli_vscode: bool = False,
-    cli_agents: str = "claude",
+    cli_agents: str | None = None,
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -1445,7 +1450,10 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     # GitHub lifecycle tier (#476). The --lifecycle flag wins; otherwise the
     # wizard explains it and asks, defaulting to the chosen preset's tier.
     resolved_lifecycle = lifecycle_flag or _choose_lifecycle_interactive(default=preset_lifecycle)
-    if cli_agents and cli_agents != "claude":
+    # An explicit --agents (including `--agents claude` for a claude-only
+    # project) is honored; an absent flag (None) opens the surface chooser —
+    # mirroring how every other concern flag wins over its interactive prompt.
+    if cli_agents is not None:
         try:
             agents = resolve_agents(cli_agents)
         except ValueError as e:
@@ -1782,6 +1790,19 @@ _LANGUAGE_COMMANDS: dict[str, tuple[str, str, str, str]] = {
 }
 
 
+def render_run_command(run_command: str, project_slug: str) -> str:
+    """Fill ``{project_slug}`` in a language ``run_command``.
+
+    Only the Python command uses the placeholder (``uv run python -m
+    {project_slug}``), and a module name can't contain the hyphens ``slugify()``
+    emits — so substitute the underscore module form. A no-op for the other
+    languages, whose ``run_command`` has no ``{project_slug}``. Shared by the
+    scaffold and upgrade/backfill paths so the module name can't drift back to
+    the invalid kebab form on `project-init upgrade`.
+    """
+    return run_command.replace("{project_slug}", (project_slug or "my-app").replace("-", "_"))
+
+
 def _upgrade_main(argv: list[str]) -> int:
     """Parse and run the `project-init upgrade` subcommand (PI-142)."""
     from project_init.upgrade import (
@@ -2104,7 +2125,7 @@ def _build_variables(
         "lint_command": lint_command,
         "format_command": format_command,
         "test_command": test_command,
-        "run_command": run_command.replace("{project_slug}", slugify(project_name) or "my-app"),
+        "run_command": render_run_command(run_command, slugify(project_name)),
         # Docs tooling axis + Renovate gate (#477, ADR-022). Default-ON opt-outs;
         # recorded so `upgrade` re-derives the same set (PI-189). The mkdocs/typedoc
         # gates AND want_docs; renovate.json gates on renovate alone.
@@ -2217,7 +2238,10 @@ def _resolve_inputs(
         return None
     try:
         selected_mcps = _resolve_mcps_non_interactive(args.mcps, args.browser)
-        agents = resolve_agents(args.agents)
+        # Only an absent flag (None) defaults to claude; an explicit value —
+        # including `--agents ""` — is passed through so resolve_agents validates
+        # it (an empty string still yields the always-included ["claude"]).
+        agents = resolve_agents(args.agents if args.agents is not None else "claude")
     except ValueError as e:
         parser.error(str(e))
     profile = args.profile or "individual"

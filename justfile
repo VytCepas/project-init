@@ -7,6 +7,7 @@
 setup:
     uv sync --group dev
     git config core.hooksPath .githooks
+    uv run python tools/sync_claude_dir.py
 
 # lint (docstring + complexity gates per pyproject.toml)
 lint:
@@ -30,3 +31,9 @@ ci: lint test
 # sync the plugin payload from templates (PI-129)
 sync-plugin:
     uv run python tools/sync_plugin.py
+
+# regenerate this repo's own .claude/ mirror from .agents/ (dogfood; PI-627).
+# Claude Code reads .claude/ only, so this is what makes the repo's own guard
+# hooks and skills load. Run after editing anything under .agents/.
+sync-claude:
+    uv run python tools/sync_claude_dir.py

@@ -846,8 +846,16 @@ def _coerce_preset_var(value: object) -> str:
 
 
 # Preset [vars] keys consumed by CLI/upgrade resolution (tier/flag selection),
-# not template variables — see the skip inside _apply_preset_vars.
-_PRESET_CONTROL_KEYS = frozenset({"memory_stack", "lifecycle", "governance"})
+# not template variables — see the skip inside _apply_preset_vars. `observability`
+# is flag-only (no preset var in v1) yet HAS a base-template gate
+# ({{#if observability}} in config.yaml.tmpl); its layer is wired from the CLI
+# flag alone, so copying a preset var here would turn the descriptor gate ON while
+# the .agents/observability/ layer stays absent — config.yaml would advertise a
+# retrieval surface the project never scaffolded. (multi_model deliberately stays
+# out: it has no base-template gate and its preset-var flow is intended, #252.)
+_PRESET_CONTROL_KEYS = frozenset(
+    {"memory_stack", "lifecycle", "governance", "observability"}
+)
 
 
 def _apply_preset_vars(variables: dict[str, str], preset: dict) -> dict[str, str]:
@@ -1066,20 +1074,117 @@ def _emit_generated_files(
             detect_root=detect_root,
         )
 
-    _generate_claude_projection(target)
+    _generate_claude_projection(target, first_scaffold=first_scaffold, conflicts=conflicts)
     return created
 
 
-def _generate_claude_projection(target: Path) -> None:
-    """Generate the .agents projection from the canonical .agents tree."""
-    import shutil
+# Top-level `.agents/` entries Claude Code never reads, kept OUT of the `.claude/`
+# projection (#627). State/descriptors (`memory/`, `vault/`, `docs/`,
+# `governance/`, `config.yaml`) must live in exactly one place — duplicating them
+# split-brains a memory write or an ADR against what Claude actually loads.
+# Lifecycle machinery (`hooks/`, `scripts/`) is referenced by absolute
+# `.agents/…` paths (settings.json points hooks at `.agents/hooks/`; scaffolded
+# skills call `.agents/scripts/…`), so its copy is dead weight. Everything else —
+# `settings.json`, `skills/`, `commands/`, `agents/`, `rules/`, and any future
+# config dir Claude adds — is projected, so config is never silently omitted.
+_PROJECTION_EXCLUDE = frozenset(
+    {"memory", "vault", "docs", "governance", "config.yaml", "hooks", "scripts"}
+)
+# Runtime state that must never enter the projection, at any depth.
+_PROJECTION_JUNK = frozenset({"__pycache__", "logs", ".local", ".cache"})
 
+
+def _unique_backup_dir(claude_dir: Path) -> Path:
+    """A non-colliding ``.claude.pre-project-init`` sibling to park adopted config."""
+    base = claude_dir.with_name(".claude.pre-project-init")
+    candidate = base
+    n = 1
+    while candidate.exists():
+        candidate = base.with_name(f"{base.name}.{n}")
+        n += 1
+    return candidate
+
+
+def _generate_claude_projection(
+    target: Path,
+    *,
+    first_scaffold: bool = True,
+    conflicts: list[tuple[Path, Path]] | None = None,
+) -> None:
+    """Project the Claude-read subset of `.agents/` into `.claude/` (PI-627).
+
+    Claude Code reads its config (settings.json — including hook *wiring* — plus
+    skills, commands, subagents) from `.claude/` only; it does NOT read a
+    top-level `.agents/` natively (verified empirically against the CLI: a hook
+    defined only in `.agents/settings.json` never fires; the same hook under
+    `.claude/settings.json` does). The hook *scripts* stay canonical — the
+    projected settings.json points hook commands at `.agents/hooks/…`, so
+    `.claude/hooks/` is never needed (and is excluded below). Every other surface
+    reads `.agents/` directly.
+
+    Only the config surface Claude discovers is projected; project state,
+    descriptors, and lifecycle machinery are excluded (see `_PROJECTION_EXCLUDE`)
+    so the canonical `.agents/` tree stays the single home for memory, ADRs, and
+    hooks/scripts — no split-brain, no dead-weight duplication (#627).
+
+    The projection is DELETE-AWARE: the previous `.claude/` is removed first, then
+    the subset is copied in fresh, so a file deleted from `.agents/`
+    (``remove <concern>``, ``upgrade``) can never linger — the two cannot diverge.
+    (The pre-PI-627 code used ``copytree(dirs_exist_ok=True)`` over the whole tree,
+    which both duplicated state and never deleted.)
+
+    Adoption safety (PI-179 spirit): the delete-aware rebuild only ever clears a
+    projection *we* generated. On the **first** scaffold, a non-empty `.claude/`
+    that already exists is the user's own hand-written Claude config (custom
+    commands/skills/settings), not our projection — so it is parked as a
+    ``.claude.pre-project-init`` sibling and reported via *conflicts* instead of
+    being deleted. On any later run the dir is our own projection, so it is
+    rebuilt in place.
+
+    We COPY rather than symlink. A committed symlink is not portable: under git's
+    default ``core.symlinks=false`` — the default on BOTH Windows (no symlink
+    privilege without Developer Mode/admin) AND macOS (set false as a security
+    measure) — a checked-out symlink is materialized as a plain text file holding
+    the link target, so Claude Code sees `.claude` as a *file*, loads nothing, and
+    says nothing. Only Linux restores it reliably. Plain files store as ordinary
+    blobs (git mode 100644) and restore identically on every platform, so the
+    projection never silently fails. Any stale symlink (or git-materialized
+    symlink file) from an earlier version is detected and replaced here.
+    """
     agents_dir = target / ".agents"
     claude_dir = target / ".claude"
     if not agents_dir.exists():
         return
 
-    shutil.copytree(agents_dir, claude_dir, dirs_exist_ok=True)
+    # Clear any prior projection before rebuilding. On the first scaffold, ANY
+    # pre-existing `.claude/` — a non-empty directory, a custom symlink, or a
+    # plain file — is user-authored Claude config being adopted, so it is parked
+    # as a sibling and reported, never deleted. On a later run (or an empty dir)
+    # it is our own generated projection: a real dir is rebuilt, and a stale
+    # symlink / git-materialized symlink-file is removed with unlink().
+    real_dir = claude_dir.is_dir() and not claude_dir.is_symlink()
+    user_config = claude_dir.is_symlink() or claude_dir.is_file() or (real_dir and any(claude_dir.iterdir()))
+    if first_scaffold and user_config:
+        backup = _unique_backup_dir(claude_dir)
+        claude_dir.rename(backup)  # rename moves a dir, symlink, or file alike
+        if conflicts is not None:
+            conflicts.append((claude_dir.relative_to(target), backup.relative_to(target)))
+    elif claude_dir.is_symlink() or claude_dir.is_file():
+        claude_dir.unlink()
+    elif real_dir:
+        shutil.rmtree(claude_dir)
+
+    agents_resolved = agents_dir.resolve()
+
+    def _ignore(dirpath: str, names: list[str]) -> set[str]:
+        skip = {n for n in names if n in _PROJECTION_JUNK or n.endswith(".pyc")}
+        # State/machinery names are excluded only at the `.agents/` root, so a
+        # nested dir that happens to share a name is unaffected.
+        if Path(dirpath).resolve() == agents_resolved:
+            skip |= {n for n in names if n in _PROJECTION_EXCLUDE}
+        return skip
+
+    shutil.copytree(agents_dir, claude_dir, ignore=_ignore)
 
 
 def _emit_generated(

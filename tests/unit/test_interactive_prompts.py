@@ -76,6 +76,63 @@ def test_gather_inputs_interactive_enter_defaults_uses_description_default(monke
     assert result.project_description == "demo project"
 
 
+def test_gather_inputs_interactive_honors_explicit_agents_claude(monkeypatch):
+    """`--agents claude` (interactive) must yield a claude-only project, not open
+    the surface chooser — the chooser can never return claude-only, so an absent
+    flag and an explicit `claude` had been conflated (default was "claude")."""
+    monkeypatch.setattr(__main__, "_prompt", lambda _label, default="": default)
+    monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: k.get("default", ""))
+    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: k.get("default", False))
+
+    def _fail_chooser():
+        raise AssertionError("surface chooser must not run when --agents is explicit")
+
+    monkeypatch.setattr(__main__, "_choose_agents_interactive", _fail_chooser)
+
+    result = __main__._gather_inputs_interactive(
+        default_name="demo",
+        no_plugin=False,
+        profile="individual",
+        cli_overlays=("prototype", "none", "none", False, False, False),
+        memory_flag="obsidian-only",
+        lifecycle_flag="github",
+        no_docs=True,
+        no_renovate=True,
+        cli_language="none",
+        cli_agents="claude",
+    )
+
+    assert result.agents == ["claude"]
+
+
+def test_gather_inputs_interactive_absent_agents_opens_chooser(monkeypatch):
+    """An absent --agents flag (None) still opens the surface chooser."""
+    monkeypatch.setattr(__main__, "_prompt", lambda _label, default="": default)
+    monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: k.get("default", ""))
+    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: k.get("default", False))
+
+    called = []
+    monkeypatch.setattr(
+        __main__, "_choose_agents_interactive", lambda: called.append(True) or ["claude", "vscode"]
+    )
+
+    result = __main__._gather_inputs_interactive(
+        default_name="demo",
+        no_plugin=False,
+        profile="individual",
+        cli_overlays=("prototype", "none", "none", False, False, False),
+        memory_flag="obsidian-only",
+        lifecycle_flag="github",
+        no_docs=True,
+        no_renovate=True,
+        cli_language="none",
+        cli_agents=None,
+    )
+
+    assert called == [True]
+    assert result.agents == ["claude", "vscode"]
+
+
 def test_prompt_menu_index_reprompts_until_in_range(monkeypatch, capsys):
     """2026-07 QA: the shared numbered-menu helper (preset/profile/delivery/
     deploy/iac/memory/lifecycle) re-asks on out-of-range answers."""

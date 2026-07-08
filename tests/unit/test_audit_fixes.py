@@ -86,6 +86,15 @@ class TestPresetVarsReachRender:
         assert merged["observability"] == ""
         assert merged["multi_model"] == "true"
 
+    def test_observability_preset_var_never_enables_the_gate_alone(self):
+        # observability is flag-only but has a base-template gate. A preset var
+        # must NOT turn the {{#if observability}} descriptor ON, because the
+        # .agents/observability/ layer is wired from the CLI flag only — leaking
+        # the gate would advertise a retrieval surface that was never scaffolded.
+        preset = {"layers": ["base"], "vars": {"observability": True}}
+        merged = sc._apply_preset_vars({"observability": ""}, preset)
+        assert merged["observability"] == ""
+
     def test_control_keys_never_refill_the_render_context(self):
         # memory_stack/lifecycle/governance configure the CLI/upgrade resolution
         # and are folded into the variables upstream. Merging them here breaks
@@ -192,3 +201,44 @@ class TestWizardHonorsMcpsFlag:
         ids = [m["id"] for m in selected]
         assert "context7" in ids
         assert "playwright" in ids
+
+
+class TestRunCommandModuleName:
+    """`{project_slug}` in the Python run_command must render an underscore module
+    name — `uv run python -m my-app` is an invalid module. The scaffold path and
+    both upgrade backfill paths share render_run_command so the kebab form can't
+    reappear on `project-init upgrade` (#634 review)."""
+
+    def test_render_underscores_python_module(self):
+        from project_init.__main__ import render_run_command
+
+        assert (
+            render_run_command("uv run python -m {project_slug}", "my-app")
+            == "uv run python -m my_app"
+        )
+
+    def test_render_is_noop_for_other_languages(self):
+        from project_init.__main__ import render_run_command
+
+        # No {project_slug} placeholder → unchanged (hyphen replacement can't leak).
+        assert render_run_command("go run .", "my-app") == "go run ."
+
+    def test_render_empty_slug_falls_back(self):
+        from project_init.__main__ import render_run_command
+
+        assert render_run_command("uv run python -m {project_slug}", "") == "uv run python -m my_app"
+
+    def test_upgrade_paths_call_the_shared_renderer(self):
+        # Both upgrade backfill sites assign run_command via the shared renderer,
+        # so a hyphenated slug can't reintroduce `python -m my-app` on upgrade —
+        # and the raw kebab substitution is gone. Asserting the specific
+        # assignments (not a total occurrence count) stays robust to unrelated
+        # refactors that mention the function elsewhere.
+        import inspect
+
+        from project_init import upgrade
+
+        src = inspect.getsource(upgrade)
+        assert 'variables["run_command"] = render_run_command(' in src
+        assert 'v.setdefault("run_command", render_run_command(' in src
+        assert 'run_cmd.replace("{project_slug}"' not in src

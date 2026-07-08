@@ -12,9 +12,11 @@ Confidence (from the #365 spike, `docs/development/non-cli-surface-matrix.md`):
   emitted hooks are **best-effort and fail-open** — git/CI remain the real
   enforcement boundary (ADR-007). Antigravity is flagged experimental.
 
-Surfaces that read `.agents/` natively (Claude CLI, Claude VS Code extension)
-need no emission; Codex/Gemini already have overlays. This module adds the
-cross-surface MCP files and the GUI hook configs (Cursor, Antigravity).
+Claude Code (CLI + VS Code extension) reads its config from `.claude/`, which the
+scaffolder keeps as a delete-aware mirror of the canonical `.agents/` tree (plain
+files, portable across OSes — see `_generate_claude_projection`), so it needs no
+per-surface emission here; Codex/Gemini already have overlays. This module adds
+the cross-surface MCP files and the GUI hook configs (Cursor, Antigravity).
 """
 
 from __future__ import annotations
