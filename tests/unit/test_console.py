@@ -19,10 +19,12 @@ def test_option_line_single_house_style() -> None:
     assert "(recommended)" in pc.option_line(1, "obsidian-only", "the default", recommended=True)
 
 
-def test_is_interactive_false_under_capture(capsys) -> None:
-    """Captured/piped output is never a TTY, so richer devices stand down."""
+def test_is_interactive_tracks_console_tty(monkeypatch) -> None:
+    """is_interactive reflects the console's TTY-ness (deterministic, no -s dep)."""
+    import io
+
+    monkeypatch.setattr(pc, "console", Console(file=io.StringIO()))
     assert pc.is_interactive() is False
-    capsys.readouterr()
 
 
 def test_render_presets_plain_lists_every_preset(capsys) -> None:
@@ -64,4 +66,4 @@ def test_scaffolding_is_noop_off_tty(capsys) -> None:
     assert ran
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "working" not in captured.err
+    assert captured.err == ""

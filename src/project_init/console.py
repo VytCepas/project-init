@@ -101,12 +101,14 @@ def render_presets(presets: list[dict], default_idx: int) -> None:
 def scaffolding(label: str = "Scaffolding project…") -> Iterator[None]:
     """Spinner for the duration of a long, single-shot operation.
 
-    A no-op when stderr is not a TTY so nothing is emitted when captured; on a
-    TTY it shows a transient spinner that clears itself when the block exits (no
-    faked determinate progress — the engine reports the real file count
-    afterwards).
+    Shown only when the session is fully interactive — stdout a TTY
+    (:func:`is_interactive`) *and* stderr a TTY — so it stays consistent with
+    every other richer device and emits nothing when either stream is
+    piped/captured. On a TTY it shows a transient spinner that clears itself
+    when the block exits (no faked determinate progress — the engine reports the
+    real file count afterwards).
     """
-    if _status_console.is_terminal:
+    if is_interactive() and _status_console.is_terminal:
         with _status_console.status(f"[info]{label}[/info]", spinner="dots"):
             yield
     else:
