@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import textwrap
 from pathlib import Path
 
@@ -189,8 +190,10 @@ class TestScaffoldGitHubFiles:
 
     def test_ci_template_uses_node24_action_versions(self):
         content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
-        assert "actions/checkout@v6" in content
-        assert "astral-sh/setup-uv@v8.1.0" in content
+        # Actions are SHA-pinned with a `# vX` version comment (#629); assert the
+        # comment still carries the Node24-capable versions.
+        assert re.search(r"actions/checkout@[0-9a-f]{40} # v6\b", content)
+        assert re.search(r"astral-sh/setup-uv@[0-9a-f]{40} # v8\.1\.0\b", content)
         assert "actions/checkout@v4" not in content
         assert "astral-sh/setup-uv@v3" not in content
 

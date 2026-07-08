@@ -175,6 +175,12 @@ _ADDED_SINCE_BASELINE = {
     # not lifecycle-move drift; their behavior is covered by test_commit_hook_gates.py.
     ".github/hooks/pre-commit",
     ".github/hooks/pre-push",
+    # #629: every shipped workflow action is now pinned to a full commit SHA
+    # (with a `# vX` comment for Renovate) so a fresh scaffold no longer trips
+    # its own Semgrep mutable-action-tag gate. ci.yml and board-automation.yml
+    # are already excluded above; project-init-upgrade.yml is the remaining
+    # lifecycle workflow whose rendered bytes this deliberate edit changes.
+    ".github/workflows/project-init-upgrade.yml",
 }
 
 

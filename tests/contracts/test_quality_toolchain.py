@@ -267,7 +267,7 @@ class TestGoToolchain:
         """golangci-lint-action must be v8+ to run the shipped v2 config —
         v6 caps the tool at v1.64.8, which rejects `version: "2"`."""
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
-        m = re.search(r"golangci/golangci-lint-action@v(\d+)", ci)
+        m = re.search(r"golangci/golangci-lint-action@[0-9a-f]{40} # v(\d+)", ci)
         assert m, "golangci-lint-action must be referenced in Go CI"
         assert int(m.group(1)) >= 8, "must be v8+ for golangci-lint v2 config"
 

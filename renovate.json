@@ -14,9 +14,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Action refs in scaffolded workflow templates: the github-actions manager cannot parse them ({{#if}} blocks break YAML), so match uses: lines directly. Keeps the scaffolder from shipping stale action pins. The optional subpath group captures owner/repo as depName for subdirectory actions like github/codeql-action/upload-sarif (#576).",
-      "managerFilePatterns": ["/^templates/.*\\.ya?ml\\.tmpl$/"],
-      "matchStrings": ["uses: (?<depName>[^/\\s]+/[^@/\\s]+)(?:/[^@\\s]+)?@(?<currentValue>v[\\d.]+)"],
+      "description": "Action refs in scaffolded workflow templates are pinned to a full commit SHA with a trailing `# vX` comment, so a fresh scaffold passes its own Semgrep mutable-action-tag gate (#629). The github-actions manager cannot parse the .tmpl files ({{#if}} blocks break YAML), so match uses: lines directly to keep the digest and its version comment fresh. The optional subpath group captures owner/repo as depName for subdirectory actions like github/codeql-action/upload-sarif (#576).",
+      "managerFilePatterns": ["/^templates/.*/workflows/.*\\.ya?ml(\\.tmpl)?$/"],
+      "matchStrings": ["uses: (?<depName>[^/\\s]+/[^@/\\s]+)(?:/[^@\\s]+)?@(?<currentDigest>[a-f0-9]{40}) # (?<currentValue>v[\\d.]+)"],
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "semver-coerced"
     }

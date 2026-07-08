@@ -125,6 +125,10 @@ _ADDED_SINCE_BASELINE = {
     ".agents/scripts/create_issue.sh",
     ".github/workflows/board-automation.yml",
     ".github/workflows/issue-validation.yml",
+    # #629: workflow actions pinned to commit SHAs so a fresh scaffold no longer
+    # trips its own Semgrep mutable-action-tag gate. ci.yml/board-automation.yml
+    # already excluded above; project-init-upgrade.yml is the remaining drift.
+    ".github/workflows/project-init-upgrade.yml",
     ".agents/skills/report_upstream_issue/SKILL.md",
     ".agents/skills/INDEX.md",
     ".agents/skills/README.md",
