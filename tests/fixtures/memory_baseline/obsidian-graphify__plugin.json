@@ -69,7 +69,7 @@
   ".agents/vault/templates/knowledge-note.md": "f53dae69e4e8523710f7957b4a7ba6802c86b5ae3e24db66426e6aee275d0de2",
   ".agents/vault/templates/session-note.md": "d2a7be81df7fcb5e084246abf006593b90cd15064f5fff44694222493fe0d85b",
   ".env.example": "c7d1004dc9d1e2cfc0edbeea72538ccee07173b64c0d57d14293b7018e5d92d6",
-  ".gitattributes": "3004a2ef51122b2bd4ec48d5b45b86f5eea80e181e901433030c650ec02b3fdb",
+  ".gitattributes": "fd4d2e922b34ea979848ae409eca21ab3e40710add452bcd17089adeef36d3d6",
   ".github/CODEOWNERS": "df676d15cfee76eeca7520b045744da7ca800cb82a6ca7d4eaa7ead9d953996b",
   ".github/ISSUE_TEMPLATE/bug.yml": "a4e9b044299893b20eafebfad4fcbe10e3093ea0b21eb5d6194a6e84b8e34b1e",
   ".github/ISSUE_TEMPLATE/chore.yml": "ff38d6e52e1604ed0863d852fd233707ef7e40a715188e6c7b3dfd6a2f554449",
