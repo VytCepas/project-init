@@ -1078,33 +1078,51 @@ def _emit_generated_files(
     return created
 
 
+# Top-level `.agents/` entries Claude Code never reads, kept OUT of the `.claude/`
+# projection (#627). State/descriptors (`memory/`, `vault/`, `docs/`,
+# `governance/`, `config.yaml`) must live in exactly one place — duplicating them
+# split-brains a memory write or an ADR against what Claude actually loads.
+# Lifecycle machinery (`hooks/`, `scripts/`) is referenced by absolute
+# `.agents/…` paths (settings.json points hooks at `.agents/hooks/`; scaffolded
+# skills call `.agents/scripts/…`), so its copy is dead weight. Everything else —
+# `settings.json`, `skills/`, `commands/`, `agents/`, `rules/`, and any future
+# config dir Claude adds — is projected, so config is never silently omitted.
+_PROJECTION_EXCLUDE = frozenset(
+    {"memory", "vault", "docs", "governance", "config.yaml", "hooks", "scripts"}
+)
+# Runtime state that must never enter the projection, at any depth.
+_PROJECTION_JUNK = frozenset({"__pycache__", "logs", ".local", ".cache"})
+
+
 def _generate_claude_projection(target: Path) -> None:
-    """Mirror the canonical `.agents/` tree into `.claude/` for Claude Code (PI-627).
+    """Project the Claude-read subset of `.agents/` into `.claude/` (PI-627).
 
     Claude Code reads project config (settings.json, hooks, skills, commands,
     subagents) from `.claude/` only — it does NOT read a top-level `.agents/`
     natively (verified empirically against the CLI: a hook defined only in
     `.agents/settings.json` never fires; the same hook under `.claude/` does).
-    Every other surface reads `.agents/` directly, so `.claude/` must always hold
-    the same content as `.agents/`.
+    Every other surface reads `.agents/` directly.
 
-    The projection is a full, DELETE-AWARE rebuild: the previous `.claude/` is
-    removed first, then `.agents/` is copied in fresh. So a file deleted from
-    `.agents/` (e.g. ``remove <concern>`` or an ``upgrade``) can never linger in
-    `.claude/` — the two cannot diverge. (The pre-PI-627 code used
-    ``copytree(dirs_exist_ok=True)``, which only ever added/overwrote and so left
-    deleted files behind forever.)
+    Only the config surface Claude discovers is projected; project state,
+    descriptors, and lifecycle machinery are excluded (see `_PROJECTION_EXCLUDE`)
+    so the canonical `.agents/` tree stays the single home for memory, ADRs, and
+    hooks/scripts — no split-brain, no dead-weight duplication (#627).
 
-    We deliberately COPY rather than symlink. A committed symlink is not portable:
-    under git's default ``core.symlinks=false`` — the default on BOTH Windows
-    (no symlink privilege without Developer Mode/admin) AND macOS (set false as a
-    security measure) — a checked-out symlink is materialized as a plain text file
-    containing the link target, so Claude Code sees `.claude` as a *file*, not a
-    config dir, and silently loads nothing. Only Linux restores it reliably. Plain
-    files, by contrast, are stored as ordinary blobs (git mode 100644) and restore
-    identically on every platform, so the projection never silently fails. Any
-    stale symlink (or git-materialized symlink file) from an earlier version is
-    detected and replaced with a real directory here.
+    The projection is DELETE-AWARE: the previous `.claude/` is removed first, then
+    the subset is copied in fresh, so a file deleted from `.agents/`
+    (``remove <concern>``, ``upgrade``) can never linger — the two cannot diverge.
+    (The pre-PI-627 code used ``copytree(dirs_exist_ok=True)`` over the whole tree,
+    which both duplicated state and never deleted.)
+
+    We COPY rather than symlink. A committed symlink is not portable: under git's
+    default ``core.symlinks=false`` — the default on BOTH Windows (no symlink
+    privilege without Developer Mode/admin) AND macOS (set false as a security
+    measure) — a checked-out symlink is materialized as a plain text file holding
+    the link target, so Claude Code sees `.claude` as a *file*, loads nothing, and
+    says nothing. Only Linux restores it reliably. Plain files store as ordinary
+    blobs (git mode 100644) and restore identically on every platform, so the
+    projection never silently fails. Any stale symlink (or git-materialized
+    symlink file) from an earlier version is detected and replaced here.
     """
     agents_dir = target / ".agents"
     claude_dir = target / ".claude"
@@ -1119,7 +1137,17 @@ def _generate_claude_projection(target: Path) -> None:
     elif claude_dir.is_dir():
         shutil.rmtree(claude_dir)
 
-    shutil.copytree(agents_dir, claude_dir)
+    agents_resolved = agents_dir.resolve()
+
+    def _ignore(dirpath: str, names: list[str]) -> set[str]:
+        skip = {n for n in names if n in _PROJECTION_JUNK or n.endswith(".pyc")}
+        # State/machinery names are excluded only at the `.agents/` root, so a
+        # nested dir that happens to share a name is unaffected.
+        if Path(dirpath).resolve() == agents_resolved:
+            skip |= {n for n in names if n in _PROJECTION_EXCLUDE}
+        return skip
+
+    shutil.copytree(agents_dir, claude_dir, ignore=_ignore)
 
 
 def _emit_generated(
