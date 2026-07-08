@@ -15,6 +15,14 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.dmypy.json
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.ipynb_checkpoints/
 
 {{#if node}}# Node
 node_modules/
@@ -34,7 +42,13 @@ vendor/
 /target/
 **/*.rs.bk
 
-{{/if rust}}{{#if graphify}}# Graphify (derived graph artifacts; keep GRAPH_REPORT.md tracked)
+{{/if rust}}{{#if want_docs}}{{#if python}}# Docs preview build output (mkdocs)
+site/
+
+{{/if python}}{{#if node}}# Docs preview build output (typedoc)
+_site/
+
+{{/if node}}{{/if want_docs}}{{#if graphify}}# Graphify (derived graph artifacts; keep GRAPH_REPORT.md tracked)
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md
 
@@ -49,6 +63,8 @@ graphify-out/*
 {{/if obsidian}}# OS / editor
 .DS_Store
 *.swp
+*.swo
+*.log
 {{#if vscode}}# Scaffolded editor config (--vscode) is shared; the rest stays personal.
 .vscode/*
 !.vscode/extensions.json

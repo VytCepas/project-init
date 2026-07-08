@@ -240,6 +240,12 @@ class TestScaffoldGitHubFiles:
         assert "useDefault = true" in content
         # The scaffold record (.agents/config.yaml) must be allowlisted.
         assert "config" in content and "agents" in content
+        # PI-643 (Codex P1): the allowlist `paths` must stay narrow — NO whole-file
+        # example/config path exemptions, which would let a real secret later
+        # committed to a `.env.example` / `*.example.*` file go unscanned by both
+        # the pre-commit and CI gitleaks gates.
+        paths_block = content.split("paths = [")[1].split("]")[0]
+        assert "example" not in paths_block, "no whole-file example-path exemptions"
 
     def test_ci_does_not_hardcode_python_version(self):
         """PI-208: a pinned Python version drifts below requires-python; let uv
