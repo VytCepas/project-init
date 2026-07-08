@@ -756,3 +756,47 @@ class TestFinishBranchGuard:
 
         assert rc == 0
         assert pushed == ["feat/PI-99-x"], "finish must push the PR's head branch by name"
+
+
+class TestCiGreenStatusContext:
+    """`gh pr view --json statusCheckRollup` returns a union of CheckRun and
+    StatusContext entries. Classic commit statuses (Vercel/Codecov/legacy CI)
+    are StatusContext: they carry `state`, not `status`/`conclusion`. The gate
+    must read `state` so a green commit status isn't stuck reporting "still
+    running" forever (blocking the merge), and a red one is counted as failing."""
+
+    @staticmethod
+    def _rollup(dag, monkeypatch, entries):
+        monkeypatch.setattr(
+            dag, "_gh",
+            lambda args: (0, json.dumps({"number": 7, "statusCheckRollup": entries})),
+        )
+
+    def test_green_status_context_is_not_pending(self, dag, monkeypatch):
+        self._rollup(dag, monkeypatch, [{"context": "vercel", "state": "SUCCESS"}])
+        ok, reason = dag.check_ci_green()
+        assert ok, reason
+        assert "CI green" in reason
+
+    def test_failed_status_context_counts_as_failing(self, dag, monkeypatch):
+        self._rollup(dag, monkeypatch, [{"context": "codecov/project", "state": "FAILURE"}])
+        ok, reason = dag.check_ci_green()
+        assert not ok
+        assert "failing" in reason
+
+    def test_pending_status_context_counts_as_pending(self, dag, monkeypatch):
+        self._rollup(dag, monkeypatch, [{"context": "deploy", "state": "PENDING"}])
+        ok, reason = dag.check_ci_green()
+        assert not ok
+        assert "still running" in reason
+
+    def test_mixed_green_checkrun_and_status_context(self, dag, monkeypatch):
+        self._rollup(
+            dag, monkeypatch,
+            [
+                {"name": "test", "status": "COMPLETED", "conclusion": "SUCCESS"},
+                {"context": "vercel", "state": "SUCCESS"},
+            ],
+        )
+        ok, reason = dag.check_ci_green()
+        assert ok, reason

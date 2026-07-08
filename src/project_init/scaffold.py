@@ -846,8 +846,16 @@ def _coerce_preset_var(value: object) -> str:
 
 
 # Preset [vars] keys consumed by CLI/upgrade resolution (tier/flag selection),
-# not template variables — see the skip inside _apply_preset_vars.
-_PRESET_CONTROL_KEYS = frozenset({"memory_stack", "lifecycle", "governance"})
+# not template variables — see the skip inside _apply_preset_vars. `observability`
+# is flag-only (no preset var in v1) yet HAS a base-template gate
+# ({{#if observability}} in config.yaml.tmpl); its layer is wired from the CLI
+# flag alone, so copying a preset var here would turn the descriptor gate ON while
+# the .agents/observability/ layer stays absent — config.yaml would advertise a
+# retrieval surface the project never scaffolded. (multi_model deliberately stays
+# out: it has no base-template gate and its preset-var flow is intended, #252.)
+_PRESET_CONTROL_KEYS = frozenset(
+    {"memory_stack", "lifecycle", "governance", "observability"}
+)
 
 
 def _apply_preset_vars(variables: dict[str, str], preset: dict) -> dict[str, str]:

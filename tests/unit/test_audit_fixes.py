@@ -86,6 +86,15 @@ class TestPresetVarsReachRender:
         assert merged["observability"] == ""
         assert merged["multi_model"] == "true"
 
+    def test_observability_preset_var_never_enables_the_gate_alone(self):
+        # observability is flag-only but has a base-template gate. A preset var
+        # must NOT turn the {{#if observability}} descriptor ON, because the
+        # .agents/observability/ layer is wired from the CLI flag only — leaking
+        # the gate would advertise a retrieval surface that was never scaffolded.
+        preset = {"layers": ["base"], "vars": {"observability": True}}
+        merged = sc._apply_preset_vars({"observability": ""}, preset)
+        assert merged["observability"] == ""
+
     def test_control_keys_never_refill_the_render_context(self):
         # memory_stack/lifecycle/governance configure the CLI/upgrade resolution
         # and are folded into the variables upstream. Merging them here breaks
