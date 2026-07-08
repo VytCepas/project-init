@@ -38,12 +38,19 @@ def test_files_exclude_present_and_valid(tmp_path: Path):
 
 def test_python_caches_hidden(tmp_path: Path):
     excl = _settings(tmp_path, language="python", python="true", node="")["files.exclude"]
+    # Kept in parity with the python tool caches ignored in .gitignore (PI-643).
     for key in (
         "**/__pycache__",
         "**/.pytest_cache",
         "**/.ruff_cache",
         "**/.mypy_cache",
+        "**/.dmypy.json",
         "**/.coverage",
+        "**/.coverage.*",
+        "**/htmlcov",
+        "**/.tox",
+        "**/.nox",
+        "**/.ipynb_checkpoints",
         "**/.venv",
     ):
         assert excl.get(key) is True, f"{key} should be hidden for python"
