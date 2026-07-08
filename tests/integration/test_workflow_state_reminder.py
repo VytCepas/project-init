@@ -102,7 +102,11 @@ class TestSessionScopedInjection:
         malicious = "../../../../etc/passwd"
         context = _run_hook(self.hook, "implement it", malicious, tmp_path)
         assert _STATIC_MARKER in context
-        assert not (tmp_path / ".." / ".." / "etc").exists()
+        # The sentinel landed INSIDE $TMPDIR, named with the sanitized id
+        # ("/" and "." stripped) — the strong form of the no-escape assertion.
+        sentinels = list(tmp_path.glob("pi_wsr_*"))
+        assert len(sentinels) == 1
+        assert sentinels[0].name.endswith("_etcpasswd")
         # The stripped id still dedups on repeat (silent: state unchanged).
         second = _run_hook(self.hook, "implement it", malicious, tmp_path)
         assert _STATIC_MARKER not in second
