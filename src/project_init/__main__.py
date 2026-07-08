@@ -1663,7 +1663,7 @@ _AGENT_SURFACES = (
     ("codex", "Codex (native overlay)"),
     ("amp", "Amp (skills layer + generated MCP config)"),
     ("junie", "Junie (skills layer + generated MCP config)"),
-    ("ollama", "Ollama (portable AGENTS.md; for the full harness, route local/cloud models through Claude Code via --multi-model)"),
+    ("ollama", "Ollama (portable AGENTS.md; full harness via --multi-model)"),
 )
 
 
