@@ -68,12 +68,19 @@ def option_line(index: int, name: str, description: str, *, recommended: bool = 
     return f"  [key]{index}[/key]. [heading]{name}[/heading] — [muted]{description}[/muted]{mark}"
 
 
-def render_presets(presets: list[dict], default_idx: int) -> None:
+def render_presets(
+    presets: list[dict], default_idx: int, memory_by_name: dict[str, str]
+) -> None:
     """Print the preset options as an aligned table (plain list off-TTY).
 
     The table adds a Memory column the old space-padded string list could not
     show; on a non-TTY it degrades to the plain numbered list callers relied on
     before, keeping captured output stable.
+
+    *memory_by_name* maps preset name → the memory stack it actually scaffolds,
+    already resolved for ``extends`` inheritance by the caller — reading the raw
+    per-preset ``vars`` here would advertise ``—`` for an inheriting preset like
+    ``governed`` (#511 / PI-645 review).
     """
     if not is_interactive():
         console.print("[heading]Available presets:[/heading]")
@@ -92,7 +99,7 @@ def render_presets(presets: list[dict], default_idx: int) -> None:
     table.add_column("What you get", style="muted", ratio=1)
     for i, preset in enumerate(presets, 1):
         rec = "  [recommend]✔ recommended[/recommend]" if i == default_idx else ""
-        memory = str(preset.get("vars", {}).get("memory_stack") or "—")
+        memory = str(memory_by_name.get(preset["name"]) or "—")
         table.add_row(str(i), preset["name"], memory, f"{preset['description']}{rec}")
     console.print(table)
 

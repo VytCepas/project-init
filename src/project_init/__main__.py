@@ -469,7 +469,11 @@ def _choose_preset_interactive(presets: list[dict]) -> dict:
         )
     )
     default_idx = _default_preset_index(presets)
-    render_presets(presets, default_idx)
+    # Resolve each preset's memory stack through extends inheritance so the
+    # table's Memory column is accurate for inheriting presets like `governed`
+    # (raw vars would show "—"; PI-645 review, mirrors #511).
+    memory_by_name = {row["name"]: row["memory_stack"] for row in _presets_payload(presets)}
+    render_presets(presets, default_idx, memory_by_name)
     console.print()
 
     choice = _prompt_menu_index("Choose a preset", len(presets), default=default_idx)

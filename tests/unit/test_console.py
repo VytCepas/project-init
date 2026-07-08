@@ -33,7 +33,7 @@ def test_render_presets_plain_lists_every_preset(capsys) -> None:
         {"name": "core", "description": "no memory", "vars": {"memory_stack": "none"}},
         {"name": "obsidian-only", "description": "vault only", "vars": {"memory_stack": "obsidian-only"}},
     ]
-    pc.render_presets(presets, default_idx=2)
+    pc.render_presets(presets, default_idx=2, memory_by_name={"core": "none", "obsidian-only": "obsidian-only"})
     out = capsys.readouterr().out
     assert "Available presets" in out
     assert "core" in out and "obsidian-only" in out
@@ -47,15 +47,30 @@ def test_render_presets_table_when_interactive(monkeypatch, capsys) -> None:
     monkeypatch.setattr(pc, "console", rec)
     monkeypatch.setattr(pc, "is_interactive", lambda: True)
     presets = [{"name": "core", "description": "no memory", "vars": {"memory_stack": "none"}}]
-    pc.render_presets(presets, default_idx=1)
+    pc.render_presets(presets, default_idx=1, memory_by_name={"core": "none"})
     out = capsys.readouterr().out
     assert "core" in out and "none" in out
     assert "recommended" in out
 
 
+def test_render_presets_shows_resolved_inherited_memory(monkeypatch, capsys) -> None:
+    """Memory column reflects the *resolved* stack, not the raw vars (#511/PI-645).
+
+    `governed` declares only `extends`, so its raw vars carry no memory_stack;
+    the caller-supplied resolved map must still show its inherited stack.
+    """
+    rec = Console(theme=pc.WIZARD_THEME, force_terminal=True, width=100)
+    monkeypatch.setattr(pc, "console", rec)
+    monkeypatch.setattr(pc, "is_interactive", lambda: True)
+    presets = [{"name": "governed", "description": "policy layer", "vars": {}}]
+    pc.render_presets(presets, default_idx=1, memory_by_name={"governed": "obsidian-only"})
+    out = capsys.readouterr().out
+    assert "obsidian-only" in out
+
+
 def test_render_presets_handles_missing_memory(capsys) -> None:
-    """A preset without a memory_stack var shows a dash, not a KeyError."""
-    pc.render_presets([{"name": "x", "description": "d", "vars": {}}], default_idx=1)
+    """A preset absent from the resolved map shows a dash, not a KeyError."""
+    pc.render_presets([{"name": "x", "description": "d", "vars": {}}], default_idx=1, memory_by_name={})
     assert "x" in capsys.readouterr().out
 
 
