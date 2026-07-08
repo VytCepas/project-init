@@ -100,12 +100,24 @@ case "$FILE" in
 esac
 
 if [ -n "$ERRORS" ]; then
-  "$PY" -c "
+  # $ERRORS travels via stdin, not argv: a single argv entry is capped by the
+  # OS (~128KB on Linux), so exactly the hugest reports — the ones the cap
+  # exists for — would fail the exec with E2BIG and emit nothing (Codex review).
+  printf '%s' "$ERRORS" | "$PY" -c "
 import json, sys
-file, errors = sys.argv[1], sys.argv[2]
+file = sys.argv[1]
+errors = sys.stdin.read()
+# Token-efficiency (PI-651, epic #641): injected context persists in the
+# transcript and is re-sent every turn — cap the error text; the first lines
+# carry the actionable findings and the linter has the full report.
+lines = errors.splitlines()
+if len(lines) > 40:
+    errors = '\n'.join(lines[:40]) + (
+        f'\n… output truncated ({len(lines)} lines total) — run \`just lint\` for the full report.'
+    )
 ctx = f'Lint errors in {file} (after auto-fix attempt) — please fix before continuing:\n{errors}'
 print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': ctx}}))
-" "$FILE" "$ERRORS"
+" "$FILE"
 fi
 
 exit 0
