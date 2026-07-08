@@ -268,7 +268,10 @@ def _build_parser() -> argparse.ArgumentParser:
             "junie. Codex gets a native overlay; antigravity gets an .agents/ "
             "skills layer + generated hooks/MCP; cursor gets generated hooks+MCP; "
             "amp/junie get a skills layer + generated MCP config; vscode gets MCP "
-            "config; ollama is instructions-level only (PI-137, PI-366, PI-386, "
+            "config; ollama gets the portable AGENTS.md contract as a standalone "
+            "surface (to run models with the full hooks/skills/MCP harness — "
+            "local ones via Ollama, or cloud ones like DeepSeek/Kimi — route them "
+            "through Claude Code with --multi-model) (PI-137, PI-366, PI-386, "
             "PI-397; antigravity hooks experimental)"
         ),
     )
@@ -1660,7 +1663,7 @@ _AGENT_SURFACES = (
     ("codex", "Codex (native overlay)"),
     ("amp", "Amp (skills layer + generated MCP config)"),
     ("junie", "Junie (skills layer + generated MCP config)"),
-    ("ollama", "Ollama (instructions-level only)"),
+    ("ollama", "Ollama (portable AGENTS.md; full harness via --multi-model)"),
 )
 
 
