@@ -2238,7 +2238,10 @@ def _resolve_inputs(
         return None
     try:
         selected_mcps = _resolve_mcps_non_interactive(args.mcps, args.browser)
-        agents = resolve_agents(args.agents or "claude")
+        # Only an absent flag (None) defaults to claude; an explicit value —
+        # including `--agents ""` — is passed through so resolve_agents validates
+        # it (an empty string still yields the always-included ["claude"]).
+        agents = resolve_agents(args.agents if args.agents is not None else "claude")
     except ValueError as e:
         parser.error(str(e))
     profile = args.profile or "individual"
