@@ -21,6 +21,12 @@ format:
 test:
     uv run pytest --tb=short -q
 
+# fast iterate loop — stop at first failure, minimal output. Use while
+# debugging to keep test noise out of agent context; run `just test` for the
+# final full green check. (token-efficiency; see PI-641)
+test-quick:
+    uv run pytest -x -q --tb=short
+
 # serve the docs site locally
 docs:
     uv run --extra docs mkdocs serve
