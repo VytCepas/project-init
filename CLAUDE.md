@@ -61,6 +61,8 @@ Template naming convention: directories stored as `dot_agents/`, `dot_gitignore`
 
 `$CLAUDE_PROJECT_DIR` in hook commands expands to the project root at runtime. To add a new hook, use the `add_hook` skill or edit `settings.json` directly following the existing pattern.
 
+**`.claude/` is a generated mirror — edit `.agents/`, never `.claude/`.** Claude Code reads project config (settings.json, hooks, skills, commands) from `.claude/` only; it does *not* read a top-level `.agents/` natively (verified empirically against the CLI). This repo authors everything under `.agents/`, so `.claude/` is a committed, delete-aware mirror of the committed `.agents/` entries (`settings.json`, `hooks/`, `scripts/`, `skills/`) — that's what actually makes the repo's own guard hooks and skills load in a Claude session. It's a copy, not a symlink, because git's default `core.symlinks=false` on macOS and Windows would check a committed symlink out as a plain text file and silently hide the config. After editing anything under `.agents/`, run `just sync-claude` (also run by `just setup`); `tests/contracts/test_claude_dir_sync.py` fails CI if the mirror drifts. Scaffolded projects get the same mirror via `_generate_claude_projection`.
+
 ## GitHub workflow
 
 For any push, PR, review, or merge work: load `.agents/skills/github_workflow/SKILL.md`.
