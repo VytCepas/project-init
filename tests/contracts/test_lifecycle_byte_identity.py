@@ -70,6 +70,14 @@ Exception (CI-status fix): `check_ci_green` now folds a StatusContext entry's
 miscounted as "still running" forever, blocking the merge gate. Deliberate bug
 fix, not move-drift — only the `.agents/hooks/dag_workflow.py` hash was re-pinned
 across all four combos, after verifying every other file still matched.
+
+Exception (PI-643): the git-config / editor-hiding parity sweep enriched two base
+files — `.gitignore` (python tool caches: `.mypy_cache/`, `.coverage`, etc.;
+mkdocs `site/` + typedoc `_site/` docs build output; `*.swo` / `*.log`) and
+`.gitattributes` (`* text=auto`, `linguist-generated` for the `.claude/` mirror
+and lockfiles, `linguist-vendored` for the vault). Deliberate content additions,
+not move-drift. Only those two hashes were re-pinned across all four combos,
+after verifying every other file still matched.
 """
 
 from __future__ import annotations

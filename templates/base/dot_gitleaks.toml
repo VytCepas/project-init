@@ -11,7 +11,13 @@
 useDefault = true
 
 [allowlist]
-description = "project-init scaffold record (content hashes, not secrets)."
+description = "scaffold record (content hashes) + example/config templates (placeholder keys, not secrets)."
 paths = [
   '''\.agents/config\.yaml''',
+  # Example env files (.env.example) and *.example.<ext> config templates ship
+  # placeholder or "$VAR" keys, not real secrets — e.g. the governance and
+  # multi-model overlays. Without this a scaffold with those overlays can trip
+  # the generic-api-key / high-entropy rules on its first CI secret scan.
+  '''(^|/)\.env\.example$''',
+  '''\.example\.[^/]+$''',
 ]

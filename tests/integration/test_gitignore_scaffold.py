@@ -75,3 +75,16 @@ def test_codex_wiring_is_trackable(tmp_path: Path):
     codex_files = [p.relative_to(target).as_posix() for p in target.rglob(".codex/*") if p.is_file()]
     assert codex_files, "expected .codex/ config to be emitted"
     assert not _ignored(target, codex_files)
+
+
+@pytest.mark.integration
+def test_docs_build_output_is_ignored(tmp_path: Path):
+    """PI-643: a docs-enabled scaffold must ignore the docs preview build output
+    (mkdocs `site/` for python) so the first `mkdocs build` leaves no untracked
+    tree. Also covers the python tool caches added in the same sweep."""
+    target = tmp_path / "proj"
+    assert _scaffold(target) == 0  # python + want_docs default on
+    subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+    should_ignore = ["site/index.html", ".mypy_cache/x", ".coverage", "debug.log"]
+    ignored = _ignored(target, should_ignore)
+    assert set(ignored) == set(should_ignore), f"not ignored: {set(should_ignore) - set(ignored)}"

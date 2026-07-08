@@ -240,6 +240,11 @@ class TestScaffoldGitHubFiles:
         assert "useDefault = true" in content
         # The scaffold record (.agents/config.yaml) must be allowlisted.
         assert "config" in content and "agents" in content
+        # PI-643: example env / config templates ship placeholder ("$VAR") keys,
+        # not real secrets (governance + multi-model overlays). Allowlisting them
+        # keeps a scaffold with those overlays from tripping the first secret scan.
+        assert r"\.env\.example$" in content
+        assert r"\.example\." in content
 
     def test_ci_does_not_hardcode_python_version(self):
         """PI-208: a pinned Python version drifts below requires-python; let uv
