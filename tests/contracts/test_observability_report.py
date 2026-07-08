@@ -79,7 +79,12 @@ def _write_transcript(path: Path) -> None:
             "type": "user",
             "message": {
                 "content": [
-                    {"type": "tool_result", "tool_use_id": "t1", "is_error": False, "content": "ok"},
+                    # List-form content (typed blocks) — exercises the block path
+                    # of the context-volume counter (PI-655). The malformed
+                    # non-string "text" block must count 0, not crash the report.
+                    {"type": "tool_result", "tool_use_id": "t1", "is_error": False,
+                     "content": [{"type": "text", "text": "ok"},
+                                 {"type": "text", "text": 123}]},
                     {"type": "tool_result", "tool_use_id": "t3", "is_error": True, "content": "boom"},
                 ]
             },
@@ -126,6 +131,13 @@ class TestBuckets:
         assert cost["total_cost_usd"] > 0
         assert 0 < cost["cache_read_ratio"] <= 1
         assert cost["approximate"] is True
+        # Context-volume attribution (PI-655): summed tool_result chars per
+        # tool — "ok" (2, list-form) for Skill, "boom" (4, string) for Bash.
+        assert cost["context_contributors"] == {"Skill": 2, "Bash": 4}
+        text = mod.render_text(report, tx)
+        assert "Top context contributors" in text
+        html = mod.render_html(report, tx)
+        assert "Top context contributors" in html
 
         prod = report["productivity"]
         assert prod["loc_added_approx"] == 5  # 3-line Write + 2-line Edit

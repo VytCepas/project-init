@@ -151,6 +151,27 @@ def _count_lines(text: object) -> int:
     return text.count("\n") + 1
 
 
+def _content_chars(content: object) -> int:
+    """Size of a tool_result content payload in characters, content discarded.
+
+    tool_result content is either a plain string or a list of typed blocks
+    (text/image/...); only text sizes are counted, nothing is retained.
+    """
+    if isinstance(content, str):
+        return len(content)
+    if isinstance(content, list):
+        # A malformed block (non-string "text") counts 0 instead of aborting
+        # the whole report — same resilience posture as _safe_int.
+        return sum(
+            len(text)
+            for b in content
+            if isinstance(b, dict) and b.get("type") == "text"
+            for text in (b.get("text"),)
+            if isinstance(text, str)
+        )
+    return 0
+
+
 def _safe_int(value: object) -> int:
     """Best-effort int cast — a malformed (non-numeric) token field yields 0.
 
@@ -173,6 +194,7 @@ def parse_transcript(path: Path) -> dict:
     models: dict[str, dict[str, int]] = {}
     tool_use_names: dict[str, str] = {}  # tool_use_id -> tool name (for reliability)
     tool_errors: dict[str, int] = {}
+    tool_result_chars: dict[str, int] = {}  # tool name -> summed result size (PI-655)
     tool_calls = 0
     tool_results = 0
     loc_added = 0
@@ -231,10 +253,17 @@ def parse_transcript(path: Path) -> dict:
                 for block in content:
                     if isinstance(block, dict) and block.get("type") == "tool_result":
                         tool_results += 1
+                        tid = block.get("tool_use_id")
+                        name = tool_use_names.get(tid, "?") if isinstance(tid, str) else "?"
                         if block.get("is_error"):
-                            tid = block.get("tool_use_id")
-                            name = tool_use_names.get(tid, "?") if isinstance(tid, str) else "?"
                             tool_errors[name] = tool_errors.get(name, 0) + 1
+                        # Context-volume attribution (PI-655, epic #641): every
+                        # result char is re-sent each subsequent turn, so per-tool
+                        # volume shows where the session's context went. Sizes
+                        # only — the text itself is discarded (privacy rule).
+                        chars = _content_chars(block.get("content"))
+                        if chars:
+                            tool_result_chars[name] = tool_result_chars.get(name, 0) + chars
 
     return {
         "skills": skills,
@@ -245,6 +274,7 @@ def parse_transcript(path: Path) -> dict:
         "tool_calls": tool_calls,
         "tool_results": tool_results,
         "tool_errors": tool_errors,
+        "tool_result_chars": tool_result_chars,
         "loc_added": loc_added,
         "edits": edits,
         "writes": writes,
@@ -352,6 +382,10 @@ def analyze(raw: dict, hooks: dict[str, int], git: dict) -> dict:
             "total_tokens": total_tokens,
             "cache_read_ratio": round(cache_ratio, 4),
             "approximate": True,
+            # Where the transcript's context volume came from (PI-655): summed
+            # tool_result chars per tool. Chars, not tokens — exact from the
+            # transcript; ≈tokens at 4 chars/token is applied at render time.
+            "context_contributors": raw.get("tool_result_chars", {}),
         },
         "productivity": {
             "loc_added_approx": raw["loc_added"],
@@ -411,6 +445,17 @@ def render_text(report: dict, transcript: Path) -> str:
             for row in c["models"]
         ]
     )
+    contributors = sorted(
+        c.get("context_contributors", {}).items(), key=lambda kv: (-kv[1], kv[0])
+    )[:10]
+    lines += ["", "== Top context contributors (tool_result volume) =="]
+    if contributors:
+        lines.extend(
+            f"    {name}: {chars:,} chars (≈{chars // 4:,} tokens)"
+            for name, chars in contributors
+        )
+    else:
+        lines.append("    (none)")
     lines += [
         "",
         "== Productivity ==",
@@ -450,6 +495,9 @@ def _bars(d: dict[str, int]) -> str:
 
 def render_html(report: dict, transcript: Path) -> str:
     a, c, p, r = (report[k] for k in ("adoption", "cost", "productivity", "reliability"))
+    contributors = dict(
+        sorted(c.get("context_contributors", {}).items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+    )
     rows = "".join(
         f"<tr><td>{escape(row['model'])}</td><td>{row['messages']}</td>"
         f"<td>{row['input']:,}</td><td>{row['output']:,}</td>"
@@ -495,6 +543,8 @@ def render_html(report: dict, transcript: Path) -> str:
 <h2>Cost by model</h2>
 <table><tr><th>Model</th><th>Msgs</th><th>Input</th><th>Output</th><th>Cache read</th><th>Cost</th></tr>
 {rows}</table>
+<h2>Top context contributors (tool_result chars)</h2>{_bars(contributors)}
+<p class="muted">Summed tool_result size per tool — every char is re-sent each later turn (PI-655).</p>
 <h2>Reliability — errors by tool</h2>{_bars(r["errors_by_tool"])}
 <p class="muted">Accept/reject and exact active-time are OTEL-only and not captured here.</p>
 </body></html>
