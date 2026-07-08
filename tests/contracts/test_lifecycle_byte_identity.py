@@ -136,7 +136,12 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     skill that routes tooling/scaffolding bugs upstream to project-init; only
 #     the --no-plugin combos copy the skill in (plugin mode ships it via the
 #     workflow plugin), and the INDEX gains its row
+#   • skills/token_efficiency/SKILL.md (PI-647) — new default-on skill with
+#     token-frugal working habits; same --no-plugin/plugin split as
+#     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
+    # PI-647: token-efficiency conventions propagated to scaffolds
+    ".agents/skills/token_efficiency/SKILL.md",
     # #605: Guards log the governance signal (decision + command)
     ".agents/hooks/_usage_log.sh",
     ".agents/hooks/prod_guard.py",
