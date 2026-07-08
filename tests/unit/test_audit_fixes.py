@@ -201,3 +201,40 @@ class TestWizardHonorsMcpsFlag:
         ids = [m["id"] for m in selected]
         assert "context7" in ids
         assert "playwright" in ids
+
+
+class TestRunCommandModuleName:
+    """`{project_slug}` in the Python run_command must render an underscore module
+    name — `uv run python -m my-app` is an invalid module. The scaffold path and
+    both upgrade backfill paths share render_run_command so the kebab form can't
+    reappear on `project-init upgrade` (#634 review)."""
+
+    def test_render_underscores_python_module(self):
+        from project_init.__main__ import render_run_command
+
+        assert (
+            render_run_command("uv run python -m {project_slug}", "my-app")
+            == "uv run python -m my_app"
+        )
+
+    def test_render_is_noop_for_other_languages(self):
+        from project_init.__main__ import render_run_command
+
+        # No {project_slug} placeholder → unchanged (hyphen replacement can't leak).
+        assert render_run_command("go run .", "my-app") == "go run ."
+
+    def test_render_empty_slug_falls_back(self):
+        from project_init.__main__ import render_run_command
+
+        assert render_run_command("uv run python -m {project_slug}", "") == "uv run python -m my_app"
+
+    def test_upgrade_paths_call_the_shared_renderer(self):
+        # Both upgrade backfill sites route through render_run_command, so a
+        # hyphenated slug can't reintroduce `python -m my-app` on upgrade.
+        import inspect
+
+        from project_init import upgrade
+
+        src = inspect.getsource(upgrade)
+        assert src.count("render_run_command(") == 2
+        assert 'run_cmd.replace("{project_slug}"' not in src

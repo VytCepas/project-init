@@ -50,6 +50,7 @@ from project_init.scaffold import (
     _PRESERVE_DIRS,
     _RECORD_MARKER,
     CONTRACT_VERSION,
+    _generate_claude_projection,
     _matches_preserve_glob,
     _new_sibling,
     hash_bytes,
@@ -593,10 +594,10 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
     }
     for flag in _LANGUAGE_FLAGS:
         variables[flag] = "true" if language == flag else ""
-    from project_init.__main__ import _LANGUAGE_COMMANDS
+    from project_init.__main__ import _LANGUAGE_COMMANDS, render_run_command
 
     _, _, _, run_cmd = _LANGUAGE_COMMANDS.get(language, ("", "", "", ""))
-    variables["run_command"] = run_cmd.replace("{project_slug}", variables["project_slug"])
+    variables["run_command"] = render_run_command(run_cmd, variables["project_slug"])
     variables["not_delivery_service"] = "true"
     return preset_name, variables, {}
 
@@ -716,10 +717,10 @@ def _backfill_variables(variables: dict) -> dict:
         "true" if (v.get("devcontainer") or v.get("delivery") == "service") else ""
     )
     v["not_delivery_service"] = "" if v.get("delivery") == "service" else "true"
-    from project_init.__main__ import _LANGUAGE_COMMANDS
+    from project_init.__main__ import _LANGUAGE_COMMANDS, render_run_command
 
     _, _, _, run_cmd = _LANGUAGE_COMMANDS.get(language, ("", "", "", ""))
-    v.setdefault("run_command", run_cmd.replace("{project_slug}", v.get("project_slug", "my-app")))
+    v.setdefault("run_command", render_run_command(run_cmd, v.get("project_slug", "")))
     return v
 
 
@@ -1732,6 +1733,12 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
             if interactive and (report.changed or report.merged or report.conflicts):
                 _interactive_select(report)
             apply_drift(target, staging, report, preset_name, variables)
+            # Re-project .claude/ from the now-updated target .agents/ (#627).
+            # apply_drift only writes the `rendered` set, which never includes
+            # the derived .claude/ projection — without this an upgraded project
+            # keeps a stale (or absent) .claude/ and Claude Code loads old config.
+            # first_scaffold=False: the target's .claude/ is our own projection.
+            _generate_claude_projection(target, first_scaffold=False)
             _write_declined(target, gate["declined_map"])
         _print_report(report, applied=apply)
         if groups:

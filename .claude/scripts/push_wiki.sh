@@ -54,6 +54,12 @@ if git diff --cached --quiet; then
   echo "Wiki already up to date."
   exit 0
 fi
-git commit -m "Update wiki content"
+# Fall back to a bot identity so the commit succeeds on ephemeral CI/agent
+# runners that have no user.name/user.email configured (per-command -c, so a
+# developer's global git identity is untouched).
+git \
+  -c "user.name=${GIT_AUTHOR_NAME:-project-init wiki bot}" \
+  -c "user.email=${GIT_AUTHOR_EMAIL:-noreply@users.noreply.github.com}" \
+  commit -m "Update wiki content"
 git push
 echo "Wiki updated."

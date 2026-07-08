@@ -104,7 +104,7 @@ def test_rebuild_is_delete_aware(tmp_path: Path):
     assert (tmp_path / ".claude" / "skills" / "demo").exists()
 
     shutil.rmtree(tmp_path / ".agents" / "skills" / "demo")  # e.g. `remove <concern>`
-    _generate_claude_projection(tmp_path)
+    _generate_claude_projection(tmp_path, first_scaffold=False)  # a re-run
 
     assert not (tmp_path / ".claude" / "skills" / "demo").exists()
     assert (tmp_path / ".claude" / "settings.json").exists()
@@ -114,7 +114,7 @@ def test_idempotent_and_reflects_edits(tmp_path: Path):
     _mk_agents(tmp_path)
     _generate_claude_projection(tmp_path)
     (tmp_path / ".agents" / "settings.json").write_text('{"hooks": {"edited": 1}}')
-    _generate_claude_projection(tmp_path)  # must not raise
+    _generate_claude_projection(tmp_path, first_scaffold=False)  # re-run, must not raise
     assert (tmp_path / ".claude" / "settings.json").read_text() == '{"hooks": {"edited": 1}}'
 
 
@@ -137,14 +137,62 @@ def test_git_materialized_symlink_file_is_replaced(tmp_path: Path):
     assert (tmp_path / ".claude" / "settings.json").exists()
 
 
+def test_first_scaffold_preserves_pre_existing_user_claude(tmp_path: Path):
+    # Adoption: `project-init` run in a repo that already has hand-written Claude
+    # config must NOT delete it — park it as a sibling and report the conflict.
+    _mk_agents(tmp_path)
+    user = tmp_path / ".claude"
+    (user / "commands").mkdir(parents=True)
+    (user / "commands" / "mine.md").write_text("my custom command")
+    (user / "settings.json").write_text('{"mine": true}')
+    conflicts: list = []
+
+    _generate_claude_projection(tmp_path, first_scaffold=True, conflicts=conflicts)
+
+    # User's config preserved under the backup, not lost.
+    backup = tmp_path / ".claude.pre-project-init"
+    assert (backup / "commands" / "mine.md").read_text() == "my custom command"
+    assert (backup / "settings.json").read_text() == '{"mine": true}'
+    # Fresh projection written; conflict reported.
+    assert (tmp_path / ".claude" / "settings.json").read_text() == '{"hooks": {}}'
+    assert (Path(".claude"), Path(".claude.pre-project-init")) in conflicts
+
+
+def test_backup_name_is_unique(tmp_path: Path):
+    _mk_agents(tmp_path)
+    (tmp_path / ".claude.pre-project-init").mkdir()  # an earlier adoption backup
+    (tmp_path / ".claude" / "x").mkdir(parents=True)
+    _generate_claude_projection(tmp_path, first_scaffold=True, conflicts=[])
+    assert (tmp_path / ".claude.pre-project-init.1").exists()
+
+
+def test_first_scaffold_empty_claude_is_not_backed_up(tmp_path: Path):
+    _mk_agents(tmp_path)
+    (tmp_path / ".claude").mkdir()  # empty — nothing to preserve
+    _generate_claude_projection(tmp_path, first_scaffold=True, conflicts=[])
+    assert not (tmp_path / ".claude.pre-project-init").exists()
+    assert (tmp_path / ".claude" / "settings.json").exists()
+
+
+def test_re_run_rebuilds_without_backup(tmp_path: Path):
+    # A later run (first_scaffold=False): .claude/ is our own projection, so it is
+    # rebuilt in place, never backed up.
+    _mk_agents(tmp_path)
+    _generate_claude_projection(tmp_path, first_scaffold=True, conflicts=[])
+    _generate_claude_projection(tmp_path, first_scaffold=False, conflicts=[])
+    assert not (tmp_path / ".claude.pre-project-init").exists()
+    assert (tmp_path / ".claude" / "settings.json").exists()
+
+
 def test_legacy_full_mirror_state_is_dropped(tmp_path: Path):
     # A project projected by an earlier full-copytree build carries duplicated
-    # state under .claude/; a re-projection must drop it.
+    # state under .claude/; a re-projection (upgrade, first_scaffold=False) must
+    # drop it — the existing .claude/ is our own projection, not user config.
     _mk_agents(tmp_path)
     shutil.copytree(tmp_path / ".agents", tmp_path / ".claude")
     assert (tmp_path / ".claude" / "memory" / "note.md").exists()
 
-    _generate_claude_projection(tmp_path)
+    _generate_claude_projection(tmp_path, first_scaffold=False)
 
     assert not (tmp_path / ".claude" / "memory").exists()
     assert (tmp_path / ".claude" / "skills" / "demo").exists()

@@ -81,6 +81,17 @@ of plain files (never a symlink)**.
   each scaffold/upgrade, so a removed file cannot linger and the two cannot
   diverge. Any stale symlink or git-materialised symlink-file from an interim
   build is detected and replaced with a real directory.
+- **Runs on the real target, on upgrade too.** `upgrade --apply` renders into a
+  staging dir and applies only the `rendered` set to the target — which never
+  includes the derived projection — so the projection is re-run against the
+  target's now-updated `.agents/` after `apply_drift`. Without this an upgraded
+  project keeps a stale or absent `.claude/` and loads old config.
+- **Adoption never clobbers user config (PI-179 spirit).** The delete-aware
+  rebuild only clears a projection *we* generated. On the **first** scaffold, a
+  non-empty pre-existing `.claude/` is the user's own Claude config (adopting
+  project-init) — it is parked as a `.claude.pre-project-init` sibling and
+  reported as a conflict, never deleted. On later runs the dir is ours, so it is
+  rebuilt in place.
 - **Plain files, not a symlink:** ordinary git blobs (mode `100644`) restore
   identically on Linux, macOS and Windows, so the projection never silently fails
   on any platform. This is the deciding constraint.

@@ -47,4 +47,4 @@ Edit `templates/presets/*.toml` to:
 1. Add a new `.toml` file in `templates/presets/`
 2. Define layers and customizations
 3. Update preset list in wizard
-4. Add tests in `tests/test_presets.py`
+4. Add tests in `tests/unit/test_presets.py` (inheritance: `tests/unit/test_presets_inheritance.py`)

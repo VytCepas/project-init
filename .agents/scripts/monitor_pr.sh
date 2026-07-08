@@ -1,6 +1,7 @@
 #!/bin/bash
 # Wait for all CI checks on a PR, then optionally merge.
-# Only prints failures or the final pass line — no per-refresh noise.
+# Prints CI failures and the final pass line; the review-wait loop also logs
+# periodic progress (every ~30s) so a long wait isn't silent.
 # Requires: gh, python3 (stdlib only — no jq dependency).
 #
 # Usage:

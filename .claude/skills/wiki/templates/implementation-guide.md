@@ -20,7 +20,7 @@ This guide covers how to contribute to the project and implement new features.
 ## Development Workflow
 
 1. Create a GitHub Issue describing the work
-2. Create a feature branch: `git checkout -b feature/PI-<n>-<slug>`
+2. Create a branch: `git checkout -b <type>/PI-<n>-<kebab-slug>` (e.g. `feat/PI-42-add-oauth`)
 3. Make changes and test locally
 4. Push and create a draft PR
 5. Wait for CI to pass

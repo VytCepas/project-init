@@ -1790,6 +1790,19 @@ _LANGUAGE_COMMANDS: dict[str, tuple[str, str, str, str]] = {
 }
 
 
+def render_run_command(run_command: str, project_slug: str) -> str:
+    """Fill ``{project_slug}`` in a language ``run_command``.
+
+    Only the Python command uses the placeholder (``uv run python -m
+    {project_slug}``), and a module name can't contain the hyphens ``slugify()``
+    emits — so substitute the underscore module form. A no-op for the other
+    languages, whose ``run_command`` has no ``{project_slug}``. Shared by the
+    scaffold and upgrade/backfill paths so the module name can't drift back to
+    the invalid kebab form on `project-init upgrade`.
+    """
+    return run_command.replace("{project_slug}", (project_slug or "my-app").replace("-", "_"))
+
+
 def _upgrade_main(argv: list[str]) -> int:
     """Parse and run the `project-init upgrade` subcommand (PI-142)."""
     from project_init.upgrade import (
@@ -2112,13 +2125,7 @@ def _build_variables(
         "lint_command": lint_command,
         "format_command": format_command,
         "test_command": test_command,
-        # {project_slug} only appears in the Python `run_command`
-        # (`uv run python -m {project_slug}`); a module name can't contain the
-        # hyphens slugify() emits, so substitute the underscore module form. A
-        # no-op for other languages, whose run_command has no {project_slug}.
-        "run_command": run_command.replace(
-            "{project_slug}", (slugify(project_name) or "my-app").replace("-", "_")
-        ),
+        "run_command": render_run_command(run_command, slugify(project_name)),
         # Docs tooling axis + Renovate gate (#477, ADR-022). Default-ON opt-outs;
         # recorded so `upgrade` re-derives the same set (PI-189). The mkdocs/typedoc
         # gates AND want_docs; renovate.json gates on renovate alone.

@@ -1074,7 +1074,7 @@ def _emit_generated_files(
             detect_root=detect_root,
         )
 
-    _generate_claude_projection(target)
+    _generate_claude_projection(target, first_scaffold=first_scaffold, conflicts=conflicts)
     return created
 
 
@@ -1094,7 +1094,23 @@ _PROJECTION_EXCLUDE = frozenset(
 _PROJECTION_JUNK = frozenset({"__pycache__", "logs", ".local", ".cache"})
 
 
-def _generate_claude_projection(target: Path) -> None:
+def _unique_backup_dir(claude_dir: Path) -> Path:
+    """A non-colliding ``.claude.pre-project-init`` sibling to park adopted config."""
+    base = claude_dir.with_name(".claude.pre-project-init")
+    candidate = base
+    n = 1
+    while candidate.exists():
+        candidate = base.with_name(f"{base.name}.{n}")
+        n += 1
+    return candidate
+
+
+def _generate_claude_projection(
+    target: Path,
+    *,
+    first_scaffold: bool = True,
+    conflicts: list[tuple[Path, Path]] | None = None,
+) -> None:
     """Project the Claude-read subset of `.agents/` into `.claude/` (PI-627).
 
     Claude Code reads project config (settings.json, hooks, skills, commands,
@@ -1113,6 +1129,14 @@ def _generate_claude_projection(target: Path) -> None:
     (``remove <concern>``, ``upgrade``) can never linger — the two cannot diverge.
     (The pre-PI-627 code used ``copytree(dirs_exist_ok=True)`` over the whole tree,
     which both duplicated state and never deleted.)
+
+    Adoption safety (PI-179 spirit): the delete-aware rebuild only ever clears a
+    projection *we* generated. On the **first** scaffold, a non-empty `.claude/`
+    that already exists is the user's own hand-written Claude config (custom
+    commands/skills/settings), not our projection — so it is parked as a
+    ``.claude.pre-project-init`` sibling and reported via *conflicts* instead of
+    being deleted. On any later run the dir is our own projection, so it is
+    rebuilt in place.
 
     We COPY rather than symlink. A committed symlink is not portable: under git's
     default ``core.symlinks=false`` — the default on BOTH Windows (no symlink
@@ -1135,7 +1159,17 @@ def _generate_claude_projection(target: Path) -> None:
     if claude_dir.is_symlink() or claude_dir.is_file():
         claude_dir.unlink()
     elif claude_dir.is_dir():
-        shutil.rmtree(claude_dir)
+        if first_scaffold and any(claude_dir.iterdir()):
+            # Adoption: preserve the user's pre-existing Claude config instead of
+            # deleting it (route through conflict preservation, never clobber).
+            backup = _unique_backup_dir(claude_dir)
+            claude_dir.rename(backup)
+            if conflicts is not None:
+                conflicts.append(
+                    (claude_dir.relative_to(target), backup.relative_to(target))
+                )
+        else:
+            shutil.rmtree(claude_dir)
 
     agents_resolved = agents_dir.resolve()
 
