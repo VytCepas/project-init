@@ -1079,15 +1079,47 @@ def _emit_generated_files(
 
 
 def _generate_claude_projection(target: Path) -> None:
-    """Generate the .agents projection from the canonical .agents tree."""
-    import shutil
+    """Mirror the canonical `.agents/` tree into `.claude/` for Claude Code (PI-627).
 
+    Claude Code reads project config (settings.json, hooks, skills, commands,
+    subagents) from `.claude/` only — it does NOT read a top-level `.agents/`
+    natively (verified empirically against the CLI: a hook defined only in
+    `.agents/settings.json` never fires; the same hook under `.claude/` does).
+    Every other surface reads `.agents/` directly, so `.claude/` must always hold
+    the same content as `.agents/`.
+
+    The projection is a full, DELETE-AWARE rebuild: the previous `.claude/` is
+    removed first, then `.agents/` is copied in fresh. So a file deleted from
+    `.agents/` (e.g. ``remove <concern>`` or an ``upgrade``) can never linger in
+    `.claude/` — the two cannot diverge. (The pre-PI-627 code used
+    ``copytree(dirs_exist_ok=True)``, which only ever added/overwrote and so left
+    deleted files behind forever.)
+
+    We deliberately COPY rather than symlink. A committed symlink is not portable:
+    under git's default ``core.symlinks=false`` — the default on BOTH Windows
+    (no symlink privilege without Developer Mode/admin) AND macOS (set false as a
+    security measure) — a checked-out symlink is materialized as a plain text file
+    containing the link target, so Claude Code sees `.claude` as a *file*, not a
+    config dir, and silently loads nothing. Only Linux restores it reliably. Plain
+    files, by contrast, are stored as ordinary blobs (git mode 100644) and restore
+    identically on every platform, so the projection never silently fails. Any
+    stale symlink (or git-materialized symlink file) from an earlier version is
+    detected and replaced with a real directory here.
+    """
     agents_dir = target / ".agents"
     claude_dir = target / ".claude"
     if not agents_dir.exists():
         return
 
-    shutil.copytree(agents_dir, claude_dir, dirs_exist_ok=True)
+    # Clear any prior projection before rebuilding: a real dir (avoids a stale
+    # union), or a symlink / git-materialized symlink-file left by an earlier
+    # version (a symlink and a plain file are both removed with unlink()).
+    if claude_dir.is_symlink() or claude_dir.is_file():
+        claude_dir.unlink()
+    elif claude_dir.is_dir():
+        shutil.rmtree(claude_dir)
+
+    shutil.copytree(agents_dir, claude_dir)
 
 
 def _emit_generated(

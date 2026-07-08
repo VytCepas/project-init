@@ -96,7 +96,7 @@ that is cheap, but it is not natively so — be explicit about what each agent g
 
 | Tier | What you get | Applies to |
 |---|---|---|
-| **Native** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring — read directly from `.agents/` | Claude Code (CLI + the Anthropic VS Code extension) |
+| **Native** | Everything: deterministic hooks (lifecycle guard, pre-commit gate), skills invoked as `/commands`, settings wiring. Claude Code reads its config from `.claude/`, which the scaffolder keeps as a delete-aware mirror of the canonical `.agents/` tree (rebuilt on every scaffold/upgrade, so it never drifts; plain files, so it restores identically on Linux, macOS and Windows) | Claude Code (CLI + the Anthropic VS Code extension) |
 | **Generated per-surface config** | One canonical hook/MCP spec rendered to each surface's native files (ADR-017): Codex `.codex/`, Cursor `.cursor/`, Antigravity `.agents/` (experimental), VS Code `.vscode/mcp.json`, Amp `.amp/settings.json`, Junie `.junie/mcp/mcp.json`. Skills cross-read natively. Agent hooks (incl. the Codex CLI) are **best-effort/fail-open** | Codex (CLI+IDE), Cursor, Antigravity, VS Code Copilot, Amp, JetBrains Junie |
 | **Instructions + portable** | `AGENTS.md` is canonical; `CLAUDE.md` redirects to it; lifecycle scripts (plain bash), memory/vault (markdown), git hooks (`commit-msg`, `pre-push`) — agent-independent; git hooks bind once `.agents/scripts/install_hooks.sh` has run (server-side actions need branch protection) | Everything, including Ollama-based agents |
 
@@ -107,7 +107,7 @@ Which scaffolded config each surface actually reads (full detail + sources:
 
 | Surface | Instructions | Skills | Hooks | MCP | Local shell |
 |---|---|---|---|---|---|
-| Claude Code CLI / VS Code ext | `CLAUDE.md` | `.agents/skills` | `.agents/settings.json` (honored) | root `.mcp.json` | yes |
+| Claude Code CLI / VS Code ext | `CLAUDE.md` | `.claude/skills` (mirror of `.agents/skills`) | `.claude/settings.json` (mirror of `.agents/settings.json`) | root `.mcp.json` | yes |
 | VS Code Copilot | `CLAUDE.md`/`AGENTS.md` | `.agents/skills` | Claude hooks (matchers ignored) | `.vscode/mcp.json` (`servers`) | yes |
 | Cursor | `AGENTS.md` | `.agents/skills` | `.cursor/hooks.json` (best-effort) | `.cursor/mcp.json` | yes |
 | Codex (CLI + IDE) | `AGENTS.md` | `.agents/skills` | `.codex/hooks.json` (advisory) | `.codex/config.toml` | yes |
