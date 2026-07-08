@@ -270,11 +270,18 @@ fi
 if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UNKNOWN" ]; then
   echo "Waiting for reviewer (up to ${REVIEW_TIMEOUT}s, polling every 30s) — reviewDecision: ${REVIEW_DECISION}"
 fi
+# Token-efficiency (PI-653, epic #641): the poll loop echoes a frame only when
+# reviewDecision CHANGES — identical repeated frames persist in the agent's
+# transcript and are re-sent every turn. Terminal summaries are unchanged.
+LAST_DECISION="$REVIEW_DECISION"
 while { [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UNKNOWN" ]; } && [ "$REVIEW_ELAPSED" -lt "$REVIEW_TIMEOUT" ]; do
   sleep 30
   REVIEW_ELAPSED=$((REVIEW_ELAPSED + 30))
   REVIEW_DECISION=$(_get_review_decision)
-  echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
+  if [ "$REVIEW_DECISION" != "$LAST_DECISION" ]; then
+    echo "  [${REVIEW_ELAPSED}s/${REVIEW_TIMEOUT}s] reviewDecision: ${REVIEW_DECISION:-none}"
+    LAST_DECISION="$REVIEW_DECISION"
+  fi
   # Early exit: if any review activity exists (even COMMENTED), stop waiting.
   # Bot reviewers like Codex post comments without changing reviewDecision.
   if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] && _has_review_activity; then
