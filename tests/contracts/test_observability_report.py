@@ -80,9 +80,11 @@ def _write_transcript(path: Path) -> None:
             "message": {
                 "content": [
                     # List-form content (typed blocks) — exercises the block path
-                    # of the context-volume counter (PI-655).
+                    # of the context-volume counter (PI-655). The malformed
+                    # non-string "text" block must count 0, not crash the report.
                     {"type": "tool_result", "tool_use_id": "t1", "is_error": False,
-                     "content": [{"type": "text", "text": "ok"}]},
+                     "content": [{"type": "text", "text": "ok"},
+                                 {"type": "text", "text": 123}]},
                     {"type": "tool_result", "tool_use_id": "t3", "is_error": True, "content": "boom"},
                 ]
             },

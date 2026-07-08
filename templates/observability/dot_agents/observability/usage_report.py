@@ -160,10 +160,14 @@ def _content_chars(content: object) -> int:
     if isinstance(content, str):
         return len(content)
     if isinstance(content, list):
+        # A malformed block (non-string "text") counts 0 instead of aborting
+        # the whole report — same resilience posture as _safe_int.
         return sum(
-            len(b.get("text") or "")
+            len(text)
             for b in content
             if isinstance(b, dict) and b.get("type") == "text"
+            for text in (b.get("text"),)
+            if isinstance(text, str)
         )
     return 0
 
