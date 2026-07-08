@@ -491,6 +491,9 @@ def _bars(d: dict[str, int]) -> str:
 
 def render_html(report: dict, transcript: Path) -> str:
     a, c, p, r = (report[k] for k in ("adoption", "cost", "productivity", "reliability"))
+    contributors = dict(
+        sorted(c.get("context_contributors", {}).items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+    )
     rows = "".join(
         f"<tr><td>{escape(row['model'])}</td><td>{row['messages']}</td>"
         f"<td>{row['input']:,}</td><td>{row['output']:,}</td>"
@@ -536,6 +539,8 @@ def render_html(report: dict, transcript: Path) -> str:
 <h2>Cost by model</h2>
 <table><tr><th>Model</th><th>Msgs</th><th>Input</th><th>Output</th><th>Cache read</th><th>Cost</th></tr>
 {rows}</table>
+<h2>Top context contributors (tool_result chars)</h2>{_bars(contributors)}
+<p class="muted">Summed tool_result size per tool — every char is re-sent each later turn (PI-655).</p>
 <h2>Reliability — errors by tool</h2>{_bars(r["errors_by_tool"])}
 <p class="muted">Accept/reject and exact active-time are OTEL-only and not captured here.</p>
 </body></html>
