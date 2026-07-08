@@ -148,6 +148,14 @@ if [ -n "$ERRORS" ]; then
   "$PY" -c "
 import json, sys
 errors = sys.argv[1].replace('\\\\n', '\n')
+# Token-efficiency (PI-651, epic #641): the deny reason persists in the
+# transcript and is re-sent every turn — cap the error text; the deny
+# decision itself is unchanged and 'just lint' has the full report.
+lines = errors.splitlines()
+if len(lines) > 40:
+    errors = '\n'.join(lines[:40]) + (
+        f'\n… output truncated ({len(lines)} lines total) — run \`just lint\` for the full report.'
+    )
 msg = 'Pre-commit lint check failed. Fix these errors before committing:\n\n' + errors
 print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny', 'permissionDecisionReason': msg}}))
 " "$ERRORS"
