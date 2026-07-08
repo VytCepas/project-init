@@ -31,8 +31,9 @@ transcript.
 
 - Read line ranges, not whole files, when you know roughly where the target is
   (search first, then read the matching region).
-- Check the cheap indexes before grepping the tree: `CODE_MAP.md` (if present),
-  the memory index (`.agents/memory/MEMORY.md`), and `docs/`.
+- Check the cheap indexes before grepping the tree: `CODE_MAP.md`, the memory
+  index (`.agents/memory/MEMORY.md`), and `docs/` — each where present (not
+  every scaffold ships every index).
 - Don't re-read a file you just edited — the edit either applied or errored.
 
 **Searches: delegate sweeps, not lookups.**
