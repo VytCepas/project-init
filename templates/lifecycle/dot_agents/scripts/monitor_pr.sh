@@ -176,6 +176,53 @@ _run_gh() {
   return "$status"
 }
 
+# PI-678: `--delete-branch` removes the remote branch, but the LOCAL branch
+# survives whenever the merge was deferred (auto-merge), gh ran with another
+# branch checked out, or the merge happened elsewhere — every merged PR left
+# one behind for the operator to hand-delete. Clean it up when — and only
+# when — the local branch is exactly what was merged: its SHA equals the PR's
+# headRefOid (no unpushed work). Never touches any other branch or the base;
+# skips silently when the branch is absent and loudly when it diverged.
+_cleanup_local_branch() {
+  local head_info head_ref head_oid base local_oid current
+  # Only after the server confirms the merge: with a merge queue enabled,
+  # a successful `gh pr merge` may have only ENQUEUED the still-open PR,
+  # and the queue can still reject it (PR #707 review).
+  _pr_is_merged || return 0
+  head_info=$(GH_PROMPT_DISABLED=1 gh pr view "$PR_NUMBER" \
+    --json headRefName,headRefOid -q '.headRefName + " " + .headRefOid' \
+    2>/dev/null || true)
+  head_ref=${head_info% *}
+  head_oid=${head_info##* }
+  { [ -n "$head_ref" ] && [ -n "$head_oid" ] && [ "$head_ref" != "$head_oid" ]; } || return 0
+  if command -v base_branch >/dev/null 2>&1; then
+    base=$(base_branch)
+  else
+    base="main"
+  fi
+  [ "$head_ref" = "$base" ] && return 0
+  git show-ref --verify --quiet "refs/heads/$head_ref" || return 0
+  local_oid=$(git rev-parse "refs/heads/$head_ref" 2>/dev/null || true)
+  if [ "$local_oid" != "$head_oid" ]; then
+    echo "  local branch $head_ref differs from the merged head — left in place."
+    return 0
+  fi
+  current=$(git branch --show-current 2>/dev/null || true)
+  if [ "$current" = "$head_ref" ]; then
+    # Dirty worktree: skip silently (#678) — dirtiness only matters here,
+    # where deleting would require switching branches under the user's feet.
+    [ -z "$(git status --porcelain 2>/dev/null)" ] || return 0
+    git checkout -q "$base" 2>/dev/null || return 0
+    git pull -q --ff-only 2>/dev/null || true
+  fi
+  # Try the safe delete first; a squash merge leaves no ancestry so `-d`
+  # refuses — then force, backed by the SHA equality above (nothing
+  # unpushed) plus the server-confirmed merged state.
+  if git branch -d "$head_ref" >/dev/null 2>&1 || git branch -D "$head_ref" >/dev/null 2>&1; then
+    echo "  cleaned up local branch $head_ref"
+  fi
+}
+
 # The PR being MERGED is success regardless of how the last attempt exited —
 # "Merge already in progress" means the server accepted an earlier attempt.
 _pr_is_merged() {
@@ -223,6 +270,7 @@ _admin_merge() {
   fi
   if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --admin || _pr_is_merged; then
     echo "Merged PR #$PR_NUMBER (admin)"
+    _cleanup_local_branch
   else
     echo "ERROR: admin merge failed for PR #$PR_NUMBER" >&2
     return 1
@@ -406,6 +454,7 @@ if [ "$MODE" = "--merge" ]; then
   if [ "$MERGE_STATE" = "CLEAN" ] || [ "$MERGE_STATE" = "UNSTABLE" ]; then
     if _merge_with_retry; then
       echo "Merged PR #$PR_NUMBER"
+      _cleanup_local_branch
     else
       echo "ERROR: merge failed for PR #$PR_NUMBER" >&2
       exit 1
@@ -436,6 +485,7 @@ if [ "$MODE" = "--merge" ]; then
       echo "Auto-merge enabled for PR #$PR_NUMBER — will merge once all requirements are met."
     else
       echo "Merged PR #$PR_NUMBER"
+      _cleanup_local_branch
     fi
   fi
 fi

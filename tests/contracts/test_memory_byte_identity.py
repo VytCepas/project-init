@@ -75,6 +75,13 @@ session state into the generated `.claude/` mirror it reads, and only the
 only the `.gitignore` hash was re-pinned across all four combos, after
 verifying every other file still matched.
 
+Exception (#678): `monitor_pr.sh` gained `_cleanup_local_branch` — a squash
+merge deletes the remote branch but the local one lingered after every merged
+PR; after a confirmed merge the script now deletes the local head branch when
+(and only when) its SHA equals the PR's headRefOid. Deliberate feature, not
+move-drift — only the `.agents/scripts/monitor_pr.sh` hash was re-pinned
+across all four combos, after verifying every other file still matched.
+
 Exception (#632): `monitor_pr.sh` gained `_merge_with_retry`/`_pr_is_merged` —
 the single-shot merge raced GitHub's mergeability computation (failing while
 every check was green) and a failed attempt whose merge actually landed
