@@ -64,6 +64,24 @@ for file in "$MEMORY_DIR"/*.md; do
   fi
 done
 
+# --- Size check (PI-641 WS12) ---
+# One fact per file: a memory file that outgrows the cap is either several
+# facts fused together (split it) or a document (move it to the vault and keep
+# a pointer fact). Recalled memories are paid in context tokens on every
+# recall, so size drift is a recurring tax, not a cosmetic issue.
+
+MAX_LINES="${LINT_MEMORY_MAX_LINES:-100}"
+
+for file in "$MEMORY_DIR"/*.md; do
+  [ -f "$file" ] || continue
+  name="$(basename "$file")"
+  is_skipped "$name" && continue
+  file_lines="$(wc -l <"$file" | tr -d '[:space:]')"
+  if [ "$file_lines" -gt "$MAX_LINES" ]; then
+    error "$name: $file_lines lines (cap: $MAX_LINES) — split into one-fact files or move detail to the vault"
+  fi
+done
+
 # --- Check index completeness ---
 
 if [ ! -f "$INDEX" ]; then

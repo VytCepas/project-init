@@ -126,6 +126,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 _ADDED_SINCE_BASELINE = {
     # PI-647: token-efficiency conventions propagated to scaffolds
     ".agents/skills/token_efficiency/SKILL.md",
+    # PI-694: token-budget lint gate — new always-copied script (justfile
+    # wiring already excluded above)
+    ".agents/scripts/lint_context_budget.sh",
     # PI-657: guard/per-surface mechanics moved out of always-loaded AGENTS.md
     ".agents/docs/guides/enforcement.md",
     # PI-666: self-hosted-runner escape-hatch guide (ci.yml + justfile edits
