@@ -556,18 +556,27 @@ jobs:
           # commit reachable, not just the latest diff.
           fetch-depth: 0
 
+      # uvx (not bare `pip`): a self-hosted runner has no writable system
+      # site-packages, so `pip install semgrep` fails there (externally-managed
+      # env). uvx runs it from an ephemeral, pinned env on hosted and
+      # self-hosted alike (CI_RUNS_ON switch, PI-666/PI-673).
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.7"
+
       - name: Run Semgrep
         env:
           SEMGREP_ENABLE_VERSION_CHECK: "0"
         run: |
-          pip install --quiet semgrep==1.168.0
+          SEMGREP="uvx semgrep@1.168.0"
           RULESETS="--config p/secrets --config p/owasp-top-ten{{#if python}} --config p/python{{/if python}}{{#if node}} --config p/typescript{{/if node}}{{#if go}} --config p/golang{{/if go}}{{#if rust}} --config p/rust{{/if rust}}"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             # Scan only the diff against the PR's base commit.
-            semgrep scan --error --metrics=off $RULESETS \
+            $SEMGREP scan --error --metrics=off $RULESETS \
               --baseline-commit "${{ github.event.pull_request.base.sha }}"
           else
-            semgrep scan --error --metrics=off $RULESETS
+            $SEMGREP scan --error --metrics=off $RULESETS
           fi
 
   # Dependency license compliance (#579): flag copyleft (GPL/AGPL) dependencies
