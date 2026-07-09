@@ -74,11 +74,15 @@ be read and addressed at least once.
    ```
    This is the admin-merge threshold — only use after genuinely addressing comments.
 
-**Solo-dev bypass** — if no human reviewer will ever respond (e.g. bot-only feedback
-already addressed), use `--no-review` instead of abusing `--review-cycle`:
-   ```bash
-   .claude/scripts/monitor_pr.sh <pr-number> --merge --no-review
-   ```
+**No bypass is needed for bot-only review (PI-715).** Solo profiles require zero
+approving reviews, so a PR merges once CI is green, a review has landed, and no
+review thread is left unresolved — `monitor_pr.sh --merge` with no extra flag,
+no `--admin`, no `--no-review`. Resolve the threads (GitHub's
+`required_conversation_resolution` enforces this server-side) and re-run.
+
+`--no-review` remains only for the case it names: skipping the review gate
+entirely. It force-merges with `--admin`, so reach for it only when a review will
+provably never arrive — not to sidestep feedback you have not answered.
 
 **Before applying any comment:** read the current file state. Check whether the
 comment is stale (already fixed), contradicts conventions, or is correct. Never

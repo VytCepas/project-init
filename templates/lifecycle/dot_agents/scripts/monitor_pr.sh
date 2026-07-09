@@ -294,6 +294,28 @@ _has_review_activity() {
   [ "$count" -gt 0 ]
 }
 
+# PI-715: count review threads nobody has resolved. On solo profiles there is no
+# approving review to gate on (see the empty-reviewDecision branch below), so
+# "every review comment is resolved" IS the review gate. GitHub enforces the same
+# thing server-side via required_conversation_resolution; checking it here turns
+# a late, opaque "merge blocked" into an actionable review cycle.
+# Echoes a count, or nothing when the query fails — callers treat that as unknown.
+_unresolved_threads() {
+  local nwo owner repo
+  nwo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null) || return 0
+  owner=${nwo%%/*}
+  repo=${nwo##*/}
+  gh api graphql -F owner="$owner" -F repo="$repo" -F number="$PR_NUMBER" -f query='
+    query($owner:String!, $repo:String!, $number:Int!) {
+      repository(owner:$owner, name:$repo) {
+        pullRequest(number:$number) {
+          reviewThreads(first:100) { nodes { isResolved } }
+        }
+      }
+    }' --jq '[.data.repository.pullRequest.reviewThreads.nodes[]
+             | select(.isResolved == false)] | length' 2>/dev/null || true
+}
+
 # PI-706: `gh pr checks` reports the rollup for whatever commit the API believes
 # is the PR head. Right after a push the API can still serve the PREVIOUS
 # headRefOid (replication lag); that commit's checks are already settled, so the
@@ -443,6 +465,28 @@ fi
 if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ] || [ "$REVIEW_DECISION" = "UNKNOWN" ]; then
   echo "Waiting for reviewer (up to ${REVIEW_TIMEOUT}s, polling every 30s) — reviewDecision: ${REVIEW_DECISION}"
 fi
+
+# PI-715: an EMPTY reviewDecision means the branch has no approval policy — the
+# solo-profile default, since an approving review is unsatisfiable there (GitHub
+# refuses self-approval; Copilot/Codex only ever COMMENT). "No approval needed"
+# must not collapse into "merge with zero review": wait for a review to land,
+# on the same budget as the approval wait above.
+if [ -z "$REVIEW_DECISION" ] && [ "$MODE" = "--merge" ]; then
+  if ! _has_review_activity; then
+    echo "Waiting for a review (up to ${REVIEW_TIMEOUT}s, polling every 30s) — no approval policy on this branch"
+    while ! _has_review_activity && [ "$REVIEW_ELAPSED" -lt "$REVIEW_TIMEOUT" ]; do
+      sleep 30
+      REVIEW_ELAPSED=$((REVIEW_ELAPSED + 30))
+    done
+  fi
+  # PR #716 review (P1): the decision was read before any review existed. A
+  # review that lands during — or just before — the wait may be
+  # CHANGES_REQUESTED, and a summary-only change request leaves no unresolved
+  # thread behind. Without this re-read, REVIEW_DECISION stays empty, the
+  # CHANGES_REQUESTED block below is skipped, and the PR merges over a
+  # requested change. Re-read so that block sees it.
+  REVIEW_DECISION=$(_get_review_decision)
+fi
 # Token-efficiency (PI-653, epic #641): the poll loop echoes a frame only when
 # reviewDecision CHANGES — identical repeated frames persist in the agent's
 # transcript and are re-sent every turn. Terminal summaries are unchanged.
@@ -513,6 +557,36 @@ if [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
     fi
   fi
   exit 1
+fi
+
+# PI-715: the no-approval-policy gate. reviewDecision is empty, so nothing above
+# blocked — enforce the agent-review protocol here instead: a review must have
+# landed, and no review thread may be left unresolved. This is the same contract
+# required_conversation_resolution enforces server-side, surfaced as a review
+# cycle rather than an opaque "merge blocked" at the last step.
+if [ -z "$REVIEW_DECISION" ] && [ "$MODE" = "--merge" ]; then
+  UNRESOLVED=$(_unresolved_threads)
+  if [ "${UNRESOLVED:-0}" -gt 0 ]; then
+    echo "PR #$PR_NUMBER: ${UNRESOLVED} unresolved review comment(s) (cycle $REVIEW_CYCLE/$MAX_REVIEW_CYCLES):"
+    _print_review_comments
+    NEXT=$((REVIEW_CYCLE + 1))
+    echo "Address them, resolve the threads, push, then re-run:"
+    echo "  .agents/scripts/monitor_pr.sh $PR_NUMBER --merge --review-cycle $NEXT"
+    # Never force past unresolved comments: required_conversation_resolution
+    # would reject the merge anyway, and --admin here would silently discard
+    # feedback nobody answered.
+    exit 2
+  fi
+  if ! _has_review_activity; then
+    if [ "$REVIEW_CYCLE" -lt "$MAX_REVIEW_CYCLES" ]; then
+      NEXT=$((REVIEW_CYCLE + 1))
+      echo "PR #$PR_NUMBER: no review has landed after ${REVIEW_TIMEOUT}s."
+      echo "Wait for the review agents, then re-run:"
+      echo "  .agents/scripts/monitor_pr.sh $PR_NUMBER --merge --review-cycle $NEXT"
+      exit 2
+    fi
+    echo "PR #$PR_NUMBER: no review landed within $MAX_REVIEW_CYCLES cycles — merging on green CI."
+  fi
 fi
 
 PR_URL=$(gh pr view "$PR_NUMBER" --json url -q '.url')

@@ -112,6 +112,17 @@ instead of `--show-toplevel`, so linked worktrees derive the same key as the
 main checkout. Deliberate bug fix, not move-drift — only the
 `.agents/scripts/start_issue.sh` hash was re-pinned across all four combos,
 after verifying every other file still matched.
+Exception (PI-715): `review-status.yml` no longer maps straight off
+`reviewDecision`. It only ever went green on APPROVED, which a solo repo can
+never produce (GitHub refuses self-approval; Copilot/Codex submit COMMENTED), so
+the required check was permanently pending and every merge became an `--admin`
+override. It now reports `success` once a review has landed with no unresolved
+threads, `failure` on changes-requested or open comments, `pending` before any
+review. Deliberate content change, not move-drift — only the
+`.github/workflows/review-status.yml` hash was re-pinned across all four combos,
+after verifying every other file still matched.
+The same PI-715 change reworded the `github_workflow` SKILL.md (`--no-review` is no longer the routine merge path); its hash was re-pinned in the no_plugin combos only, where the skill ships as a file rather than through the plugin.
+
 """
 
 from __future__ import annotations
