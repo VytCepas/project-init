@@ -86,6 +86,14 @@ session state into the generated `.claude/` mirror it reads, and only the
 only the `.gitignore` hash was re-pinned across all four combos, after
 verifying every other file still matched.
 
+Exception (#633): `start_issue.sh`'s seed-commit decision now compares HEAD
+against the REMOTE base (`_seed_base`) — GitHub judges "No commits between"
+against its own base ref, so a branch cut from origin/main with a lagging
+local main skipped the seed and PR creation failed. PR creation also seeds +
+retries once on that rejection. Deliberate bug fix, not move-drift — only the
+`.agents/scripts/start_issue.sh` hash was re-pinned across all four combos,
+after verifying every other file still matched.
+
 Exception (#631): `start_issue.sh` gained `_repo_root_name` — project-key
 derivation now anchors on the MAIN worktree's directory (via git-common-dir)
 instead of `--show-toplevel`, so linked worktrees derive the same key as the

@@ -207,11 +207,28 @@ fi
 # construction and cannot capture the user's staged index — a plain
 # `git commit --allow-empty` still commits whatever is currently staged, which
 # would silently fold unrelated work into the generated seed commit (#446).
-BASE_BRANCH=$(base_branch)
-if [ -z "$(git rev-list "${BASE_BRANCH}..HEAD" 2>/dev/null || true)" ]; then
+_seed_commit() {
   SEED_COMMIT=$(git commit-tree "HEAD^{tree}" -p HEAD \
     -m "chore(${ISSUE_REF}): start #${ISSUE_NUMBER} — ${CLEAN_TITLE}")
   git reset --soft "$SEED_COMMIT"
+}
+
+# Judge "level with the base" against the REMOTE base when we have it — GitHub
+# decides "No commits between" against ITS base ref, not the local one. A
+# branch cut from origin/<base> while the local <base> lags behind has
+# local-only commits (rev-list <base>..HEAD non-empty) yet is identical to the
+# remote base, so the seed was skipped and PR creation still failed (#633).
+_seed_base() {
+  if git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
+    echo "origin/$BASE_BRANCH"
+  else
+    echo "$BASE_BRANCH"
+  fi
+}
+
+BASE_BRANCH=$(base_branch)
+if [ -z "$(git rev-list "$(_seed_base)..HEAD" 2>/dev/null || true)" ]; then
+  _seed_commit
 fi
 
 # --- Push and set upstream (retry + remote-SHA verification) ---
@@ -222,10 +239,37 @@ fi
 PR_TITLE="${TYPE}(${ISSUE_REF}): ${CLEAN_TITLE}"
 PR_BODY="Closes #${ISSUE_NUMBER}"
 
-PR_URL=$(gh pr create \
-  --draft \
-  --base "$BASE_BRANCH" \
-  --title "$PR_TITLE" \
-  --body "$PR_BODY")
+_create_pr() {
+  gh pr create \
+    --draft \
+    --base "$BASE_BRANCH" \
+    --title "$PR_TITLE" \
+    --body "$PR_BODY"
+}
+
+PR_ERR=$(mktemp)
+if ! PR_URL=$(_create_pr 2>"$PR_ERR"); then
+  if grep -qi "No commits between" "$PR_ERR"; then
+    # Whatever the local refs said, GitHub judged the branch empty — the seed
+    # heuristic above can never cover every ref-state (#633). Seed now, push,
+    # and retry once so the script keeps its one-issue-one-branch-one-PR
+    # promise instead of stranding a branch without a PR.
+    echo "GitHub rejected the PR (no commits) — seeding a bootstrap commit and retrying."
+    _seed_commit
+    "$SCRIPT_DIR/push_branch.sh" "$BRANCH"
+    if ! PR_URL=$(_create_pr 2>"$PR_ERR"); then
+      echo "ERROR: could not create the draft PR after seeding:" >&2
+      sed 's/^/  /' "$PR_ERR" >&2
+      rm -f "$PR_ERR"
+      exit 1
+    fi
+  else
+    echo "ERROR: could not create the draft PR:" >&2
+    sed 's/^/  /' "$PR_ERR" >&2
+    rm -f "$PR_ERR"
+    exit 1
+  fi
+fi
+rm -f "$PR_ERR"
 
 echo "Draft PR: $PR_URL"
