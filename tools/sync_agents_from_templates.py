@@ -78,6 +78,10 @@ SYNCED: dict[str, str | tuple[str, object]] = {
     # resolution) strictly supersede the repo copy's wording tweaks; both
     # dependencies (scripts/gh_host.sh, hooks/_py.sh) are in the shared set
     "scripts/monitor_pr.sh": "lifecycle/dot_agents/scripts/monitor_pr.sh",
+    # reconciled from DIVERGED (#710): the repo copy's --prune flag, bash-3.2
+    # empty-array guard, and bot-identity commit fallback were upstreamed into
+    # the template, which keeps its host-aware gh_web_base clone URL
+    "scripts/push_wiki.sh": "lifecycle/dot_agents/scripts/push_wiki.sh",
     # subagent specs (Claude Code reads them from the .claude/ mirror)
     "agents/explore.md": "base/dot_agents/agents/explore.md",
     "agents/code-reviewer.md": "base/dot_agents/agents/code-reviewer.md",
@@ -92,11 +96,6 @@ SYNCED: dict[str, str | tuple[str, object]] = {
 # Intentionally different from the template source. The contract test asserts
 # these really DO differ — a reconciled file must move to SYNCED, not linger.
 DIVERGED: dict[str, tuple[str, str]] = {
-    "scripts/push_wiki.sh": (
-        "lifecycle/dot_agents/scripts/push_wiki.sh",
-        "repo copy is AHEAD: --prune flag for the repo-only wiki skill; template has "
-        "gh_host.sh sourcing; upstream --prune in a follow-up",
-    ),
     "skills/add_command": (
         "fallback/dot_agents/skills/add_command",
         "source-repo adaptation (hook/skill paths differ from scaffolded projects)",
