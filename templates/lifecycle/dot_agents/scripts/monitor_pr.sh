@@ -179,7 +179,9 @@ _run_gh() {
 # The PR being MERGED is success regardless of how the last attempt exited —
 # "Merge already in progress" means the server accepted an earlier attempt.
 _pr_is_merged() {
-  [ "$(gh pr view "$PR_NUMBER" --json state -q .state 2>/dev/null)" = "MERGED" ]
+  # Best-effort probe: any failure (network, auth) reads as "not merged" —
+  # the caller then keeps retrying or fails, never aborts under set -e.
+  [ "$(GH_PROMPT_DISABLED=1 gh pr view "$PR_NUMBER" --json state -q .state 2>/dev/null || true)" = "MERGED" ]
 }
 
 # PI-632: the merge fires the instant the last check settles, but GitHub's

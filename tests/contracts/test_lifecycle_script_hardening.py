@@ -381,21 +381,20 @@ class TestMonitorPrMergeRetry:
                 f"{path}: a failed attempt whose merge actually landed "
                 "server-side must count as success"
             )
-            # No single-shot non-admin merge may remain outside the helpers.
-            body = s.split("_merge_with_retry() {")[1]
-            plain = [
+            # No single-shot non-admin merge may remain outside the helper.
+            # Bound the helper's span by line index (its body ends at the
+            # first bare closing brace) so a text-identical line elsewhere
+            # can't be mistaken for one of the helper's own attempts.
+            lines = s.split("_merge_with_retry() {")[1].splitlines()
+            helper_end = next(i for i, ln in enumerate(lines) if ln == "}")
+            outside = [
                 ln
-                for ln in body.splitlines()
+                for ln in lines[helper_end + 1 :]
                 if "pr merge" in ln
                 and "--admin" not in ln
                 and "--auto" not in ln
                 and not ln.lstrip().startswith("#")
-                and "_merge_with_retry() " not in ln
             ]
-            # the helper's own two attempts are inside its function body,
-            # which ends at the first unindented closing brace
-            helper_body = body.split("\n}\n")[0]
-            outside = [ln for ln in plain if ln not in helper_body.splitlines()]
             assert not outside, (
                 f"{path}: single-shot merge outside _merge_with_retry: {outside}"
             )
