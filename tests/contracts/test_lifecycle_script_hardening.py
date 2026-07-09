@@ -479,3 +479,128 @@ class TestMonitorPrMergeRetry:
         assert int((tmp_path / "n").read_text().strip()) == 4, (
             "expected 3 backoff attempts + 1 final attempt"
         )
+
+
+class TestMonitorPrLocalBranchCleanup:
+    """#678: `--delete-branch` removes the remote branch, but the local one
+    survives deferred/raced merges — every merged PR left a branch behind for
+    the operator to hand-delete. After a confirmed merge the script deletes
+    the local head branch, but ONLY when its SHA equals the PR's headRefOid
+    (no unpushed work); diverged branches stay, absent branches no-op."""
+
+    _GIT_ENV = ["-c", "user.email=t@t", "-c", "user.name=t"]
+
+    def test_every_confirmed_merge_triggers_cleanup(self):
+        for path in (
+            _LIFECYCLE_SCRIPTS / "monitor_pr.sh",
+            _ROOT_SCRIPTS / "monitor_pr.sh",
+        ):
+            lines = path.read_text().splitlines()
+            for i, ln in enumerate(lines):
+                if 'echo "Merged PR' in ln:
+                    window = "\n".join(lines[i + 1 : i + 3])
+                    assert "_cleanup_local_branch" in window, (
+                        f"{path}:{i + 1}: confirmed merge without local cleanup"
+                    )
+                if "Auto-merge enabled" in ln:
+                    window = "\n".join(lines[i + 1 : i + 3])
+                    assert "_cleanup_local_branch" not in window, (
+                        f"{path}:{i + 1}: deferred auto-merge must NOT delete "
+                        "the still-unmerged local branch"
+                    )
+
+    def _setup_repo(self, tmp_path: Path) -> Path:
+        origin = tmp_path / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+        clone = tmp_path / "clone"
+        subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True)
+        self._git(clone, "commit", "-q", "--allow-empty", "-m", "c1")
+        self._git(clone, "push", "-q", "-u", "origin", "HEAD:main")
+        self._git(clone, "checkout", "-q", "-B", "main", "origin/main")
+        return clone
+
+    def _git(self, cwd: Path, *args: str) -> str:
+        r = subprocess.run(
+            ["git", *self._GIT_ENV, *args],
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return r.stdout.strip()
+
+    def _run_cleanup(self, tmp_path: Path, clone: Path, head_oid: str) -> subprocess.CompletedProcess:
+        s = (_LIFECYCLE_SCRIPTS / "monitor_pr.sh").read_text()
+        m = re.search(
+            r"^_cleanup_local_branch\(\) \{\n.*?\n\}$", s, re.MULTILINE | re.DOTALL
+        )
+        assert m, "_cleanup_local_branch not found"
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        gh = bin_dir / "gh"
+        gh.write_text(
+            f'#!/usr/bin/env bash\necho "feat/T-9-x {head_oid}"\n'
+        )
+        gh.chmod(0o755)
+        script = f"export PATH={bin_dir}:$PATH\nset -euo pipefail\nPR_NUMBER=9\n{m.group(0)}\n_cleanup_local_branch"
+        return subprocess.run(
+            ["bash", "-c", script],
+            cwd=clone,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def _branch_exists(self, clone: Path, name: str) -> bool:
+        return (
+            subprocess.run(
+                ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{name}"],
+                cwd=clone,
+            ).returncode
+            == 0
+        )
+
+    def test_deletes_matching_branch_and_returns_to_base(self, tmp_path):
+        clone = self._setup_repo(tmp_path)
+        self._git(clone, "checkout", "-q", "-b", "feat/T-9-x")
+        self._git(clone, "commit", "-q", "--allow-empty", "-m", "seed")
+        sha = self._git(clone, "rev-parse", "HEAD")
+
+        r = self._run_cleanup(tmp_path, clone, sha)
+        assert r.returncode == 0, r.stderr
+        assert "cleaned up local branch feat/T-9-x" in r.stdout
+        assert not self._branch_exists(clone, "feat/T-9-x")
+        assert self._git(clone, "branch", "--show-current") == "main"
+
+    def test_keeps_diverged_branch(self, tmp_path):
+        clone = self._setup_repo(tmp_path)
+        self._git(clone, "checkout", "-q", "-b", "feat/T-9-x")
+        self._git(clone, "commit", "-q", "--allow-empty", "-m", "seed")
+        merged_sha = self._git(clone, "rev-parse", "HEAD")
+        self._git(clone, "commit", "-q", "--allow-empty", "-m", "unpushed")
+
+        r = self._run_cleanup(tmp_path, clone, merged_sha)
+        assert r.returncode == 0, r.stderr
+        assert "differs from the merged head" in r.stdout
+        assert self._branch_exists(clone, "feat/T-9-x"), (
+            "a branch with unpushed work must never be deleted"
+        )
+
+    def test_noop_when_branch_absent(self, tmp_path):
+        clone = self._setup_repo(tmp_path)
+        r = self._run_cleanup(tmp_path, clone, "0" * 40)
+        assert r.returncode == 0, r.stderr
+        assert r.stdout.strip() == "", "absent local branch must no-op silently"
+
+    def test_dirty_worktree_left_alone(self, tmp_path):
+        clone = self._setup_repo(tmp_path)
+        self._git(clone, "checkout", "-q", "-b", "feat/T-9-x")
+        self._git(clone, "commit", "-q", "--allow-empty", "-m", "seed")
+        sha = self._git(clone, "rev-parse", "HEAD")
+        (clone / "wip.txt").write_text("uncommitted\n")
+
+        r = self._run_cleanup(tmp_path, clone, sha)
+        assert r.returncode == 0, r.stderr
+        assert "worktree dirty" in r.stdout
+        assert self._branch_exists(clone, "feat/T-9-x")
+        assert self._git(clone, "branch", "--show-current") == "feat/T-9-x"
