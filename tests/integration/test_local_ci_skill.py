@@ -52,7 +52,7 @@ class TestLocalCiSkill:
         assert "just ci-local-on" in content
         assert "self-hosted-ci-runner.md" in content
         # Safety rails.
-        assert "never point them at `CI_RUNS_ON`" in content.lower() or "never point them at" in content
+        assert "never point them at `CI_RUNS_ON`" in content
         assert "self-attestation" in content
         assert "queue forever" in content
 
