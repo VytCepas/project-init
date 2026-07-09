@@ -48,6 +48,17 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/_py.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/tool_output_compressor.py",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }

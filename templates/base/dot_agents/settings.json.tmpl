@@ -92,6 +92,17 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/tool_output_compressor.py",
+            "timeout": 10
+          }
+        ]
       }
     ]{{#if lifecycle}},
     "UserPromptSubmit": [
