@@ -78,6 +78,13 @@ mkdocs `site/` + typedoc `_site/` docs build output; `*.swo` / `*.log`) and
 and lockfiles, `linguist-vendored` for the vault). Deliberate content additions,
 not move-drift. Only those two hashes were re-pinned across all four combos,
 after verifying every other file still matched.
+
+Exception (#631): `start_issue.sh` gained `_repo_root_name` — project-key
+derivation now anchors on the MAIN worktree's directory (via git-common-dir)
+instead of `--show-toplevel`, so linked worktrees derive the same key as the
+main checkout. Deliberate bug fix, not move-drift — only the
+`.agents/scripts/start_issue.sh` hash was re-pinned across all four combos,
+after verifying every other file still matched.
 """
 
 from __future__ import annotations

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -149,3 +150,76 @@ class TestNojiraPrStateCheck:
         ):
             s = (_REPO_ROOT / rel).read_text()
             assert '"url,state"' in s, f"{rel}: nojira PR reuse ignores PR state"
+
+
+class TestStartIssueWorktreeKey:
+    """#631: the derived project key must be pinned to the repository, not the
+    working directory. Inside a linked worktree (``git worktree add
+    ../zari-15-synthetic``) a ``--show-toplevel``-based derivation yields Z1S
+    while the main checkout yields ZARI, so one repo accumulates mixed
+    branch/PR keys — validate-pr only checks title<->branch consistency, so
+    both pass."""
+
+    def test_derivation_anchors_on_main_worktree(self):
+        for path in (
+            _LIFECYCLE_SCRIPTS / "start_issue.sh",
+            _ROOT_SCRIPTS / "start_issue.sh",
+        ):
+            s = path.read_text()
+            assert "_repo_root_name" in s, f"{path}: main-worktree helper missing"
+            assert "--git-common-dir" in s, (
+                f"{path}: repo-name derivation must anchor on the common git "
+                "dir (main worktree), not the current worktree's toplevel"
+            )
+            # Both derivation sites (initials fallback + short-key widening)
+            # must go through the helper; --show-toplevel may appear only
+            # inside the helper's own last-resort fallback.
+            body = s.split("_repo_root_name() {")[1]
+            derive = body.split("derive_project_key() {")[1]
+            assert "_repo_root_name" in derive, (
+                f"{path}: derive_project_key bypasses the main-worktree helper"
+            )
+            assert "--show-toplevel" not in derive, (
+                f"{path}: a --show-toplevel call after the helper reintroduces "
+                "the per-worktree key drift"
+            )
+
+    def _extract_helper(self, script: Path) -> str:
+        m = re.search(
+            r"^_repo_root_name\(\) \{\n.*?\n\}$",
+            script.read_text(),
+            re.MULTILINE | re.DOTALL,
+        )
+        assert m, f"{script}: _repo_root_name not found"
+        return m.group(0)
+
+    def test_helper_returns_main_repo_name_from_linked_worktree(self, tmp_path):
+        helper = self._extract_helper(_LIFECYCLE_SCRIPTS / "start_issue.sh")
+        git_env = ["-c", "user.email=t@t", "-c", "user.name=t"]
+        repo = tmp_path / "zarija"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+        subprocess.run(
+            ["git", *git_env, "commit", "-q", "--allow-empty", "-m", "init"],
+            cwd=repo,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "worktree", "add", "-q", "-b", "wt", "../zari-15-synthetic"],
+            cwd=repo,
+            check=True,
+        )
+        sub = tmp_path / "zari-15-synthetic" / "sub"
+        sub.mkdir()
+        for cwd in (repo, tmp_path / "zari-15-synthetic", sub):
+            out = subprocess.run(
+                ["bash", "-c", f"{helper}\n_repo_root_name"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            assert out.stdout.strip() == "zarija", (
+                f"from {cwd}: derived repo name {out.stdout.strip()!r} — the "
+                "key must match the main checkout's"
+            )
