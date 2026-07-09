@@ -147,6 +147,10 @@ _ADDED_SINCE_BASELINE = {
     # PI-661: zero-token statusline context meter (wired in settings.json,
     # which is already excluded above)
     ".agents/hooks/statusline.sh",
+    # PI-663: checkpoint skill (checkpoint-and-clear session handoff);
+    # INDEX/README/project-init.md rows already excluded above. The .gitignore
+    # edit (.agents/tmp/) was re-pinned in the fixtures, not excluded.
+    ".agents/skills/checkpoint/SKILL.md",
     # #605: Guards log the governance signal (decision + command)
     ".agents/hooks/_usage_log.sh",
     ".agents/hooks/prod_guard.py",

@@ -7,6 +7,9 @@
 {{#if memory}}.agents/memory/.cache/
 {{/if memory}}.agents/logs/
 .agents/.local/
+# Session handoff files (checkpoint skill, PI-663) — contain session state,
+# must never be committable by accident
+.agents/tmp/
 
 # Python
 __pycache__/
