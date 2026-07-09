@@ -9,6 +9,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/gh_host.sh"
+
 if [[ $# -lt 2 ]]; then
   echo "Usage: push_wiki.sh <repo-slug> <wiki-source-file> [--prune <page.md> ...]" >&2
   exit 1
@@ -20,23 +24,28 @@ shift 2
 PRUNE_PAGES=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --prune)
-      if [[ $# -lt 2 || "$2" == --* ]]; then
-        echo "--prune requires at least one page name" >&2
-        exit 1
-      fi
+  --prune)
+    if [[ $# -lt 2 || "$2" == --* ]]; then
+      echo "--prune requires at least one page name" >&2
+      exit 1
+    fi
+    shift
+    while [[ $# -gt 0 && "$1" != --* ]]; do
+      PRUNE_PAGES+=("$1")
       shift
-      while [[ $# -gt 0 && "$1" != --* ]]; do
-        PRUNE_PAGES+=("$1"); shift
-      done ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+    done
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
   esac
 done
 WIKI_DIR="$(mktemp -d)"
 trap 'rm -rf "$WIKI_DIR"' EXIT
 
 echo "Cloning wiki for $REPO_SLUG..."
-git clone "https://github.com/${REPO_SLUG}.wiki.git" "$WIKI_DIR"
+git clone "$(gh_web_base)/${REPO_SLUG}.wiki.git" "$WIKI_DIR"
 
 cp "$SOURCE_FILE" "$WIKI_DIR/Home.md"
 

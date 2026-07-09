@@ -50,7 +50,7 @@
   ".agents/scripts/monitor_pr.sh": "da89d8a99c9fba3927dc9c93833dac95116ebd574cffb604fe40ad2e6393c71c",
   ".agents/scripts/promote_review.sh": "fef0604c5ca69ab496203a205a03f6fc4dad21d6ddc06c11b68d342aaf7bd6b4",
   ".agents/scripts/push_branch.sh": "37c215988d429361b099e4c8a46ea31ee73b8728da7d1a7b9678413cb1bfb096",
-  ".agents/scripts/push_wiki.sh": "2b12c789d9a43f2f97b030762fea9e3b627ec0682cf3d4283b051f03c23b0df0",
+  ".agents/scripts/push_wiki.sh": "443c5d0050d452c75b71cb5eae13f8d4d1153632a94e1addc016d35d19238ddc",
   ".agents/scripts/setup_github.sh": "edac3172e42d05c85ad59478db7b5b2e16664e35daae7b0726c9da1b48a5ee51",
   ".agents/scripts/start_issue.sh": "21ff650a6ddcbc786ca68e071a97f0c64ba27e123424e0841c0a9f7a2d3ae7c9",
   ".agents/settings.json": "42ad4604d2d1facd7ebb4f6679e2335bbf12d50e5c0daa33916d4518fa09279d",

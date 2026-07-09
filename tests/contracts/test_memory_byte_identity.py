@@ -75,6 +75,15 @@ session state into the generated `.claude/` mirror it reads, and only the
 only the `.gitignore` hash was re-pinned across all four combos, after
 verifying every other file still matched.
 
+Exception (#710): `push_wiki.sh` upstreamed the repo copy's improvements —
+`--prune <page.md> ...` (remove stale pages in the same commit), the
+bash-3.2-safe empty-array guard, and the bot-identity commit fallback for
+runners with no git identity — while keeping the template's host-aware
+`gh_web_base` clone URL. Deliberate feature reconciliation (semi-scaffold
+DIVERGED → SYNCED), not move-drift — only the `.agents/scripts/push_wiki.sh`
+hash was re-pinned across all four combos, after verifying every other file
+still matched.
+
 Exception (#678): `monitor_pr.sh` gained `_cleanup_local_branch` — a squash
 merge deletes the remote branch but the local one lingered after every merged
 PR; after a confirmed merge the script now deletes the local head branch when
