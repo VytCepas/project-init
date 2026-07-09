@@ -63,12 +63,22 @@ def test_monitor_pr_gates_on_reviews_and_unresolved_threads(tmp_target: Path):
     assert "_admin_merge" not in gate.split("if ! _has_review_activity", 1)[0]
 
 
+# PI_TEST_DECISION_LATE, when set, is returned from the SECOND reviewDecision
+# query onward — the first answers empty. That reproduces the real ordering: the
+# decision is read before any review exists, then a review lands.
 _GH_STUB = """#!/bin/bash
 case "$*" in
 *"--json headRefName"*) echo "feature false" ;;
 *"--json headRefOid"*) echo "$PI_TEST_SHA" ;;
 *"pr checks"*) echo '[{"name":"ci","state":"SUCCESS","bucket":"pass"}]' ;;
-*"--json reviewDecision"*) echo "" ;;
+*"--json reviewDecision"*)
+  if [ -n "${PI_TEST_DECISION_LATE:-}" ] && [ -f "$PI_TEST_STATE" ]; then
+    echo "$PI_TEST_DECISION_LATE"
+  else
+    : >"$PI_TEST_STATE"
+    echo ""
+  fi
+  ;;
 *"--json reviews"*) echo "$PI_TEST_REVIEWS" ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
 *"api graphql"*) echo "$PI_TEST_UNRESOLVED" ;;
@@ -89,7 +99,14 @@ exec {real_git} "$@"
 """
 
 
-def _run_monitor(tmp_target: Path, tmp_path: Path, *, reviews: str, unresolved: str):
+def _run_monitor(
+    tmp_target: Path,
+    tmp_path: Path,
+    *,
+    reviews: str,
+    unresolved: str,
+    decision_late: str = "",
+):
     import shutil
 
     scaffold(tmp_target, fallback_preset(), fallback_variables())
@@ -106,6 +123,8 @@ def _run_monitor(tmp_target: Path, tmp_path: Path, *, reviews: str, unresolved: 
     env["PI_TEST_SHA"] = "a" * 40
     env["PI_TEST_REVIEWS"] = reviews
     env["PI_TEST_UNRESOLVED"] = unresolved
+    env["PI_TEST_DECISION_LATE"] = decision_late
+    env["PI_TEST_STATE"] = str(tmp_path / "decision-seen")
     return subprocess.run(
         ["bash", str(tmp_target / _SCRIPTS / "monitor_pr.sh"), "1", "--merge"],
         capture_output=True,
@@ -133,3 +152,23 @@ def test_reviewed_with_no_open_comments_merges_without_override(
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Merged PR #1" in result.stdout
     assert "(admin)" not in result.stdout
+
+
+def test_changes_requested_after_the_no_policy_wait_blocks_the_merge(
+    tmp_target: Path, tmp_path: Path
+):
+    """PR #716 review (P1): reviewDecision is read before any review exists.
+
+    A summary-only change request leaves no unresolved thread, so without
+    re-reading the decision the script merged straight over it.
+    """
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        reviews="1",
+        unresolved="0",
+        decision_late="CHANGES_REQUESTED",
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "Review/decision failed" in result.stdout
+    assert "Merged" not in result.stdout

@@ -471,12 +471,21 @@ fi
 # refuses self-approval; Copilot/Codex only ever COMMENT). "No approval needed"
 # must not collapse into "merge with zero review": wait for a review to land,
 # on the same budget as the approval wait above.
-if [ -z "$REVIEW_DECISION" ] && [ "$MODE" = "--merge" ] && ! _has_review_activity; then
-  echo "Waiting for a review (up to ${REVIEW_TIMEOUT}s, polling every 30s) — no approval policy on this branch"
-  while ! _has_review_activity && [ "$REVIEW_ELAPSED" -lt "$REVIEW_TIMEOUT" ]; do
-    sleep 30
-    REVIEW_ELAPSED=$((REVIEW_ELAPSED + 30))
-  done
+if [ -z "$REVIEW_DECISION" ] && [ "$MODE" = "--merge" ]; then
+  if ! _has_review_activity; then
+    echo "Waiting for a review (up to ${REVIEW_TIMEOUT}s, polling every 30s) — no approval policy on this branch"
+    while ! _has_review_activity && [ "$REVIEW_ELAPSED" -lt "$REVIEW_TIMEOUT" ]; do
+      sleep 30
+      REVIEW_ELAPSED=$((REVIEW_ELAPSED + 30))
+    done
+  fi
+  # PR #716 review (P1): the decision was read before any review existed. A
+  # review that lands during — or just before — the wait may be
+  # CHANGES_REQUESTED, and a summary-only change request leaves no unresolved
+  # thread behind. Without this re-read, REVIEW_DECISION stays empty, the
+  # CHANGES_REQUESTED block below is skipped, and the PR merges over a
+  # requested change. Re-read so that block sees it.
+  REVIEW_DECISION=$(_get_review_decision)
 fi
 # Token-efficiency (PI-653, epic #641): the poll loop echoes a frame only when
 # reviewDecision CHANGES — identical repeated frames persist in the agent's
