@@ -52,8 +52,17 @@ def test_committed_claude_matches_a_fresh_sync(tmp_path: Path):
 def test_mirror_set_tracks_the_gitignore_allowlist():
     # MIRRORED must equal the `.agents/` entries the repo commits (the
     # `!.agents/...` un-ignore lines), so the two can't silently diverge.
+    # A dir un-ignored only to re-expose a nested file (`!.agents/docs` followed
+    # by `.agents/docs/*`) is a plumbing line, not a committed entry — the
+    # committed entry is the nested `!.agents/docs/CODE_MAP.md` line itself.
     lines = (REPO_ROOT / ".gitignore").read_text().splitlines()
-    committed = {ln.removeprefix("!.agents/") for ln in lines if ln.startswith("!.agents/")}
+    unignored = {ln.removeprefix("!.agents/") for ln in lines if ln.startswith("!.agents/")}
+    reignored_dirs = {
+        ln.removeprefix(".agents/").removesuffix("/*")
+        for ln in lines
+        if ln.startswith(".agents/") and ln.endswith("/*") and ln != ".agents/*"
+    }
+    committed = unignored - reignored_dirs
     assert set(sync_claude_dir.MIRRORED) == committed
 
 

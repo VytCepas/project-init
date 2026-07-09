@@ -9,10 +9,11 @@ allowed-tools: Bash(git *) Bash(gh *) Bash(.claude/scripts/*) Read
 
 Load this skill before any push, PR creation, review response, or merge action.
 
-> **project-init source repo note:** Root `.claude/scripts/` lifecycle scripts
-> exist here but may not have all variants — those scripts are scaffolded-project
-> artifacts. If a script is missing, use the equivalent `git`/`gh` commands
-> directly while preserving the same lifecycle behavior described below.
+> **project-init source repo note:** the full lifecycle script set (including
+> `create_issue.sh`, `start_issue.sh`, `setup_github.sh`) is synced from
+> `templates/` via the semi-scaffold (`just sync-agents`, PI-685) and lives in
+> `.agents/scripts/`. If a script ever misbehaves here, fall back to the
+> equivalent `git`/`gh` commands while preserving the lifecycle behavior below.
 
 ## Quick reference
 

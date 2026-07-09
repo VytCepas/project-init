@@ -26,13 +26,19 @@ venv/
 *.log
 logs/
 
-# Local agent runtime state — committed: skills/, hooks/, scripts/, settings.json
+# Local agent runtime state — committed entries below (semi-scaffold shared set,
+# PI-685: agents/, config.yaml, docs/CODE_MAP.md synced from templates/);
 # gitignored: vault/, settings.local.json, scheduled_tasks.lock (personal/runtime)
 .agents/*
 !.agents/skills
 !.agents/hooks
 !.agents/scripts
 !.agents/settings.json
+!.agents/agents
+!.agents/config.yaml
+!.agents/docs
+.agents/docs/*
+!.agents/docs/CODE_MAP.md
 .codex
 
 # coverage data

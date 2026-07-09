@@ -1,5 +1,5 @@
-#!/bin/bash
-# Thin shim — actual logic lives in the sibling ../hooks/dag_workflow.py
-# (canonical: .agents/hooks/; the same tree is mirrored under .claude/ for
-# Claude Code). Resolving relative to $0 keeps whichever copy is invoked working.
-exec python3 "$(dirname "$0")/../hooks/dag_workflow.py" push "$@"
+#!/usr/bin/env bash
+# Thin shim — actual logic lives in .agents/hooks/dag_workflow.py.
+# Kept under .agents/scripts/ so existing skill paths and agent muscle
+# memory keep working.
+exec "$(dirname "$0")/../hooks/_py.sh" "$(dirname "$0")/../hooks/dag_workflow.py" push "$@"

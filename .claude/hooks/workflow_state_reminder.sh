@@ -11,14 +11,42 @@
 
 set -euo pipefail
 
+# Self-log this firing (dormant unless the observability overlay is installed;
+# reads no stdin, so the payload below is untouched).
+# shellcheck source=/dev/null
+. "$(dirname "$0")/_usage_log.sh" 2>/dev/null &&
+  usage_log workflow_state_reminder UserPromptSubmit </dev/null || true
+
 INPUT=$(cat)
+
+# Resolve the Python interpreter through the canonical helper (PI-361).
+PY="$(dirname "$0")/_py.sh"
 
 # Try to derive a current-state snapshot from dag_workflow.py.
 # Failures are non-fatal — the static rules are always injected.
-DAG_STATE=$(python3 "$(dirname "$0")/dag_workflow.py" nodes 2>/dev/null || true)
+DAG_STATE=$("$PY" "$(dirname "$0")/dag_workflow.py" nodes 2>/dev/null || true)
 
-printf '%s' "$INPUT" | DAG_STATE="$DAG_STATE" \
-  PI_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}" python3 -c '
+# The issue key is project-specific (start_issue.sh derives it from config.yaml's
+# project_key / the repo name), so the naming rules must NOT hardcode `PI`
+# (2026-07 review). Resolve the project config via $CLAUDE_PROJECT_DIR when set
+# — in plugin mode this hook runs from the plugin root, so a $0-relative path
+# points into the plugin, not the project (Codex review); fall back to the
+# $0-relative path (the adapter/no-plugin case). Strip an optional YAML quote
+# around the value (config documents `project_key: "PI"`), or the reminder emits
+# invalid names like `feat/"PI"-98-...`.
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+  _pi_config="$CLAUDE_PROJECT_DIR/.agents/config.yaml"
+else
+  _pi_config="$(dirname "$0")/../config.yaml"
+fi
+# `|| true` so a missing project_key (the common case) doesn't fail the pipe
+# under `set -euo pipefail` and abort the hook — it must fall back to <KEY>.
+PROJECT_KEY=$({ grep '^[[:space:]]*project_key:' "$_pi_config" 2>/dev/null || true; } |
+  head -n1 | sed 's/#.*$//' | cut -d: -f2- | tr -d "[:space:]\"'" | tr '[:lower:]' '[:upper:]')
+[ -z "$PROJECT_KEY" ] && PROJECT_KEY="<KEY>"
+
+printf '%s' "$INPUT" | DAG_STATE="$DAG_STATE" PROJECT_KEY="$PROJECT_KEY" \
+  PI_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}" "$PY" -c '
 import hashlib
 import json
 import os
@@ -48,6 +76,7 @@ if not trigger:
     sys.exit(0)
 
 dag_state = os.environ.get("DAG_STATE", "").strip()
+key = os.environ.get("PROJECT_KEY", "").strip() or "<KEY>"
 
 # Session-scoped dedup (ADR-028): the static rules are injected once per
 # session, and the dynamic DAG state is re-injected only when it CHANGED
@@ -82,23 +111,23 @@ state_block = f"\nCurrent DAG nodes:\n{dag_state}\n" if dag_state else ""
 
 if first_time:
     context = (
-        "GitHub workflow rules (enforced by .agents/hooks/dag_workflow.py):\n"
+        "GitHub workflow rules (enforced by the dag_workflow.py guard hook):\n"
         "\n"
         "Lifecycle order (DAG):\n"
         "  issue.created -> branch.created -> branch.pushed -> pr.opened\n"
         "                                                  \\-> ci.green -+\n"
         "                                                  \\-> review.approved -+-> pr.merged\n"
         "\n"
-        "Use these entrypoints — the DAG hook blocks the raw commands:\n"
-        "  start_task skill (issue + branch + draft PR) | create_nojira_pr.sh (not: gh pr create)\n"
+        "Use the wrapper scripts in .agents/scripts/ — the guard blocks the raw commands:\n"
+        "  create_issue.sh (not: gh issue create) | start_issue.sh / create_nojira_pr.sh (not: gh pr create)\n"
         "  push_branch.sh (not: git push) | promote_review.sh (not: gh pr ready)\n"
-        "  finish_pr.sh <pr> | monitor_pr.sh <pr> --merge (not: gh pr merge / gh api .../merge / gh pr checks --watch)\n"
-        "  (scripts live in .agents/scripts/)\n"
+        "  monitor_pr.sh <pr> --merge (not: gh pr merge / gh api .../merge / gh pr checks --watch)\n"
         "\n"
-        "Naming: branch <type>/PI-<n>-<kebab-slug> | "
-        "PR title type(PI-N): description (no scope = no linked issue, ADR-006) | "
+        f"Naming: branch <type>/{key}-<n>-<kebab-slug> | "
+        f"PR title type({key}-N): description (no scope = no linked issue) | "
         "body includes `Closes #N`\n"
-        "Details (review cycles, iterating before push): load the github_workflow skill.\n"
+        "Details (review cycles, no-issue PRs, iterating before push): load the "
+        "github_workflow skill.\n"
         f"{state_block}"
     )
 elif state_block and state_changed:

@@ -43,3 +43,15 @@ sync-plugin:
 # hooks and skills load. Run after editing anything under .agents/.
 sync-claude:
     uv run python tools/sync_claude_dir.py
+
+# semi-scaffold: sync this repo's own .agents/ shared set from templates/
+# (dogfood; PI-685). Run after template changes to shared files, then
+# `just sync-claude`. CI enforces via tests/contracts/test_agents_template_sync.py.
+sync-agents:
+    uv run python tools/sync_agents_from_templates.py
+
+# regenerate .agents/docs/CODE_MAP.md — the low-token "what does what" index
+# agents read before grepping (PI-685 dogfood). Run after public-API changes.
+code-map:
+    uv run python .agents/scripts/gen_code_map.py
+    uv run python tools/sync_claude_dir.py

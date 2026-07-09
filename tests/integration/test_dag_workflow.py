@@ -597,11 +597,13 @@ class TestScriptShims:
 
     @pytest.mark.parametrize("name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"])
     def test_source_script_is_shim(self, name: str):
+        # Since PI-685 the repo's shims are synced verbatim from
+        # templates/lifecycle, so they carry the PI-361 _py.sh resolver form.
         path = REPO_ROOT / ".agents" / "scripts" / name
         assert path.is_file()
         text = path.read_text()
         assert "dag_workflow.py" in text
-        assert "exec python3" in text
+        assert 'exec "$(dirname "$0")/../hooks/_py.sh"' in text
         # Each shim should be tiny.
         assert len(text.splitlines()) <= 6
 

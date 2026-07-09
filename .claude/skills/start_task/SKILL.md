@@ -24,20 +24,23 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 2. **Check for existing issue and PR** — run `gh issue list` and `gh pr list`. If an issue already exists, use its number. If a draft PR already exists for that issue, use it — do **not** create a second PR. Skip to step 5.
 
-3. **Create the issue** (no `create_issue.sh` in this repo — use gh directly):
+3. **Create the issue** with the lifecycle script (adopted via the
+   semi-scaffold, PI-685):
    ```bash
-   gh issue create --title "<title>" --label "<type>" --body "..."
+   .claude/scripts/create_issue.sh <type> "<title>" [--body-file FILE]
    # Note the issue number from the output URL
    ```
    Issue titles are plain descriptions — the type is carried by the label.
+   (The script applies the type label and planning metadata; extra body
+   content goes through `--body-file`, not `--body`; see its --help.)
 
-4. **Create branch and draft PR**:
+4. **Create branch and draft PR** with the lifecycle script — the guard now
+   denies raw `gh pr create` and redirects here:
    ```bash
-   git checkout -b <type>/PI-<n>-<slug>
-   .claude/scripts/push_branch.sh          # retrying push with SHA verification
-   gh pr create --title "<type>(PI-<n>): <title>" --body "Closes #<n>" --draft
+   .claude/scripts/start_issue.sh <n> <type>   # branch + push + draft PR in one step
    ```
-   Branch name pattern: `<issue_type>/PI-<issue_number>-<short-slug>`
+   It derives the branch as `<type>/PI-<n>-<slug-from-title>`, pushes with SHA
+   verification, and opens the draft PR with `Closes #<n>` wired.
 
 5. **Proceed** — only begin implementation after issue + branch + draft PR exist.
 
