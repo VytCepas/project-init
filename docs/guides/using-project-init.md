@@ -45,11 +45,18 @@ The most-used flags:
 |------|--------|---------|
 | `--preset` | `core`, `auto`, `obsidian-only`, `obsidian-graphify`, `governed` (see `--list-presets`) | (asked interactively) |
 | `--language` | `python`, `node`, `go`, `rust`, `none` | `none` |
+| `--python-version` | `3.11`, `3.12`, `3.13`, `3.14` | `pyproject.toml`'s `requires-python` floor, else `3.11` |
 | `--memory` | `none`, `auto`, `obsidian-only`, `obsidian-graphify`, `obsidian-graphify-rag` | the preset's tier |
 | `--lifecycle` | `github`, `none` | `github` |
 | `--mcps` | `context7`, `context7-http` (comma-separated) | none |
 | `--browser` | flag (Playwright MCP) | off |
 | `--strict` | flag (fail on unrendered placeholders) | off |
+
+`--python-version` is the single source for "what Python is this project on": it
+pins `mise.toml`'s toolchain, `mypy.ini`'s typeshed baseline, and the floor of the
+CI test matrix to one value. On a greenfield scaffold the wizard asks; once your
+`pyproject.toml` declares `requires-python`, that becomes the source of truth and
+CI derives the matrix from it instead.
 
 The full surface (delivery/deploy/IaC overlays, governance, observability,
 multi-model, agents, license, profile, …) is documented by `project-init --help`

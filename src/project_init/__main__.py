@@ -99,6 +99,46 @@ class ScaffoldInputs:
     # Renovate config (#477, ADR-022): gates renovate.json (dependency-update bot).
     # Opt-OUT — default ON to preserve today's always-shipped config.
     renovate: bool = True
+    # Target CPython for a Python scaffold (#628). One value renders into
+    # mise.toml (toolchain pin), mypy.ini (typeshed baseline), and the CI
+    # matrix floor — before this, those three disagreed on day one. Empty means
+    # "derive": an existing pyproject.toml's requires-python floor, else 3.11.
+    # Precedence: --python-version > pyproject requires-python > prompt > 3.11.
+    python_version: str = ""
+
+
+# Every CPython a Python scaffold is willing to target (#628). Kept byte-equal
+# to the `KNOWN` list in templates/base/dot_github/workflows/ci.yml.tmpl, which
+# derives the test matrix from it — test_python_version_pins.py fails on drift.
+# The first entry is the default floor when nothing else declares one.
+SUPPORTED_PYTHON_VERSIONS: tuple[str, ...] = ("3.11", "3.12", "3.13", "3.14")
+
+
+def _python_floor_from_pyproject(target: Path | None) -> str | None:
+    """The requires-python floor declared by an existing pyproject.toml, if any.
+
+    Returns None for a greenfield scaffold — the case #628 is about, where no
+    file declares a version and every consumer used to invent its own.
+    """
+    if not target or not (target / "pyproject.toml").exists():
+        return None
+    try:
+        import tomllib
+
+        with (target / "pyproject.toml").open("rb") as f:
+            data = tomllib.load(f)
+        req = data.get("project", {}).get("requires-python", "")
+        if not req:
+            req = data.get("tool", {}).get("poetry", {}).get("dependencies", {}).get("python", "")
+        if req:
+            import re
+
+            m = re.search(r"(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)", req)
+            if m and m.group(1):
+                return m.group(1)
+    except Exception:
+        return None
+    return None
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -131,6 +171,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "--language",
         choices=["python", "node", "go", "rust", "none"],
         help="Primary language/runtime",
+    )
+    p.add_argument(
+        "--python-version",
+        metavar="X.Y",
+        choices=list(SUPPORTED_PYTHON_VERSIONS),
+        help=(
+            "Target CPython for a Python project — pins mise.toml, mypy.ini, and "
+            "the CI matrix floor to one version "
+            f"(choices: {', '.join(SUPPORTED_PYTHON_VERSIONS)}; "
+            "default: pyproject.toml's requires-python floor, else "
+            f"{SUPPORTED_PYTHON_VERSIONS[0]})"
+        ),
     )
     p.add_argument(
         "--delivery",
@@ -1191,6 +1243,7 @@ WIZARD_MECHANICAL_FLAGS: frozenset[str] = frozenset(
         "name",
         "description",
         "language",
+        "python_version",
         "owner",
         "license",
         "agents",
@@ -1405,6 +1458,8 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     cli_mise: bool = False,
     cli_vscode: bool = False,
     cli_agents: str | None = None,
+    cli_python_version: str | None = None,
+    target: Path | None = None,
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -1440,6 +1495,17 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         ("python", "node", "go", "rust", "none"),
         default=cli_language or "none",
     )
+    # #628: only a Python scaffold has a version to pin, and only a greenfield
+    # one has an unanswered question — when pyproject.toml already declares
+    # requires-python, that file is the source of truth and asking would invite
+    # a contradiction. An explicit --python-version still wins over both.
+    python_version = cli_python_version or ""
+    if not python_version and language == "python" and not _python_floor_from_pyproject(target):
+        python_version = _prompt_choice(
+            "Target Python (pins mise.toml, mypy.ini, and the CI matrix floor)",
+            SUPPORTED_PYTHON_VERSIONS,
+            default=SUPPORTED_PYTHON_VERSIONS[0],
+        )
     (
         delivery_flag,
         deploy_flag,
@@ -1527,6 +1593,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         no_plugin=no_plugin,
         profile=resolved_profile,
         no_egress=no_egress,
+        python_version=python_version,
         delivery=resolved_delivery,
         deploy=resolved_deploy,
         iac=resolved_iac,
@@ -2082,29 +2149,16 @@ def _build_variables(
         language, ("", "", "", "")
     )
 
-    python_floor = "3.11"
-    if target and (target / "pyproject.toml").exists():
-        try:
-            import tomllib
-
-            with (target / "pyproject.toml").open("rb") as f:
-                data = tomllib.load(f)
-                req = data.get("project", {}).get("requires-python", "")
-                if not req:
-                    req = (
-                        data.get("tool", {})
-                        .get("poetry", {})
-                        .get("dependencies", {})
-                        .get("python", "")
-                    )
-                if req:
-                    import re
-
-                    m = re.search(r"(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)", req)
-                    if m and m.group(1):
-                        python_floor = m.group(1)
-        except Exception:
-            pass
+    # #628: one value answers "what Python is this project on" for mise.toml,
+    # mypy.ini, and the CI matrix floor. An explicit --python-version (or the
+    # wizard's answer, which lands in the same field) wins over the declared
+    # requires-python; a greenfield scaffold with neither falls back to the
+    # oldest supported CPython.
+    python_floor = (
+        inputs.python_version
+        or _python_floor_from_pyproject(target)
+        or SUPPORTED_PYTHON_VERSIONS[0]
+    )
 
     return {
         "python_floor": python_floor,
@@ -2304,6 +2358,7 @@ def _resolve_inputs(
         no_plugin=no_plugin,
         profile=profile,
         no_egress=args.no_egress,
+        python_version=args.python_version or "",
         delivery=delivery,
         deploy=deploy,
         iac=iac,
@@ -2589,6 +2644,8 @@ def _cli(argv: list[str]) -> int:
             no_plugin=args.no_plugin,
             profile=args.profile,
             no_egress=args.no_egress,
+            cli_python_version=args.python_version,
+            target=target,
             cli_overlays=(
                 args.delivery,
                 args.deploy,
