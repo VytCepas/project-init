@@ -29,8 +29,11 @@ class TestCheckpointSkill:
         # Deletion-after-resume requirement.
         assert "delete" in content.lower()
         assert "rm .agents/tmp/checkpoint.md" in content
-        # Never-committable requirement is stated to the agent too.
-        assert "gitignored" in content
+        # Never-committable requirement: the skill self-verifies the ignore
+        # entry before writing (old scaffolds get the skill via plugin update
+        # but keep their pre-PI-663 .gitignore — Codex review).
+        assert "git check-ignore -q .agents/tmp/checkpoint.md" in content
+        assert ">> .gitignore" in content
 
     def test_checkpoint_path_is_gitignored(self, tmp_target: Path):
         """The scaffold's .gitignore must make the handoff file uncommittable."""

@@ -15,9 +15,17 @@ summarized away.
 
 ## Writing a checkpoint
 
-1. Write the handoff to `.agents/tmp/checkpoint.md` (create the directory if
-   needed — the path is **gitignored by the scaffold**; never write it
-   anywhere committable, it contains session state).
+1. **Verify the path is ignored before writing** — projects scaffolded before
+   this skill existed may lack the ignore entry, and the file contains
+   session state that must never be committable:
+
+   ```bash
+   git check-ignore -q .agents/tmp/checkpoint.md 2>/dev/null \
+     || printf '\n# Session handoff files (checkpoint skill)\n.agents/tmp/\n' >> .gitignore
+   ```
+
+   Then write the handoff to `.agents/tmp/checkpoint.md` (create the
+   directory if needed).
 2. Use exactly this structure — every section, one line each unless more is
    genuinely load-bearing:
 
