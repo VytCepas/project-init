@@ -128,7 +128,9 @@ ACCEPTANCE=()
 contains_word() {
   local needle="$1"
   local haystack="$2"
-  echo "$haystack" | grep -qw "$needle"
+  # Words are one per line so the needle is matched fixed and whole (-Fx --):
+  # a value starting with '-' can't be parsed as a grep option (PI-691).
+  printf '%s\n' $haystack | grep -qFx -- "$needle"
 }
 
 require_option_value() {
@@ -274,13 +276,24 @@ PARENT_NUMBER=""
 
 parse_parent() {
   local raw="${1#\#}" # strip leading #
-  # Host-agnostic URL match: github.com, GHES, and *.ghe.com issue URLs all
-  # parse (the lifecycle tooling is host-aware via gh_host.sh, PI-691); a
-  # wrong host fails loudly at the sub-issue API call, not silently here.
-  if [[ "$raw" =~ ^https?://[^/]+/([^/]+)/([^/]+)/issues/([0-9]+)$ ]]; then
-    PARENT_OWNER="${BASH_REMATCH[1]}"
-    PARENT_REPO="${BASH_REMATCH[2]}"
-    PARENT_NUMBER="${BASH_REMATCH[3]}"
+  # Host-aware URL match: github.com, GHES, and *.ghe.com issue URLs all
+  # parse (PI-691), but the URL's host must equal the active host resolved by
+  # gh_host.sh — the sub-issue API call runs in the current gh context, so a
+  # same-named owner/repo#n on ANOTHER host would silently link the wrong
+  # parent (Codex review). Mismatch fails loudly here instead.
+  if [[ "$raw" =~ ^https?://([^/]+)/([^/]+)/([^/]+)/issues/([0-9]+)$ ]]; then
+    local url_host="${BASH_REMATCH[1]}" active_host
+    # shellcheck source=/dev/null
+    . "$SCRIPT_DIR/gh_host.sh"
+    active_host="$(gh_host)"
+    if [ "$url_host" != "$active_host" ]; then
+      echo "ERROR: parent URL host '$url_host' does not match the active GitHub host '$active_host'." >&2
+      echo "Use owner/repo#n for same-host parents, or set PROJECT_INIT_HOST/GH_HOST to '$url_host'." >&2
+      exit 1
+    fi
+    PARENT_OWNER="${BASH_REMATCH[2]}"
+    PARENT_REPO="${BASH_REMATCH[3]}"
+    PARENT_NUMBER="${BASH_REMATCH[4]}"
   elif [[ "$raw" =~ ^([^/#]+)/([^#]+)#([0-9]+)$ ]]; then
     PARENT_OWNER="${BASH_REMATCH[1]}"
     PARENT_REPO="${BASH_REMATCH[2]}"
