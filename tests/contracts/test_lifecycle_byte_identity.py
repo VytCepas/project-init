@@ -145,6 +145,9 @@ _ADDED_SINCE_BASELINE = {
     # PI-694: token-budget lint gate — new always-copied script (justfile
     # wiring already excluded above)
     ".agents/scripts/lint_context_budget.sh",
+    # PI-696: PostToolUse tool-output compressor (settings.json/AGENTS.md
+    # wiring already excluded above)
+    ".agents/hooks/tool_output_compressor.py",
     # PI-657: guard/per-surface mechanics moved out of always-loaded AGENTS.md
     ".agents/docs/guides/enforcement.md",
     # PI-666: self-hosted-runner escape-hatch guide (ci.yml + justfile edits

@@ -76,6 +76,7 @@ override in `.agents/settings.json` `env` only with a measured reason:
 | `MAX_MCP_OUTPUT_TOKENS` | MCP tool response tokens | 25,000 |
 | `TASK_MAX_OUTPUT_LENGTH` | Subagent final-output chars | 32,000 |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | Autocompact trigger (already set to 70 in this scaffold) | model-dependent |
+| `PI_COMPRESS_MIN_CHARS` | `tool_output_compressor` hook threshold — an unfiltered `git diff`/`show`/`log` result above it is replaced by a diffstat + pointer to the full text in `.agents/tmp/tool_output/` (`PI_COMPRESS_TOOL_OUTPUT=0` disables) | 4,000 |
 
 If the observability overlay is installed, `usage_report.py` shows where the
 session's tokens actually went — measure before tuning.
