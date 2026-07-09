@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -25,12 +26,15 @@ def _frozen_templates(tmp_path_factory: pytest.TempPathFactory):
     straddle the write. Reproduced deliberately: toggling one template file
     while the suite runs fails exactly that test class.
 
-    ``capabilities`` binds ``_TEMPLATES_DIR`` via from-import at module load,
-    so it must be re-pointed alongside ``scaffold``. Tests that monkeypatch
-    ``scaffold._TEMPLATES_DIR`` themselves are unaffected (monkeypatch restores
-    to the snapshot).
+    ``from project_init.scaffold import _TEMPLATES_DIR`` aliases (capabilities,
+    some test modules) bind the object at import time, so patching scaffold
+    alone would leave them on the live tree — sweep every loaded module whose
+    ``_TEMPLATES_DIR`` is the same object (collection has imported all test
+    modules by the time a session fixture runs; modules imported later
+    from-import the already-patched global). Tests that monkeypatch
+    ``scaffold._TEMPLATES_DIR`` themselves are unaffected (monkeypatch
+    restores to the snapshot).
     """
-    import project_init.capabilities as capabilities
     import project_init.scaffold as scaffold
 
     snap = tmp_path_factory.mktemp("frozen") / "templates"
@@ -39,11 +43,17 @@ def _frozen_templates(tmp_path_factory: pytest.TempPathFactory):
         snap,
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
-    originals = (scaffold._TEMPLATES_DIR, capabilities._TEMPLATES_DIR)
-    scaffold._TEMPLATES_DIR = snap
-    capabilities._TEMPLATES_DIR = snap
+    original = scaffold._TEMPLATES_DIR
+    patched = [
+        mod
+        for mod in list(sys.modules.values())
+        if mod is not None and getattr(mod, "_TEMPLATES_DIR", None) is original
+    ]
+    for mod in patched:
+        mod._TEMPLATES_DIR = snap
     yield
-    scaffold._TEMPLATES_DIR, capabilities._TEMPLATES_DIR = originals
+    for mod in patched:
+        mod._TEMPLATES_DIR = original
 
 
 @pytest.fixture
