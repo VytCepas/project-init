@@ -97,7 +97,46 @@ def test_unsupported_python_version_is_rejected(tmp_path: Path):
     assert not (tmp_path / "mise.toml").exists()
 
 
-def _wizard(monkeypatch, answers: list[str], *, target: Path | None = None):
+def test_python_version_without_python_language_is_rejected(tmp_path: Path):
+    """Every python_floor consumer is gated on `python`, so the flag would render
+    nowhere — a typo or wrapper bug must not pass unnoticed (PR #713 review).
+    """
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "project_init",
+            str(tmp_path),
+            "--non-interactive",
+            "--preset",
+            "core",
+            "--agents",
+            "claude",
+            "--name",
+            "t",
+            "--description",
+            "t",
+            "--language",
+            "go",
+            "--python-version",
+            "3.13",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "requires --language python" in result.stderr
+    assert not (tmp_path / ".agents").exists()
+
+
+def _wizard(
+    monkeypatch,
+    answers: list[str],
+    *,
+    target: Path | None = None,
+    python_version: str | None = None,
+):
     """Drive _gather_inputs_interactive, returning (inputs, prompt labels seen)."""
     import project_init.__main__ as cli
 
@@ -119,7 +158,11 @@ def _wizard(monkeypatch, answers: list[str], *, target: Path | None = None):
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 
     inputs = cli._gather_inputs_interactive(
-        default_name="proj", no_plugin=False, profile="individual", target=target
+        default_name="proj",
+        no_plugin=False,
+        profile="individual",
+        target=target,
+        cli_python_version=python_version,
     )
     return inputs, seen
 
@@ -139,6 +182,15 @@ def test_wizard_does_not_ask_for_python_on_a_non_python_scaffold(monkeypatch):
     inputs, seen = _wizard(monkeypatch, ["proj", "desc", "go", "", "none"])
     assert not _asked_for_python(seen)
     assert inputs.python_version == ""
+
+
+def test_wizard_drops_python_version_when_the_language_is_not_python(monkeypatch, capsys):
+    """--language wasn't passed, so main() couldn't reject the pairing; the wizard
+    must drop the value loudly rather than carry a flag nothing consumes.
+    """
+    inputs, _ = _wizard(monkeypatch, ["proj", "desc", "go", "", "none"], python_version="3.13")
+    assert inputs.python_version == ""
+    assert "--python-version 3.13 ignored" in capsys.readouterr().out
 
 
 def test_wizard_does_not_ask_when_pyproject_already_declares_a_floor(

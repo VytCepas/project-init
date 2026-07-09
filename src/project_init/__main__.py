@@ -143,6 +143,23 @@ def _python_floor_from_pyproject(target: Path | None) -> str | None:
     return None
 
 
+def _reject_python_version_without_python(
+    flag: str | None, language: str | None, parser: argparse.ArgumentParser
+) -> None:
+    """Refuse --python-version on a non-Python scaffold.
+
+    Every python_floor consumer is gated on the `python` flag, so the value
+    would render nowhere and a typo or wrapper bug would pass unnoticed
+    (PR #713 review). Only checkable when --language is explicit; the wizard
+    drops the flag with a warning instead, since language is chosen later.
+    """
+    if flag and language and language != "python":
+        parser.error(
+            f"--python-version {flag} requires --language python "
+            f"(got --language {language}); nothing would consume the value."
+        )
+
+
 def _reject_conflicting_python_version(
     flag: str | None, target: Path | None, parser: argparse.ArgumentParser
 ) -> None:
@@ -1527,6 +1544,14 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     # requires-python, that file is the source of truth and asking would invite
     # a contradiction. An explicit --python-version still wins over both.
     python_version = cli_python_version or ""
+    if python_version and language != "python":
+        # --language wasn't passed, so main() couldn't reject this pairing; the
+        # value would render nowhere. Drop it loudly rather than silently.
+        console.print(
+            f"[yellow]--python-version {python_version} ignored: it applies only to "
+            f"a python project (this is {language}).[/yellow]"
+        )
+        python_version = ""
     if not python_version and language == "python" and not _python_floor_from_pyproject(target):
         python_version = _prompt_choice(
             "Target Python (pins mise.toml, mypy.ini, and the CI matrix floor)",
@@ -2652,6 +2677,7 @@ def _cli(argv: list[str]) -> int:
     _reject_bare_subcommand_target(args.target, parser)
     target = Path(args.target).resolve()
     # Before the target directory is created (PI-20) and before any prompt.
+    _reject_python_version_without_python(args.python_version, args.language, parser)
     _reject_conflicting_python_version(args.python_version, target, parser)
 
     # Select preset BEFORE creating the target directory — a typo'd --preset
