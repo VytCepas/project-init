@@ -81,6 +81,15 @@ fuzz:
 # what CI runs
 ci: setup lint typecheck test-cov audit
 
+# route CI to a self-hosted runner when Actions minutes run out (PI-666);
+# requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+ci-local-on:
+    gh variable set CI_RUNS_ON --body self-hosted
+
+# back to GitHub-hosted runners
+ci-local-off:
+    gh variable delete CI_RUNS_ON
+
 # serve the docs site locally
 docs:
     uv run --with mkdocs-material --with "mkdocstrings[python]" mkdocs serve
@@ -158,6 +167,15 @@ scan:
 
 # what CI runs
 ci: setup lint typecheck test audit
+
+# route CI to a self-hosted runner when Actions minutes run out (PI-666);
+# requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+ci-local-on:
+    gh variable set CI_RUNS_ON --body self-hosted
+
+# back to GitHub-hosted runners
+ci-local-off:
+    gh variable delete CI_RUNS_ON
 {{/if node}}{{#if go}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
@@ -231,6 +249,15 @@ scan:
 
 # what CI runs
 ci: lint test-cov audit
+
+# route CI to a self-hosted runner when Actions minutes run out (PI-666);
+# requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+ci-local-on:
+    gh variable set CI_RUNS_ON --body self-hosted
+
+# back to GitHub-hosted runners
+ci-local-off:
+    gh variable delete CI_RUNS_ON
 {{/if go}}{{#if rust}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
@@ -310,6 +337,15 @@ scan:
 
 # what CI runs
 ci: lint test-cov audit
+
+# route CI to a self-hosted runner when Actions minutes run out (PI-666);
+# requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+ci-local-on:
+    gh variable set CI_RUNS_ON --body self-hosted
+
+# back to GitHub-hosted runners
+ci-local-off:
+    gh variable delete CI_RUNS_ON
 {{/if rust}}{{#if delivery_service}}
 # --- container parity (delivery=service): same image local and in cloud ---
 

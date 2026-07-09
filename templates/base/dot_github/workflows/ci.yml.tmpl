@@ -1,5 +1,13 @@
 name: CI
 
+# Compute jobs read `vars.CI_RUNS_ON` (PI-666): set the repo variable to
+# `self-hosted` to run CI on your own runner — the escape hatch when a private
+# repo exhausts its GitHub Actions minutes. Toggle with `just ci-local-on` /
+# `ci-local-off`; setup guide: .agents/docs/guides/self-hosted-ci-runner.md.
+# Secret/PAT-bearing workflows{{#if lifecycle}} (board-automation, validate-pr,
+# issue-validation, …){{/if lifecycle}} deliberately stay on GitHub-hosted
+# ephemeral runners.
+
 on:
   push:
     branches: [{{base_branch}}]
@@ -31,7 +39,7 @@ jobs:
   # a new CPython is released. The floor is always taken from requires-python.
   python-matrix:
     name: Resolve Python matrix
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     outputs:
       versions: ${{ steps.resolve.outputs.versions }}
     steps:
@@ -91,7 +99,7 @@ jobs:
 
   lint-and-test:
     name: Lint and test
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
 {{#if python}}
     needs: python-matrix
     strategy:
@@ -343,7 +351,7 @@ jobs:
   # integration suite is stable enough to gate merges.
   integration-tests:
     name: Integration tests
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     needs: lint-and-test
     # Optional: Only run on main branch or when tests change significantly
     # if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.files[*].name, 'tests/')
@@ -394,7 +402,7 @@ jobs:
   # not a standalone file like ruff.toml/mypy.ini.
   mutation-tests:
     name: Mutation tests (mutmut)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     if: github.event_name == 'schedule'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -446,7 +454,7 @@ jobs:
   # vulnerable image to block merges.
   build-image:
     name: Build image (build-once)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     needs: lint-and-test
     permissions:
       contents: read
@@ -504,7 +512,7 @@ jobs:
   # no Dockerfile is scaffolded for other delivery modes.
   dockerfile-lint:
     name: Lint Dockerfile (hadolint)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Lint Dockerfile (hadolint)
@@ -517,7 +525,7 @@ jobs:
   # gives fast local feedback but is fail-open; this job is the hard gate.
   secret-scan:
     name: Secret scan (gitleaks)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -540,7 +548,7 @@ jobs:
   # visible. Promote to ci-gate's needs once calibrated.
   semgrep:
     name: Semgrep (semantic security scan)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -571,7 +579,7 @@ jobs:
   # lives in the justfile's `license` recipe (or deny.toml for Rust).
   license-scan:
     name: Dependency license scan
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
@@ -633,7 +641,7 @@ jobs:
   # targets worth gating on.
   fuzz:
     name: Go fuzz (seed corpus replay)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
@@ -662,7 +670,7 @@ jobs:
   # granted so the OIDC upload to the public dashboard works).
   scorecard:
     name: OpenSSF Scorecard
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04  # pinned: OSSF scorecard-action requires GitHub-hosted runners
     if: github.event_name == 'schedule'
     permissions:
       security-events: write   # upload the SARIF result to code scanning
@@ -705,7 +713,7 @@ jobs:
   # failing gate actually blocks the merge.
   ci-gate:
     name: CI gate
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04  # pinned: seconds-long aggregator; stays on GitHub-hosted
     needs: [lint-and-test, secret-scan{{#if governance}}, governance{{/if governance}}]
     if: always()
     steps:
@@ -730,7 +738,7 @@ jobs:
   # best-effort); the gate is stdlib-only, so no language toolchain is needed.
   governance:
     name: AI governance gate
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Validate system cards
