@@ -149,6 +149,74 @@ def test_wizard_skips_the_prompt_when_lifecycle_is_declined(monkeypatch):
     assert not any("Review cycles" in label for label in seen)
 
 
+def _wizard_with_flag(monkeypatch, *, lifecycle: str, cli_cycles: int | None):
+    import project_init.__main__ as cli
+
+    answers = iter(["proj", "desc", "go", "", "none"])
+    monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
+    monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
+    monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
+    monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
+    monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
+    monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
+    monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: lifecycle)
+    monkeypatch.setattr(cli, "_choose_review_cycles_interactive", lambda *a, **k: 2)
+    monkeypatch.setattr(cli, "_choose_agents_interactive", lambda: ["claude"])
+    monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
+    return cli._gather_inputs_interactive(
+        default_name="proj",
+        no_plugin=False,
+        profile="individual",
+        cli_review_cycles=cli_cycles,
+    )
+
+
+def test_wizard_warns_when_a_chosen_lifecycle_none_drops_the_flag(monkeypatch, capsys):
+    """PR #717 review: the value used to be dropped in silence.
+
+    main() cannot reject this — the tier is picked at the prompt, after parsing.
+    """
+    inputs = _wizard_with_flag(monkeypatch, lifecycle="none", cli_cycles=3)
+    assert inputs.review_cycles == 0
+    assert "--review-cycles 3 ignored" in capsys.readouterr().out
+
+
+def test_wizard_honors_the_flag_over_the_prompt(monkeypatch):
+    inputs = _wizard_with_flag(monkeypatch, lifecycle="github", cli_cycles=4)
+    assert inputs.review_cycles == 4
+
+
+@pytest.mark.parametrize(
+    ("extra", "expected"),
+    [
+        (["--review-cycles", "-1"], "non-negative integer"),
+        (["--lifecycle", "none", "--review-cycles", "2"], "requires the GitHub lifecycle"),
+    ],
+)
+def test_interactive_runs_validate_the_flag_before_prompting(tmp_path: Path, extra, expected):
+    """PR #717 review: validation lived only on the non-interactive path."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "project_init",
+            str(tmp_path),
+            "--preset",
+            "core",
+            "--agents",
+            "claude",
+            *extra,
+        ],
+        capture_output=True,
+        text=True,
+        input="",
+        check=False,
+    )
+    assert result.returncode != 0
+    assert expected in result.stderr
+    assert not (tmp_path / ".agents").exists()
+
+
 def test_review_cycles_explainer_states_its_value(capsys, monkeypatch):
     import project_init.__main__ as cli
 

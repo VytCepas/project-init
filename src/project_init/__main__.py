@@ -149,28 +149,34 @@ def _python_floor_from_pyproject(target: Path | None) -> str | None:
     return None
 
 
-def _resolve_review_cycles(args, parser: argparse.ArgumentParser) -> int:
-    """Resolve --review-cycles for a non-interactive run (#714).
+def _validate_review_cycles(args, parser: argparse.ArgumentParser) -> None:
+    """Reject an unusable --review-cycles before the target dir or any prompt.
 
-    A `--lifecycle none` scaffold ships no monitor_pr.sh, so the count has
-    nowhere to land: reject an explicit flag rather than record a value the
-    project can never read, and otherwise fall back to 0.
+    Runs on BOTH paths (PR #717 review). The interactive wizard used to copy the
+    raw value, so `--review-cycles -1` recorded a count that later crashed
+    monitor_pr.sh, and `--lifecycle none --review-cycles 2` was silently dropped.
+    A tier chosen at the prompt still can't be known here; the wizard warns and
+    drops in that case.
     """
-    if args.lifecycle == "none":
-        if args.review_cycles is not None:
-            parser.error(
-                f"--review-cycles {args.review_cycles} requires the GitHub lifecycle "
-                "(got --lifecycle none); no merge gate is scaffolded to run them."
-            )
-        return 0
     if args.review_cycles is None:
-        return 2
+        return
     if args.review_cycles < 0:
         parser.error(
             f"--review-cycles must be a non-negative integer (got {args.review_cycles}); "
             "0 disables review control."
         )
-    return args.review_cycles
+    if args.lifecycle == "none":
+        parser.error(
+            f"--review-cycles {args.review_cycles} requires the GitHub lifecycle "
+            "(got --lifecycle none); no merge gate is scaffolded to run them."
+        )
+
+
+def _resolve_review_cycles(args) -> int:
+    """The non-interactive count (#714). _validate_review_cycles has already run."""
+    if args.lifecycle == "none":
+        return 0
+    return 2 if args.review_cycles is None else args.review_cycles
 
 
 def _reject_python_version_without_python(
@@ -1696,7 +1702,20 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     # #714: cycles configure the scaffolded monitor_pr.sh, which only ships with
     # the lifecycle. Asking a `--lifecycle none` user to size a review gate they
     # will never run is noise, so the prompt is gated on the resolved tier.
+    #
+    # PR #717 review: a CLI value reaching the wizard used to be copied raw —
+    # `--review-cycles -1` wrote an invalid config that later crashed
+    # monitor_pr.sh, and a flag paired with an interactively-chosen
+    # `lifecycle none` was dropped in silence. main() rejects a negative value
+    # and an explicit `--lifecycle none` up front; what it cannot know is a tier
+    # the user picks at the prompt, so that case warns and drops here rather
+    # than aborting a wizard the user has already half-answered.
     if resolved_lifecycle == "none":
+        if cli_review_cycles is not None:
+            console.print(
+                f"[yellow]--review-cycles {cli_review_cycles} ignored: no merge gate is "
+                "scaffolded with lifecycle 'none'.[/yellow]"
+            )
         review_cycles = 0
     elif cli_review_cycles is not None:
         review_cycles = cli_review_cycles
@@ -2500,7 +2519,7 @@ def _resolve_inputs(
         profile=profile,
         no_egress=args.no_egress,
         python_version=args.python_version or "",
-        review_cycles=_resolve_review_cycles(args, parser),
+        review_cycles=_resolve_review_cycles(args),
         delivery=delivery,
         deploy=deploy,
         iac=iac,
@@ -2772,6 +2791,7 @@ def _cli(argv: list[str]) -> int:
     # interactive run the language is still unknown here — the wizard warns.
     effective_language = args.language or ("none" if args.non_interactive else None)
     _reject_python_version_without_python(args.python_version, effective_language, parser)
+    _validate_review_cycles(args, parser)
     _reject_conflicting_python_version(args.python_version, target, parser)
 
     # Select preset BEFORE creating the target directory — a typo'd --preset
