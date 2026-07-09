@@ -39,6 +39,8 @@ stateDiagram-v2
     note right of pr_opened
         Iterate freely before the gates:
         edit, test, push_branch.sh.
-        The DAG guard only fires on
-        push / PR create / ready / merge.
+        The DAG guard fires on the raw
+        lifecycle commands (see COMMAND_RULES
+        in dag_workflow.py) — use the
+        labeled wrappers instead.
     end note
