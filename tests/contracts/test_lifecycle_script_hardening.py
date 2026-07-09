@@ -260,3 +260,105 @@ class TestStartIssueWorktreeKey:
             f"derived {out.stdout.strip()!r} from a bare-repo worktree — the "
             "bare dir's own name (minus .git), never its parent directory"
         )
+
+
+class TestStartIssueSeedCommit:
+    """#633: 'No commits between main and <branch>' despite the #433 seed.
+
+    The seed heuristic compared HEAD against the LOCAL base ref, but GitHub
+    judges emptiness against ITS base. A branch cut from origin/main while the
+    local main lags behind (the normal worktree state on zarija) has
+    rev-list main..HEAD non-empty, so the seed was skipped — and PR creation
+    failed anyway. The seed must compare against the remote base, and PR
+    creation must self-repair by seeding + retrying once if GitHub still
+    rejects."""
+
+    def test_seed_compares_against_remote_base(self):
+        for path in (
+            _LIFECYCLE_SCRIPTS / "start_issue.sh",
+            _ROOT_SCRIPTS / "start_issue.sh",
+        ):
+            s = path.read_text()
+            assert "_seed_base" in s, f"{path}: remote-base resolver missing"
+            assert 'refs/remotes/origin/$BASE_BRANCH' in s, (
+                f"{path}: the seed decision must prefer the remote-tracking "
+                "base ref — the local base can lag behind what GitHub compares"
+            )
+
+    def test_pr_create_retries_once_after_seeding(self):
+        for path in (
+            _LIFECYCLE_SCRIPTS / "start_issue.sh",
+            _ROOT_SCRIPTS / "start_issue.sh",
+        ):
+            s = path.read_text()
+            retry_idx = s.find('grep -qi "No commits between"')
+            assert retry_idx != -1, (
+                f"{path}: a 'No commits between' rejection must trigger "
+                "seed-and-retry, not strand a branch without a PR"
+            )
+            # The retry must re-push the seeded branch before re-creating.
+            tail = s[retry_idx:]
+            assert "push_branch.sh" in tail.split("Draft PR:")[0], (
+                f"{path}: the seeded commit must be pushed before the retry"
+            )
+
+    def test_seed_decision_flips_when_local_base_lags(self, tmp_path):
+        """Behavioral: replicate the zarija state — local main one commit
+        behind origin/main, feature branch cut from origin/main. The old
+        local-base comparison says 'has commits' (skip seed); the remote-base
+        comparison correctly says 'level' (seed)."""
+        s = (_LIFECYCLE_SCRIPTS / "start_issue.sh").read_text()
+        m = re.search(
+            r"^_seed_base\(\) \{\n.*?\n\}$", s, re.MULTILINE | re.DOTALL
+        )
+        assert m, "_seed_base not found"
+        helper = m.group(0)
+
+        git_env = ["-c", "user.email=t@t", "-c", "user.name=t"]
+        origin = tmp_path / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+        clone = tmp_path / "clone"
+        subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True)
+
+        def git(*args: str) -> str:
+            r = subprocess.run(
+                ["git", *git_env, *args],
+                cwd=clone,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return r.stdout.strip()
+
+        git("commit", "-q", "--allow-empty", "-m", "c1")
+        git("push", "-q", "-u", "origin", "HEAD:main")
+        git("checkout", "-q", "-B", "main", "origin/main")
+        git("commit", "-q", "--allow-empty", "-m", "c2")
+        git("push", "-q", "origin", "main")
+        git("reset", "-q", "--hard", "HEAD~1")  # local main lags origin/main
+        git("checkout", "-q", "-b", "feat/T-1-x", "origin/main")
+
+        script = f'BASE_BRANCH=main\n{helper}\ngit rev-list "$(_seed_base)..HEAD" | wc -l'
+        out = subprocess.run(
+            ["bash", "-c", script],
+            cwd=clone,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert out.stdout.strip() == "0", (
+            "branch cut from origin/main must count as level with the base "
+            "(seed fires) even though the stale local main is behind"
+        )
+        # The pre-#633 comparison really would have skipped the seed here.
+        old = subprocess.run(
+            ["bash", "-c", 'git rev-list "main..HEAD" | wc -l'],
+            cwd=clone,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert old.stdout.strip() != "0", (
+            "fixture no longer reproduces the stale-local-base state the "
+            "regression test is meant to pin"
+        )
