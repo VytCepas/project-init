@@ -176,6 +176,41 @@ _run_gh() {
   return "$status"
 }
 
+# The PR being MERGED is success regardless of how the last attempt exited —
+# "Merge already in progress" means the server accepted an earlier attempt.
+_pr_is_merged() {
+  # Best-effort probe: any failure (network, auth) reads as "not merged" —
+  # the caller then keeps retrying or fails, never aborts under set -e.
+  [ "$(GH_PROMPT_DISABLED=1 gh pr view "$PR_NUMBER" --json state -q .state 2>/dev/null || true)" = "MERGED" ]
+}
+
+# PI-632: the merge fires the instant the last check settles, but GitHub's
+# mergeability computation lags a few seconds behind — the first attempt can
+# fail ("Merge already in progress", "Pull Request is not mergeable") while
+# every check is green and the PR is CLEAN. A manual re-run seconds later
+# succeeded every time, so retry with backoff instead of declaring failure.
+_merge_with_retry() {
+  local delay delays
+  delays="${PI_MERGE_RETRY_DELAYS:-5 10 20}"
+  # word splitting of the delay list is intended
+  # shellcheck disable=SC2086
+  for delay in $delays; do
+    if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
+      return 0
+    fi
+    if _pr_is_merged; then
+      echo "PR #$PR_NUMBER is already merged — treating as success."
+      return 0
+    fi
+    echo "  merge not accepted yet — retrying in ${delay}s"
+    sleep "$delay"
+  done
+  if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch || _pr_is_merged; then
+    return 0
+  fi
+  return 1
+}
+
 _admin_merge() {
   # Hard enforcement must bind under the org profile (ADR-013/#251): admin-merge
   # bypasses the server-side rules, so it is refused — use auto-merge / the merge
@@ -186,7 +221,7 @@ _admin_merge() {
     echo "  required checks, or resolve the blocking review/checks." >&2
     return 1
   fi
-  if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --admin; then
+  if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --admin || _pr_is_merged; then
     echo "Merged PR #$PR_NUMBER (admin)"
   else
     echo "ERROR: admin merge failed for PR #$PR_NUMBER" >&2
@@ -369,7 +404,7 @@ if [ "$MODE" = "--merge" ]; then
   MERGE_STATE=$(gh pr view "$PR_NUMBER" --json mergeStateStatus -q '.mergeStateStatus' 2>/dev/null || echo "UNKNOWN")
 
   if [ "$MERGE_STATE" = "CLEAN" ] || [ "$MERGE_STATE" = "UNSTABLE" ]; then
-    if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
+    if _merge_with_retry; then
       echo "Merged PR #$PR_NUMBER"
     else
       echo "ERROR: merge failed for PR #$PR_NUMBER" >&2
@@ -393,7 +428,7 @@ if [ "$MODE" = "--merge" ]; then
       exit 1
     fi
   else
-    if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
+    if ! _merge_with_retry; then
       if ! _run_gh pr merge "$PR_NUMBER" --squash --delete-branch --auto; then
         echo "ERROR: could not merge or enable auto-merge for PR #$PR_NUMBER" >&2
         exit 1

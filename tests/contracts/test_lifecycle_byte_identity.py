@@ -86,6 +86,13 @@ session state into the generated `.claude/` mirror it reads, and only the
 only the `.gitignore` hash was re-pinned across all four combos, after
 verifying every other file still matched.
 
+Exception (#632): `monitor_pr.sh` gained `_merge_with_retry`/`_pr_is_merged` —
+the single-shot merge raced GitHub's mergeability computation (failing while
+every check was green) and a failed attempt whose merge actually landed
+server-side was reported as an error. Deliberate bug fix, not move-drift —
+only the `.agents/scripts/monitor_pr.sh` hash was re-pinned across all four
+combos, after verifying every other file still matched.
+
 Exception (#633): `start_issue.sh`'s seed-commit decision now compares HEAD
 against the REMOTE base (`_seed_base`) — GitHub judges "No commits between"
 against its own base ref, so a branch cut from origin/main with a lagging
