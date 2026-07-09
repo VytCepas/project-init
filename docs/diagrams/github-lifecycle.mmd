@@ -1,0 +1,44 @@
+---
+title: GitHub lifecycle DAG (dag_workflow.py) — states and entrypoints
+---
+stateDiagram-v2
+    %% Source of truth: .agents/hooks/dag_workflow.py DAG (lines 46-52).
+    %% Transitions carry the wrapper scripts/skills that advance the state;
+    %% raw git/gh commands are blocked by github_command_guard.
+
+    state start_fork <<fork>>
+    state pr_join <<join>>
+    state gates_fork <<fork>>
+    state merge_join <<join>>
+
+    [*] --> start_fork: start_task skill
+    start_fork --> issue_created
+    start_fork --> branch_created
+
+    issue_created: issue.created
+    branch_created: branch.created
+    branch_pushed: branch.pushed
+    pr_opened: pr.opened
+    ci_green: ci.green
+    review_approved: review.approved
+    pr_merged: pr.merged
+
+    branch_created --> branch_pushed: push_branch.sh
+    issue_created --> pr_join
+    branch_pushed --> pr_join
+    pr_join --> pr_opened: draft PR (start_task /\ncreate_nojira_pr.sh)
+
+    pr_opened --> gates_fork: promote_review.sh /\nfinish_pr.sh
+    gates_fork --> ci_green: CI workflows pass
+    gates_fork --> review_approved: review cycles\n(monitor_pr.sh --review-cycle N)
+    ci_green --> merge_join
+    review_approved --> merge_join
+    merge_join --> pr_merged: monitor_pr.sh --merge /\nfinish_pr.sh
+    pr_merged --> [*]
+
+    note right of pr_opened
+        Iterate freely before the gates:
+        edit, test, push_branch.sh.
+        The DAG guard only fires on
+        push / PR create / ready / merge.
+    end note
