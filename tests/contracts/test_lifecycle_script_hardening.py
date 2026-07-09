@@ -362,3 +362,121 @@ class TestStartIssueSeedCommit:
             "fixture no longer reproduces the stale-local-base state the "
             "regression test is meant to pin"
         )
+
+
+class TestMonitorPrMergeRetry:
+    """#632: the merge fires the instant the last check settles, but GitHub's
+    mergeability lags a few seconds — the single-shot merge failed ('Merge
+    already in progress', 'not mergeable') while the PR was CLEAN, and a
+    manual re-run seconds later succeeded every time."""
+
+    def test_merge_paths_use_retry(self):
+        for path in (
+            _LIFECYCLE_SCRIPTS / "monitor_pr.sh",
+            _ROOT_SCRIPTS / "monitor_pr.sh",
+        ):
+            s = path.read_text()
+            assert "_merge_with_retry" in s, f"{path}: merge retry missing"
+            assert "_pr_is_merged" in s, (
+                f"{path}: a failed attempt whose merge actually landed "
+                "server-side must count as success"
+            )
+            # No single-shot non-admin merge may remain outside the helpers.
+            body = s.split("_merge_with_retry() {")[1]
+            plain = [
+                ln
+                for ln in body.splitlines()
+                if "pr merge" in ln
+                and "--admin" not in ln
+                and "--auto" not in ln
+                and not ln.lstrip().startswith("#")
+                and "_merge_with_retry() " not in ln
+            ]
+            # the helper's own two attempts are inside its function body,
+            # which ends at the first unindented closing brace
+            helper_body = body.split("\n}\n")[0]
+            outside = [ln for ln in plain if ln not in helper_body.splitlines()]
+            assert not outside, (
+                f"{path}: single-shot merge outside _merge_with_retry: {outside}"
+            )
+
+    def _extract(self, script: Path, *names: str) -> str:
+        s = script.read_text()
+        parts = []
+        for name in names:
+            m = re.search(
+                rf"^{re.escape(name)}\(\) \{{\n.*?\n\}}$",
+                s,
+                re.MULTILINE | re.DOTALL,
+            )
+            assert m, f"{script}: {name} not found"
+            parts.append(m.group(0))
+        return "\n".join(parts)
+
+    def _run_with_stub(self, tmp_path: Path, stub: str, script_tail: str) -> subprocess.CompletedProcess:
+        helpers = self._extract(
+            _LIFECYCLE_SCRIPTS / "monitor_pr.sh",
+            "_run_gh",
+            "_pr_is_merged",
+            "_merge_with_retry",
+        )
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        gh = bin_dir / "gh"
+        gh.write_text(stub)
+        gh.chmod(0o755)
+        script = (
+            f"export PATH={bin_dir}:$PATH\n"
+            f"export PI_MERGE_RETRY_DELAYS='0 0 0'\n"
+            f"PR_NUMBER=12\n{helpers}\n{script_tail}"
+        )
+        return subprocess.run(
+            ["bash", "-c", script],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def test_retry_succeeds_after_transient_failure(self, tmp_path):
+        stub = (
+            "#!/usr/bin/env bash\n"
+            'if [ "$1 $2" = "pr merge" ]; then\n'
+            "  n=$(cat n 2>/dev/null || echo 0); n=$((n+1)); echo $n > n\n"
+            '  [ "$n" -ge 2 ] && exit 0\n'
+            '  echo "GraphQL: Merge already in progress (mergePullRequest)" >&2; exit 1\n'
+            "fi\n"
+            'echo "OPEN"\n'
+        )
+        r = self._run_with_stub(tmp_path, stub, "_merge_with_retry")
+        assert r.returncode == 0, f"retry should recover: {r.stdout} {r.stderr}"
+        assert (tmp_path / "n").read_text().strip() == "2", "expected exactly 2 attempts"
+
+    def test_already_merged_counts_as_success(self, tmp_path):
+        stub = (
+            "#!/usr/bin/env bash\n"
+            'if [ "$1 $2" = "pr merge" ]; then\n'
+            '  echo "GraphQL: Merge already in progress (mergePullRequest)" >&2; exit 1\n'
+            "fi\n"
+            # any `gh pr view --json state -q .state` probe reports MERGED
+            'echo "MERGED"\n'
+        )
+        r = self._run_with_stub(tmp_path, stub, "_merge_with_retry")
+        assert r.returncode == 0, (
+            f"a merge that landed server-side must not be an error: {r.stdout} {r.stderr}"
+        )
+
+    def test_persistent_failure_still_fails(self, tmp_path):
+        stub = (
+            "#!/usr/bin/env bash\n"
+            'if [ "$1 $2" = "pr merge" ]; then\n'
+            "  n=$(cat n 2>/dev/null || echo 0); echo $((n+1)) > n\n"
+            '  echo "merge blocked" >&2; exit 1\n'
+            "fi\n"
+            'echo "OPEN"\n'
+        )
+        r = self._run_with_stub(tmp_path, stub, "_merge_with_retry")
+        assert r.returncode != 0, "an unmergeable PR must still fail"
+        assert int((tmp_path / "n").read_text().strip()) == 4, (
+            "expected 3 backoff attempts + 1 final attempt"
+        )
