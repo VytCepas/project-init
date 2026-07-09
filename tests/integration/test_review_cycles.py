@@ -217,6 +217,59 @@ def test_interactive_runs_validate_the_flag_before_prompting(tmp_path: Path, ext
     assert not (tmp_path / ".agents").exists()
 
 
+class _Args:
+    """Minimal argparse.Namespace stand-in for the resolver under test."""
+
+    def __init__(self, *, lifecycle=None, review_cycles=None, non_interactive=True):
+        self.lifecycle = lifecycle
+        self.review_cycles = review_cycles
+        self.non_interactive = non_interactive
+
+
+def _effective(args, preset_lifecycle):
+    import project_init.__main__ as cli
+
+    return cli._normalize_lifecycle(args.lifecycle) or preset_lifecycle
+
+
+def test_preset_lifecycle_none_zeroes_cycles():
+    """PR #717 review, cycle 2: validation read args.lifecycle only.
+
+    A preset can resolve the tier to "none" with no --lifecycle flag present, so
+    cycles defaulted to 2 for a project that scaffolds no merge gate at all.
+    """
+    import project_init.__main__ as cli
+
+    args = _Args()
+    assert cli._resolve_review_cycles(args, _effective(args, "none")) == 0
+    # And the flagged tier still wins when the preset says none.
+    args = _Args(lifecycle="github")
+    assert cli._resolve_review_cycles(args, _effective(args, "none")) == 2
+
+
+def test_preset_lifecycle_none_rejects_an_explicit_flag():
+    import argparse
+
+    import project_init.__main__ as cli
+
+    parser = argparse.ArgumentParser()
+    args = _Args(review_cycles=2)
+    with pytest.raises(SystemExit):
+        cli._validate_review_cycles(args, parser, _effective(args, "none"))
+
+
+def test_interactive_defers_when_only_the_preset_says_none():
+    """The tier is still the prompt's to choose, so main() must not reject here."""
+    import argparse
+
+    import project_init.__main__ as cli
+
+    parser = argparse.ArgumentParser()
+    args = _Args(review_cycles=2, non_interactive=False)
+    # main() passes None (unknown) for an interactive run; no error.
+    cli._validate_review_cycles(args, parser, None)
+
+
 def test_review_cycles_explainer_states_its_value(capsys, monkeypatch):
     import project_init.__main__ as cli
 

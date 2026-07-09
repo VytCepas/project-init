@@ -149,14 +149,20 @@ def _python_floor_from_pyproject(target: Path | None) -> str | None:
     return None
 
 
-def _validate_review_cycles(args, parser: argparse.ArgumentParser) -> None:
+def _validate_review_cycles(
+    args, parser: argparse.ArgumentParser, effective_lifecycle: str | None
+) -> None:
     """Reject an unusable --review-cycles before the target dir or any prompt.
 
     Runs on BOTH paths (PR #717 review). The interactive wizard used to copy the
     raw value, so `--review-cycles -1` recorded a count that later crashed
-    monitor_pr.sh, and `--lifecycle none --review-cycles 2` was silently dropped.
-    A tier chosen at the prompt still can't be known here; the wizard warns and
-    drops in that case.
+    monitor_pr.sh, and a lifecycle-none pairing was dropped in silence.
+
+    ``effective_lifecycle`` is the tier this run will actually scaffold, or None
+    when it isn't knowable yet. A *preset* may set ``lifecycle = "none"`` with no
+    --lifecycle flag in sight (PR #717 review, cycle 2), so checking args alone
+    let that combination through. In an interactive run the preset only seeds the
+    prompt's default, so the tier stays unknown here and the wizard warns instead.
     """
     if args.review_cycles is None:
         return
@@ -165,16 +171,17 @@ def _validate_review_cycles(args, parser: argparse.ArgumentParser) -> None:
             f"--review-cycles must be a non-negative integer (got {args.review_cycles}); "
             "0 disables review control."
         )
-    if args.lifecycle == "none":
+    if effective_lifecycle == "none":
         parser.error(
             f"--review-cycles {args.review_cycles} requires the GitHub lifecycle "
-            "(got --lifecycle none); no merge gate is scaffolded to run them."
+            "(the run resolves to lifecycle 'none'); no merge gate is scaffolded "
+            "to run them."
         )
 
 
-def _resolve_review_cycles(args) -> int:
+def _resolve_review_cycles(args, effective_lifecycle: str) -> int:
     """The non-interactive count (#714). _validate_review_cycles has already run."""
-    if args.lifecycle == "none":
+    if effective_lifecycle == "none":
         return 0
     return 2 if args.review_cycles is None else args.review_cycles
 
@@ -2504,6 +2511,9 @@ def _resolve_inputs(
         iac = resolve_iac(args.iac)
     except ValueError as e:
         parser.error(str(e))
+    # #714: the tier this run actually scaffolds — a preset may set it, with no
+    # --lifecycle flag present (PR #717 review, cycle 2).
+    effective_lifecycle = _normalize_lifecycle(args.lifecycle) or preset_lifecycle
     return ScaffoldInputs(
         project_name=args.name,
         project_description=args.description,
@@ -2519,7 +2529,7 @@ def _resolve_inputs(
         profile=profile,
         no_egress=args.no_egress,
         python_version=args.python_version or "",
-        review_cycles=_resolve_review_cycles(args),
+        review_cycles=_resolve_review_cycles(args, effective_lifecycle),
         delivery=delivery,
         deploy=deploy,
         iac=iac,
@@ -2527,7 +2537,7 @@ def _resolve_inputs(
         governance=args.governance,
         observability=args.observability,
         memory=_normalize_memory(args.memory) or preset_memory,
-        lifecycle=_normalize_lifecycle(args.lifecycle) or preset_lifecycle,
+        lifecycle=effective_lifecycle,
         want_docs=not args.no_docs,
         renovate=not args.no_renovate,
     )
@@ -2791,7 +2801,6 @@ def _cli(argv: list[str]) -> int:
     # interactive run the language is still unknown here — the wizard warns.
     effective_language = args.language or ("none" if args.non_interactive else None)
     _reject_python_version_without_python(args.python_version, effective_language, parser)
-    _validate_review_cycles(args, parser)
     _reject_conflicting_python_version(args.python_version, target, parser)
 
     # Select preset BEFORE creating the target directory — a typo'd --preset
@@ -2803,6 +2812,16 @@ def _cli(argv: list[str]) -> int:
     # Lifecycle-tier fallback when --lifecycle is absent (#476): the preset's
     # tier (a preset may set lifecycle = "none" to be minimal), default "github".
     preset_lifecycle = _resolve_preset_lifecycle(preset, parser)
+
+    # Interactive runs may still change the tier at the prompt, so only a
+    # non-interactive run can be judged here; the wizard warns in that case.
+    _validate_review_cycles(
+        args,
+        parser,
+        (_normalize_lifecycle(args.lifecycle) or preset_lifecycle)
+        if args.non_interactive
+        else _normalize_lifecycle(args.lifecycle),
+    )
 
     # Validate non-interactive args / gather interactive input BEFORE creating
     # the target directory (PI-20, PI-199: a bad flag OR a Ctrl-C at an
