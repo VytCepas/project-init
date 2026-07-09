@@ -128,6 +128,9 @@ _ADDED_SINCE_BASELINE = {
     ".agents/skills/token_efficiency/SKILL.md",
     # PI-657: guard/per-surface mechanics moved out of always-loaded AGENTS.md
     ".agents/docs/guides/enforcement.md",
+    # PI-661: zero-token statusline context meter (wired in settings.json,
+    # which is already excluded above)
+    ".agents/hooks/statusline.sh",
     # #605: Guards log the governance signal (decision + command)
     ".agents/hooks/_usage_log.sh",
     ".agents/hooks/prod_guard.py",

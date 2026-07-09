@@ -3,6 +3,10 @@
   "env": {
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70"
   },
+  "statusLine": {
+    "type": "command",
+    "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/statusline.sh"
+  },
   "extraKnownMarketplaces": {
     {{#if egress_ok}}"claude-plugins-official": {
       "source": {
