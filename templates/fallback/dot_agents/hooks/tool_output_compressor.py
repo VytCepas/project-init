@@ -27,6 +27,7 @@ import os
 import re
 import sys
 import time
+from pathlib import Path
 
 DEFAULT_MIN_CHARS = 4000
 HEAD_LINES = 20
@@ -72,17 +73,14 @@ def _diffstat(text: str) -> list[str]:
     return stats
 
 
-def _spill(root: str, tool_use_id: str, text: str) -> str:
-    rel = os.path.join(".agents", "tmp", "tool_output")
-    out_dir = os.path.join(root, rel)
-    os.makedirs(out_dir, exist_ok=True)
+def _spill(root: Path, tool_use_id: str, text: str) -> str:
+    out_dir = root / ".agents" / "tmp" / "tool_output"
+    out_dir.mkdir(parents=True, exist_ok=True)
     stamp = tool_use_id or str(int(time.time() * 1000))
     # Keep the name filesystem-safe regardless of the id's alphabet.
     safe = re.sub(r"[^A-Za-z0-9_.-]", "_", stamp)[:80]
-    path = os.path.join(out_dir, f"bash-{safe}.txt")
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write(text)
-    return os.path.join(rel, f"bash-{safe}.txt")
+    (out_dir / f"bash-{safe}.txt").write_text(text, encoding="utf-8")
+    return f".agents/tmp/tool_output/bash-{safe}.txt"
 
 
 def main() -> int:
@@ -105,7 +103,7 @@ def main() -> int:
     if len(stdout) <= min_chars or not _target_command(command):
         return 0
 
-    root = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path.cwd())
     spill_path = _spill(root, str(payload.get("tool_use_id") or ""), stdout)
 
     lines = stdout.splitlines()
