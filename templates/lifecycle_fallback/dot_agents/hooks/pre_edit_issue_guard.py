@@ -53,8 +53,8 @@ def _current_branch(directory: Path) -> str | None:
     edit is allowed.
     """
     try:
-        result = subprocess.run(
-            ["git", "-C", str(directory), "rev-parse", "--abbrev-ref", "HEAD"],
+        result = subprocess.run(  # noqa: S603 — fixed git argv, never a shell string
+            ["git", "-C", str(directory), "rev-parse", "--abbrev-ref", "HEAD"],  # noqa: S607 — bare "git" resolves via PATH like every other hook
             capture_output=True,
             text=True,
             timeout=5,
