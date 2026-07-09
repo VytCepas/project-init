@@ -1,0 +1,70 @@
+---
+title: CI architecture the scaffolder generates into downstream projects (templates/)
+---
+flowchart TB
+    subgraph SRC["Source of truth (this repo)"]
+        TPL["templates/base/dot_github/workflows/ci.yml.tmpl\n(handlebars-gated: {{#if python/node/go/rust}}\n{{#if lifecycle}} {{#if delivery_service}} {{#if governance}})"]
+    end
+    TPL -->|"project-init scaffold run"| TARGET[("target project repo\n.github/ + .agents/")]
+
+    subgraph LOCALGUARD["Target repo: local hooks (git-level)"]
+        PRECOMMIT["dot_github/hooks/pre-commit\ninstalled via install_hooks.sh\n1. lint staged snapshot (just lint)\n2. gitleaks scan of staged diff\nfail-closed on lint, fail-open on missing gitleaks"]
+        GITLEAKSCFG["dot_gitleaks.toml"]
+        PRECOMMIT --> GITLEAKSCFG
+    end
+
+    subgraph CLAUDEGUARD["Target repo: agent-side hooks (Claude Code, PreToolUse)"]
+        PCG["pre_commit_gate.sh\nintercepts `git commit`, auto-fixes lint,\nblocks only if errors remain"]
+        DAGT["dag_workflow.py (same DAG engine as this repo)\nissue.created -> branch.created -> branch.pushed\n-> pr.opened -> {ci.green, review.approved} -> pr.merged"]
+        PRODGUARD["prod_guard.py\nblocks terraform/tofu destroy, apply -destroy,\nkubectl delete, helm uninstall/delete\nask (interactive) / deny (autonomous)"]
+        PKGGUARD["package_guard.py\nblocks unpinned/unsafe package installs"]
+    end
+
+    DEV2["Agent / developer commits & pushes"] --> PCG --> PRECOMMIT
+    DEV2 -->|"raw git/gh"| DAGT -->|"redirect to safe scripts"| SCRIPTS2["lifecycle/dot_agents/scripts/\ncreate_issue · start_issue · push_branch\npromote_review · monitor_pr · finish_pr"]
+    DEV2 -->|"destructive infra/db command"| PRODGUARD
+    DEV2 -->|"package install command"| PKGGUARD
+    SCRIPTS2 --> TARGET
+
+    subgraph CIWF["Target repo: .github/workflows (server-side, applies to everyone)"]
+        direction TB
+        RUNSON{{"runs-on: vars.CI_RUNS_ON || 'ubuntu-24.04'\n(local_ci skill toggles the repo variable;\nself-hosted escape hatch, PI-666/PI-673)"}}
+        LT["lint-and-test\n(+ python-matrix if python)"]
+        IT["integration-tests (python)"]
+        MT["mutation-tests (python, mumut)\n>=80% killed gate"]
+        BI["build-image {{#if delivery_service}}\nbuild-once, Trivy scan, SARIF"]
+        DL["dockerfile-lint {{#if delivery_service}}\nhadolint"]
+        SS["secret-scan\ngitleaks-action"]
+        SG["semgrep\nlanguage-specific ruleset"]
+        LS["license-scan"]
+        FZ["fuzz (go only)"]
+        SC["scorecard\nOpenSSF, PINNED ubuntu-24.04\n(never follows CI_RUNS_ON)"]
+        GOV["governance {{#if governance}}\nvalidates AI system cards"]
+        GATE["ci-gate\nREQUIRED CHECK\nneeds: lint-and-test, secret-scan[, governance]\nMUST follow CI_RUNS_ON var so it can still run\nduring a billing lockout"]
+        VALIDATEPR["validate-pr.yml.tmpl\nPR title + Closes-keyword lint"]
+        ISSUEVAL["issue-validation.yml\nvalidates issue metadata"]
+        REVSTATUST["review-status.yml\nmirrors review decision -> commit status"]
+        BOARDT["board-automation.yml"]
+
+        RUNSON -.-> LT & IT & MT & BI & DL
+        LT --> IT --> MT
+        LT --> GATE
+        SS --> GATE
+        GOV --> GATE
+    end
+
+    TARGET -->|"push / PR"| CIWF
+    GATE --> MERGE2{{"branch protection:\nci-gate required check\n+ review.approved\n(both enforced independent of any agent hook)"}}
+    REVSTATUST --> MERGE2
+    VALIDATEPR --> MERGE2
+    DAGT -->|"gh pr merge intercepted"| MERGE2
+
+    subgraph DEPLOY["Optional: deploy / IaC tiered gates (ADR-015, {{#if deploy_container}})"]
+        BUILD["deploy.yml.tmpl: build-push\nimage by digest to GHCR, SLSA L3 provenance"]
+        STAGE["deploy-staging\nenvironment: staging, auto on merge"]
+        PROD["deploy-production\nneeds build-push + deploy-staging\nenvironment: production (manual approval gate)\npromotes the SAME digest, no rebuild"]
+        INFRA["infra.yml.tmpl (OpenTofu)\nplan (on PR) -> apply\nenvironment: infra-apply (approval gate)"]
+        BUILD --> STAGE --> PROD
+    end
+    MERGE2 -->|"merge to base branch"| BUILD
+    MERGE2 -->|"IaC changes"| INFRA

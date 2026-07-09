@@ -218,7 +218,10 @@ _has_review_activity() {
 # Bounded wait (PI-186): a required check that never leaves PENDING/EXPECTED
 # (e.g. a workflow that never triggers on this branch) must not hang the
 # script — and any autonomous caller — forever. Fail closed on timeout.
-CI_TIMEOUT=900
+# PI-674: overridable — a single self-hosted runner serializes jobs past
+# 900s; set PI_CI_TIMEOUT (seconds) in the environment, or register a second
+# runner to restore parallelism.
+CI_TIMEOUT="${PI_CI_TIMEOUT:-900}"
 CI_ELAPSED=0
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"

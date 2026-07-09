@@ -56,6 +56,12 @@ just ci-local-off    # back to GitHub-hosted
 otherwise jobs queue forever, which is harder to notice than the billing
 error.
 
+**Single runner = sequential CI.** One runner executes jobs one at a time
+(~15–20 min for a full pipeline), which exceeds the lifecycle scripts'
+default 900s CI wait. Set `PI_CI_TIMEOUT` (seconds) in the environment where
+you run `finish_pr.sh` / `monitor_pr.sh` (e.g. `PI_CI_TIMEOUT=1800`), or
+register a second runner to restore parallelism.
+
 ## Trust model — read before enabling
 
 - Use this only on **private repos with trusted collaborators**. A

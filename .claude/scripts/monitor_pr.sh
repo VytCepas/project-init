@@ -174,7 +174,10 @@ _has_review_activity() {
 # which caused premature merges before CI even started. Bounded by CI_TIMEOUT
 # so a required check that never registers can't hang the script — and any
 # autonomous caller — forever; fail closed on timeout (PI-186/PI-203).
-CI_TIMEOUT=900
+# PI-674: overridable — a single self-hosted runner serializes jobs past
+# 900s; set PI_CI_TIMEOUT (seconds) in the environment, or register a second
+# runner to restore parallelism.
+CI_TIMEOUT="${PI_CI_TIMEOUT:-900}"
 CI_ELAPSED=0
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
