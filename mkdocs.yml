@@ -60,6 +60,7 @@ nav:
     - Memory descriptor: development/memory-descriptor.md
     - Non-CLI surface matrix: development/non-cli-surface-matrix.md
     - Testing: development/testing.md
+    - Repo reference (CI, extension points, non-goals): development/repo-reference.md
     - Measurement methodology: development/measurement-methodology.md
     - Build reproducibility: development/build-reproducibility.md
     - Enterprise GitHub support matrix: development/enterprise-github-support-matrix.md

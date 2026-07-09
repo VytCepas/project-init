@@ -78,5 +78,5 @@ Template skills (in `templates/base/dot_agents/skills/`) reference scripts like 
 
 CI optimization strategies, the extend-the-infrastructure table (skill vs
 hook vs agent spec), and this repo's non-goals live in
-[`.agents/docs/guides/repo-reference.md`](.agents/docs/guides/repo-reference.md)
+[`docs/development/repo-reference.md`](docs/development/repo-reference.md)
 — consult when adding capabilities or tuning CI, not needed per turn.
