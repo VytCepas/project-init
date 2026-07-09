@@ -208,6 +208,24 @@ class TestCreateIssueScript:
         assert result.returncode == 1
         assert "missing value for '--priority'" in result.stderr
 
+    def test_script_rejects_invalid_agent_ready(self):
+        # PI-691: --agent-ready is documented Yes|No; an invalid value must
+        # fail up front, not surface later as a confusing project-field warning.
+        result = subprocess.run(
+            [str(self.script), "feat", "Example", "--agent-ready", "maybe"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1
+        assert "invalid agent-ready 'maybe'" in result.stderr
+
+    def test_parent_url_parsing_is_host_agnostic(self):
+        # PI-691: --parent must accept GHES / *.ghe.com issue URLs, not only
+        # github.com — the rest of the lifecycle tooling is host-aware.
+        content = self.script.read_text()
+        assert "^https?://[^/]+/([^/]+)/([^/]+)/issues/([0-9]+)$" in content
+        assert "^https://github" not in content
+
 
 class TestCreateIssueSkill:
     @pytest.fixture(autouse=True)

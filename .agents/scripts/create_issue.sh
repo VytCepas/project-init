@@ -50,6 +50,7 @@ VALID_SCALES="epic task"
 VALID_PRIORITIES="high medium low"
 VALID_SIZES="XS S M L XL"
 VALID_CONFIDENCES="high medium low unknown"
+VALID_AGENT_READY="Yes No"
 
 usage() {
   cat <<'EOF'
@@ -249,6 +250,11 @@ if [ -n "$SCALE" ] && ! contains_word "$SCALE" "$VALID_SCALES"; then
   exit 1
 fi
 
+if [ -n "$AGENT_READY" ] && ! contains_word "$AGENT_READY" "$VALID_AGENT_READY"; then
+  echo "ERROR: invalid agent-ready '$AGENT_READY'. Valid: $VALID_AGENT_READY" >&2
+  exit 1
+fi
+
 if [ -n "$BODY_FILE" ] && [ ! -f "$BODY_FILE" ]; then
   echo "ERROR: body file not found: $BODY_FILE" >&2
   exit 1
@@ -268,7 +274,10 @@ PARENT_NUMBER=""
 
 parse_parent() {
   local raw="${1#\#}" # strip leading #
-  if [[ "$raw" =~ ^https://github\.com/([^/]+)/([^/]+)/issues/([0-9]+)$ ]]; then
+  # Host-agnostic URL match: github.com, GHES, and *.ghe.com issue URLs all
+  # parse (the lifecycle tooling is host-aware via gh_host.sh, PI-691); a
+  # wrong host fails loudly at the sub-issue API call, not silently here.
+  if [[ "$raw" =~ ^https?://[^/]+/([^/]+)/([^/]+)/issues/([0-9]+)$ ]]; then
     PARENT_OWNER="${BASH_REMATCH[1]}"
     PARENT_REPO="${BASH_REMATCH[2]}"
     PARENT_NUMBER="${BASH_REMATCH[3]}"
