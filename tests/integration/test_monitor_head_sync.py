@@ -25,7 +25,7 @@ _OLD_SHA = "2222222222222222222222222222222222222222"
 # for the just-pushed commit is exactly the bug.
 _GH_STUB = """#!/bin/bash
 case "$*" in
-*"--json headRefName"*) echo "feature" ;;
+*"--json headRefName"*) echo "feature ${PI_TEST_CROSS_REPO:-false}" ;;
 *"--json headRefOid"*) echo "$PI_TEST_API_SHA" ;;
 *"pr checks"*) echo '[{"name":"ci","state":"FAILURE","bucket":"fail"}]' ;;
 *"run list"*) echo '"success"' ;;
@@ -46,13 +46,17 @@ exec {real_git} "$@"
 
 
 def _stub_bin(tmp_path: Path) -> Path:
+    real_git = shutil.which("git")
+    # Without this, the stub renders as `exec None "$@"` and the suite fails
+    # with a shell error that says nothing about the missing binary.
+    assert real_git, "git must be on PATH to stub `git ls-remote`"
     stub_bin = tmp_path / "stub-bin"
     stub_bin.mkdir()
     gh = stub_bin / "gh"
     gh.write_text(_GH_STUB)
     gh.chmod(0o755)
     git = stub_bin / "git"
-    git.write_text(_GIT_STUB.format(real_git=shutil.which("git")))
+    git.write_text(_GIT_STUB.format(real_git=real_git))
     git.chmod(0o755)
     # No-op sleep so the bounded waits resolve instantly.
     slp = stub_bin / "sleep"
@@ -104,6 +108,21 @@ def test_synced_api_head_passes_through_to_the_check_verdict(
 
 def test_head_sync_timeout_zero_disables_the_gate(tmp_target: Path, tmp_path: Path):
     result = _run(tmp_target, tmp_path, api_sha=_OLD_SHA, PI_HEAD_SYNC_TIMEOUT="0")
+    assert result.returncode == 1
+    assert "CI failed on PR #1" in result.stdout
+    assert "Refusing to judge check results" not in result.stderr
+
+
+def test_cross_repo_pr_skips_the_gate(tmp_target: Path, tmp_path: Path):
+    """A fork's `headRefName` may name a base-repo branch that isn't its head.
+
+    `ls-remote origin refs/heads/feature` would then answer with the base repo's
+    `feature`, and the gate would wait out its timeout against a SHA from the
+    wrong repository. Skip instead of guessing (PR #712 review).
+    """
+    result = _run(
+        tmp_target, tmp_path, api_sha=_OLD_SHA, PI_TEST_CROSS_REPO="true"
+    )
     assert result.returncode == 1
     assert "CI failed on PR #1" in result.stdout
     assert "Refusing to judge check results" not in result.stderr

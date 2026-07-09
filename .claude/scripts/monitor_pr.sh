@@ -301,16 +301,34 @@ _has_review_activity() {
 # predecessor reads as "CI failed" (observed on #705), and a green one would
 # merge a commit whose CI never ran. `git ls-remote` answers from git's endpoint
 # rather than the API, so it sees the pushed tip immediately: wait until the two
-# agree before any check result is trusted. Fails open (returns 0) whenever the
-# expected SHA cannot be established — a fork PR, a deleted branch, no `origin`
-# — leaving behavior exactly as it was before this gate existed.
+# agree before any check result is trusted.
+#
+# Two distinct outcomes when the SHAs don't line up:
+#   * skipped entirely (return 0, unchanged behavior) when no expected SHA can
+#     be established — a cross-repo PR, a deleted branch, no `origin`, or the
+#     gate switched off with PI_HEAD_SYNC_TIMEOUT=0;
+#   * fail closed (exit 1) when an expected SHA IS known and the API never
+#     catches up to it within the timeout, since every check result on hand
+#     may belong to some other commit.
 _wait_for_head_sync() {
-  local head_ref remote_sha api_sha elapsed
+  local head_info head_ref cross_repo remote_sha api_sha elapsed
   if [ "$HEAD_SYNC_TIMEOUT" -eq 0 ]; then
     return 0
   fi
-  head_ref=$(GH_PROMPT_DISABLED=1 gh pr view "$PR_NUMBER" --json headRefName \
-    -q '.headRefName' 2>/dev/null || true)
+  # Cross-repo (fork) PRs: headRefName carries only the branch name, so
+  # `ls-remote origin refs/heads/$head_ref` would resolve a base-repo branch
+  # that merely shares the name (`main`, `feature`) and then wait out the
+  # timeout against a SHA from the wrong repository (PR #712 review). The
+  # fork's remote isn't configured here — skip rather than guess.
+  head_info=$(GH_PROMPT_DISABLED=1 gh pr view "$PR_NUMBER" \
+    --json headRefName,isCrossRepository \
+    -q '.headRefName + " " + (.isCrossRepository | tostring)' 2>/dev/null || true)
+  [ -n "$head_info" ] || return 0
+  head_ref=${head_info% *}
+  cross_repo=${head_info##* }
+  if [ "$cross_repo" = "true" ]; then
+    return 0
+  fi
   [ -n "$head_ref" ] || return 0
   remote_sha=$(git ls-remote origin "refs/heads/$head_ref" 2>/dev/null | cut -f1 || true)
   [ -n "$remote_sha" ] || return 0
@@ -356,8 +374,8 @@ if [ "$CI_TIMEOUT" -eq 0 ]; then
 fi
 
 # PI-706: how long to wait for the API's PR head to catch up with the pushed
-# tip. 0 disables the gate (escape hatch for forks/mirrors where `git ls-remote
-# origin` cannot see the head branch and the wait would be pure latency).
+# tip. 0 disables the gate — an escape hatch for mirrors and other setups where
+# `git ls-remote origin` reports a SHA the API will never converge on.
 HEAD_SYNC_TIMEOUT="${PI_HEAD_SYNC_TIMEOUT:-120}"
 case "$HEAD_SYNC_TIMEOUT" in
 '' | *[!0-9]*)
