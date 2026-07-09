@@ -73,6 +73,11 @@ SYNCED: dict[str, str | tuple[str, object]] = {
     "scripts/create_issue.sh": "lifecycle/dot_agents/scripts/create_issue.sh",
     "scripts/start_issue.sh": "lifecycle/dot_agents/scripts/start_issue.sh",
     "scripts/setup_github.sh": "lifecycle/dot_agents/scripts/setup_github.sh",
+    # reconciled from DIVERGED (#708): the template's extras (gh hard-require,
+    # gh_host.sh sourcing incl. the org-profile admin guard, _py.sh interpreter
+    # resolution) strictly supersede the repo copy's wording tweaks; both
+    # dependencies (scripts/gh_host.sh, hooks/_py.sh) are in the shared set
+    "scripts/monitor_pr.sh": "lifecycle/dot_agents/scripts/monitor_pr.sh",
     # subagent specs (Claude Code reads them from the .claude/ mirror)
     "agents/explore.md": "base/dot_agents/agents/explore.md",
     "agents/code-reviewer.md": "base/dot_agents/agents/code-reviewer.md",
@@ -87,11 +92,6 @@ SYNCED: dict[str, str | tuple[str, object]] = {
 # Intentionally different from the template source. The contract test asserts
 # these really DO differ — a reconciled file must move to SYNCED, not linger.
 DIVERGED: dict[str, tuple[str, str]] = {
-    "scripts/monitor_pr.sh": (
-        "lifecycle/dot_agents/scripts/monitor_pr.sh",
-        "bidirectional drift: repo copy has PI-653/PI-674 wording tweaks, template has "
-        "gh_host.sh sourcing + gh hard-require (PI-362); reconcile upstream in a follow-up",
-    ),
     "scripts/push_wiki.sh": (
         "lifecycle/dot_agents/scripts/push_wiki.sh",
         "repo copy is AHEAD: --prune flag for the repo-only wiki skill; template has "
