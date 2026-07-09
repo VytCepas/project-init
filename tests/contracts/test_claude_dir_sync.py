@@ -18,10 +18,19 @@ import tools.sync_claude_dir as sync_claude_dir
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+# Runtime state Claude Code writes into the live .claude/ dir it reads —
+# present whenever a session is active (e.g. a pending scheduled task), never
+# part of the mirror, and gitignored. Without this carve-out the contract
+# flakes on exactly the checkouts that run it most: inside a session (#668).
+_RUNTIME_ARTIFACTS = {"scheduled_tasks.lock", "settings.local.json"}
+
+
 def _tree_hashes(root: Path) -> dict[str, str]:
     out: dict[str, str] = {}
     for p in sorted(root.rglob("*")):
         if not p.is_file() or "__pycache__" in p.parts or p.suffix == ".pyc":
+            continue
+        if p.name in _RUNTIME_ARTIFACTS:
             continue
         out[p.relative_to(root).as_posix()] = hashlib.sha256(p.read_bytes()).hexdigest()
     return out
