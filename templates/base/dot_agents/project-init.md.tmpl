@@ -108,9 +108,9 @@ This project is **single-trunk**: feature PRs target `main` and merge by squash.
 ### Commit and PR format
 
 Commit messages, PR titles, and branch names follow the quick-ref in
-[AGENTS.md](../AGENTS.md) (single source: `type(KEY-N): description`, branch
-`<type>/<KEY>-<n>-<slug>`, body includes `Closes #<n>`). Commit messages use
-the same format as PR titles. Types: `feat` · `fix` · `chore` · `docs` · `test`
+[AGENTS.md](../AGENTS.md) — the single source for those formats. Commit
+messages use the same format as PR titles.
+Types: `feat` · `fix` · `chore` · `docs` · `test`
 
 For minor work without an issue, use `.agents/scripts/create_nojira_pr.sh <type> "description"`.
 It creates or reuses a typed `nojira` branch, pushes through `push_branch.sh`,
