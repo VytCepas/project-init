@@ -79,6 +79,13 @@ and lockfiles, `linguist-vendored` for the vault). Deliberate content additions,
 not move-drift. Only those two hashes were re-pinned across all four combos,
 after verifying every other file still matched.
 
+Exception (#668): the scaffolded `.gitignore` gained the `.claude/` runtime
+entries (`scheduled_tasks.lock`, `settings.local.json`) — Claude Code writes
+session state into the generated `.claude/` mirror it reads, and only the
+`.agents/` copies were ignored. Deliberate content addition, not move-drift —
+only the `.gitignore` hash was re-pinned across all four combos, after
+verifying every other file still matched.
+
 Exception (#631): `start_issue.sh` gained `_repo_root_name` — project-key
 derivation now anchors on the MAIN worktree's directory (via git-common-dir)
 instead of `--show-toplevel`, so linked worktrees derive the same key as the

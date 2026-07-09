@@ -39,6 +39,10 @@ logs/
 !.agents/docs
 .agents/docs/*
 !.agents/docs/CODE_MAP.md
+# Claude Code writes runtime state into the committed .claude/ mirror it
+# actually reads — keep it out of the index and the sync contract (#668)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
 .codex
 
 # coverage data

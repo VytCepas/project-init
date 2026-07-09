@@ -4,6 +4,10 @@
 .agents/scheduled_tasks.lock
 .agents/.session_setup_stamp
 .agents/settings.local.json
+# Claude Code writes runtime state into the generated .claude/ mirror it
+# actually reads — never commit it (#668)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
 {{#if memory}}.agents/memory/.cache/
 {{/if memory}}.agents/logs/
 .agents/.local/
