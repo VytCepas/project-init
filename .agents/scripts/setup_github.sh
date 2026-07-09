@@ -72,7 +72,23 @@ if [ "$PROTECT" = 1 ]; then
   #   2. review/decision is a derived status only posted on review events and is
   #      unsatisfiable for a solo owner (you can't approve your own PR), so it is
   #      NOT required here — it stays the advisory signal monitor_pr.sh treats it as.
-  cat >"$PROTECTION" <<'JSON'
+  #
+  # PI-715: an *approving review* is unsatisfiable for exactly the same reason,
+  # and requiring one anyway was the bug. GitHub refuses self-approval, and the
+  # bot reviewers (Copilot, Codex) submit COMMENTED, never APPROVED — so on a
+  # solo repo reviewDecision never left REVIEW_REQUIRED and every merge became an
+  # `--admin` override of a gate that enforce_admins=false was never enforcing.
+  # A bypass on every PR is strictly worse than no gate: it trains the operator
+  # to reach for --no-review. org keeps the requirement (real reviewers exist).
+  # required_conversation_resolution stays on for EVERY profile — that is what
+  # actually enforces "resolve the review comments before merging", and unlike an
+  # approval, an agent can satisfy it.
+  if [ "$(gh_profile)" = "org" ]; then
+    REQUIRED_APPROVALS=1
+  else
+    REQUIRED_APPROVALS=0
+  fi
+  cat >"$PROTECTION" <<JSON
 {
   "required_status_checks": {
     "strict": true,
@@ -83,7 +99,7 @@ if [ "$PROTECT" = 1 ]; then
   },
   "enforce_admins": false,
   "required_pull_request_reviews": {
-    "required_approving_review_count": 1,
+    "required_approving_review_count": $REQUIRED_APPROVALS,
     "dismiss_stale_reviews": true,
     "require_code_owner_reviews": false,
     "require_last_push_approval": false

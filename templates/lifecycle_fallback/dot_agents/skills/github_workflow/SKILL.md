@@ -78,6 +78,13 @@ the merged or auto-merge-enabled status.
    ```
 4. After 1 review-fix cycle, the script auto force-merges with `--admin`.
 
+**Merging needs no bypass (PI-715).** `individual`/`standalone` profiles require
+zero approving reviews — an approval is unsatisfiable there, since GitHub refuses
+self-approval and bot reviewers only ever COMMENT. A PR merges once CI is green, a
+review has landed, and every review thread is resolved. Unresolved comments open a
+review cycle (exit 2) rather than being force-merged: `required_conversation_resolution`
+would reject the merge anyway, and `--admin` would discard feedback nobody answered.
+
 **Before applying any comment:** read the current file state. Check whether the
 comment is stale (already fixed), contradicts conventions, or is correct. Never
 blindly apply a suggestion — post reasoning even when rejecting.
