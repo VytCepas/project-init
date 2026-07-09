@@ -48,9 +48,18 @@ The most-used flags:
 | `--python-version` | `3.11`, `3.12`, `3.13`, `3.14` | `pyproject.toml`'s `requires-python` floor, else `3.11` |
 | `--memory` | `none`, `auto`, `obsidian-only`, `obsidian-graphify`, `obsidian-graphify-rag` | the preset's tier |
 | `--lifecycle` | `github`, `none` | `github` |
+| `--review-cycles` | `0` (no review control), `1`, `2`, … | `2` (requires `--lifecycle github`) |
 | `--mcps` | `context7`, `context7-http` (comma-separated) | none |
 | `--browser` | flag (Playwright MCP) | off |
 | `--strict` | flag (fail on unrendered placeholders) | off |
+
+A **review cycle** is one pass of the merge gate: push → the review agents comment
+→ you resolve → they re-review. `--review-cycles` sizes how many `monitor_pr.sh`
+runs before it stops asking for another. `0` disables review control and merges on
+green CI — it is *not* an admin override, so an approval policy still blocks the
+merge. Whatever the count, the merge rule is the same: once the agents' comments
+are resolved (or none arise), the PR is free to merge. Change it later in
+`.agents/config.yaml`, or per-run with `PI_REVIEW_CYCLES`.
 
 `--python-version` is the single source for "what Python is this project on": it
 pins `mise.toml`'s toolchain, `mypy.ini`'s typeshed baseline, and the floor of the

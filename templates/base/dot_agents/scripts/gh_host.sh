@@ -69,6 +69,17 @@ gh_profile() {
   printf '%s\n' "${prof:-individual}"
 }
 
+# Review-fix cycles monitor_pr.sh runs before it stops asking for another pass
+# (#714). 0 means no review control: merge as soon as CI is green. Anchored on
+# this file's location for the same reason gh_profile is. Falls back to 2 — the
+# default the wizard explains — when unset or absent.
+review_cycles() {
+  local cfg n=""
+  cfg="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../config.yaml"
+  [ -f "$cfg" ] && n=$(sed -nE 's/^[[:space:]]*review_cycles:[[:space:]]*([0-9]+).*/\1/p' "$cfg" | head -1)
+  printf '%s\n' "${n:-2}"
+}
+
 # Base branch for feature PRs. Single trunk: the scaffolder pins the rendered
 # workflows (ci.yml, validate-pr.yml) to 'main', so this MUST return 'main' too —
 # resolving the live default branch instead would let start_issue.sh target a

@@ -48,7 +48,16 @@ PY="$SCRIPT_DIR/../hooks/_py.sh"
 PR_NUMBER="${1:-}"
 MODE=""
 REVIEW_CYCLE=0
-MAX_REVIEW_CYCLES=2
+# #714: review-fix cycles before the script stops asking for another pass.
+# Precedence: PI_REVIEW_CYCLES env > config.yaml `review_cycles` > 2.
+# 0 disables review control entirely — merge as soon as CI is green.
+MAX_REVIEW_CYCLES="${PI_REVIEW_CYCLES:-$(review_cycles)}"
+case "$MAX_REVIEW_CYCLES" in
+'' | *[!0-9]*)
+  echo "review cycles must be a non-negative integer; got '$MAX_REVIEW_CYCLES'" >&2
+  exit 2
+  ;;
+esac
 NO_REVIEW=0
 ALLOW_ADMIN=0
 
@@ -456,6 +465,19 @@ fi
 REVIEW_TIMEOUT=360
 REVIEW_ELAPSED=0
 REVIEW_DECISION=$(_get_review_decision)
+
+# #714: review_cycles=0 means the operator declined review control. Skip the whole
+# review gate — the wait, the changes-requested cycle, the unresolved-thread check
+# — and merge on green CI. Deliberately NOT an admin override: if an approval
+# policy is in force the merge still blocks, because "no review control" is a
+# choice about this script's cycles, not a licence to bypass branch protection.
+# Set before the max-cycles check below, which would otherwise read 0 >= 0 as
+# "cycles exhausted" and force an admin merge.
+if [ "$MAX_REVIEW_CYCLES" -eq 0 ] && [ "$MODE" = "--merge" ]; then
+  echo "PR #$PR_NUMBER: CI passed. review_cycles=0 — no review control; merging on green CI."
+  REVIEW_DECISION="SKIPPED"
+fi
+
 if [ "$MODE" = "--merge" ] && [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ] && [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
   echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — skipping reviewer wait and force-merging with admin override."
   _admin_merge
