@@ -1,0 +1,57 @@
+---
+title: project-init — this repo's own CI architecture
+---
+flowchart TB
+    subgraph LOCAL["Local dev loop"]
+        DEV["Developer / Claude Code agent"]
+        JUST["justfile recipes\nsetup · lint · format · test · test-quick · docs · ci\nsync-plugin · sync-claude"]
+        PREPUSH[".githooks/pre-push\n(core.hooksPath, wired by `just setup`)\nruns local CI before every push"]
+        DEV --> JUST
+        JUST -->|"just ci = lint + test"| PREPUSH
+    end
+
+    subgraph GUARD["Agent-side guard (Claude Code hooks, .agents/)"]
+        PTU["PreToolUse(Bash)\n.agents/hooks/github_command_guard.sh"]
+        DAG["dag_workflow.py guard\nCOMMAND_RULES: blocks/redirects\ngit push main · gh pr merge · gh api .../merge\ngh pr ready · gh pr create · gh issue create · bare git push"]
+        SCRIPTS[".agents/scripts/*.sh\npush_branch · promote_review · monitor_pr\nfinish_pr · create_nojira_pr · push_wiki"]
+        UPS["UserPromptSubmit\nworkflow_state_reminder.sh\ninjects DAG rules + live node state"]
+        DEV -->|"raw git/gh command"| PTU --> DAG
+        DAG -->|"blocked, redirected to"| SCRIPTS
+        SCRIPTS -->|"safe git/gh call"| PREPUSH
+        UPS -.->|"context injection"| DEV
+    end
+
+    PREPUSH -->|"git push"| GH[("GitHub repo")]
+
+    subgraph WORKFLOWS[".github/workflows/*.yml"]
+        CI["ci.yml\nlint-and-test · wheel-smoke · secret-scan (gitleaks)\nshellcheck · macos/windows-portability (path-filtered)"]
+        VALIDATE["validate-pr.yml\nPR title lint + Closes-keyword check"]
+        REVSTATUS["review-status.yml\nmirrors PR review decision -> commit status"]
+        BOARD["board-automation.yml\nissue/PR -> project board card moves"]
+        DOCS["docs.yml\nmkdocs build -> GitHub Pages deploy"]
+        TPU["third-party-updates.yml\nscheduled dependency-update proposals"]
+        TAGREL["tag-release.yml\nworkflow_dispatch: creates vX.Y.Z tag\n(works around GITHUB_TOKEN push not self-triggering)"]
+        RELEASE["release.yml\ntrigger: push tag v* (or dispatch)\nverify tag==pyproject version -> uv build\n-> git-cliff changelog -> GitHub Release"]
+        PUBLISH["publish-pypi job\nneeds: release · environment: pypi\nOIDC trusted publishing, no stored token (ADR-011)"]
+        RELEASE --> PUBLISH
+    end
+
+    GH -->|"push / PR opened"| CI
+    GH -->|"PR opened"| VALIDATE
+    GH -->|"review submitted"| REVSTATUS
+    GH -->|"issue/PR events"| BOARD
+    GH -->|"docs paths changed"| DOCS
+    TAGREL -->|"tag push"| RELEASE
+
+    subgraph SELFCHECK["Self-consistency contract"]
+        MIRROR["tools/sync_claude_dir.py\n.agents/ (canonical) -> .claude/ (committed mirror,\nClaude Code only reads .claude/)"]
+        TEST["tests/contracts/test_claude_dir_sync.py\nbyte-compares fresh sync vs committed .claude/\nchecks MIRRORED set == .gitignore allowlist\nchecks hook paths point at .agents/hooks/"]
+        JUST -->|"just sync-claude"| MIRROR
+        CI -->|"lint-and-test runs"| TEST
+        TEST -.->|"fails if drifted"| DEV
+    end
+
+    CI -->|"all required checks green"| MERGE{{"branch protection:\nci-gate + review approval\nrequired before merge"}}
+    VALIDATE --> MERGE
+    REVSTATUS --> MERGE
+    DAG -->|"gh pr merge intercepted\n(redirect to monitor_pr.sh --merge)"| MERGE
