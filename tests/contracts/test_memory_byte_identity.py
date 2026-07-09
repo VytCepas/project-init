@@ -128,6 +128,9 @@ _ADDED_SINCE_BASELINE = {
     ".agents/skills/token_efficiency/SKILL.md",
     # PI-657: guard/per-surface mechanics moved out of always-loaded AGENTS.md
     ".agents/docs/guides/enforcement.md",
+    # PI-666: self-hosted-runner escape-hatch guide (ci.yml + justfile edits
+    # already excluded above)
+    ".agents/docs/guides/self-hosted-ci-runner.md",
     # PI-661: zero-token statusline context meter (wired in settings.json,
     # which is already excluded above)
     ".agents/hooks/statusline.sh",
