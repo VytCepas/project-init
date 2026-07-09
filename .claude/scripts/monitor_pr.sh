@@ -294,6 +294,45 @@ _has_review_activity() {
   [ "$count" -gt 0 ]
 }
 
+# PI-706: `gh pr checks` reports the rollup for whatever commit the API believes
+# is the PR head. Right after a push the API can still serve the PREVIOUS
+# headRefOid (replication lag); that commit's checks are already settled, so the
+# CI wait below breaks on the first poll and judges the wrong commit — a red
+# predecessor reads as "CI failed" (observed on #705), and a green one would
+# merge a commit whose CI never ran. `git ls-remote` answers from git's endpoint
+# rather than the API, so it sees the pushed tip immediately: wait until the two
+# agree before any check result is trusted. Fails open (returns 0) whenever the
+# expected SHA cannot be established — a fork PR, a deleted branch, no `origin`
+# — leaving behavior exactly as it was before this gate existed.
+_wait_for_head_sync() {
+  local head_ref remote_sha api_sha elapsed
+  if [ "$HEAD_SYNC_TIMEOUT" -eq 0 ]; then
+    return 0
+  fi
+  head_ref=$(GH_PROMPT_DISABLED=1 gh pr view "$PR_NUMBER" --json headRefName \
+    -q '.headRefName' 2>/dev/null || true)
+  [ -n "$head_ref" ] || return 0
+  remote_sha=$(git ls-remote origin "refs/heads/$head_ref" 2>/dev/null | cut -f1 || true)
+  [ -n "$remote_sha" ] || return 0
+  elapsed=0
+  while true; do
+    api_sha=$(GH_PROMPT_DISABLED=1 gh pr view "$PR_NUMBER" --json headRefOid \
+      -q '.headRefOid' 2>/dev/null || true)
+    if [ "$api_sha" = "$remote_sha" ]; then
+      return 0
+    fi
+    if [ "$elapsed" -ge "$HEAD_SYNC_TIMEOUT" ]; then
+      echo "PR #$PR_NUMBER: GitHub still reports head ${api_sha:-<unknown>}, but the" >&2
+      echo "  remote branch $head_ref is at $remote_sha (${HEAD_SYNC_TIMEOUT}s elapsed)." >&2
+      echo "  Refusing to judge check results that may belong to another commit." >&2
+      echo "  Re-run shortly, or set PI_HEAD_SYNC_TIMEOUT=0 to skip this gate." >&2
+      exit 1
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+  done
+}
+
 # --- Wait for all CI checks (excludes review/decision commit status) ---
 # Guard: if checks haven't registered yet (empty list), keep polling.
 # An empty list is indistinguishable from "all done" without this guard,
@@ -315,6 +354,19 @@ if [ "$CI_TIMEOUT" -eq 0 ]; then
   echo "PI_CI_TIMEOUT must be a positive integer (seconds); got '${PI_CI_TIMEOUT:-}'" >&2
   exit 2
 fi
+
+# PI-706: how long to wait for the API's PR head to catch up with the pushed
+# tip. 0 disables the gate (escape hatch for forks/mirrors where `git ls-remote
+# origin` cannot see the head branch and the wait would be pure latency).
+HEAD_SYNC_TIMEOUT="${PI_HEAD_SYNC_TIMEOUT:-120}"
+case "$HEAD_SYNC_TIMEOUT" in
+'' | *[!0-9]*)
+  echo "PI_HEAD_SYNC_TIMEOUT must be a non-negative integer (seconds); got '${PI_HEAD_SYNC_TIMEOUT:-}'" >&2
+  exit 2
+  ;;
+esac
+_wait_for_head_sync
+
 CI_ELAPSED=0
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
