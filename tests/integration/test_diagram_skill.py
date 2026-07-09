@@ -40,6 +40,12 @@ class TestDiagramSkill:
         assert ".agents/vault/design/" in content
         assert "bunx @mermaid-js/mermaid-cli" in content
         assert "node ids stable" in content.lower()
+        # Folder-per-diagram + unconditional human-viewable render (PI-679):
+        # each diagram owns a <slug>/ folder holding source AND picture, and the
+        # picture is re-rendered on every source change, never left stale.
+        assert "docs/diagrams/<slug>/<slug>.mmd" in content
+        assert "Always render a picture file" in content
+        assert "source **and** rendered picture" in content
         # Quality rules.
         assert "25 nodes" in content
         assert "subgraph" in content

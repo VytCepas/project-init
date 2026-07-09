@@ -31,7 +31,7 @@ flowchart TB
         RUNSON{{"runs-on: vars.CI_RUNS_ON || 'ubuntu-24.04'\n(local_ci skill toggles the repo variable;\nself-hosted escape hatch, PI-666/PI-673)"}}
         LT["lint-and-test\n(+ python-matrix if python)"]
         IT["integration-tests (python)"]
-        MT["mutation-tests (python, mumut)\n>=80% killed gate"]
+        MT["mutation-tests (python, mutmut)\nscore gate: see ci.yml.tmpl"]
         BI["build-image {{#if delivery_service}}\nbuild-once, Trivy scan, SARIF"]
         DL["dockerfile-lint {{#if delivery_service}}\nhadolint"]
         SS["secret-scan\ngitleaks-action"]

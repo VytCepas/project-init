@@ -41,20 +41,27 @@ source is the artifact.
 
 ## 3. The iteration loop
 
-1. Write source to `docs/diagrams/<slug>.mmd` — or `.agents/vault/design/`
-   when the project has an Obsidian vault (its existing home for "diagrams,
-   spec drafts").
-2. Preview:
-   - On Claude Code, send the `.mmd` file to the user with inline render —
-     the side panel renders Mermaid natively, no tooling needed.
-   - For a picture file (or non-Claude surfaces):
-     `bunx @mermaid-js/mermaid-cli -i <slug>.mmd -o <slug>.svg` and send the
-     SVG.
-3. Ask **one** targeted question per round — "right boxes?", "right
+1. Each diagram gets its own folder, named after the task/topic (kebab-case
+   slug): `docs/diagrams/<slug>/` — or `.agents/vault/design/<slug>/` when
+   the project has an Obsidian vault (its existing home for "diagrams, spec
+   drafts"). Everything about that diagram lives inside: the source, the
+   rendered picture, and any other related assets (notes, alternate views,
+   exported data). Write the source to `docs/diagrams/<slug>/<slug>.mmd` —
+   or `.agents/vault/design/<slug>/<slug>.mmd` in the vault case.
+2. **Always render a picture file for human viewing, every time the source
+   changes** — not only on request. From the repo root:
+   `bunx @mermaid-js/mermaid-cli -i docs/diagrams/<slug>/<slug>.mmd -o docs/diagrams/<slug>/<slug>.svg`
+   (swap in the vault folder when that's the diagram's home). This is
+   unconditional: the folder should never be left with only a `.mmd` and no
+   picture.
+3. Preview: on Claude Code, also send the `.mmd` file inline (the side panel
+   renders Mermaid natively) so iteration doesn't require re-rendering.
+4. Ask **one** targeted question per round — "right boxes?", "right
    arrows?", "right grouping?" — not "any feedback?".
-4. Apply feedback as **small edits, never wholesale regeneration**. Keep
+5. Apply feedback as **small edits, never wholesale regeneration**. Keep
    node IDs stable across rounds so the source diff shows exactly what
-   changed.
+   changed. Re-render the picture after every edit round — it must stay in
+   sync with the source, never stale.
 
 ## 4. Quality rules
 
@@ -68,8 +75,9 @@ source is the artifact.
 
 ## 5. Finalize
 
-- Commit the **source**. Optionally export the SVG next to it (same
-  `bunx @mermaid-js/mermaid-cli` command) when a rendered file is needed.
+- Commit the whole `<slug>/` folder: source **and** rendered picture
+  together. The source is the artifact of record for diffing/regeneration;
+  the picture is what a human opens without tooling — both ship, always.
 - Embedding:
   - GitHub/GitLab render ```` ```mermaid ```` fences in markdown natively —
     inline the source in docs/README where useful.
