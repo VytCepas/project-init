@@ -2677,7 +2677,12 @@ def _cli(argv: list[str]) -> int:
     _reject_bare_subcommand_target(args.target, parser)
     target = Path(args.target).resolve()
     # Before the target directory is created (PI-20) and before any prompt.
-    _reject_python_version_without_python(args.python_version, args.language, parser)
+    # --language is optional; a non-interactive run resolves an absent one to
+    # "none" (see _resolve_inputs), so validate against that rather than letting
+    # None read as "unknown" and slip the flag through (PR #713 review). In an
+    # interactive run the language is still unknown here — the wizard warns.
+    effective_language = args.language or ("none" if args.non_interactive else None)
+    _reject_python_version_without_python(args.python_version, effective_language, parser)
     _reject_conflicting_python_version(args.python_version, target, parser)
 
     # Select preset BEFORE creating the target directory — a typo'd --preset

@@ -17,6 +17,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 _BASE = (
     "--non-interactive",
     "--preset",
@@ -97,10 +99,15 @@ def test_unsupported_python_version_is_rejected(tmp_path: Path):
     assert not (tmp_path / "mise.toml").exists()
 
 
-def test_python_version_without_python_language_is_rejected(tmp_path: Path):
+@pytest.mark.parametrize("language", ["go", None])
+def test_python_version_without_python_language_is_rejected(tmp_path: Path, language):
     """Every python_floor consumer is gated on `python`, so the flag would render
     nowhere — a typo or wrapper bug must not pass unnoticed (PR #713 review).
+
+    An absent --language is the sharper case: non-interactive resolves it to
+    "none", so the run used to succeed with the pin rendered nowhere.
     """
+    lang_args = ["--language", language] if language else []
     result = subprocess.run(
         [
             sys.executable,
@@ -116,8 +123,7 @@ def test_python_version_without_python_language_is_rejected(tmp_path: Path):
             "t",
             "--description",
             "t",
-            "--language",
-            "go",
+            *lang_args,
             "--python-version",
             "3.13",
         ],
