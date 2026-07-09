@@ -233,6 +233,13 @@ for c in json.load(sys.stdin):
     if c.get('name') != 'review/decision' and c.get('bucket') == 'pending':
         print('  -', c.get('name'))" 2>/dev/null || true
     echo "Re-run once the check registers, or investigate why it never started."
+    # PI-671: a billing/minutes lockout means checks NEVER register — point
+    # at the escape hatch instead of leaving the user to rediscover it.
+    if gh run list --limit 5 --json conclusion --jq '.[].conclusion' 2>/dev/null | grep -q startup_failure; then
+      echo "Note: recent runs show startup_failure — GitHub Actions may be out of"
+      echo "minutes or billing-locked. Load the local_ci skill (self-hosted runner"
+      echo "escape hatch: just ci-local-on)."
+    fi
     exit 1
   fi
   sleep 10
