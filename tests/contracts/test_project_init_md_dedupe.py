@@ -10,6 +10,7 @@ surfaces).
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from project_init.scaffold import scaffold
@@ -38,8 +39,17 @@ class TestProjectInitMdDedupe:
         assert "CLAUDE.md" in project_init  # pointer present
 
     def test_pointer_links_resolve(self, tmp_target: Path):
-        """project-init.md lives in .agents/, so its ../ hrefs must resolve."""
+        """project-init.md lives in .agents/, so the ACTUAL hrefs in the
+        rendered file must resolve from there (a link to plain `AGENTS.md`
+        instead of `../AGENTS.md` would be broken)."""
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        base = tmp_target / ".agents"
-        assert (base / ".." / "AGENTS.md").resolve().exists()
-        assert (base / ".." / "CLAUDE.md").resolve().exists()
+        source = tmp_target / ".agents" / "project-init.md"
+        content = source.read_text()
+        hrefs = re.findall(r"\]\(([^)#]+)\)", content)
+        pointer_hrefs = [h for h in hrefs if h.endswith(("AGENTS.md", "CLAUDE.md"))]
+        # Both dedup pointers are present as real links...
+        assert any(h.endswith("AGENTS.md") for h in pointer_hrefs)
+        assert any(h.endswith("CLAUDE.md") for h in pointer_hrefs)
+        # ...and every one of them resolves relative to the file's location.
+        for href in pointer_hrefs:
+            assert (source.parent / href).resolve().exists(), f"broken href {href!r}"
