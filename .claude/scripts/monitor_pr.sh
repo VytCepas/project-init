@@ -151,6 +151,10 @@ _run_gh() {
 # skips silently when the branch is absent and loudly when it diverged.
 _cleanup_local_branch() {
   local head_info head_ref head_oid base local_oid current
+  # Only after the server confirms the merge: with a merge queue enabled,
+  # a successful `gh pr merge` may have only ENQUEUED the still-open PR,
+  # and the queue can still reject it (PR #707 review).
+  _pr_is_merged || return 0
   head_info=$(GH_PROMPT_DISABLED=1 gh pr view "$PR_NUMBER" \
     --json headRefName,headRefOid -q '.headRefName + " " + .headRefOid' \
     2>/dev/null || true)
@@ -171,17 +175,16 @@ _cleanup_local_branch() {
   fi
   current=$(git branch --show-current 2>/dev/null || true)
   if [ "$current" = "$head_ref" ]; then
-    if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-      echo "  worktree dirty — leaving local branch $head_ref checked out."
-      return 0
-    fi
+    # Dirty worktree: skip silently (#678) — dirtiness only matters here,
+    # where deleting would require switching branches under the user's feet.
+    [ -z "$(git status --porcelain 2>/dev/null)" ] || return 0
     git checkout -q "$base" 2>/dev/null || return 0
     git pull -q --ff-only 2>/dev/null || true
   fi
-  # A squash merge leaves no ancestry, so `git branch -d` refuses; the SHA
-  # equality above (nothing unpushed) plus the PR's merged state on the
-  # server is the safety condition that matters.
-  if git branch -D "$head_ref" >/dev/null 2>&1; then
+  # Try the safe delete first; a squash merge leaves no ancestry so `-d`
+  # refuses — then force, backed by the SHA equality above (nothing
+  # unpushed) plus the server-confirmed merged state.
+  if git branch -d "$head_ref" >/dev/null 2>&1 || git branch -D "$head_ref" >/dev/null 2>&1; then
     echo "  cleaned up local branch $head_ref"
   fi
 }

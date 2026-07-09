@@ -529,20 +529,36 @@ class TestMonitorPrLocalBranchCleanup:
         )
         return r.stdout.strip()
 
-    def _run_cleanup(self, tmp_path: Path, clone: Path, head_oid: str) -> subprocess.CompletedProcess:
+    def _run_cleanup(
+        self,
+        tmp_path: Path,
+        clone: Path,
+        head_oid: str,
+        pr_state: str = "MERGED",
+    ) -> subprocess.CompletedProcess:
         s = (_LIFECYCLE_SCRIPTS / "monitor_pr.sh").read_text()
-        m = re.search(
-            r"^_cleanup_local_branch\(\) \{\n.*?\n\}$", s, re.MULTILINE | re.DOTALL
-        )
-        assert m, "_cleanup_local_branch not found"
+        parts = []
+        for name in ("_pr_is_merged", "_cleanup_local_branch"):
+            m = re.search(
+                rf"^{name}\(\) \{{\n.*?\n\}}$", s, re.MULTILINE | re.DOTALL
+            )
+            assert m, f"{name} not found"
+            parts.append(m.group(0))
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir(exist_ok=True)
         gh = bin_dir / "gh"
+        # `pr view --json state` probes get the PR state; the head-ref query
+        # gets "name oid" — matching the two real gh calls cleanup makes.
         gh.write_text(
-            f'#!/usr/bin/env bash\necho "feat/T-9-x {head_oid}"\n'
+            "#!/usr/bin/env bash\n"
+            'case "$*" in\n'
+            f'*"--json state"*) echo "{pr_state}" ;;\n'
+            f'*) echo "feat/T-9-x {head_oid}" ;;\n'
+            "esac\n"
         )
         gh.chmod(0o755)
-        script = f"export PATH={bin_dir}:$PATH\nset -euo pipefail\nPR_NUMBER=9\n{m.group(0)}\n_cleanup_local_branch"
+        body = "\n".join(parts)
+        script = f"export PATH={bin_dir}:$PATH\nset -euo pipefail\nPR_NUMBER=9\n{body}\n_cleanup_local_branch"
         return subprocess.run(
             ["bash", "-c", script],
             cwd=clone,
@@ -592,7 +608,7 @@ class TestMonitorPrLocalBranchCleanup:
         assert r.returncode == 0, r.stderr
         assert r.stdout.strip() == "", "absent local branch must no-op silently"
 
-    def test_dirty_worktree_left_alone(self, tmp_path):
+    def test_dirty_worktree_left_alone_silently(self, tmp_path):
         clone = self._setup_repo(tmp_path)
         self._git(clone, "checkout", "-q", "-b", "feat/T-9-x")
         self._git(clone, "commit", "-q", "--allow-empty", "-m", "seed")
@@ -601,6 +617,22 @@ class TestMonitorPrLocalBranchCleanup:
 
         r = self._run_cleanup(tmp_path, clone, sha)
         assert r.returncode == 0, r.stderr
-        assert "worktree dirty" in r.stdout
+        assert r.stdout.strip() == "", "dirty-worktree skip must be silent (#678)"
         assert self._branch_exists(clone, "feat/T-9-x")
         assert self._git(clone, "branch", "--show-current") == "feat/T-9-x"
+
+    def test_enqueued_but_unmerged_pr_keeps_branch(self, tmp_path):
+        """PR #707 review: with a merge queue, a successful merge command may
+        have only ENQUEUED the still-open PR — cleanup must not delete the
+        branch until the server says MERGED."""
+        clone = self._setup_repo(tmp_path)
+        self._git(clone, "checkout", "-q", "-b", "feat/T-9-x")
+        self._git(clone, "commit", "-q", "--allow-empty", "-m", "seed")
+        sha = self._git(clone, "rev-parse", "HEAD")
+
+        r = self._run_cleanup(tmp_path, clone, sha, pr_state="OPEN")
+        assert r.returncode == 0, r.stderr
+        assert r.stdout.strip() == ""
+        assert self._branch_exists(clone, "feat/T-9-x"), (
+            "an enqueued-but-unmerged PR's local branch must survive"
+        )

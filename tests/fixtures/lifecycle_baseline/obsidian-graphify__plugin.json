@@ -42,7 +42,7 @@
   ".agents/scripts/gh_host.sh": "1b3c6dc8e8b910f2b53a84236936ae22968509852dab2422bcc5ece58f05f9e3",
   ".agents/scripts/install_hooks.sh": "a99f26ecf9d3d1bafd73ab0cb201ad4c9c5269fc58091731d57f3d4861ea21da",
   ".agents/scripts/lint_memory.sh": "8ba792a106ad625851a3da89986d090a1100ca475da3435cae56433300aea76c",
-  ".agents/scripts/monitor_pr.sh": "38d253c90a9f5ea285bb3fbfe04e668680ec3154efe042b603ddcd91608ca325",
+  ".agents/scripts/monitor_pr.sh": "da89d8a99c9fba3927dc9c93833dac95116ebd574cffb604fe40ad2e6393c71c",
   ".agents/scripts/promote_review.sh": "fef0604c5ca69ab496203a205a03f6fc4dad21d6ddc06c11b68d342aaf7bd6b4",
   ".agents/scripts/push_branch.sh": "37c215988d429361b099e4c8a46ea31ee73b8728da7d1a7b9678413cb1bfb096",
   ".agents/scripts/push_wiki.sh": "2b12c789d9a43f2f97b030762fea9e3b627ec0682cf3d4283b051f03c23b0df0",
