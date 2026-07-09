@@ -68,7 +68,7 @@ fi
 # (#631). The common git dir always lives under the main worktree, so anchor
 # the name there.
 _repo_root_name() {
-  local common=""
+  local common="" base=""
   common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
   if [ -z "$common" ]; then
     # git < 2.31 lacks --path-format; the raw value may be relative to cwd.
@@ -78,11 +78,27 @@ _repo_root_name() {
     *) common="$(pwd)/$common" ;;
     esac
   fi
-  if [ -n "$common" ] && [ -d "$(dirname "$common")" ]; then
-    basename "$(cd "$(dirname "$common")" && pwd)"
-  else
-    basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  if [ -n "$common" ]; then
+    base=$(basename "$common")
+    if [ "$base" = ".git" ] && [ -d "$(dirname "$common")" ]; then
+      # Normal layout: the common dir is <main-worktree>/.git — the repo
+      # name is its parent directory's.
+      basename "$(cd "$(dirname "$common")" && pwd)"
+      return
+    fi
+    case "$base" in
+    ?*.git)
+      # Bare repo (worktrees hang off /srv/repos/widget.git): the repo name
+      # is the git dir itself minus the .git suffix — its parent directory
+      # is unrelated (PR #702 review).
+      printf '%s\n' "${base%.git}"
+      return
+      ;;
+    esac
   fi
+  # Separate/custom git dir (GIT_DIR=...): no repo name to infer from it —
+  # fall back to the current worktree's own name.
+  basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 }
 
 derive_project_key() {

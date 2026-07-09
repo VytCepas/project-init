@@ -223,3 +223,40 @@ class TestStartIssueWorktreeKey:
                 f"from {cwd}: derived repo name {out.stdout.strip()!r} — the "
                 "key must match the main checkout's"
             )
+
+    def test_helper_handles_bare_repo_worktrees(self, tmp_path):
+        """PR #702 review: with worktrees hanging off a bare repo
+        (/srv/widget.git), the common dir IS the bare dir — dirname would
+        derive the unrelated parent ('srv'), not the repo name ('widget')."""
+        helper = self._extract_helper(_LIFECYCLE_SCRIPTS / "start_issue.sh")
+        git_env = ["-c", "user.email=t@t", "-c", "user.name=t"]
+        seed = tmp_path / "seed"
+        seed.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=seed, check=True)
+        subprocess.run(
+            ["git", *git_env, "commit", "-q", "--allow-empty", "-m", "init"],
+            cwd=seed,
+            check=True,
+        )
+        srv = tmp_path / "srv"
+        srv.mkdir()
+        bare = srv / "widget.git"
+        subprocess.run(
+            ["git", "clone", "-q", "--bare", str(seed), str(bare)], check=True
+        )
+        wt = tmp_path / "widget-15-fix"
+        subprocess.run(
+            ["git", "--git-dir", str(bare), "worktree", "add", "-q", str(wt)],
+            check=True,
+        )
+        out = subprocess.run(
+            ["bash", "-c", f"{helper}\n_repo_root_name"],
+            cwd=wt,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert out.stdout.strip() == "widget", (
+            f"derived {out.stdout.strip()!r} from a bare-repo worktree — the "
+            "bare dir's own name (minus .git), never its parent directory"
+        )

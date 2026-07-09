@@ -56,7 +56,7 @@
   ".agents/scripts/push_wiki.sh": "2b12c789d9a43f2f97b030762fea9e3b627ec0682cf3d4283b051f03c23b0df0",
   ".agents/scripts/setup_github.sh": "edac3172e42d05c85ad59478db7b5b2e16664e35daae7b0726c9da1b48a5ee51",
   ".agents/scripts/setup_graphify.sh": "d78683be78ad42605e1850dd9cf6b387d0ce35f65589ee5115a396dd24f1fee4",
-  ".agents/scripts/start_issue.sh": "637931953ccfd27e9644ff92f633c33ca477f19ea125efaa18ef7be93ab836b0",
+  ".agents/scripts/start_issue.sh": "d4102333d8d8e7bfe0997675a225180496069c6e1699512cc42cdc4206b59970",
   ".agents/settings.json": "42ad4604d2d1facd7ebb4f6679e2335bbf12d50e5c0daa33916d4518fa09279d",
   ".agents/skills/INDEX.md": "7720b83d153fe4cc95316d33ed9cc7e307ac1167b2b8cd77335f72c1b74c8f10",
   ".agents/skills/README.md": "d9340d505c3e842a187f44122e3e72913849261e9b7b1fa58bf38065766ebccc",
