@@ -115,7 +115,14 @@ class TestCiRunsOnEscapeHatch:
         kinds, and the scaffold bans pip anyway."""
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         ci = (tmp_target / ".github" / "workflows" / "ci.yml").read_text()
-        assert "pip install" not in ci
+        # Executable lines only — the explanatory comment legitimately names
+        # the failure mode ("pip install semgrep fails there").
+        runnable = [
+            ln for ln in ci.splitlines() if not ln.lstrip().startswith("#")
+        ]
+        assert not [ln for ln in runnable if "pip install" in ln], (
+            "pip must not be executed in scaffolded CI"
+        )
         assert "uvx semgrep@" in ci
 
     def test_justfile_toggles_present(self, tmp_target: Path):
