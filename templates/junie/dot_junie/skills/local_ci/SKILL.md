@@ -23,8 +23,11 @@ not started because recent account payments have failed or your spending
 limit needs to be increased."* Check remaining minutes:
 
 ```bash
-gh api /users/{username}/settings/billing/actions   # personal repos
-gh api /orgs/{org}/settings/billing/actions         # org repos
+# Enhanced billing platform (current; filter for Actions usage):
+gh api "/users/{username}/settings/billing/usage" --jq '[.usageItems[] | select(.product == "actions")]'
+gh api "/organizations/{org}/settings/billing/usage" --jq '[.usageItems[] | select(.product == "actions")]'
+# Accounts not yet on the enhanced platform: the legacy endpoint still answers:
+gh api /users/{username}/settings/billing/actions
 ```
 
 If runs are failing for any *other* reason, this skill does not apply — fix

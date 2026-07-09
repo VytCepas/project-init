@@ -45,7 +45,8 @@ class TestLocalCiSkill:
         assert "user-invocable: true" in content
         # Diagnosis before action.
         assert "startup_failure" in content
-        assert "settings/billing/actions" in content
+        assert "settings/billing/usage" in content  # enhanced billing platform
+        assert "settings/billing/actions" in content  # legacy fallback, still documented
         # The just-ci-parity unblock and the durable fix.
         assert "just ci" in content
         assert "just ci-local-on" in content
