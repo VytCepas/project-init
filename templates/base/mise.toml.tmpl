@@ -19,7 +19,10 @@ just = "1"
 # commit.
 shellcheck = "latest"
 shfmt = "latest"
-{{#if python}}python = "3.12"
+{{#if python}}# Kept equal to mypy.ini's python_version and the CI matrix floor (#628) —
+# one answer to "what Python is this project on". Change all three together,
+# or re-run `project-init upgrade` after editing requires-python.
+python = "{{python_floor}}"
 uv = "latest"
 {{/if python}}{{#if node}}bun = "1"
 {{/if node}}{{#if go}}go = "1.24"

@@ -104,7 +104,8 @@ class TestAgentSelection:
         fall back to claude-only (PR #167 review)."""
         import project_init.__main__ as cli
 
-        prompt_answers = iter(["proj", "desc", "python", "@owner", "none"])
+        # "3.11" answers the target-Python prompt a python scaffold now asks (#628).
+        prompt_answers = iter(["proj", "desc", "python", "3.11", "@owner", "none"])
         ask_answers = iter(["4,10", "4"])
         monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(prompt_answers))
         monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: next(ask_answers))

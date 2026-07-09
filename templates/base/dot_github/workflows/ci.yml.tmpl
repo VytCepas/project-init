@@ -62,8 +62,13 @@ jobs:
           from packaging.specifiers import InvalidSpecifier, SpecifierSet
 
           # Maintained ceiling set — every CPython this template is willing to
-          # test. The floor comes from requires-python (below), never from here.
+          # test. The floor comes from requires-python, else from the version
+          # project-init pinned at scaffold time; never from here. Kept
+          # byte-equal to SUPPORTED_PYTHON_VERSIONS in the scaffolder.
           KNOWN = ["3.11", "3.12", "3.13", "3.14"]
+
+          def _key(v):
+              return tuple(int(part) for part in v.split("."))
 
           spec = ""
           pyproject = pathlib.Path("pyproject.toml")
@@ -83,8 +88,10 @@ jobs:
                   # than failing the job on a bad requires-python.
                   versions = list(KNOWN)
           else:
-              # No declared floor yet (e.g. a fresh scaffold) — test the full set.
-              versions = list(KNOWN)
+              # No requires-python yet (a fresh scaffold, #628) — honor the floor
+              # project-init pinned into mise.toml and mypy.ini instead of fanning
+              # out across CPythons the project never claimed to support.
+              versions = [v for v in KNOWN if _key(v) >= _key("{{python_floor}}")]
           if not versions:
               # requires-python excludes every KNOWN version — fall back to the
               # newest so CI still runs instead of erroring on an empty matrix.
@@ -92,7 +99,7 @@ jobs:
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write("versions=" + json.dumps(versions) + "\n")
-          print("requires-python:", spec or "(none) -> full KNOWN set")
+          print("requires-python:", spec or '(none) -> floor {{python_floor}} from project-init')
           print("matrix:", versions)
           PY
 {{/if python}}

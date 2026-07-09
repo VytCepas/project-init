@@ -194,7 +194,8 @@ class TestInteractiveResolution:
     def _mock_leaves(monkeypatch):
         import project_init.__main__ as cli
 
-        answers = iter(["proj", "desc", "python", "@owner", "none", "claude"])
+        # "3.11" answers the target-Python prompt a python scaffold now asks (#628).
+        answers = iter(["proj", "desc", "python", "3.11", "@owner", "none", "claude"])
         monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
         monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
         monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)

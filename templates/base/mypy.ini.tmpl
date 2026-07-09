@@ -3,8 +3,9 @@
 # only — test code and agent infra (.agents/**) are out of scope by construction,
 # the same way ruff.toml exempts them via per-file-ignores.
 #
-# python_version pins the typeshed/syntax baseline mypy checks against; keep it
-# aligned with your pyproject.toml's requires-python floor.
+# python_version pins the typeshed/syntax baseline mypy checks against. It is
+# the same value as mise.toml's python pin and the CI matrix floor (#628); keep
+# all three aligned with your pyproject.toml's requires-python floor.
 #
 # Deliberately NOT enabled: disallow_any_explicit / disallow_any_decorated.
 # Verified against real code (PI-570) — both fire on legitimate, idiomatic
