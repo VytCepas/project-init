@@ -47,19 +47,23 @@ class TestCiRunsOnEscapeHatch:
         )
         assert jobs, "no jobs parsed from ci.yml"
         for job, runs_on in jobs.items():
-            if job in ("scorecard", "ci-gate"):
+            if job == "scorecard":
                 continue
             assert _EXPR in runs_on, f"{job} should read CI_RUNS_ON: {runs_on}"
 
-    def test_scorecard_and_gate_stay_pinned(self, tmp_target: Path):
+    def test_scorecard_stays_pinned_but_gate_follows(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         jobs = _jobs_with_runs_on(
             (tmp_target / ".github" / "workflows" / "ci.yml").read_text()
         )
-        for job in ("scorecard", "ci-gate"):
-            if job in jobs:  # presence depends on scaffold options
-                assert _EXPR not in jobs[job], f"{job} must stay GitHub-hosted"
-                assert "ubuntu-24.04" in jobs[job]
+        # scorecard: OSSF-hosted requirement; schedule-gated so it never
+        # blocks a PR — safe to pin.
+        if "scorecard" in jobs:
+            assert _EXPR not in jobs["scorecard"]
+        # ci-gate is the REQUIRED check: pinned, it couldn't start during a
+        # billing lockout and would block the merge — the exact scenario this
+        # feature exists for (Codex P1 on PR #670).
+        assert _EXPR in jobs["ci-gate"]
 
     def test_secret_bearing_workflows_never_use_the_variable(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())

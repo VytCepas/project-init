@@ -713,7 +713,7 @@ jobs:
   # failing gate actually blocks the merge.
   ci-gate:
     name: CI gate
-    runs-on: ubuntu-24.04  # pinned: seconds-long aggregator; stays on GitHub-hosted
+    runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}  # must follow the variable: it is the REQUIRED check — pinned, it can't start during a billing lockout and blocks the merge
     needs: [lint-and-test, secret-scan{{#if governance}}, governance{{/if governance}}]
     if: always()
     steps:
