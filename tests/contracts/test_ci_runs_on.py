@@ -79,6 +79,35 @@ class TestCiRunsOnEscapeHatch:
             )
         assert checked, "no pinned workflows found to check"
 
+    def test_header_renders_as_valid_comments_without_lifecycle(self, tmp_path: Path):
+        """PR #670 review: the lifecycle-gated name-drop must never splice a
+        non-comment line into the YAML header when lifecycle is off."""
+        from project_init.scaffold import load_preset, overlay_layers
+        from tests.helpers import make_variables
+
+        preset = load_preset("obsidian-only")
+        extra = overlay_layers(
+            [], no_plugin=True, memory_stack="obsidian-only", lifecycle=False
+        )
+        preset = {**preset, "layers": [*preset["layers"], *extra]}
+        target = tmp_path / "p"
+        scaffold(
+            target,
+            preset,
+            make_variables(
+                memory_stack="obsidian-only",
+                no_plugin="true",
+                plugin_mode="",
+                lifecycle="",
+                lifecycle_off="true",
+            ),
+        )
+        text = (target / ".github" / "workflows" / "ci.yml").read_text()
+        header = text.split("\non:", 1)[0]
+        for line in header.splitlines()[1:]:  # skip "name: CI"
+            assert not line or line.startswith("#"), f"non-comment header line: {line!r}"
+        assert "board-automation" not in text
+
     def test_justfile_toggles_present(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         justfile = (tmp_target / "justfile").read_text()

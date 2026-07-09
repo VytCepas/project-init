@@ -4,9 +4,9 @@ name: CI
 # `self-hosted` to run CI on your own runner — the escape hatch when a private
 # repo exhausts its GitHub Actions minutes. Toggle with `just ci-local-on` /
 # `ci-local-off`; setup guide: .agents/docs/guides/self-hosted-ci-runner.md.
-# Secret/PAT-bearing workflows{{#if lifecycle}} (board-automation, validate-pr,
-# issue-validation, …){{/if lifecycle}} deliberately stay on GitHub-hosted
-# ephemeral runners.
+# Secret/PAT-bearing workflows deliberately stay on GitHub-hosted ephemeral runners.
+{{#if lifecycle}}# Pinned here: board-automation, validate-pr, issue-validation, project-init-upgrade.
+{{/if lifecycle}}
 
 on:
   push:
