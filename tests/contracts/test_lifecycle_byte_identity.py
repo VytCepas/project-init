@@ -151,6 +151,9 @@ _ADDED_SINCE_BASELINE = {
     # INDEX/README/project-init.md rows already excluded above. The .gitignore
     # edit (.agents/tmp/) was re-pinned in the fixtures, not excluded.
     ".agents/skills/checkpoint/SKILL.md",
+    # PI-665: diagram skill (collaborative Mermaid-first diagramming);
+    # INDEX/README/project-init.md rows already excluded above
+    ".agents/skills/diagram/SKILL.md",
     # #605: Guards log the governance signal (decision + command)
     ".agents/hooks/_usage_log.sh",
     ".agents/hooks/prod_guard.py",
