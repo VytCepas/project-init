@@ -178,6 +178,12 @@ _has_review_activity() {
 # 900s; set PI_CI_TIMEOUT (seconds) in the environment, or register a second
 # runner to restore parallelism.
 CI_TIMEOUT="${PI_CI_TIMEOUT:-900}"
+case "$CI_TIMEOUT" in
+'' | *[!0-9]* | 0)
+  echo "PI_CI_TIMEOUT must be a positive integer (seconds); got '${PI_CI_TIMEOUT:-}'" >&2
+  exit 2
+  ;;
+esac
 CI_ELAPSED=0
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"

@@ -51,3 +51,23 @@ def test_pi_ci_timeout_override_respected(tmp_target: Path, tmp_path: Path):
     # The override is respected: the message reports 20s, not 900s.
     assert "within 20s" in result.stdout
     assert "within 900s" not in result.stdout
+
+
+def test_invalid_pi_ci_timeout_fails_closed_with_clear_message(
+    tmp_target: Path, tmp_path: Path
+):
+    scaffold(tmp_target, fallback_preset(), fallback_variables())
+    script = tmp_target / ".agents" / "scripts" / "monitor_pr.sh"
+    env = os.environ.copy()
+    env["PI_CI_TIMEOUT"] = "twenty"
+    result = subprocess.run(
+        ["bash", str(script), "1"],
+        capture_output=True,
+        text=True,
+        cwd=tmp_target,
+        env=env,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "positive integer" in result.stderr
