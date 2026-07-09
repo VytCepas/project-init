@@ -49,10 +49,11 @@ source is the artifact.
    exported data). Write the source to `docs/diagrams/<slug>/<slug>.mmd` —
    or `.agents/vault/design/<slug>/<slug>.mmd` in the vault case.
 2. **Always render a picture file for human viewing, every time the source
-   changes** — not only on request:
-   `bunx @mermaid-js/mermaid-cli -i <slug>/<slug>.mmd -o <slug>/<slug>.svg`.
-   This is unconditional: the folder should never be left with only a
-   `.mmd` and no picture.
+   changes** — not only on request. From the repo root:
+   `bunx @mermaid-js/mermaid-cli -i docs/diagrams/<slug>/<slug>.mmd -o docs/diagrams/<slug>/<slug>.svg`
+   (swap in the vault folder when that's the diagram's home). This is
+   unconditional: the folder should never be left with only a `.mmd` and no
+   picture.
 3. Preview: on Claude Code, also send the `.mmd` file inline (the side panel
    renders Mermaid natively) so iteration doesn't require re-rendering.
 4. Ask **one** targeted question per round — "right boxes?", "right
