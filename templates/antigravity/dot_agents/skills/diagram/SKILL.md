@@ -46,7 +46,8 @@ source is the artifact.
    the project has an Obsidian vault (its existing home for "diagrams, spec
    drafts"). Everything about that diagram lives inside: the source, the
    rendered picture, and any other related assets (notes, alternate views,
-   exported data). Write the source to `docs/diagrams/<slug>/<slug>.mmd`.
+   exported data). Write the source to `docs/diagrams/<slug>/<slug>.mmd` —
+   or `.agents/vault/design/<slug>/<slug>.mmd` in the vault case.
 2. **Always render a picture file for human viewing, every time the source
    changes** — not only on request:
    `bunx @mermaid-js/mermaid-cli -i <slug>/<slug>.mmd -o <slug>/<slug>.svg`.
