@@ -126,6 +126,8 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 _ADDED_SINCE_BASELINE = {
     # PI-647: token-efficiency conventions propagated to scaffolds
     ".agents/skills/token_efficiency/SKILL.md",
+    # PI-657: guard/per-surface mechanics moved out of always-loaded AGENTS.md
+    ".agents/docs/guides/enforcement.md",
     # #605: Guards log the governance signal (decision + command)
     ".agents/hooks/_usage_log.sh",
     ".agents/hooks/prod_guard.py",
