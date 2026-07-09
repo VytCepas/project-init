@@ -21,6 +21,11 @@ format:
 test:
     uv run pytest --tb=short -q
 
+# run the test suite with a coverage report (#636) — drift visibility, no floor.
+# Kept off `just test` so the default loop stays fast; CI runs this one.
+test-cov:
+    uv run pytest --tb=short -q --cov --cov-report=term-missing
+
 # fast iterate loop — stop at first failure, minimal output. Use while
 # debugging to keep test noise out of agent context; run `just test` for the
 # final full green check. (token-efficiency; see PI-641)

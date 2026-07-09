@@ -49,7 +49,9 @@ jobs:
       - name: Tests (pytest)
         # Serial execution avoids xdist cross-test interference in upgrade
         # drift checks while preserving the same assertions CI enforces.
-        run: uv run pytest --tb=short -q
+        # --cov reports coverage (#636) without gating on it: no fail_under, so
+        # a dip is visible in the log and never blocks an unrelated PR.
+        run: uv run pytest --tb=short -q --cov --cov-report=term-missing
 
   wheel-smoke:
     name: Wheel smoke test
