@@ -39,7 +39,7 @@ class TestDiagramSkill:
         assert "docs/diagrams/" in content
         assert ".agents/vault/design/" in content
         assert "bunx @mermaid-js/mermaid-cli" in content
-        assert "node IDs stable" in content.lower() or "Keep\n   node IDs stable" in content
+        assert "node ids stable" in content.lower()
         # Quality rules.
         assert "25 nodes" in content
         assert "subgraph" in content
