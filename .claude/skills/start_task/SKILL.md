@@ -24,12 +24,14 @@ Before starting any non-trivial task, create a GitHub Issue, a dedicated branch,
 
 2. **Check for existing issue and PR** — run `gh issue list` and `gh pr list`. If an issue already exists, use its number. If a draft PR already exists for that issue, use it — do **not** create a second PR. Skip to step 5.
 
-3. **Create the issue** (no `create_issue.sh` in this repo — use gh directly):
+3. **Create the issue** with the lifecycle script (adopted via the
+   semi-scaffold, PI-685):
    ```bash
-   gh issue create --title "<title>" --label "<type>" --body "..."
+   .claude/scripts/create_issue.sh <type> "<title>" [--body "..."]
    # Note the issue number from the output URL
    ```
    Issue titles are plain descriptions — the type is carried by the label.
+   (The script applies the type label and planning metadata; see its --help.)
 
 4. **Create branch and draft PR**:
    ```bash

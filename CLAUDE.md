@@ -62,7 +62,9 @@ Template naming convention: directories stored as `dot_agents/`, `dot_gitignore`
 
 `$CLAUDE_PROJECT_DIR` in hook commands expands to the project root at runtime. To add a new hook, use the `add_hook` skill or edit `settings.json` directly following the existing pattern.
 
-**`.claude/` is a generated mirror — edit `.agents/`, never `.claude/`.** Claude Code reads project config (settings.json, hooks, skills, commands) from `.claude/` only; it does *not* read a top-level `.agents/` natively (verified empirically against the CLI). This repo authors everything under `.agents/`, so `.claude/` is a committed, delete-aware mirror of the committed `.agents/` entries (`settings.json`, `hooks/`, `scripts/`, `skills/`) — that's what actually makes the repo's own guard hooks and skills load in a Claude session. It's a copy, not a symlink, because git's default `core.symlinks=false` on macOS and Windows would check a committed symlink out as a plain text file and silently hide the config. After editing anything under `.agents/`, run `just sync-claude` (also run by `just setup`); `tests/contracts/test_claude_dir_sync.py` fails CI if the mirror drifts. Scaffolded projects get the same mirror via `_generate_claude_projection`.
+**`.claude/` is a generated mirror — edit `.agents/`, never `.claude/`.** Claude Code reads project config (settings.json, hooks, skills, commands, agents) from `.claude/` only; it does *not* read a top-level `.agents/` natively (verified empirically against the CLI). This repo authors everything under `.agents/`, so `.claude/` is a committed, delete-aware mirror of the committed `.agents/` entries (`settings.json`, `hooks/`, `scripts/`, `skills/`, `agents/`, `config.yaml`, `docs/CODE_MAP.md`) — that's what actually makes the repo's own guard hooks and skills load in a Claude session. It's a copy, not a symlink, because git's default `core.symlinks=false` on macOS and Windows would check a committed symlink out as a plain text file and silently hide the config. After editing anything under `.agents/`, run `just sync-claude` (also run by `just setup`); `tests/contracts/test_claude_dir_sync.py` fails CI if the mirror drifts. Scaffolded projects get the same mirror via `_generate_claude_projection`.
+
+**Semi-scaffold (PI-685): a declared shared set of `.agents/` files is synced FROM `templates/`.** This repo dogfoods the lifecycle infrastructure it ships without being a scaffolded project: `tools/sync_agents_from_templates.py` declares which `.agents/` files must stay byte-identical to their template sources (guard hooks + helpers, lifecycle scripts incl. `create_issue.sh`/`start_issue.sh`, subagent specs, `gen_code_map.py`), which intentionally diverge (with reasons), and which template files are deliberately not adopted. After changing a shared file in `templates/`, run `just sync-agents` then `just sync-claude`; `tests/contracts/test_agents_template_sync.py` fails CI on drift. Edit shared files in `templates/` (the source), never in `.agents/`. `.agents/docs/CODE_MAP.md` is the generated module index (`just code-map` after public-API changes) — read it before grepping `src/`.
 
 ## GitHub workflow
 
@@ -70,9 +72,7 @@ For any push, PR, review, or merge work: load `.agents/skills/github_workflow/SK
 
 Quick ref: branch = `<type>/PI-<n>-<slug>` | PR title = `type(PI-N): desc` (no scope = no issue) | body includes `Closes #N`.
 
-Root `.agents/scripts/` lifecycle scripts exist here but may not cover every variant — they are scaffolded-project artifacts. If a script is missing, the skill documents the `git`/`gh` fallback.
-
-Template skills (in `templates/base/dot_agents/skills/`) reference scripts like `create_issue.sh` and `start_issue.sh` that live in scaffolded projects, not in this source repo. The source `.agents/skills/INDEX.md` documents what's available here.
+Root `.agents/scripts/` carries the full lifecycle script set (incl. `create_issue.sh`, `start_issue.sh`, `setup_github.sh`), synced from `templates/` by the semi-scaffold (`just sync-agents`, PI-685). If a script misbehaves here, the skill documents the `git`/`gh` fallback. The source `.agents/skills/INDEX.md` documents what's available here.
 
 ## Reference (on demand)
 

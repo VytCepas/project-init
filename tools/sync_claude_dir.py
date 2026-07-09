@@ -26,8 +26,18 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Exactly the `.agents/` entries the repo commits (see `.gitignore`) and Claude
-# Code consumes. Keep in step with the `!.agents/...` allowlist there.
-MIRRORED = ("settings.json", "hooks", "scripts", "skills")
+# Code consumes. Keep in step with the `!.agents/...` allowlist there. Nested
+# entries (e.g. `docs/CODE_MAP.md`) mirror a single file out of an otherwise
+# gitignored directory — matching the gitignore's re-ignore pattern for it.
+MIRRORED = (
+    "settings.json",
+    "hooks",
+    "scripts",
+    "skills",
+    "agents",
+    "config.yaml",
+    "docs/CODE_MAP.md",
+)
 
 # Volatile artifacts that must never enter the committed mirror.
 _IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc")
@@ -52,6 +62,7 @@ def sync(repo_root: Path = REPO_ROOT) -> list[str]:
         if not src.exists():
             continue
         dest = claude / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
         if src.is_dir():
             shutil.copytree(src, dest, ignore=_IGNORE)
         else:

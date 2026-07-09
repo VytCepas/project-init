@@ -1,0 +1,6 @@
+# Project configuration read by lifecycle scripts and hooks
+# (create_issue.sh, start_issue.sh, setup_github.sh, workflow_state_reminder.sh).
+project:
+  name: "project-init"
+  project_key: "PI"
+  github_project_number: 2
