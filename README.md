@@ -174,6 +174,24 @@ uvx --from ~/.local/share/project-init project-init . \
   --mcps context7
 ```
 
+### Pick the scaffold weight by use-case
+
+The full profile pays for itself on long-lived repos: the guards, lifecycle
+enforcement, and quality gates cost a measured token overhead per agent
+session (extra compliance turns + always-loaded instructions), and that
+overhead amortizes as sessions get longer and the codebase grows. For
+scratch projects, prototypes you'll delete, or short one-off tasks, that
+overhead buys nothing — scaffold light instead:
+
+```bash
+project-init . --non-interactive --preset core \
+  --memory none --lifecycle none --no-docs --no-renovate \
+  --name scratch --description "short-lived" --language python
+```
+
+You can add any declined concern later (see
+[Adding or removing a concern later](#adding-or-removing-a-concern-later)).
+
 The wizard asks (interactive mode only):
 
 - Project name / description

@@ -76,8 +76,11 @@ def evaluate(file_path: Path, cwd: Path, permission_mode: str) -> dict | None:
     decision = "deny" if permission_mode in _AUTONOMOUS_MODES else "ask"
     reason = (
         f"pre_edit_issue_guard: editing on the default branch ('{branch}'). "
-        "Create an issue and a branch first (e.g. feat/KEY-N-slug), then edit — "
-        "so every change is traceable as one issue -> one branch -> one PR. "
+        "Create an issue and a branch first, then edit — every change stays "
+        "traceable as one issue -> one branch -> one PR. Run: "
+        '.agents/scripts/create_issue.sh <type> "<title>" (prints the issue '
+        "number N), then .agents/scripts/start_issue.sh N <type> (branch + "
+        "draft PR in one step); or use the start_task skill. "
         "(Guardrail only; pre-push and validate-pr also enforce this later.)"
     )
     return {
