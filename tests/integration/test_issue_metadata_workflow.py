@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -207,6 +208,45 @@ class TestCreateIssueScript:
         )
         assert result.returncode == 1
         assert "missing value for '--priority'" in result.stderr
+
+    def test_script_rejects_invalid_agent_ready(self):
+        # PI-691: --agent-ready is documented Yes|No; an invalid value must
+        # fail up front, not surface later as a confusing project-field warning.
+        result = subprocess.run(
+            [str(self.script), "feat", "Example", "--agent-ready", "maybe"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1
+        assert "invalid agent-ready 'maybe'" in result.stderr
+
+    def test_parent_url_parsing_is_host_aware(self):
+        # PI-691: --parent must accept GHES / *.ghe.com issue URLs, not only
+        # github.com — but the URL host must match the active host (a
+        # same-named repo on another host would link the wrong parent).
+        content = self.script.read_text()
+        assert "^https?://([^/]+)/([^/]+)/([^/]+)/issues/([0-9]+)$" in content
+        assert "^https://github" not in content
+        assert 'gh_host.sh"' in content
+
+    @pytest.mark.skipif(shutil.which("gh") is None, reason="gh CLI not installed")
+    def test_parent_url_from_wrong_host_fails_loudly(self):
+        # PROJECT_INIT_HOST pins the active host without any network call, so
+        # the mismatch check is deterministic and offline.
+        result = subprocess.run(
+            [
+                str(self.script),
+                "feat",
+                "Example",
+                "--parent",
+                "https://ghes.example.com/acme/widgets/issues/7",
+            ],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PROJECT_INIT_HOST": "github.com"},
+        )
+        assert result.returncode == 1
+        assert "does not match the active GitHub host" in result.stderr
 
 
 class TestCreateIssueSkill:
