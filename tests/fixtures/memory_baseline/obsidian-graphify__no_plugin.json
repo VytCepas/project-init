@@ -30,7 +30,7 @@
   ".agents/hooks/workflow_state_reminder.sh": "0983f90f506da7f22bb154fb3bfd04ac559df3ef9bd7b5afda6807f1b78d6dad",
   ".agents/memory/MEMORY.md": "544dac81979cbe795cc55a020360c2569036381b62f879d10ce8dffdc0de0791",
   ".agents/memory/README.md": "c18a7964cd3ed895d31ff003bfb6233a8a795f3e1ec7d4acdd5ea4b9416ca94c",
-  ".agents/memory/SCHEMA.md": "3bde02325140984a17d860d8965c5ce847a999ceebe601062fffe88d88668bed",
+  ".agents/memory/SCHEMA.md": "93f5a4e962766266fe2646552388d08fa0b8401295f231930a961fc385130578",
   ".agents/memory/feedback_conventions.md": "abd94813bbd6aa8522f5df1523f63785fa005d9052b8513cad5966e0de0ba443",
   ".agents/memory/project_context.md": "395604794021cc2eaa1f4df3be451fc71ecad21daa1333656a102a6776ae4bff",
   ".agents/memory/user_role.md": "cbeb0886e2f9c8e4b8e444c4835e2dac85b66bdf8dc24d68329ee3bbf458586b",

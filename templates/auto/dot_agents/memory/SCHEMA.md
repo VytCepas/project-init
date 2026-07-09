@@ -37,7 +37,9 @@ Every memory file must appear in `MEMORY.md` as a one-line bullet:
 - [Title](filename.md) — short description
 ```
 
-Keep lines under ~150 characters and files under 100 lines (`LINT_MEMORY_MAX_LINES` overrides) — one fact per file; move longer material to the vault. `lint_memory.sh` enforces the size cap and checks for orphaned files and stale index entries.
+Keep lines under ~150 characters and files under 100 lines (`LINT_MEMORY_MAX_LINES` overrides).
+One fact per file — move longer material to the vault.
+`lint_memory.sh` enforces the size cap and checks for orphaned files and stale index entries.
 
 ## What NOT to store
 

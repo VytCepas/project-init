@@ -81,7 +81,11 @@ class TestJustfileWiring:
         regardless of language choice."""
         template = (REPO_ROOT / "templates" / "base" / "justfile.tmpl").read_text()
         lint_recipes = sum(1 for line in template.splitlines() if line.startswith("lint:"))
-        gate_calls = template.count("lint_context_budget.sh")
+        gate_calls = sum(
+            1
+            for line in template.splitlines()
+            if line.strip() == "bash .agents/scripts/lint_context_budget.sh"
+        )
         assert lint_recipes > 0
         assert gate_calls == lint_recipes, (
             f"{gate_calls} gate call(s) for {lint_recipes} lint recipe(s) — "
