@@ -20,6 +20,9 @@ transcript.
 - Tests: use the fail-fast quiet recipe while iterating — `just test-quick`
   (stops at the first failure; one traceback, not the whole suite's). Run the
   full `just test` once, for the final green check.
+- Gates: batch them — one `just ci` (or `just lint` + full test) exactly once
+  before finishing. Re-running whole-project gates after every edit pays the
+  full report each time; fix lint findings per-file as they are reported.
 - Noisy commands: pipe before ingesting — `… 2>&1 | tail -n 40`,
   `… | grep -E "FAILED|ERROR"`. Ask for the slice you need, not the firehose.
 - Diffs: `git diff --stat` first; open the full diff only for the files you
@@ -35,6 +38,9 @@ transcript.
   index (`.agents/memory/MEMORY.md`), and `docs/` — each where present (not
   every scaffold ships every index).
 - Don't re-read a file you just edited — the edit either applied or errored.
+- When a tool result says it was compressed or truncated and points at a spill
+  file (e.g. `.agents/tmp/tool_output/…`), Read only the line ranges you need
+  — re-reading the whole file pays back the cost the compression just saved.
 
 **Searches: delegate sweeps, not lookups.**
 
