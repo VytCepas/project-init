@@ -5,7 +5,9 @@ Before this, a single greenfield run wrote `python_version = 3.11` to mypy.ini
 CI matrix fanning 3.11-3.14 (no `requires-python` to derive from) — three
 different answers to "what Python is this project on".
 
-Precedence, exercised below: --python-version > pyproject requires-python > 3.11.
+A declared requires-python is authoritative, since the scaffolded CI re-derives
+its matrix from that file on every run. --python-version supplies the value when
+nothing declares one, and is rejected outright when it contradicts one.
 """
 
 from __future__ import annotations
@@ -69,11 +71,22 @@ def test_declared_requires_python_wins_over_the_default(tmp_path: Path):
     assert set(pins.values()) == {"3.12"}, pins
 
 
-def test_flag_wins_over_declared_requires_python(tmp_path: Path):
+def test_flag_contradicting_requires_python_is_rejected(tmp_path: Path):
+    """CI re-derives its matrix from requires-python on every run, so honoring the
+    flag would pin mypy to 3.14 typeshed while CI ran the code on 3.12 — syntax
+    that type-checks clean and then breaks the oldest job (PR #713 review).
+    """
     (tmp_path / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.12"\n')
-    assert _scaffold(tmp_path, "--python-version", "3.14").returncode == 0
-    pins = _pins(tmp_path)
-    assert set(pins.values()) == {"3.14"}, pins
+    result = _scaffold(tmp_path, "--python-version", "3.14")
+    assert result.returncode != 0
+    assert "conflicts with the requires-python floor (3.12)" in result.stderr
+    assert not (tmp_path / "mise.toml").exists()
+
+
+def test_flag_agreeing_with_requires_python_is_accepted(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.12"\n')
+    assert _scaffold(tmp_path, "--python-version", "3.12").returncode == 0
+    assert set(_pins(tmp_path).values()) == {"3.12"}
 
 
 def test_unsupported_python_version_is_rejected(tmp_path: Path):

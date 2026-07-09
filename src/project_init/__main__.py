@@ -103,7 +103,9 @@ class ScaffoldInputs:
     # mise.toml (toolchain pin), mypy.ini (typeshed baseline), and the CI
     # matrix floor — before this, those three disagreed on day one. Empty means
     # "derive": an existing pyproject.toml's requires-python floor, else 3.11.
-    # Precedence: --python-version > pyproject requires-python > prompt > 3.11.
+    # A declared requires-python is authoritative (CI derives its matrix from it
+    # at run time), so a --python-version that disagrees is rejected outright
+    # rather than half-applied; see _reject_conflicting_python_version.
     python_version: str = ""
 
 
@@ -139,6 +141,30 @@ def _python_floor_from_pyproject(target: Path | None) -> str | None:
     except Exception:
         return None
     return None
+
+
+def _reject_conflicting_python_version(
+    flag: str | None, target: Path | None, parser: argparse.ArgumentParser
+) -> None:
+    """Refuse a --python-version that contradicts a declared requires-python.
+
+    project-init does not own pyproject.toml, and the scaffolded CI matrix
+    derives from requires-python whenever it exists. Honoring the flag anyway
+    would pin mise.toml/mypy.ini to one version while CI tested another — mypy
+    would green-light syntax the oldest tested CPython cannot run (PR #713
+    review). One value or none: make the user reconcile the declaration.
+    """
+    if not flag:
+        return
+    declared = _python_floor_from_pyproject(target)
+    if declared and declared != flag:
+        parser.error(
+            f"--python-version {flag} conflicts with the requires-python floor "
+            f"({declared}) declared in pyproject.toml. CI derives its matrix from "
+            f"requires-python, so mise.toml and mypy.ini would pin {flag} while CI "
+            f"tested {declared}. Set requires-python to >={flag}, or drop "
+            f"--python-version to adopt the declared {declared}."
+        )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -181,7 +207,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "the CI matrix floor to one version "
             f"(choices: {', '.join(SUPPORTED_PYTHON_VERSIONS)}; "
             "default: pyproject.toml's requires-python floor, else "
-            f"{SUPPORTED_PYTHON_VERSIONS[0]})"
+            f"{SUPPORTED_PYTHON_VERSIONS[0]}). Rejected if it contradicts a "
+            "declared requires-python."
         ),
     )
     p.add_argument(
@@ -2150,13 +2177,14 @@ def _build_variables(
     )
 
     # #628: one value answers "what Python is this project on" for mise.toml,
-    # mypy.ini, and the CI matrix floor. An explicit --python-version (or the
-    # wizard's answer, which lands in the same field) wins over the declared
-    # requires-python; a greenfield scaffold with neither falls back to the
-    # oldest supported CPython.
+    # mypy.ini, and the CI matrix floor. A declared requires-python is the
+    # source of truth (CI re-derives from it on every run); --python-version —
+    # or the wizard's answer, which lands in the same field — supplies the
+    # value when nothing declares one, and a contradicting flag was already
+    # rejected by _reject_conflicting_python_version. Neither: oldest supported.
     python_floor = (
-        inputs.python_version
-        or _python_floor_from_pyproject(target)
+        _python_floor_from_pyproject(target)
+        or inputs.python_version
         or SUPPORTED_PYTHON_VERSIONS[0]
     )
 
@@ -2623,6 +2651,8 @@ def _cli(argv: list[str]) -> int:
 
     _reject_bare_subcommand_target(args.target, parser)
     target = Path(args.target).resolve()
+    # Before the target directory is created (PI-20) and before any prompt.
+    _reject_conflicting_python_version(args.python_version, target, parser)
 
     # Select preset BEFORE creating the target directory — a typo'd --preset
     # should fail without leaving an empty dir behind.

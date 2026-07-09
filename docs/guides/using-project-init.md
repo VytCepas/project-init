@@ -54,9 +54,11 @@ The most-used flags:
 
 `--python-version` is the single source for "what Python is this project on": it
 pins `mise.toml`'s toolchain, `mypy.ini`'s typeshed baseline, and the floor of the
-CI test matrix to one value. On a greenfield scaffold the wizard asks; once your
-`pyproject.toml` declares `requires-python`, that becomes the source of truth and
-CI derives the matrix from it instead.
+CI test matrix to one value. On a greenfield scaffold the wizard asks. Once your
+`pyproject.toml` declares `requires-python`, that file is authoritative — CI
+re-derives the matrix from it on every run — so the wizard stops asking, and a
+`--python-version` that contradicts it is rejected rather than half-applied.
+To move an existing project, edit `requires-python` and re-run `project-init upgrade`.
 
 The full surface (delivery/deploy/IaC overlays, governance, observability,
 multi-model, agents, license, profile, …) is documented by `project-init --help`
