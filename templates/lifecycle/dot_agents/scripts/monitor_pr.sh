@@ -190,7 +190,8 @@ _pr_is_merged() {
 _merge_with_retry() {
   local delay delays
   delays="${PI_MERGE_RETRY_DELAYS:-5 10 20}"
-  # shellcheck disable=SC2086 — word splitting of the delay list is intended
+  # word splitting of the delay list is intended
+  # shellcheck disable=SC2086
   for delay in $delays; do
     if _run_gh pr merge "$PR_NUMBER" --squash --delete-branch; then
       return 0
