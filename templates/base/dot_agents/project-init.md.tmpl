@@ -107,14 +107,9 @@ This project is **single-trunk**: feature PRs target `main` and merge by squash.
 
 ### Commit and PR format
 
-| What | Format | Example |
-|------|--------|---------|
-| Commit message | `<type>(KEY-<n>): description` | `feat(PI-42): Add OAuth login` |
-| PR title | `<type>(KEY-<n>): description` | `feat(PI-42): Add OAuth login` |
-| No-issue PR | `<type>: description` (no scope) | `fix: Fix typo` |
-| PR body | must include `Closes #<n>` | triggers auto-close on merge |
-| Branch | `<type>/<KEY>-<n>-<slug>` | `feat/PI-42-add-oauth-login` |
-
+Commit messages, PR titles, and branch names follow the quick-ref in
+[AGENTS.md](../AGENTS.md) — the single source for those formats. Commit
+messages use the same format as PR titles.
 Types: `feat` · `fix` · `chore` · `docs` · `test`
 
 For minor work without an issue, use `.agents/scripts/create_nojira_pr.sh <type> "description"`.
@@ -172,9 +167,5 @@ gh pr list                                            # open PRs
 
 ## Compact Instructions
 
-When compacting, preserve:
-- GitHub Issue number being worked on
-- Files modified this session
-- Test results (pass/fail count, failing test names)
-- Unresolved errors or lint failures
-- Decisions not yet committed to `.agents/docs/adr/`
+Compaction is a Claude Code mechanism; the canonical preserve-list lives in
+[CLAUDE.md](../CLAUDE.md) (single source — do not duplicate it here).
