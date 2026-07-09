@@ -59,15 +59,17 @@ def test_invalid_pi_ci_timeout_fails_closed_with_clear_message(
     scaffold(tmp_target, fallback_preset(), fallback_variables())
     script = tmp_target / ".agents" / "scripts" / "monitor_pr.sh"
     env = os.environ.copy()
-    env["PI_CI_TIMEOUT"] = "twenty"
-    result = subprocess.run(
-        ["bash", str(script), "1"],
-        capture_output=True,
-        text=True,
-        cwd=tmp_target,
-        env=env,
-        timeout=30,
-        check=False,
-    )
-    assert result.returncode == 2
-    assert "positive integer" in result.stderr
+    # "00" is digits-only but numerically zero — must fail closed too (review).
+    for bad in ("twenty", "0", "00"):
+        env["PI_CI_TIMEOUT"] = bad
+        result = subprocess.run(
+            ["bash", str(script), "1"],
+            capture_output=True,
+            text=True,
+            cwd=tmp_target,
+            env=env,
+            timeout=30,
+            check=False,
+        )
+        assert result.returncode == 2, bad
+        assert "positive integer" in result.stderr, bad
