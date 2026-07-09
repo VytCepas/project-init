@@ -60,6 +60,47 @@ fi
 # --- Resolve project key / abbreviation ---
 # Set PROJECT_KEY env var, add `project_key: PI` to .agents/config.yaml,
 # or let the script derive one from the repository directory name.
+
+# Name of the repository's MAIN worktree directory — never the current one.
+# Inside a linked worktree (`git worktree add ../zari-15-synthetic`),
+# `--show-toplevel` returns the worktree directory, so the derived key changes
+# per worktree (Z1S vs ZARI) and one repo accumulates mixed branch/PR keys
+# (#631). The common git dir always lives under the main worktree, so anchor
+# the name there.
+_repo_root_name() {
+  local common="" base=""
+  common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+  if [ -z "$common" ]; then
+    # git < 2.31 lacks --path-format; the raw value may be relative to cwd.
+    common=$(git rev-parse --git-common-dir 2>/dev/null || true)
+    case "$common" in
+    "" | /*) ;;
+    *) common="$(pwd)/$common" ;;
+    esac
+  fi
+  if [ -n "$common" ]; then
+    base=$(basename "$common")
+    if [ "$base" = ".git" ] && [ -d "$(dirname "$common")" ]; then
+      # Normal layout: the common dir is <main-worktree>/.git — the repo
+      # name is its parent directory's.
+      basename "$(cd "$(dirname "$common")" && pwd)"
+      return
+    fi
+    case "$base" in
+    ?*.git)
+      # Bare repo (worktrees hang off /srv/repos/widget.git): the repo name
+      # is the git dir itself minus the .git suffix — its parent directory
+      # is unrelated (PR #702 review).
+      printf '%s\n' "${base%.git}"
+      return
+      ;;
+    esac
+  fi
+  # Separate/custom git dir (GIT_DIR=...): no repo name to infer from it —
+  # fall back to the current worktree's own name.
+  basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+}
+
 derive_project_key() {
   if [ -n "${PROJECT_KEY:-}" ]; then
     echo "$PROJECT_KEY"
@@ -79,7 +120,7 @@ derive_project_key() {
   fi
 
   local repo_name=""
-  repo_name=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+  repo_name=$(_repo_root_name)
   echo "$repo_name" |
     tr '[:lower:]' '[:upper:]' |
     tr -cs 'A-Z0-9' '\n' |
@@ -94,7 +135,7 @@ PROJECT_KEY=$(echo "$PROJECT_KEY" | tr '[:lower:]' '[:upper:]' | tr -cd 'A-Z0-9'
 # commit — its scope regex requires >=2 chars: [A-Z][A-Z0-9]{1,9}- (#432).
 # Widen a too-short key to the repo name's leading alphanumerics first.
 if [ "${#PROJECT_KEY}" -lt 2 ]; then
-  PROJECT_KEY=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" |
+  PROJECT_KEY=$(_repo_root_name |
     tr '[:lower:]' '[:upper:]' | tr -cd 'A-Z0-9' | cut -c1-4)
 fi
 # Final guard: the key must satisfy the shared key regex (>=2 chars, leading
