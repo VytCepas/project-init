@@ -23,6 +23,10 @@ on:
     # fires on EVERY cron here, which silently made `fuzz` weekly for node/go/
     # rust (where this nightly entry used to be absent) and made scorecard run
     # nightly for python (PR #736 review, Copilot + Codex).
+    #
+    # NOTE: a cron triggers the whole workflow. Ungated jobs (lint-and-test,
+    # secret-scan, semgrep, license-scan, ci-gate) run on it too — see the
+    # `fuzz` job's comment for how to restrict cron runs to gated jobs only.
     - cron: "0 3 * * *"
   # Optimization: Only run CI when relevant files change
   # Uncomment and adjust paths as needed for your project
@@ -736,8 +740,17 @@ jobs:
   # Non-blocking: NOT in ci-gate's `needs`. To gate on it, add a `-fuzztime`
   # active-fuzzing step and promote it there deliberately.
   #
-  # Only one language renders per scaffold, so this costs exactly one nightly
-  # job — the same as the Go-only job it replaces.
+  # Only one language renders per scaffold, so exactly one `fuzz` job exists.
+  #
+  # COST, STATED HONESTLY (PR #736 review). A cron entry triggers the WHOLE
+  # workflow, not just the jobs gated on it. The nightly cron therefore also runs
+  # every ungated job — `lint-and-test`, `secret-scan`, `semgrep`, `license-scan`
+  # — plus `ci-gate`. Python scaffolds have behaved this way since the nightly
+  # mutmut cron landed (#563); #727 extends the same nightly run to node/go/rust.
+  # To make cron runs execute ONLY the schedule-gated jobs, add
+  # `if: github.event_name != 'schedule'` to each ungated job AND to `ci-gate`
+  # — `ci-gate` is `if: always()` and treats a skipped `needs` job as a failure,
+  # so gating the others without gating it turns every nightly run red.
   #
   # The `if:` matches the NIGHTLY cron specifically. `github.event_name ==
   # 'schedule'` alone fires on every cron in `on.schedule`, which would make
