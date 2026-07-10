@@ -714,3 +714,64 @@ class TestFormatGate:
         assert result.returncode == 0, (
             f"ruff format --check exited {result.returncode}\n{result.stdout}{result.stderr}"
         )
+
+
+class TestTypeScriptSecurityGate:
+    """PI-729: TS had no blocking security lint; semgrep was its only SAST, non-blocking.
+
+    Python runs ruff's `S` (bandit) rules on every `just lint`. TS had no
+    equivalent, so a fresh repo could merge with OWASP-class findings.
+
+    The subtlety these assertions exist for: `eslint-plugin-security`'s
+    recommended preset sets its rules to **warn**, and eslint exits 0 on
+    warnings. Installing the plugin without pinning severities yields a gate that
+    never blocks — the exact defect #729 describes, reintroduced.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path):
+        self.target = _scaffold_language(tmp_target, "node")
+        self.config = (self.target / "eslint.config.mjs").read_text(encoding="utf-8")
+        self.justfile = (self.target / "justfile").read_text(encoding="utf-8")
+
+    def test_security_plugins_installed_by_setup(self):
+        assert "eslint-plugin-security" in self.justfile
+        assert "eslint-plugin-no-unsanitized" in self.justfile
+
+    @pytest.mark.parametrize(
+        "rule",
+        [
+            "security/detect-eval-with-expression",
+            "security/detect-child-process",
+            "security/detect-non-literal-fs-filename",
+            "security/detect-unsafe-regex",
+            "no-unsanitized/method",
+            "no-unsanitized/property",
+        ],
+    )
+    def test_security_rules_pinned_to_error(self, rule: str):
+        """`warn` would exit 0. The gate must block."""
+        assert f'"{rule}": "error"' in self.config, f"{rule} must be pinned to error, not inherited"
+
+    @pytest.mark.parametrize(
+        "rule",
+        [
+            "@typescript-eslint/no-floating-promises",
+            "@typescript-eslint/no-misused-promises",
+            "@typescript-eslint/no-unsafe-assignment",
+            "@typescript-eslint/no-unsafe-call",
+            "@typescript-eslint/no-unsafe-member-access",
+            "@typescript-eslint/no-unsafe-return",
+            "@typescript-eslint/no-unsafe-argument",
+        ],
+    )
+    def test_type_aware_security_rules_are_explicit_not_inherited(self, rule: str):
+        """They come from strictTypeChecked today; an upstream change could drop them."""
+        assert f'"{rule}": "error"' in self.config
+
+    def test_typescript_pinned_below_7(self):
+        """PI-732: unpinned `bun add -d typescript` resolves to TS 7, which
+        typescript-eslint cannot parse — eslint exits 2 (crash), not 1.
+        """
+        assert '"typescript@^5"' in self.justfile
+        assert "bun add -d eslint typescript " not in self.justfile
