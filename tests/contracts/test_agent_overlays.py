@@ -115,6 +115,8 @@ class TestAgentSelection:
         monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
         monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
         monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
+        # PI-714: a lifecycle-on wizard now asks for review cycles.
+        monkeypatch.setattr(cli, "_choose_review_cycles_interactive", lambda *a, **k: 2)
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 
         result = cli._gather_inputs_interactive(

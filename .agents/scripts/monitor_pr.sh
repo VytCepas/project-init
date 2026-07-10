@@ -48,7 +48,19 @@ PY="$SCRIPT_DIR/../hooks/_py.sh"
 PR_NUMBER="${1:-}"
 MODE=""
 REVIEW_CYCLE=0
-MAX_REVIEW_CYCLES=2
+# #714: review-fix cycles before the script stops asking for another pass.
+# Precedence: PI_REVIEW_CYCLES env > config.yaml `review_cycles` > 2.
+# 0 disables review control entirely — merge as soon as CI is green.
+MAX_REVIEW_CYCLES="${PI_REVIEW_CYCLES:-$(review_cycles)}"
+case "$MAX_REVIEW_CYCLES" in
+'' | *[!0-9]*)
+  echo "review cycles must be a non-negative integer; got '$MAX_REVIEW_CYCLES'" >&2
+  exit 2
+  ;;
+esac
+# Base-10, so a config.yaml or PI_REVIEW_CYCLES carrying "08" can never reach an
+# arithmetic context as octal (PR #717 review).
+MAX_REVIEW_CYCLES=$((10#$MAX_REVIEW_CYCLES))
 NO_REVIEW=0
 ALLOW_ADMIN=0
 
@@ -101,6 +113,11 @@ case "$REVIEW_CYCLE" in
   exit 2
   ;;
 esac
+# The digits-only check above accepts "08", which arithmetic expansion then reads
+# as octal: `NEXT=$((REVIEW_CYCLE + 1))` dies with "value too great for base"
+# (PR #717 review). `[ ]` comparisons parse base-10 and are unaffected, but the
+# $(( )) sites are not — normalize once, here, rather than at each use.
+REVIEW_CYCLE=$((10#$REVIEW_CYCLE))
 
 # --admin, --no-review and --review-cycle only take effect while merging. Warn
 # loudly if they were passed without --merge (e.g. `monitor_pr.sh 12 --admin`)
@@ -456,6 +473,25 @@ fi
 REVIEW_TIMEOUT=360
 REVIEW_ELAPSED=0
 REVIEW_DECISION=$(_get_review_decision)
+
+# #714: review_cycles=0 means the operator declined review control. Skip the whole
+# review gate — the wait, the changes-requested cycle, the unresolved-thread check
+# — and merge on green CI. Deliberately NOT an admin override: if an approval
+# policy is in force the merge still blocks, because "no review control" is a
+# choice about this script's cycles, not a licence to bypass branch protection.
+# Set before the max-cycles check below, which would otherwise read 0 >= 0 as
+# "cycles exhausted" and force an admin merge.
+# Not gated on --merge: a monitor-only run would otherwise sit in the reviewer
+# wait loop for a gate the operator switched off (PR #717 review).
+if [ "$MAX_REVIEW_CYCLES" -eq 0 ]; then
+  if [ "$MODE" = "--merge" ]; then
+    echo "PR #$PR_NUMBER: CI passed. review_cycles=0 — no review control; merging on green CI."
+  else
+    echo "PR #$PR_NUMBER: CI passed. review_cycles=0 — no review control; skipping the review gate."
+  fi
+  REVIEW_DECISION="SKIPPED"
+fi
+
 if [ "$MODE" = "--merge" ] && [ "$REVIEW_CYCLE" -ge "$MAX_REVIEW_CYCLES" ] && [ "$REVIEW_DECISION" = "REVIEW_REQUIRED" ]; then
   echo "Max review cycles ($MAX_REVIEW_CYCLES) reached — skipping reviewer wait and force-merging with admin override."
   _admin_merge

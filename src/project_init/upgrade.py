@@ -149,6 +149,9 @@ def _overlay_off_defaults() -> dict[str, str]:
         "license_apache": "",
         "license_proprietary": "",
         "python_floor": "3.11",
+        # #714: pre-714 records carry no review_cycles; re-render with the
+        # default the wizard explains rather than dropping the key.
+        "review_cycles": "2",
     }
 
 

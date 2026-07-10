@@ -326,7 +326,8 @@ class TestScaffoldGitHubFiles:
         assert "--delete-branch" in content
         assert "reviewDecision" in content
         assert "Waiting for reviewer" in content
-        assert "MAX_REVIEW_CYCLES=2" in content
+        # PI-714: config-driven, no longer a hardcoded literal.
+        assert 'MAX_REVIEW_CYCLES="${PI_REVIEW_CYCLES:-$(review_cycles)}"' in content
         assert "REVIEW_TIMEOUT=360" in content
         assert "--no-review" in content
 

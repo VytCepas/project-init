@@ -51,6 +51,7 @@ def _explainer_calls() -> dict:
         "profile": cli._choose_profile_interactive,
         "memory": cli._choose_memory_interactive,
         "lifecycle": cli._choose_lifecycle_interactive,
+        "review_cycles": cli._choose_review_cycles_interactive,
         "delivery": lambda: cli._choose_delivery_interactive("python"),
         "deploy": cli._choose_deploy_interactive,
         "iac": cli._choose_iac_interactive,

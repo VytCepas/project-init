@@ -160,6 +160,7 @@ def _wizard(
     monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
     monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
     monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
+    monkeypatch.setattr(cli, "_choose_review_cycles_interactive", lambda *a, **k: 2)
     monkeypatch.setattr(cli, "_choose_agents_interactive", lambda: ["claude"])
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 

@@ -389,7 +389,8 @@ class TestGitHubWorkflowHooks:
         assert "_get_review_decision" in content
         assert "Waiting for reviewer" in content
         assert "could not fetch reviewDecision" in content
-        assert "MAX_REVIEW_CYCLES=2" in content
+        # PI-714: the count is config-driven now, not a literal.
+        assert 'MAX_REVIEW_CYCLES="${PI_REVIEW_CYCLES:-$(review_cycles)}"' in content
         assert "REVIEW_TIMEOUT=360" in content
         assert "--no-review" in content
 
