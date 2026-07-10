@@ -59,12 +59,40 @@ class TestFuzzJob:
         assert "just fuzz" in ci
 
     @pytest.mark.parametrize("language", _LANGUAGES)
-    def test_job_is_schedule_only(self, tmp_path: Path, language: str):
-        """Nightly, never per-PR — the placement mutation testing already uses."""
+    def test_job_runs_nightly_not_merely_on_some_schedule(self, tmp_path: Path, language: str):
+        """Nightly, never per-PR — the placement mutation testing already uses.
+
+        Asserting only `event_name == 'schedule'` does NOT pin the cadence: the
+        job then fires on every cron in `on.schedule`. The nightly cron used to
+        live inside `{{#if python}}`, so node/go/rust rendered a fuzz job that ran
+        WEEKLY while the docs said nightly — the very map-not-territory defect
+        this issue is about, caught in review of PR #736 rather than by this test.
+        Pin both halves: the cron must exist, and the job must match on it.
+        """
         ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
+        assert '- cron: "0 3 * * *"' in ci, f"{language} has no nightly cron"
         job = ci[ci.index("\n  fuzz:") :]
         job = job[: job.index("\n    steps:")]
-        assert "if: github.event_name == 'schedule'" in job, job
+        assert (
+            "if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'" in job
+        ), job
+
+    @pytest.mark.parametrize("language", _LANGUAGES)
+    def test_no_schedule_gated_job_matches_every_cron(self, tmp_path: Path, language: str):
+        """A bare `event_name == 'schedule'` gate fires on EVERY cron.
+
+        With two crons defined, that silently couples job cadences: adding the
+        nightly entry for fuzz would otherwise have promoted the weekly Scorecard
+        run to nightly too (PR #736 review). Every schedule-gated job must name
+        the cron it wants.
+        """
+        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
+        offenders = [
+            line.strip()
+            for line in ci.splitlines()
+            if "github.event_name == 'schedule'" in line and "github.event.schedule" not in line
+        ]
+        assert not offenders, f"schedule-gated jobs must match their own cron: {offenders}"
 
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_fuzz_non_blocking(self, tmp_path: Path, language: str):

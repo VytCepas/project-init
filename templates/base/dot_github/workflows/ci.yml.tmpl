@@ -17,10 +17,13 @@ on:
     # Weekly OpenSSF Scorecard security-posture run (#576). The scorecard job
     # below is schedule-gated, so it never runs — or blocks — on a PR.
     - cron: "0 4 * * 1"
-{{#if python}}
-    # Nightly mutation-testing run (PI-138/#563).
+    # Nightly run: the `fuzz` job in every language, plus `mutation-tests` for
+    # python (PI-138/#563). Each schedule-gated job below matches on its OWN
+    # cron via `github.event.schedule` — `github.event_name == 'schedule'` alone
+    # fires on EVERY cron here, which silently made `fuzz` weekly for node/go/
+    # rust (where this nightly entry used to be absent) and made scorecard run
+    # nightly for python (PR #736 review, Copilot + Codex).
     - cron: "0 3 * * *"
-{{/if python}}
   # Optimization: Only run CI when relevant files change
   # Uncomment and adjust paths as needed for your project
 
@@ -476,7 +479,8 @@ jobs:
   mutation-tests:
     name: Mutation tests (mutmut)
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
-    if: github.event_name == 'schedule'
+    # Nightly cron only — not the weekly Scorecard one (see `on.schedule`).
+    if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -734,10 +738,15 @@ jobs:
   #
   # Only one language renders per scaffold, so this costs exactly one nightly
   # job — the same as the Go-only job it replaces.
+  #
+  # The `if:` matches the NIGHTLY cron specifically. `github.event_name ==
+  # 'schedule'` alone fires on every cron in `on.schedule`, which would make
+  # this job weekly-and-nightly and (worse) couple unrelated jobs' cadences.
   fuzz:
     name: Fuzz / property tests
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
-    if: github.event_name == 'schedule'
+    # Nightly cron only — not the weekly Scorecard one (see `on.schedule`).
+    if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
@@ -804,7 +813,8 @@ jobs:
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-24.04  # pinned: OSSF scorecard-action requires GitHub-hosted runners
-    if: github.event_name == 'schedule'
+    # Weekly cron only — not the nightly one (see `on.schedule`).
+    if: github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'
     permissions:
       security-events: write   # upload the SARIF result to code scanning
       id-token: write          # only needed if publish_results is turned on

@@ -486,14 +486,18 @@ class TestCiQualityGates:
         assert "cron:" in self.ci
 
     @pytest.mark.parametrize("language", ["node", "go", "rust"])
-    def test_mutmut_schedule_absent_for_other_languages(self, tmp_target: Path, language):
+    def test_mutmut_job_absent_for_other_languages(self, tmp_target: Path, language):
         target = _scaffold_language(tmp_target, language)
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
-        # The nightly mutation cron is Python-only; the weekly Scorecard cron
-        # (#576) is language-agnostic, so assert on the mutation-specific pieces
-        # rather than the presence of any cron at all.
-        assert "0 3 * * *" not in ci, f"nightly mutation cron must not render for {language}"
+        # mutmut is python-only, so the JOB must not render. The nightly cron is
+        # NOT a proxy for that any more: #727 made it language-agnostic because
+        # the `fuzz` job needs it in every language. Each schedule-gated job now
+        # names its own cron via `github.event.schedule`, so a shared cron does
+        # not imply a shared job.
         assert "mutation-tests:" not in ci
+        # `mutmut` as a bare word also appears in the scorecard job's prose
+        # comment in every language — assert the command, not the mention.
+        assert "mutmut run" not in ci
 
 
 class TestVulnerabilityScanGate:
