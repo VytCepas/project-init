@@ -43,6 +43,10 @@ dev = [
     # `patch = ["subprocess"]` in [tool.coverage.run] landed in coverage 7.10.
     "coverage>=7.10",
     "pytest-xdist>=3.0",
+    # Workflow-schema gate (#719): an invalid trigger made GitHub reject a whole
+    # workflow file at load time. Declared here so tests/integration/
+    # test_workflow_lint_gate.py never silently skips.
+    "actionlint-py>=1.7.12",
     "jsonschema>=4.26.0",
     "pyyaml>=6.0.3",
 ]

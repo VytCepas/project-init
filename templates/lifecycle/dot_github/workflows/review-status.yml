@@ -23,9 +23,17 @@ name: Review status
 on:
   pull_request_review:
     types: [submitted, edited, dismissed]
-  # Resolving the last thread must flip the check green without a new review.
-  pull_request_review_thread:
-    types: [resolved, unresolved]
+  # Inline review comments are the thread activity we CAN see. Resolving a thread
+  # emits no workflow event at all — `pull_request_review_thread` is a webhook
+  # event, not an Actions trigger, and naming it made GitHub reject this entire
+  # file at load time (#719). So a resolution only refreshes the status once some
+  # other event follows: a comment, a review, or a push.
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  # PR comments (the review-response convention) are a reliable post-resolution
+  # nudge. `issue_comment` also fires for plain issues; the job guards on that.
+  issue_comment:
+    types: [created]
   # A new commit needs its own status, or the required check is missing on the
   # head SHA and the PR is blocked with nothing to click.
   pull_request:
@@ -38,13 +46,16 @@ permissions:
 jobs:
   set-review-status:
     name: Set review/decision status
+    # issue_comment fires for plain issues too; only PRs have a head SHA to
+    # attach a commit status to (#719).
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     runs-on: ubuntu-24.04
     steps:
       - name: Post commit status
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          SHA: ${{ github.event.pull_request.head.sha }}
+          # pull_request* events carry .pull_request; issue_comment carries .issue.
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
@@ -55,6 +66,12 @@ jobs:
           REVIEW_URL: ${{ github.event.review.html_url }}
         run: |
           set -euo pipefail
+
+          # Resolve the head SHA from the API rather than the payload: only the
+          # pull_request* events carry .pull_request.head.sha, and posting the
+          # status to the wrong (or empty) SHA leaves the check missing (#719).
+          SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
+            --json headRefOid -q '.headRefOid')
 
           DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
             --json reviewDecision -q '.reviewDecision // ""')
