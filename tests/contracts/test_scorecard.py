@@ -15,6 +15,7 @@ import pytest
 
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
+from tests.workflow import load_workflow, needs
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
@@ -59,12 +60,8 @@ class TestScorecardJob:
         assert "results.sarif" in ci
 
     def test_non_blocking_not_in_ci_gate_needs(self, tmp_path: Path):
-        ci = _ci(_scaffold_language(tmp_path / "p", "python"))
-        gate_start = ci.index("ci-gate:")
-        gate_needs_line = next(
-            line for line in ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
-        )
-        assert "scorecard" not in gate_needs_line, "scorecard must stay non-blocking"
+        wf = load_workflow(_scaffold_language(tmp_path / "p", "python"))
+        assert "scorecard" not in needs(wf, "ci-gate"), "scorecard must stay non-blocking"
 
     def test_renders_cleanly_no_template_markers(self, tmp_path: Path):
         ci = _ci(_scaffold_language(tmp_path / "p", "python"))

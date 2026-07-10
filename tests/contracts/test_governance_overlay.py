@@ -21,6 +21,7 @@ from project_init.__main__ import main
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from project_init.upgrade import read_scaffold_record
 from tests.helpers import make_variables
+from tests.workflow import load_workflow, needs
 
 _GOV_README = Path(".agents") / "governance" / "README.md"
 
@@ -80,12 +81,8 @@ class TestGovernanceOn:
         assert "NIST AI RMF" in text
 
     @staticmethod
-    def _gate_needs(target: Path) -> str:
-        ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        gate_start = ci.index("ci-gate:")
-        return next(
-            line for line in ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
-        )
+    def _gate_needs(target: Path) -> list[str]:
+        return needs(load_workflow(target), "ci-gate")
 
     def test_governance_job_blocks_via_ci_gate(self, tmp_path: Path):
         # The job's comment calls it "the enforcement boundary" — only true if

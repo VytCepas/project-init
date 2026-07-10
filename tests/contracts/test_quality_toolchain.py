@@ -16,6 +16,7 @@ import pytest
 
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
+from tests.workflow import job, load_workflow, needs, steps
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
@@ -79,22 +80,33 @@ class TestPythonToolchain:
         assert "just typecheck" in ci
 
     def test_ci_uv_sync_guarded_for_fresh_scaffold(self):
-        """2026-07 QA: a fresh scaffold ships no pyproject.toml — every CI job
+        """2026-07 QA: a fresh scaffold ships no pyproject.toml — every CI step
         that runs `uv sync --group dev` (integration tests, nightly mutation)
-        must guard on it like the justfile's setup recipe, or the first PR
-        shows red on jobs that have nothing to test yet."""
-        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
-        lines = ci.splitlines()
-        syncs = [i for i, line in enumerate(lines) if "uv sync --group dev" in line]
-        assert syncs, "expected uv sync steps in the python CI workflow"
-        for i in syncs:
-            window = "\n".join(lines[max(0, i - 12) : i])
-            assert "pyproject.toml" in window, (
-                f"line {i + 1}: `uv sync --group dev` without a nearby "
-                "pyproject.toml existence guard"
-            )
-        # Both the integration-tests job and the mutation job carry a guard.
-        assert ci.count("No pyproject.toml yet") >= 2
+        must guard on it, or the first PR shows red on jobs that have nothing to
+        test yet.
+
+        Guarded structurally, two ways (parse, not a text window — #739): the
+        `pyproject.toml` check is either INSIDE the step's own `run:` script
+        (integration-tests) or in the step's `if:` referencing a prior
+        `Check for pyproject.toml` step (mutation-tests). The old ±12-line text
+        window happened to span both; a reformat that pushed the guard further
+        away would have silently passed.
+        """
+        wf = load_workflow(self.target)
+        found = 0
+        for job_name, spec in (wf.get("jobs") or {}).items():
+            for step in steps(spec):
+                run = step.get("run") or ""
+                if "uv sync --group dev" not in run:
+                    continue
+                found += 1
+                guarded = "pyproject.toml" in run or "pyproject" in str(step.get("if", ""))
+                assert guarded, (
+                    f"{job_name}: `uv sync --group dev` step has no pyproject.toml "
+                    f"guard (run block or step if:)"
+                )
+        # Both the integration-tests job and the nightly mutation job run it.
+        assert found >= 2, f"expected >=2 guarded uv sync steps, found {found}"
 
     def test_mkdocs_config_rendered(self):
         content = (self.target / "mkdocs.yml").read_text()
@@ -474,13 +486,9 @@ class TestCiQualityGates:
         assert "mutation-tests:" in self.ci
         assert "mutmut run" in self.ci
         assert "export-cicd-stats" in self.ci
-        assert "if: github.event_name == 'schedule'" in self.ci
-
-        gate_start = self.ci.index("ci-gate:")
-        gate_needs_line = next(
-            line for line in self.ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
-        )
-        assert "mutation-tests" not in gate_needs_line, "mutation-tests must stay non-blocking"
+        wf = load_workflow(self.target)
+        assert "schedule" in str(job(wf, "mutation-tests").get("if", ""))
+        assert "mutation-tests" not in needs(wf, "ci-gate"), "mutation-tests must stay non-blocking"
 
     def test_mutmut_schedule_present_for_python(self):
         assert "cron:" in self.ci
@@ -593,11 +601,9 @@ class TestSemgrepGate:
         assert "p/owasp-top-ten" in ci
         assert "--baseline-commit" in ci
 
-        gate_start = ci.index("ci-gate:")
-        gate_needs_line = next(
-            line for line in ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
+        assert "semgrep" not in needs(load_workflow(target), "ci-gate"), (
+            "semgrep must stay non-blocking initially"
         )
-        assert "semgrep" not in gate_needs_line, "semgrep must stay non-blocking initially"
 
     def test_python_ruleset_selected(self, tmp_target: Path):
         target = _scaffold_language(tmp_target, "python")
@@ -795,8 +801,9 @@ class TestTypecheckParity:
         `Install just`, it failed with `just: command not found` on a fresh runner.
         """
         target = _scaffold_language(tmp_target, "go")
-        ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        assert ci.index("- name: Install just") < ci.index("- name: Typecheck")
+        names = [s.get("name") for s in steps(job(load_workflow(target), "lint-and-test"))]
+        assert "Install just" in names and "Typecheck" in names, names
+        assert names.index("Install just") < names.index("Typecheck"), names
 
     def test_go_typecheck_is_guarded_for_a_source_less_module(self, tmp_target: Path):
         """PR #734 review (P2): `go vet ./...` exits 1 on a module with no .go
