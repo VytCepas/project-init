@@ -33,12 +33,19 @@ def _has_clippy() -> bool:
     """
     if shutil.which("cargo") is None:
         return False
-    return (
-        subprocess.run(
-            ["cargo", "clippy", "--version"], capture_output=True, check=False
-        ).returncode
-        == 0
-    )
+    try:
+        # Bounded: this runs during pytest COLLECTION via skipif, so a hung or
+        # misconfigured toolchain would stall the whole run (PR #734 review).
+        result = subprocess.run(
+            ["cargo", "clippy", "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return result.returncode == 0
 
 
 pytestmark = [

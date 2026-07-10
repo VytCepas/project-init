@@ -733,6 +733,15 @@ class TestTypecheckParity:
     def _justfile(self, target: Path, language: str) -> str:
         return (_scaffold_language(target, language) / "justfile").read_text(encoding="utf-8")
 
+    @staticmethod
+    def _recipe_body(justfile: str, name: str) -> str:
+        """A missing recipe must FAIL with a clear message, not IndexError out of
+        a chained split (PR #734 review). Mirrors tests/contracts/test_justfile.py.
+        """
+        match = re.search(rf"^{name}:.*\n((?:[ \t]+.*\n?)*)", justfile, re.MULTILINE)
+        assert match, f"recipe {name!r} not found in the scaffolded justfile"
+        return match.group(1)
+
     def test_clippy_covers_tests_benches_examples(self, tmp_target: Path):
         justfile = self._justfile(tmp_target, "rust")
         assert "cargo clippy --all-targets --all-features" in justfile
@@ -753,8 +762,7 @@ class TestTypecheckParity:
     )
     def test_typecheck_recipe_exists(self, tmp_target: Path, language: str, command: str):
         justfile = self._justfile(tmp_target / language, language)
-        recipe = justfile.split("\ntypecheck:", 1)[1].split("\n\n", 1)[0]
-        assert command in recipe
+        assert command in self._recipe_body(justfile, "typecheck")
 
     @pytest.mark.parametrize("language", ["go", "rust"])
     def test_ci_runs_typecheck(self, tmp_target: Path, language: str):
@@ -785,8 +793,7 @@ class TestTypecheckParity:
         files (`no packages to vet`, verified). A fresh scaffold must not be red;
         the sibling recipes (test-cov, license, fuzz) already guard the same way.
         """
-        justfile = self._justfile(tmp_target, "go")
-        recipe = justfile.split("\ntypecheck:", 1)[1].split("\n\n", 1)[0]
+        recipe = self._recipe_body(self._justfile(tmp_target, "go"), "typecheck")
         assert 'find . -name "*.go"' in recipe
         assert "nothing to type-check" in recipe
 
