@@ -29,7 +29,9 @@ def target(tmp_path: Path) -> Path:
 class TestCanonicality:
     def test_agents_md_carries_full_instructions(self, target: Path):
         content = (target / "AGENTS.md").read_text()
-        for marker in ("Key rules for agents", "TDD", "GitHub workflow", "Skills (load on demand)"):
+        # "cannot fail" keys on the durable break-it rule, not a methodology name
+        # that gets reworded (PI-745 changed "TDD" -> "Test-first for design").
+        for marker in ("Key rules for agents", "cannot fail", "GitHub workflow", "Skills (load on demand)"):
             assert marker in content, f"AGENTS.md missing canonical content: {marker}"
 
     def test_claude_md_is_a_thin_redirect(self, target: Path):

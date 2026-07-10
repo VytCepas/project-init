@@ -39,6 +39,11 @@ point of a test, not a vulnerability.
 
 - One assertion per test; name: `test_<unit>_<scenario>`
 - External services (DB, API) use a real instance, not a mock
+- **Prove a guard can fail** (AGENTS.md): `just test-mutation` (mutmut) automates
+  the break-it check — it mutates your code and reports which mutants your tests
+  fail to kill. A surviving mutant is a test that passes on broken code. Coverage
+  is not this: a suite can hit 100% line coverage and kill ~0% of mutants, which
+  is why the CI mutation job gates on kill-rate, not coverage.
 
 ## Property-based testing (Hypothesis, #580)
 
