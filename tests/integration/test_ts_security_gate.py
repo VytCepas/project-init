@@ -60,7 +60,33 @@ _DEV_DEPS = (
     "eslint-plugin-tsdoc",
     "eslint-plugin-security",
     "eslint-plugin-no-unsanitized",
+    "@biomejs/biome",
 )
+
+
+def test_dev_deps_match_the_scaffolded_setup_recipe(tmp_path: Path):
+    """_DEV_DEPS claims to be "exactly what `just setup` installs" — prove it.
+
+    It silently omitted @biomejs/biome (PR #731 review). A drifting copy of the
+    toolchain makes the behavioral tests exercise something the scaffold does not
+    ship.
+    """
+    from project_init.scaffold import scaffold as _scaffold
+
+    target = tmp_path / "n"
+    _scaffold(target, fallback_preset(), fallback_variables(language="node", node="true", python=""))
+    setup = (target / "justfile").read_text(encoding="utf-8").split("\nsetup:", 1)[1]
+    setup = setup.split("\n\n", 1)[0]
+    command = " ".join(
+        ln.strip().rstrip("\\")
+        for ln in setup.splitlines()
+        if ln.strip() and not ln.strip().startswith("#")
+    )
+    installed = {tok.strip('"') for tok in command.split() if tok not in ("bun", "add", "-d")}
+    assert installed == set(_DEV_DEPS), (
+        f"_DEV_DEPS drifted from `just setup`\n  only in recipe: "
+        f"{sorted(installed - set(_DEV_DEPS))}\n  only in test:   {sorted(set(_DEV_DEPS) - installed)}"
+    )
 
 
 @pytest.fixture(scope="module")
@@ -132,9 +158,10 @@ def test_insecure_code_is_blocked(ts_project: Path):
     )
     assert "security/detect-eval-with-expression" in result.stdout
     assert "no-unsanitized/property" in result.stdout
-    # `error`, not `warn` — eslint exits 0 on warnings, which would be a gate
-    # that never blocks (the defect #729 describes).
-    assert "  error  " in result.stdout
+    # exit 1 already proves severity: eslint exits 0 when every finding is a
+    # warning, which is the defect #729 describes. Asserting the formatter's
+    # `"  error  "` column spacing on top of that is brittle across eslint
+    # versions and adds nothing (PR #731 review).
 
 
 def test_clean_code_passes(ts_project: Path):
