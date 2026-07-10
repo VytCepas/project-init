@@ -13,6 +13,20 @@ the deterministic, no-LLM core of the scheduled "third-party-updates" workflow:
 The workflow runs `check --json`, security-scans each candidate (npm audit), then
 `apply`s and opens a PR — never auto-merged. Stdlib only (tomllib + urllib); no
 new dependencies, no LLM (CLAUDE.md / ADR-001).
+
+Scope — what this does NOT own (#689):
+
+* **npm only.** `fetch_latest` raises on any other ecosystem rather than
+  guessing a registry API. Adding one means adding a fetcher, not just a
+  manifest entry.
+* **GitHub Actions pins** (`uses: owner/action@sha`) are owned by
+  `renovate.json`, which already opens bump PRs for them.
+* **Version numbers quoted in prose** — docs, ADRs, review notes — are dated
+  context ("as of 2026-07, codex was 0.138.0"), not managed pins. They are not
+  tracked here and must not be silently rewritten.
+
+Anything a scaffolded project *installs at a pinned version* belongs in the
+manifest. A tool it installs unpinned (tracking upstream latest) does not.
 """
 
 from __future__ import annotations

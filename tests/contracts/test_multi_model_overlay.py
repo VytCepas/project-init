@@ -19,7 +19,23 @@ import pytest
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables
 
-PINNED_CCR_VERSION = "2.0.0"
+
+def _pinned_ccr_version() -> str:
+    """Read the CCR pin from the manifest — never restate it (#689).
+
+    This module used to carry its own `PINNED_CCR_VERSION = "2.0.0"` literal, a
+    third copy alongside `tools/pinned_third_party.toml` and `setup_models.sh`.
+    `check_third_party_updates.py apply` bumps the first two in lockstep and knew
+    nothing about the third, so a routine version bump left this test asserting a
+    version the scaffold no longer ships.
+    """
+    import tomllib
+
+    manifest = Path(__file__).resolve().parents[2] / "tools" / "pinned_third_party.toml"
+    return tomllib.loads(manifest.read_text(encoding="utf-8"))["tools"]["ccr"]["pinned"]
+
+
+PINNED_CCR_VERSION = _pinned_ccr_version()
 
 
 def _scaffold(target: Path, *, multi_model: bool) -> Path:
