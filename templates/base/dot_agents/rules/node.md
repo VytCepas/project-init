@@ -16,7 +16,7 @@ bun run lint      # lint
 bun test          # tests
 just sbom         # CycloneDX SBOM via cdxgen (#574) — release.yml attaches it to Releases
 just license      # dependency license scan (#579) — deny GPL/AGPL; tune the recipe's --failOn list
-just fuzz         # property-based tests with fast-check (#580) — runs under `bun test`
+just fuzz         # property-based tests with fast-check (#580) — runs under `bun test`; CI runs it nightly, not per-PR
 ```
 
 ## Property-based testing (fast-check, #580)
@@ -38,3 +38,7 @@ test("clamp stays within bounds", () => {
 ```
 
 Pattern/tooling, **not** a blocking gate — property tests live alongside unit tests.
+
+**When it runs:** the CI `fuzz` job is schedule-only (nightly) and non-blocking —
+never on a PR (#727). fast-check draws fresh seeds each run, so nightly explores
+inputs a per-PR run would only repeat. Run `just fuzz` locally at will.

@@ -13,7 +13,7 @@ just test-cov       # tests + coverage gate (>= 70%, per justfile) — CI always
 just audit          # dependency CVE/advisory scan (govulncheck) — CI always runs this
 just sbom           # CycloneDX SBOM via cyclonedx-gomod (#574) — release.yml attaches it to Releases
 just license        # dependency license scan (#579) — deny copyleft; tune --disallowed_types
-just fuzz           # replay fuzz-test seed corpora (#580) — native go test -fuzz, CI-safe
+just fuzz           # replay fuzz-test seed corpora (#580) — native go test -fuzz; CI runs it nightly, not per-PR
 just typecheck      # `go vet ./...` — type-only pass; redundant with golangci-lint by design (#725)
 golangci-lint run   # revive, godoclint, gocognit, cyclop, dupl, errcheck, govet, staticcheck, gosec — see .golangci.yml
                     # ALSO the format gate: `formatters: gofumpt` in .golangci.yml makes `run` fail on unformatted code (#726)
@@ -30,8 +30,11 @@ corpora deterministically (CI-safe); active fuzzing targets one function:
 go test -run='^$' -fuzz=FuzzMyTarget -fuzztime=30s ./...
 ```
 
-Pattern/tooling, **not** a blocking gate — the CI `fuzz` job runs seed-corpus
-replay only and is non-blocking.
+Pattern/tooling, **not** a blocking gate. **When it runs:** the CI `fuzz` job is
+schedule-only (nightly) and non-blocking — never on a PR (#727). Seed replay is
+deterministic, so nightly repetition costs nothing; it is placed there to match
+the other three languages. Run `just fuzz` locally whenever you touch a fuzz
+target.
 
 `govulncheck` (`go install golang.org/x/vuln/cmd/govulncheck@latest`) only
 reports vulnerabilities actually reachable from your code, not every

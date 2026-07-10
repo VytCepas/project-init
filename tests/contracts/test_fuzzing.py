@@ -1,9 +1,13 @@
-"""#580: property-based testing / fuzzing wired per language.
+"""#580/#727: property-based testing / fuzzing wired per language.
 
-Each language gets a `just fuzz` recipe and a documented pattern in its rules
-file. Go — whose fuzzing is native to the toolchain — additionally gets a real,
-CI-safe (seed-corpus replay) CI job. Everything is scoped as opt-in pattern/
-tooling, NOT a blocking gate: the Go fuzz job is not in ci-gate's needs.
+Each language gets a `just fuzz` recipe, a documented pattern in its rules file,
+and a CI job that actually invokes the recipe. #727: only Go used to have a job,
+so three of four languages shipped a recipe nothing ever ran.
+
+The job is schedule-only (nightly) and non-blocking — NOT in ci-gate's needs —
+the same rollout mutation testing uses. Fuzzing is a pattern for surfacing edge
+cases, not a uniform gate; and Hypothesis/proptest/fast-check draw fresh seeds
+per run, so nightly is where repetition buys new inputs.
 """
 
 from __future__ import annotations
@@ -38,29 +42,61 @@ class TestFuzzRecipe:
         assert needle in justfile
 
 
-class TestGoFuzzJob:
-    def test_job_present_for_go(self, tmp_path: Path):
-        ci = (_scaffold(tmp_path / "go", "go") / ".github" / "workflows" / "ci.yml").read_text()
-        assert "fuzz:" in ci
-        assert "Go fuzz" in ci
-        # CI-safe: seed-corpus replay via the recipe, not unbounded generation.
+_LANGUAGES = ["python", "node", "go", "rust"]
+
+
+class TestFuzzJob:
+    """#727: `just fuzz` exists in every language, so a CI job must exist in every
+    language. Previously only Go had one, and python/node/rust shipped a recipe
+    nothing ever invoked — dead surface that reads as covered.
+    """
+
+    @pytest.mark.parametrize("language", _LANGUAGES)
+    def test_job_present_for_every_language(self, tmp_path: Path, language: str):
+        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
+        assert "\n  fuzz:" in ci
+        assert "Fuzz / property tests" in ci
         assert "just fuzz" in ci
 
-    def test_go_fuzz_non_blocking(self, tmp_path: Path):
-        ci = (_scaffold(tmp_path / "go", "go") / ".github" / "workflows" / "ci.yml").read_text()
+    @pytest.mark.parametrize("language", _LANGUAGES)
+    def test_job_is_schedule_only(self, tmp_path: Path, language: str):
+        """Nightly, never per-PR — the placement mutation testing already uses."""
+        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
+        job = ci[ci.index("\n  fuzz:") :]
+        job = job[: job.index("\n    steps:")]
+        assert "if: github.event_name == 'schedule'" in job, job
+
+    @pytest.mark.parametrize("language", _LANGUAGES)
+    def test_fuzz_non_blocking(self, tmp_path: Path, language: str):
+        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
         gate_start = ci.index("ci-gate:")
         needs_line = next(
             line for line in ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
         )
-        assert "fuzz" not in needs_line, "the Go fuzz job must stay non-blocking"
+        assert "fuzz" not in needs_line, "the fuzz job must stay non-blocking"
 
-    @pytest.mark.parametrize("language", ["python", "node", "rust"])
-    def test_go_fuzz_job_absent_for_non_go(self, tmp_path: Path, language: str):
+    @pytest.mark.parametrize(
+        "language,setup_step",
+        [
+            ("python", "astral-sh/setup-uv"),
+            ("node", "oven-sh/setup-bun"),
+            ("go", "actions/setup-go"),
+            ("rust", "actions-rust-lang/setup-rust-toolchain"),
+        ],
+    )
+    def test_job_installs_the_language_toolchain(
+        self, tmp_path: Path, language: str, setup_step: str
+    ):
+        """A fuzz job that cannot run its own recipe is the skipped-test defect
+        in another costume (#733). Assert the toolchain is actually installed."""
         ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
-        assert "Go fuzz" not in ci
+        job = ci[ci.index("\n  fuzz:") :]
+        job = job[: job.index("\n  # OpenSSF Scorecard")]
+        assert setup_step in job, job
 
-    def test_renders_cleanly(self, tmp_path: Path):
-        ci = (_scaffold(tmp_path / "go", "go") / ".github" / "workflows" / "ci.yml").read_text()
+    @pytest.mark.parametrize("language", _LANGUAGES)
+    def test_renders_cleanly(self, tmp_path: Path, language: str):
+        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
         assert "{{#if" not in ci and "{{/if" not in ci
 
 
@@ -79,3 +115,19 @@ class TestFuzzDocumented:
         assert tool in rules
         # Explicitly scoped as pattern/tooling, not a blocking gate.
         assert "not** a blocking gate" in rules or "not a blocking gate" in rules
+
+    @pytest.mark.parametrize(
+        "language,rules_file",
+        [("python", "python.md"), ("node", "node.md"), ("go", "go.md"), ("rust", "rust.md")],
+    )
+    def test_rules_say_when_fuzzing_runs(self, tmp_path: Path, language: str, rules_file: str):
+        """#727: no language may ship a recipe without saying when CI invokes it.
+
+        The go doc previously implied a per-PR job and the other three said
+        nothing at all — a doc restating a gate that does not exist as written is
+        the map-not-territory failure (#688).
+        """
+        rules = (_scaffold(tmp_path / language, language) / ".agents" / "rules" / rules_file).read_text()
+        assert "**When it runs:**" in rules, f"{rules_file} does not say when fuzzing runs"
+        assert "schedule-only (nightly)" in rules
+        assert "never on a PR" in rules

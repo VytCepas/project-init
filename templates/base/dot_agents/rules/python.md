@@ -56,3 +56,8 @@ def test_clamp_stays_within_bounds(lo, hi, x):
 Pattern/tooling, **not** a blocking gate — property tests live alongside unit
 tests and complement mutation testing (which checks existing tests) and the
 coverage floor (which checks how much is exercised).
+
+**When it runs:** the CI `fuzz` job is schedule-only (nightly) and non-blocking —
+never on a PR (#727), the same placement mutation testing already uses.
+Hypothesis draws fresh seeds each run, so nightly explores inputs a per-PR run
+would only repeat. Run `just fuzz` locally at will.

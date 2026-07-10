@@ -713,31 +713,82 @@ jobs:
       - name: License scan (cargo-deny)
         run: just license
 {{/if rust}}
-{{#if go}}
-  # Go native fuzzing (#580): go test -fuzz is built into the toolchain (1.18+),
-  # no third-party dependency. This job replays the fuzz-test SEED CORPORA
-  # deterministically — a short, CI-safe mode (no unbounded input generation).
-  # Non-blocking (NOT in ci-gate's needs): fuzzing is a pattern to surface edge
-  # cases, not a uniform gate like ruff/coverage that applies to every project.
-  # Promote it — or add a scheduled active `-fuzztime` run — once you have fuzz
-  # targets worth gating on.
+  # Property-based testing / fuzzing (#580, #727). `just fuzz` exists in every
+  # language, so it runs in CI in every language — previously only Go had a job,
+  # and the other three shipped a recipe nothing ever invoked: dead surface that
+  # reads as covered.
+  #
+  # WHY NIGHTLY, NOT PER-PR (#727). Fuzzing is a pattern for surfacing edge
+  # cases, not a uniform gate like ruff or coverage. Per-PR it would tax every
+  # push for near-zero value on a fresh scaffold. Nightly is also where it earns
+  # its keep: Hypothesis, proptest and fast-check draw FRESH random seeds each
+  # run, so a nightly job explores inputs a per-PR run would only repeat. (Go's
+  # `go test -run=Fuzz` is a deterministic seed-corpus replay, so it gains
+  # nothing from repetition — but uniformity across the four languages is worth
+  # more than one job placed differently.) This is the same rollout mutation
+  # testing already uses: schedule-gated, non-blocking, promote when you have a
+  # baseline worth gating on.
+  #
+  # Non-blocking: NOT in ci-gate's `needs`. To gate on it, add a `-fuzztime`
+  # active-fuzzing step and promote it there deliberately.
+  #
+  # Only one language renders per scaffold, so this costs exactly one nightly
+  # job — the same as the Go-only job it replaces.
   fuzz:
-    name: Go fuzz (seed corpus replay)
+    name: Fuzz / property tests
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    if: github.event_name == 'schedule'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      - name: Set up Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
-        with:
-          go-version-file: go.mod
 
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
-      - name: Replay fuzz seed corpora
+      # A fresh scaffold ships no manifest. Skip rather than fail: a nightly run
+      # that is red from day one is a notification people learn to ignore. Only
+      # one language renders per scaffold, so testing all four names needs no
+      # per-language variable.
+      - name: Check for a project manifest
+        id: manifest
+        run: |
+          if [ -f pyproject.toml ] || [ -f package.json ] || [ -f go.mod ] || [ -f Cargo.toml ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No project manifest yet — nothing to fuzz."
+          fi
+{{#if python}}
+      - name: Install uv
+        if: steps.manifest.outputs.exists == 'true'
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.7"
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+{{/if python}}{{#if node}}
+      - name: Install Bun
+        if: steps.manifest.outputs.exists == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        if: steps.manifest.outputs.exists == 'true'
+        run: bun install --frozen-lockfile 2>/dev/null || bun install
+{{/if node}}{{#if go}}
+      - name: Set up Go
+        if: steps.manifest.outputs.exists == 'true'
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+{{/if go}}{{#if rust}}
+      - name: Install Rust toolchain
+        if: steps.manifest.outputs.exists == 'true'
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
+{{/if rust}}
+      - name: Run property/fuzz tests
+        if: steps.manifest.outputs.exists == 'true'
         run: just fuzz
-{{/if go}}
 
   # OpenSSF Scorecard (#576): standardized security-posture scoring (branch
   # protection, dependency pinning, SAST presence, token permissions, ...).
