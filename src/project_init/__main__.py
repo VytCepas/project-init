@@ -107,6 +107,12 @@ class ScaffoldInputs:
     # at run time), so a --python-version that disagrees is rejected outright
     # rather than half-applied; see _reject_conflicting_python_version.
     python_version: str = ""
+    # Review-fix cycles the scaffolded monitor_pr.sh runs before it stops asking
+    # for another pass (#714). Rendered into .agents/config.yaml and read back by
+    # gh_host.sh's review_cycles(). 0 = no review control (merge on green CI).
+    # Only meaningful with the GitHub lifecycle; a --lifecycle none project ships
+    # no monitor_pr.sh, so the wizard doesn't ask and the key isn't rendered.
+    review_cycles: int = 2
 
 
 # Every CPython a Python scaffold is willing to target (#628). Kept byte-equal
@@ -141,6 +147,43 @@ def _python_floor_from_pyproject(target: Path | None) -> str | None:
     except Exception:
         return None
     return None
+
+
+def _validate_review_cycles(
+    args, parser: argparse.ArgumentParser, effective_lifecycle: str | None
+) -> None:
+    """Reject an unusable --review-cycles before the target dir or any prompt.
+
+    Runs on BOTH paths (PR #717 review). The interactive wizard used to copy the
+    raw value, so `--review-cycles -1` recorded a count that later crashed
+    monitor_pr.sh, and a lifecycle-none pairing was dropped in silence.
+
+    ``effective_lifecycle`` is the tier this run will actually scaffold, or None
+    when it isn't knowable yet. A *preset* may set ``lifecycle = "none"`` with no
+    --lifecycle flag in sight (PR #717 review, cycle 2), so checking args alone
+    let that combination through. In an interactive run the preset only seeds the
+    prompt's default, so the tier stays unknown here and the wizard warns instead.
+    """
+    if args.review_cycles is None:
+        return
+    if args.review_cycles < 0:
+        parser.error(
+            f"--review-cycles must be a non-negative integer (got {args.review_cycles}); "
+            "0 disables review control."
+        )
+    if effective_lifecycle == "none":
+        parser.error(
+            f"--review-cycles {args.review_cycles} requires the GitHub lifecycle "
+            "(the run resolves to lifecycle 'none'); no merge gate is scaffolded "
+            "to run them."
+        )
+
+
+def _resolve_review_cycles(args, effective_lifecycle: str) -> int:
+    """The non-interactive count (#714). _validate_review_cycles has already run."""
+    if effective_lifecycle == "none":
+        return 0
+    return 2 if args.review_cycles is None else args.review_cycles
 
 
 def _reject_python_version_without_python(
@@ -331,6 +374,18 @@ def _build_parser() -> argparse.ArgumentParser:
             "minimalist scaffold). Forge-portable quality hooks (commit-msg, "
             "gitleaks, lint/format gate, prod-safety) stay either way. Overrides "
             "the preset's default."
+        ),
+    )
+    p.add_argument(
+        "--review-cycles",
+        metavar="N",
+        type=int,
+        default=None,
+        help=(
+            "Review-fix passes the merge gate runs before it stops asking for "
+            "another (#714): 0 disables review control and merges on green CI, "
+            "1 comments once then merges, 2 (default) re-reviews the resolved "
+            "comments. Requires the GitHub lifecycle."
         ),
     )
     p.add_argument(
@@ -1171,6 +1226,37 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
     return _LIFECYCLE_TIERS[choice - 1]
 
 
+def _choose_review_cycles_interactive(default: int = 2) -> int:
+    """Explain review cycles, then ask how many the merge gate should run (#714).
+
+    Only reached when the GitHub lifecycle is selected — a `--lifecycle none`
+    project ships no monitor_pr.sh, so there is no cycle count to configure.
+    """
+    from rich.panel import Panel
+
+    body = (
+        "A [bold]review cycle[/bold] is one pass of the merge gate: "
+        "[bold]push → the review agents comment → you resolve → they re-review[/bold]. "
+        "monitor_pr.sh runs up to this many before it stops asking for another.\n\n"
+        "[bold]0[/bold]  [dim]no review control — merge as soon as CI is green[/dim]\n"
+        "[bold]1[/bold]  [dim]comment once, resolve, merge[/dim]\n"
+        "[bold]2[/bold]  [dim]the resolved comments are reviewed too, then merge[/dim]\n"
+        "[bold]3+[/bold] [dim]additional re-review rounds[/dim]\n\n"
+        "Whatever the count, the merge rule is the same: once the review agents' "
+        "comments are resolved — or none arise — the PR is free to merge.\n\n"
+        "[cyan]Helps:[/cyan] the second pass is where a fix's own bugs surface; "
+        "review agents routinely find a flaw in the patch that answered them.\n"
+        "[dim]Cost: each cycle is another round-trip before a merge. Default: 2. "
+        "Change later in .agents/config.yaml, or per-run with PI_REVIEW_CYCLES.[/dim]"
+    )
+    console.print(Panel(body, title="Review cycles (before merge)", border_style="cyan"))
+    while True:
+        raw = _prompt("Review cycles", default=str(default)).strip()
+        if raw.isdigit():
+            return int(raw)
+        console.print("[red]Enter a non-negative integer (0 disables review control).[/red]")
+
+
 # Wizard-explanation standard (#472, ADR-023): every selectable concern explains
 # its value before asking — what it ships · a "Helps:" line · the honest cost ·
 # the safe default. Heavyweight concerns (memory, lifecycle, overlays) render a
@@ -1261,6 +1347,7 @@ WIZARD_CONCERN_FLAGS: dict[str, str] = {
     "profile": "profile",
     "memory": "memory",
     "lifecycle": "lifecycle",
+    "review_cycles": "review_cycles",
     "delivery": "delivery",
     "deploy": "deploy",
     "iac": "iac",
@@ -1503,6 +1590,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     cli_vscode: bool = False,
     cli_agents: str | None = None,
     cli_python_version: str | None = None,
+    cli_review_cycles: int | None = None,
     target: Path | None = None,
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
@@ -1618,6 +1706,28 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     # GitHub lifecycle tier (#476). The --lifecycle flag wins; otherwise the
     # wizard explains it and asks, defaulting to the chosen preset's tier.
     resolved_lifecycle = lifecycle_flag or _choose_lifecycle_interactive(default=preset_lifecycle)
+    # #714: cycles configure the scaffolded monitor_pr.sh, which only ships with
+    # the lifecycle. Asking a `--lifecycle none` user to size a review gate they
+    # will never run is noise, so the prompt is gated on the resolved tier.
+    #
+    # PR #717 review: a CLI value reaching the wizard used to be copied raw —
+    # `--review-cycles -1` wrote an invalid config that later crashed
+    # monitor_pr.sh, and a flag paired with an interactively-chosen
+    # `lifecycle none` was dropped in silence. main() rejects a negative value
+    # and an explicit `--lifecycle none` up front; what it cannot know is a tier
+    # the user picks at the prompt, so that case warns and drops here rather
+    # than aborting a wizard the user has already half-answered.
+    if resolved_lifecycle == "none":
+        if cli_review_cycles is not None:
+            console.print(
+                f"[yellow]--review-cycles {cli_review_cycles} ignored: no merge gate is "
+                "scaffolded with lifecycle 'none'.[/yellow]"
+            )
+        review_cycles = 0
+    elif cli_review_cycles is not None:
+        review_cycles = cli_review_cycles
+    else:
+        review_cycles = _choose_review_cycles_interactive()
     # An explicit --agents (including `--agents claude` for a claude-only
     # project) is honored; an absent flag (None) opens the surface chooser —
     # mirroring how every other concern flag wins over its interactive prompt.
@@ -1646,6 +1756,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         profile=resolved_profile,
         no_egress=no_egress,
         python_version=python_version,
+        review_cycles=review_cycles,
         delivery=resolved_delivery,
         deploy=resolved_deploy,
         iac=resolved_iac,
@@ -2215,6 +2326,9 @@ def _build_variables(
 
     return {
         "python_floor": python_floor,
+        # #714: read back by gh_host.sh's review_cycles(); only rendered under
+        # the {{#if lifecycle}} gate in config.yaml.tmpl.
+        "review_cycles": str(inputs.review_cycles),
         "project_name": project_name,
         # Kebab-cased name for identifier-ish slots (deploy app-name stubs);
         # a name with no ASCII alphanumerics falls back to a generic slug.
@@ -2397,6 +2511,9 @@ def _resolve_inputs(
         iac = resolve_iac(args.iac)
     except ValueError as e:
         parser.error(str(e))
+    # #714: the tier this run actually scaffolds — a preset may set it, with no
+    # --lifecycle flag present (PR #717 review, cycle 2).
+    effective_lifecycle = _normalize_lifecycle(args.lifecycle) or preset_lifecycle
     return ScaffoldInputs(
         project_name=args.name,
         project_description=args.description,
@@ -2412,6 +2529,7 @@ def _resolve_inputs(
         profile=profile,
         no_egress=args.no_egress,
         python_version=args.python_version or "",
+        review_cycles=_resolve_review_cycles(args, effective_lifecycle),
         delivery=delivery,
         deploy=deploy,
         iac=iac,
@@ -2419,7 +2537,7 @@ def _resolve_inputs(
         governance=args.governance,
         observability=args.observability,
         memory=_normalize_memory(args.memory) or preset_memory,
-        lifecycle=_normalize_lifecycle(args.lifecycle) or preset_lifecycle,
+        lifecycle=effective_lifecycle,
         want_docs=not args.no_docs,
         renovate=not args.no_renovate,
     )
@@ -2695,6 +2813,16 @@ def _cli(argv: list[str]) -> int:
     # tier (a preset may set lifecycle = "none" to be minimal), default "github".
     preset_lifecycle = _resolve_preset_lifecycle(preset, parser)
 
+    # Interactive runs may still change the tier at the prompt, so only a
+    # non-interactive run can be judged here; the wizard warns in that case.
+    _validate_review_cycles(
+        args,
+        parser,
+        (_normalize_lifecycle(args.lifecycle) or preset_lifecycle)
+        if args.non_interactive
+        else _normalize_lifecycle(args.lifecycle),
+    )
+
     # Validate non-interactive args / gather interactive input BEFORE creating
     # the target directory (PI-20, PI-199: a bad flag OR a Ctrl-C at an
     # interactive prompt must not leave an empty dir behind).
@@ -2706,6 +2834,7 @@ def _cli(argv: list[str]) -> int:
             profile=args.profile,
             no_egress=args.no_egress,
             cli_python_version=args.python_version,
+            cli_review_cycles=args.review_cycles,
             target=target,
             cli_overlays=(
                 args.delivery,

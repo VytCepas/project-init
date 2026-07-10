@@ -13,6 +13,8 @@ project:
   project_init_host: {{project_init_host}}  # upstream GitHub host (github.com | *.ghe.com | GHES) — #255/#259
   project_key: ""          # e.g. "PI" → branches use feat/PI-42-slug, PR titles use feat(PI-42):
   github_project_number: 1 # numeric GitHub Project V2 board number{{#if lifecycle}} — single source of truth read by board-automation.yml, create_issue.sh, and setup_github.sh (#556){{/if lifecycle}}
+{{#if lifecycle}}  review_cycles: {{review_cycles}}       # review-fix passes monitor_pr.sh runs before it stops asking (#714); 0 = no review control, merge on green CI. Override per-run with PI_REVIEW_CYCLES.
+{{/if lifecycle}}
 
 language: {{language}}            # python | node | go | none
 
