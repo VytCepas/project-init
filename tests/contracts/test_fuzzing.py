@@ -100,7 +100,9 @@ class TestFuzzJob:
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_job_present_for_every_language(self, tmp_path: Path, language: str):
         ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
-        assert "\n  fuzz:" in ci
+        # _job_block asserts the job key exists, with a clearer message than a
+        # `"\n  fuzz:" in ci` check — which would also break if fuzz ever became
+        # the first job (PR #736 review).
         job = _job_block(ci, "fuzz")
         assert "name: Fuzz / property tests" in job
         # `run:` — not a bare `"just fuzz" in ci`, which the job's own prose
@@ -135,12 +137,20 @@ class TestFuzzJob:
         nightly entry for fuzz would otherwise have promoted the weekly Scorecard
         run to nightly too (PR #736 review). Every schedule-gated job must name
         the cron it wants.
+
+        Scans `if:` lines ONLY. The workflow's own prose comments quote
+        `github.event_name == 'schedule'` while explaining this very rule, so a
+        whole-file scan would flag them — today it passes only because those
+        quotes happen to fall on lines that also mention `github.event.schedule`
+        or wrap mid-expression (PR #736 review).
         """
         ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
         offenders = [
             line.strip()
             for line in ci.splitlines()
-            if "github.event_name == 'schedule'" in line and "github.event.schedule" not in line
+            if line.strip().startswith("if:")
+            and "github.event_name == 'schedule'" in line
+            and "github.event.schedule" not in line
         ]
         assert not offenders, f"schedule-gated jobs must match their own cron: {offenders}"
 

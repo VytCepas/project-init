@@ -32,9 +32,10 @@ go test -run='^$' -fuzz=FuzzMyTarget -fuzztime=30s ./...
 
 Pattern/tooling, **not** a blocking gate. **When it runs:** the CI `fuzz` job is
 schedule-only (nightly) and non-blocking — never on a PR (#727). Seed replay is
-deterministic, so nightly repetition costs nothing; it is placed there to match
-the other three languages. Run `just fuzz` locally whenever you touch a fuzz
-target.
+deterministic, so repeating it nightly surfaces no *new* inputs the way
+Hypothesis/proptest/fast-check do — it still consumes CI minutes. It runs nightly
+to keep the four languages uniform. Run `just fuzz` locally whenever you touch a
+fuzz target.
 
 `govulncheck` (`go install golang.org/x/vuln/cmd/govulncheck@latest`) only
 reports vulnerabilities actually reachable from your code, not every

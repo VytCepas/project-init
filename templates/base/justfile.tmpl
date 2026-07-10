@@ -266,7 +266,9 @@ license:
 #   go test -run='^$' -fuzz=FuzzMyTarget -fuzztime=30s ./...
 # Built into the toolchain (go 1.18+). Pattern/tooling, NOT a blocking gate: CI
 # runs this in the nightly `fuzz` job, never on a PR (#727). Seed replay is
-# deterministic, so nightly costs nothing and keeps all four languages uniform.
+# deterministic, so repeating it nightly surfaces no NEW inputs (unlike the other
+# three languages) — it still uses CI minutes; it runs nightly to keep the four
+# languages uniform.
 fuzz:
     sh -c 'if find . -name "*.go" | grep -q .; then go test -run="Fuzz" ./...; else echo "No Go sources yet — nothing to fuzz."; fi'
 
