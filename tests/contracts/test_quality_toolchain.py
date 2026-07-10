@@ -714,3 +714,50 @@ class TestFormatGate:
         assert result.returncode == 0, (
             f"ruff format --check exited {result.returncode}\n{result.stdout}{result.stderr}"
         )
+
+
+class TestTypecheckParity:
+    """PI-725: `just typecheck` must mean the same thing in every language.
+
+    Go and rust had no recipe and no CI step. They are not untyped — golangci-lint
+    runs go/analysis and clippy drives the compiler front-end — so the fix is a
+    uniform command surface, not a new checker.
+
+    The real defect was clippy's SCOPE: without `--all-targets` it checks only
+    lib/bin, so a test module with an outright type error passed `just lint` with
+    exit 0 (verified against clippy 0.1.97). `-D missing_docs` cannot be combined
+    with `--all-targets` — it then demands a crate-level `//!` in every
+    integration test file — hence two passes.
+    """
+
+    def _justfile(self, target: Path, language: str) -> str:
+        return (_scaffold_language(target, language) / "justfile").read_text(encoding="utf-8")
+
+    def test_clippy_covers_tests_benches_examples(self, tmp_target: Path):
+        justfile = self._justfile(tmp_target, "rust")
+        assert "cargo clippy --all-targets --all-features" in justfile
+
+    def test_missing_docs_is_not_applied_to_all_targets(self, tmp_target: Path):
+        """It would demand `//!` in every tests/*.rs — a born-red scaffold."""
+        justfile = self._justfile(tmp_target, "rust")
+        for line in justfile.splitlines():
+            if "--all-targets" in line and "clippy" in line:
+                assert "missing_docs" not in line, line
+
+    @pytest.mark.parametrize(
+        ("language", "command"),
+        [
+            ("rust", "cargo check --all-targets --all-features"),
+            ("go", "go vet ./..."),
+        ],
+    )
+    def test_typecheck_recipe_exists(self, tmp_target: Path, language: str, command: str):
+        justfile = self._justfile(tmp_target / language, language)
+        recipe = justfile.split("\ntypecheck:", 1)[1].split("\n\n", 1)[0]
+        assert command in recipe
+
+    @pytest.mark.parametrize("language", ["go", "rust"])
+    def test_ci_runs_typecheck(self, tmp_target: Path, language: str):
+        target = _scaffold_language(tmp_target / language, language)
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        assert "just typecheck" in ci

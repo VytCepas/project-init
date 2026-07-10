@@ -103,6 +103,7 @@ markers = [
     "contract: scaffolded template and documentation contract checks",
     "integration: CLI, hook, or scaffolded script behavior using subprocesses",
     "smoke: packaging or installed-artifact end-to-end smoke checks",
+    "slow: needs a non-python toolchain (bun, cargo); skipped where absent",
 ]
 
 # Coverage (#636): drift VISIBILITY, not a gate. No `fail_under` — a hard floor

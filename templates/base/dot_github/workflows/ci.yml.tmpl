@@ -298,6 +298,12 @@ jobs:
           find .agents -name '*.sh' -exec shellcheck -S error -x {} +
           find .agents -name '*.sh' -exec shfmt -d -i 2 {} +
 
+      # #725: `just typecheck` must mean the same thing in every language, since
+      # this is the step CI and agents call. For go it is `go vet ./...` —
+      # redundant with golangci-lint's go/analysis pass by design.
+      - name: Typecheck
+        run: just typecheck
+
       # Tests run via the justfile recipe agents and humans use (PI-139);
       # lint stays on the action above, which installs and caches the binary.
       - name: Install just
@@ -353,6 +359,13 @@ jobs:
 
       - name: Lint
         run: just lint
+
+      # #725: `just typecheck` must mean the same thing in every language, since
+      # this is the step CI and agents call. For rust it is `cargo check
+      # --all-targets --all-features` — redundant with clippy by design, and fast
+      # (no codegen).
+      - name: Typecheck
+        run: just typecheck
 
       # Coverage-gated (PI-569).
       - name: Tests — coverage-gated
