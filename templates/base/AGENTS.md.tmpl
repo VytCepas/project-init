@@ -40,7 +40,7 @@ follow the inline quick-references in the rules below.
 
 - **TDD** — write failing tests before any implementation.
 - **Verify the premise before you plan against it** — an issue description, a stale comment, or a tool's documented behavior is a *claim*, not a fact. Check it against the code, or run the tool, before building on it. Say what you verified and how.
-- **A test that cannot fail is worse than no test** — after writing a guard, break the thing it guards, watch it fail, then restore. A test asserting a config file's *text* passes while the tool it configures crashes and checks nothing.
+- **A test that cannot fail is worse than no test** — break what a guard guards, watch it fail, restore (also the helper you write to fix it). Matching *text* passes on a comment, docstring, or data; assert parsed structure or behaviour, not a substring.
 {{#if lifecycle}}- **GitHub Projects** — work is tracked on the GitHub Projects board backed by GitHub Issues. Before starting non-trivial work, create or reference an issue.
 - **GitHub workflow** — for any push, PR, review, or merge action, load the `github_workflow` skill{{#if no_plugin}} (`.agents/skills/github_workflow/SKILL.md`){{/if no_plugin}}. Quick ref: branch = `<type>/<KEY>-<n>-<slug>` | PR title = `type(KEY-N): desc` (no scope = no issue) | body includes `Closes #N`.
 {{/if lifecycle}}{{#if lint_command}}- **Commands** — the `justfile` is the canonical command surface: `just --list` shows every recipe (`setup`, `lint`, `format`, `test`, `docs`, `ci`). Prefer `just <recipe>` over raw tool invocations so every agent and CI run the same commands.
