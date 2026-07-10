@@ -794,9 +794,18 @@ jobs:
         with:
           bun-version: latest
 
+      # `--frozen-lockfile 2>/dev/null || bun install` would silently fall back to
+      # a NON-frozen install when the lockfile is merely out of date, letting
+      # dependency drift through CI (PR #736 review) — and `2>/dev/null` hides why.
+      # Use frozen only when a lockfile exists; otherwise a plain install.
       - name: Install dependencies
         if: steps.manifest.outputs.exists == 'true'
-        run: bun install --frozen-lockfile 2>/dev/null || bun install
+        run: |
+          if [ -f bun.lock ] || [ -f bun.lockb ]; then
+            bun install --frozen-lockfile
+          else
+            bun install
+          fi
 {{/if node}}{{#if go}}
       - name: Set up Go
         if: steps.manifest.outputs.exists == 'true'
