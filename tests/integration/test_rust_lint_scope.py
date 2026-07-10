@@ -26,6 +26,7 @@ from pathlib import Path
 
 import pytest
 
+
 def _has_clippy() -> bool:
     """cargo alone is not enough — clippy is a separate rustup component, and it
     is commonly absent on distro-packaged toolchains (PR #734 review).

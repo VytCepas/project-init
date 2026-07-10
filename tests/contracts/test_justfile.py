@@ -162,14 +162,14 @@ class TestJustfilePerLanguage:
     def test_go_ci_recipe_uses_coverage_variant(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "g", "go")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint test-cov audit\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: lint typecheck test-cov audit\s*$", text, re.MULTILINE)
         assert "go tool cover -func" in _recipe_body(text, "test-cov")
         assert "govulncheck ./..." in _recipe_body(text, "audit")
 
     def test_rust_ci_recipe_uses_coverage_variant(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "r", "rust")
         text = (target / "justfile").read_text()
-        assert re.search(r"^ci: lint test-cov audit\s*$", text, re.MULTILINE)
+        assert re.search(r"^ci: lint typecheck test-cov audit\s*$", text, re.MULTILINE)
         assert "cargo llvm-cov --fail-under-lines" in _recipe_body(text, "test-cov")
         assert "cargo audit" in _recipe_body(text, "audit")
 

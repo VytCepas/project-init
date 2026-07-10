@@ -290,7 +290,7 @@ class TestGoToolchain:
         justfile = (self.target / "justfile").read_text()
         assert "test-cov:" in justfile
         assert "go tool cover -func" in justfile
-        assert "ci: lint test-cov" in justfile
+        assert "ci: lint typecheck test-cov" in justfile
 
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just test-cov" in ci
@@ -341,7 +341,7 @@ class TestRustToolchain:
         justfile = (self.target / "justfile").read_text()
         assert "test-cov:" in justfile
         assert "cargo llvm-cov --fail-under-lines" in justfile
-        assert "ci: lint test-cov" in justfile
+        assert "ci: lint typecheck test-cov" in justfile
 
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just test-cov" in ci
@@ -526,7 +526,7 @@ class TestVulnerabilityScanGate:
         justfile = (target / "justfile").read_text()
         assert "audit:" in justfile
         assert "govulncheck ./..." in justfile
-        assert "ci: lint test-cov audit" in justfile
+        assert "ci: lint typecheck test-cov audit" in justfile
 
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just audit" in ci
@@ -537,7 +537,7 @@ class TestVulnerabilityScanGate:
         justfile = (target / "justfile").read_text()
         assert "audit:" in justfile
         assert "cargo audit" in justfile
-        assert "ci: lint test-cov audit" in justfile
+        assert "ci: lint typecheck test-cov audit" in justfile
 
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just audit" in ci
