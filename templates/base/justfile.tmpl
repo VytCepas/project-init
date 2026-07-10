@@ -205,6 +205,12 @@ lint:
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint_context_budget.sh
 
+# type-only pass. Redundant with `just lint` by design: golangci-lint runs
+# go/analysis, which type-checks. `just typecheck` exists so the command means
+# the same thing in every language, which is what CI and agents call (#725).
+typecheck:
+    sh -c 'if find . -name "*.go" | grep -q .; then go vet ./...; else echo "No Go sources yet — nothing to type-check."; fi'
+
 # auto-format project code (gofumpt via golangci-lint fmt — no separate binary
 # to provision; golangci-lint is already required for `just lint`)
 format:
@@ -263,7 +269,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test-cov audit
+ci: lint typecheck test-cov audit
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
@@ -292,11 +298,26 @@ build:
 # items (parity with ruff's D gate and revive's `exported`); for a binary crate
 # with no pub items it only asks for a crate-level `//!` doc.
 lint:
-    cargo clippy -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity -D missing_docs
+    # Two passes, because -D missing_docs and --all-targets do not mix (#725).
+    # 1. Public API: docs enforced on lib/bin only. Applied to --all-targets it
+    #    demands a crate-level `//!` in every integration test file — verified.
+    cargo clippy --all-features -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity -D missing_docs
+    # 2. Everything else: without --all-targets clippy never sees tests/, benches/
+    #    or examples/, so a test module with an outright TYPE ERROR passed
+    #    `just lint` with exit 0. --all-features also reaches code behind a
+    #    non-default feature flag. Verified against clippy 0.1.97.
+    cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity
     cargo fmt --check
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint_context_budget.sh
+
+# type-only compile pass. Redundant with `just lint` by design: clippy already
+# type-checks, but `just typecheck` must mean the same thing in every language,
+# because that is what CI and agents call (#725). `cargo check` skips codegen,
+# so it is fast.
+typecheck:
+    cargo check --all-targets --all-features
 
 # auto-format project code
 format:
@@ -353,7 +374,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test-cov audit
+ci: lint typecheck test-cov audit
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md

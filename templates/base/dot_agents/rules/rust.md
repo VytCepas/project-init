@@ -14,7 +14,9 @@ cargo audit                                       # dependency CVE/advisory scan
 cargo cyclonedx --format json                     # CycloneDX SBOM (`just sbom`, #574) — release.yml attaches it to Releases
 cargo deny check licenses                         # license compliance (`just license`, #579) — allow-list in deny.toml (denies GPL/AGPL)
 cargo test                                        # property-based tests with proptest (`just fuzz`, #580)
-cargo clippy -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity -D missing_docs   # lint + complexity + public-API docs
+cargo clippy --all-features -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity -D missing_docs   # lint + complexity + public-API docs (lib/bin)
+cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity     # also tests/, benches/, examples/ (#725)
+cargo check --all-targets --all-features          # `just typecheck` — type-only pass, no codegen
 cargo fmt --check                                 # format gate — part of `just lint`, CI runs it (#726); `cargo fmt` writes
 ```
 

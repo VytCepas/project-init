@@ -14,6 +14,7 @@ just audit          # dependency CVE/advisory scan (govulncheck) — CI always r
 just sbom           # CycloneDX SBOM via cyclonedx-gomod (#574) — release.yml attaches it to Releases
 just license        # dependency license scan (#579) — deny copyleft; tune --disallowed_types
 just fuzz           # replay fuzz-test seed corpora (#580) — native go test -fuzz, CI-safe
+just typecheck      # `go vet ./...` — type-only pass; redundant with golangci-lint by design (#725)
 golangci-lint run   # revive, godoclint, gocognit, cyclop, dupl, errcheck, govet, staticcheck, gosec — see .golangci.yml
                     # ALSO the format gate: `formatters: gofumpt` in .golangci.yml makes `run` fail on unformatted code (#726)
 golangci-lint fmt   # WRITES gofumpt formatting (stricter than gofmt) — no separate binary needed

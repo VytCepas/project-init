@@ -290,7 +290,7 @@ class TestGoToolchain:
         justfile = (self.target / "justfile").read_text()
         assert "test-cov:" in justfile
         assert "go tool cover -func" in justfile
-        assert "ci: lint test-cov" in justfile
+        assert "ci: lint typecheck test-cov" in justfile
 
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just test-cov" in ci
@@ -341,7 +341,7 @@ class TestRustToolchain:
         justfile = (self.target / "justfile").read_text()
         assert "test-cov:" in justfile
         assert "cargo llvm-cov --fail-under-lines" in justfile
-        assert "ci: lint test-cov" in justfile
+        assert "ci: lint typecheck test-cov" in justfile
 
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just test-cov" in ci
@@ -526,7 +526,7 @@ class TestVulnerabilityScanGate:
         justfile = (target / "justfile").read_text()
         assert "audit:" in justfile
         assert "govulncheck ./..." in justfile
-        assert "ci: lint test-cov audit" in justfile
+        assert "ci: lint typecheck test-cov audit" in justfile
 
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just audit" in ci
@@ -537,7 +537,7 @@ class TestVulnerabilityScanGate:
         justfile = (target / "justfile").read_text()
         assert "audit:" in justfile
         assert "cargo audit" in justfile
-        assert "ci: lint test-cov audit" in justfile
+        assert "ci: lint typecheck test-cov audit" in justfile
 
         ci = (target / ".github" / "workflows" / "ci.yml").read_text()
         assert "just audit" in ci
@@ -715,6 +715,91 @@ class TestFormatGate:
             f"ruff format --check exited {result.returncode}\n{result.stdout}{result.stderr}"
         )
 
+
+class TestTypecheckParity:
+    """PI-725: `just typecheck` must mean the same thing in every language.
+
+    Go and rust had no recipe and no CI step. They are not untyped — golangci-lint
+    runs go/analysis and clippy drives the compiler front-end — so the fix is a
+    uniform command surface, not a new checker.
+
+    The real defect was clippy's SCOPE: without `--all-targets` it checks only
+    lib/bin, so a test module with an outright type error passed `just lint` with
+    exit 0 (verified against clippy 0.1.97). `-D missing_docs` cannot be combined
+    with `--all-targets` — it then demands a crate-level `//!` in every
+    integration test file — hence two passes.
+    """
+
+    def _justfile(self, target: Path, language: str) -> str:
+        return (_scaffold_language(target, language) / "justfile").read_text(encoding="utf-8")
+
+    @staticmethod
+    def _recipe_body(justfile: str, name: str) -> str:
+        """A missing recipe must FAIL with a clear message, not IndexError out of
+        a chained split (PR #734 review). Mirrors tests/contracts/test_justfile.py.
+        """
+        match = re.search(rf"^{name}:.*\n((?:[ \t]+.*\n?)*)", justfile, re.MULTILINE)
+        assert match, f"recipe {name!r} not found in the scaffolded justfile"
+        return match.group(1)
+
+    def test_clippy_covers_tests_benches_examples(self, tmp_target: Path):
+        justfile = self._justfile(tmp_target, "rust")
+        assert "cargo clippy --all-targets --all-features" in justfile
+
+    def test_missing_docs_is_not_applied_to_all_targets(self, tmp_target: Path):
+        """It would demand `//!` in every tests/*.rs — a born-red scaffold."""
+        justfile = self._justfile(tmp_target, "rust")
+        for line in justfile.splitlines():
+            if "--all-targets" in line and "clippy" in line:
+                assert "missing_docs" not in line, line
+
+    @pytest.mark.parametrize(
+        ("language", "command"),
+        [
+            ("rust", "cargo check --all-targets --all-features"),
+            ("go", "go vet ./..."),
+        ],
+    )
+    def test_typecheck_recipe_exists(self, tmp_target: Path, language: str, command: str):
+        justfile = self._justfile(tmp_target / language, language)
+        assert command in self._recipe_body(justfile, "typecheck")
+
+    @pytest.mark.parametrize("language", ["go", "rust"])
+    def test_ci_runs_typecheck(self, tmp_target: Path, language: str):
+        target = _scaffold_language(tmp_target / language, language)
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        assert "just typecheck" in ci
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_ci_alias_includes_typecheck(self, tmp_target: Path, language: str):
+        """`just ci` is documented as "what CI runs". Go and rust omitted
+        typecheck, so the local gate diverged from CI the moment CI gained the
+        step (PR #734 review).
+        """
+        justfile = self._justfile(tmp_target / language, language)
+        # Assert the alias exists before reading it — a bare `next()` would raise
+        # StopIteration and read as a test error, not a contract failure
+        # (PR #734 review; same shape as the _recipe_body fix above).
+        ci_lines = [ln for ln in justfile.splitlines() if ln.startswith("ci:")]
+        assert ci_lines, f"{language}: no `ci:` alias in the scaffolded justfile"
+        assert "typecheck" in ci_lines[0], ci_lines[0]
+
+    def test_go_typecheck_step_comes_after_just_is_installed(self, tmp_target: Path):
+        """PR #734 review (P1): it invokes a justfile recipe. Ordered before
+        `Install just`, it failed with `just: command not found` on a fresh runner.
+        """
+        target = _scaffold_language(tmp_target, "go")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        assert ci.index("- name: Install just") < ci.index("- name: Typecheck")
+
+    def test_go_typecheck_is_guarded_for_a_source_less_module(self, tmp_target: Path):
+        """PR #734 review (P2): `go vet ./...` exits 1 on a module with no .go
+        files (`no packages to vet`, verified). A fresh scaffold must not be red;
+        the sibling recipes (test-cov, license, fuzz) already guard the same way.
+        """
+        recipe = self._recipe_body(self._justfile(tmp_target, "go"), "typecheck")
+        assert 'find . -name "*.go"' in recipe
+        assert "nothing to type-check" in recipe
 
 class TestTypeScriptSecurityGate:
     """PI-729: TS had no blocking security lint; semgrep was its only SAST, non-blocking.
