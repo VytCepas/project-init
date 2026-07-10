@@ -2,7 +2,8 @@
 
 ## Principles
 
-- **Test-driven** — write failing tests before implementation. Tests define the contract.
+- **Test-first for design** — write the test first when it shapes an interface or a fix; the test is the contract. (Test-first is a *design* tool, not a fault-detection guarantee — see the next point.)
+- **A test that cannot fail is worse than no test** — after writing a guard, break what it checks and watch it fail, then restore. A guard that matches *text* passes on a comment or data; assert behavior. Mutation testing automates this check where a tool is wired.
 - **No mocks for external systems** — integration tests hit real instances (DB, APIs). Mocks mask divergence between test and production.
 - **One assertion per test** — narrow tests pinpoint failures immediately.
 - **Name tests descriptively** — `test_<unit>_<scenario>` (e.g. `test_auth_rejects_expired_token`)

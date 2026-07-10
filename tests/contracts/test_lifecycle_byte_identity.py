@@ -150,6 +150,11 @@ on day one (the #698 class of bug). Deliberate formatting change, not move-drift
 — only the `.agents/hooks/dag_workflow.py` hash was re-pinned across all four
 combos, after verifying every other file still matched.
 
+Exception (PI-745): the TDD-guidance alignment reworded two always-rendered docs
+— `.agents/docs/development/testing.md` and `.github/copilot-instructions.md`.
+Deliberate content change, not move-drift — only those two keys were re-pinned
+across all four combos, after asserting no OTHER key drifted.
+
 """
 
 from __future__ import annotations
