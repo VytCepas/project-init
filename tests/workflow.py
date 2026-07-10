@@ -65,8 +65,14 @@ def job_names(workflow: dict) -> list[str]:
 
 
 def needs(workflow: dict, name: str) -> list[str]:
-    """Job `name`'s `needs` as a list — `needs:` may be a string or a list."""
+    """Job `name`'s `needs` as a list — `needs:` may be a string or a list.
+
+    Asserts the shape: a bare `list(raw)` on a mapping would silently return its
+    keys, so a structurally wrong `needs:` could pass a contract test (PR #742
+    review).
+    """
     raw = job(workflow, name).get("needs") or []
+    assert isinstance(raw, (str, list)), f"`needs:` on `{name}` is neither str nor list: {type(raw).__name__}"
     return [raw] if isinstance(raw, str) else list(raw)
 
 
@@ -95,11 +101,16 @@ def _strip_shell_comments(script: str) -> str:
     shell script that can carry its OWN `#` comments — so `job_runs_command`
     would match a command kept only as a comment (`echo x  # just fuzz`),
     reintroducing the exact defect #739 fixes inside the helper that fixes it
-    (PR #742 review, Codex). Conservative and line-based: drop full-line comments
-    and inline comments introduced by whitespace-then-`#`. A `#` inside a quoted
-    string or `${#var}` is not stripped, so a needle hiding there could still
-    match — but that errs toward a false NEGATIVE (a real command not found ->
-    the test fails loudly), never a silent false positive.
+    (PR #742 review, Codex).
+
+    A naive line-based heuristic, NOT a shell parser: drop full-line comments,
+    and truncate each line at the first whitespace-then-`#`. That deliberately
+    over-strips — a `#` after whitespace INSIDE a quoted string (`echo "a # b"`)
+    is also cut (PR #742 review). The error direction is safe: over-stripping can
+    only DROP text, so a real command that followed such a `#` goes unmatched and
+    the test fails loudly — never a silent false positive. The callers match
+    tool invocations (`just fuzz`, `bun install …`) that do not appear as quoted
+    `#`-bearing data in these workflows, so the imprecision does not bite.
     """
     out = []
     for line in script.splitlines():
@@ -112,9 +123,12 @@ def _strip_shell_comments(script: str) -> str:
 
 
 def job_runs_command(job_dict: dict, needle: str) -> bool:
-    """True if any step's `run:` script actually INVOKES `needle`.
+    """True if `needle` appears in any step's `run:` script, comments removed.
 
-    Shell comments are stripped first, so a command preserved only as a comment
-    does not count (PR #742 review).
+    A substring match on the comment-stripped script, NOT a parse of the command
+    line — `echo "just fuzz"` (the needle as data) would still match (PR #742
+    review). It exists to reject the common failure it was built for: a needle
+    kept only as a comment. Pass a distinctive needle (a recipe/binary name) so
+    the data-vs-invocation gap stays theoretical.
     """
     return any(needle in _strip_shell_comments(cmd) for cmd in run_commands(job_dict))

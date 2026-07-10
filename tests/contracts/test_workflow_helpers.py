@@ -33,6 +33,13 @@ def test_needs_normalises_string_and_list():
     assert needs({"jobs": {"g": {}}}, "g") == []
 
 
+def test_needs_rejects_a_mapping_shape():
+    """A mapping `needs:` must assert, not silently become a list of its keys
+    (PR #742 review)."""
+    with pytest.raises(AssertionError, match="neither str nor list"):
+        needs({"jobs": {"g": {"needs": {"a": 1}}}}, "g")
+
+
 def test_job_missing_asserts_clearly():
     with pytest.raises(AssertionError, match="no `nope` job"):
         job({"jobs": {"a": {}}}, "nope")
