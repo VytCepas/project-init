@@ -31,6 +31,25 @@ class TestSkillIndex:
             "Skill directories not referenced in INDEX.md: " + ", ".join(missing)
         )
 
+    def test_this_repos_own_index_covers_every_skill_dir(self):
+        """PI-686: the template INDEX was guarded; this repo's own INDEX was not.
+
+        `_INDEX_PATH` above points at `templates/fallback/...INDEX.md.tmpl`, so a
+        skill added under this repo's `.agents/skills/` and forgotten in its
+        INDEX passed CI. Only `test_wiki_skill.py` touched the own-repo INDEX, and
+        only to assert the literal string "wiki".
+        """
+        own_skills = _REPO_ROOT / ".agents" / "skills"
+        own_index = own_skills / "INDEX.md"
+        assert own_index.exists(), ".agents/skills/INDEX.md missing"
+        index_text = own_index.read_text(encoding="utf-8")
+        missing = [
+            d.name for d in sorted(own_skills.iterdir()) if d.is_dir() and d.name not in index_text
+        ]
+        assert not missing, (
+            "skill directories missing from .agents/skills/INDEX.md: " + ", ".join(missing)
+        )
+
     def test_index_scaffolded_into_project(self, tmp_path: Path):
         target = tmp_path / "proj"
         preset = fallback_preset()
@@ -133,3 +152,33 @@ class TestSkillFrontmatter:
         audit = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents" / "skills" / "audit"
         fm = self._frontmatter(audit / "SKILL.md")
         assert fm.get("context") == "fork"
+
+
+class TestCodeMapStaleness:
+    """PI-686: the scaffolded CODE_MAP had a generator but no staleness check.
+
+    `gen_code_map.py` was wired only to a manual `just code-map` recipe — absent
+    from the scaffolded ci.yml, pre-push hook, install_hooks.sh, and pre-commit
+    config. The file whose header says "read this before grepping" rotted freely
+    in every scaffolded project.
+    """
+
+    def _ci(self, tmp_path: Path, language: str) -> str:
+        target = tmp_path / f"proj-{language}"
+        scaffold(target, fallback_preset(), fallback_variables(**{language: "true"}))
+        return (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    def test_python_ci_checks_the_code_map(self, tmp_path: Path):
+        ci = self._ci(tmp_path, "python")
+        assert "CODE_MAP is current" in ci
+        # Compares, never rewrites the committed file.
+        assert "cmp -s" in ci
+        assert "run 'just code-map' and commit" in ci
+
+    def test_non_python_ci_omits_the_check(self, tmp_path: Path):
+        """The generator is a Python AST walker; there is nothing to map."""
+        target = tmp_path / "proj-go"
+        variables = fallback_variables(python="", go="true", language="go")
+        scaffold(target, fallback_preset(), variables)
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        assert "CODE_MAP is current" not in ci

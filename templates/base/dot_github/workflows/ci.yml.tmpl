@@ -158,6 +158,35 @@ jobs:
       - name: Typecheck
         run: just typecheck
 
+      # PI-686: CODE_MAP.md's header tells agents to "read this before grepping",
+      # but nothing checked it was current — the generator shipped wired only to
+      # a manual `just code-map`, so the map rotted silently and agents were
+      # routed to a stale index. Regenerate into a temp dir (gen_code_map.py
+      # writes .agents/docs/CODE_MAP.md relative to cwd) and compare bytes;
+      # never rewrite the committed file in CI. Skips cleanly before the first
+      # `just code-map` run, so a fresh scaffold is not born red.
+      - name: CODE_MAP is current
+        run: |
+          set -euo pipefail
+          map=".agents/docs/CODE_MAP.md"
+          gen=".agents/scripts/gen_code_map.py"
+          if [ ! -f "$map" ] || [ ! -f "$gen" ]; then
+            echo "no $map yet — generate it with 'just code-map' and commit."
+            exit 0
+          fi
+          scan="src"
+          [ -d "$scan" ] || scan="."
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          ( cd "$tmp" && uv run --no-project python \
+              "$GITHUB_WORKSPACE/$gen" "$GITHUB_WORKSPACE/$scan" >/dev/null )
+          if ! cmp -s "$tmp/$map" "$map"; then
+            echo "::error file=$map::CODE_MAP.md is stale — run 'just code-map' and commit"
+            diff -u "$map" "$tmp/$map" | head -n 40 || true
+            exit 1
+          fi
+          echo "$map is current."
+
       # Coverage gate (PI-138/PI-569): always on, not conditional — pytest-cov
       # is pulled in ephemerally via `uv run --with`, the same pattern mypy
       # (PI-558) and mutmut (PI-563) use, so there's no dev-dependency to
