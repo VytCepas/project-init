@@ -255,10 +255,17 @@ jobs:
           # never listed — eslint.config.mjs then fails to import and `just lint`
           # exits 2, a crash, before any gate runs (PR #731 review). `just setup`
           # is idempotent, so seed the toolchain whenever it is incomplete.
-          if ! bun pm ls 2>/dev/null | grep -q "eslint-plugin-security"; then
-            echo "lint toolchain incomplete (upgraded project?) — running just setup"
-            just setup
-          fi
+          # Check EVERY plugin eslint.config.mjs imports, not just one: a
+          # partially-upgraded project can have one and miss the other, skip the
+          # seed, and still crash at import time (PR #731 review).
+          installed="$(bun pm ls 2>/dev/null || true)"
+          for pkg in eslint-plugin-security eslint-plugin-no-unsanitized; do
+            if ! printf '%s' "$installed" | grep -q "$pkg"; then
+              echo "lint toolchain incomplete ($pkg missing; upgraded project?) — running just setup"
+              just setup
+              break
+            fi
+          done
 
       - name: Lint
         run: just lint

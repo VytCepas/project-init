@@ -776,8 +776,13 @@ class TestTypeScriptSecurityGate:
         a crash, before any gate runs. Verified: exit 2 before, 1 after.
         """
         ci = (self.target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        assert 'grep -q "eslint-plugin-security"' in ci
-        assert "just setup" in ci.split("Install dependencies", 1)[1].split("- name:", 1)[0]
+        step = ci.split("Install dependencies", 1)[1].split("- name:", 1)[0]
+        assert "just setup" in step
+        # Every plugin eslint.config.mjs imports must be probed — a partially
+        # upgraded project with one and not the other would skip the seed and
+        # still crash at import time (PR #731 review).
+        for plugin in ("eslint-plugin-security", "eslint-plugin-no-unsanitized"):
+            assert plugin in step, f"{plugin} not probed by the toolchain guard"
 
     def test_security_plugins_registered_in_the_typescript_block(self):
         """Pinning a rule whose plugin was registered by a preset re-couples the
