@@ -36,10 +36,28 @@ def _job_block(ci: str, job: str) -> str:
     job that follows, so the block may carry a trailing comment; that is fine,
     every assertion here looks for a presence, not an absence.
     """
-    start = ci.index(f"\n  {job}:")
-    rest = ci[start + 1 :]
+    match = re.search(rf"^  {re.escape(job)}:$", ci, flags=re.MULTILINE)
+    assert match is not None, f"no `{job}:` job in the rendered workflow"
+    rest = ci[match.start() :]
     nxt = re.search(r"^  [a-z][a-z0-9-]*:$", rest[len(f"  {job}:") :], flags=re.MULTILINE)
     return rest if nxt is None else rest[: len(f"  {job}:") + nxt.start()]
+
+
+def _needs(ci: str, job: str) -> str:
+    """Return `job`'s whole `needs:` section — inline list OR multiline items.
+
+    Reading only the `needs:` line would let a later reformat to a multiline list
+    hide `fuzz` in a `- fuzz` item while the test still passed (PR #736 review).
+    """
+    block = _job_block(ci, job).splitlines()
+    start = next(i for i, line in enumerate(block) if line.strip().startswith("needs:"))
+    section = [block[start]]
+    for line in block[start + 1 :]:
+        if line.strip().startswith("-") or not line.strip():
+            section.append(line)
+        else:
+            break
+    return "\n".join(section)
 
 
 class TestFuzzRecipe:
@@ -117,11 +135,8 @@ class TestFuzzJob:
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_fuzz_non_blocking(self, tmp_path: Path, language: str):
         ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
-        gate_start = ci.index("ci-gate:")
-        needs_line = next(
-            line for line in ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
-        )
-        assert "fuzz" not in needs_line, "the fuzz job must stay non-blocking"
+        needs = _needs(ci, "ci-gate")
+        assert "fuzz" not in needs, f"the fuzz job must stay non-blocking:\n{needs}"
 
     @pytest.mark.parametrize(
         "language,setup_step",
