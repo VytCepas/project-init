@@ -50,18 +50,25 @@ def on_triggers(workflow: dict) -> dict:
 def schedule_crons(workflow: dict) -> list[str]:
     """Every cron expression in the `on.schedule` block."""
     schedule = on_triggers(workflow).get("schedule") or []
-    return [entry["cron"] for entry in schedule if "cron" in entry]
+    assert isinstance(schedule, list), f"`on.schedule` is not a list: {type(schedule).__name__}"
+    return [entry["cron"] for entry in schedule if isinstance(entry, dict) and "cron" in entry]
+
+
+def _jobs(workflow: dict) -> dict:
+    jobs = workflow.get("jobs") or {}
+    assert isinstance(jobs, dict), f"`jobs:` is not a mapping: {type(jobs).__name__}"
+    return jobs
 
 
 def job(workflow: dict, name: str) -> dict:
     """Return job `name`, asserting it exists (a clear message, not a KeyError)."""
-    jobs = workflow.get("jobs") or {}
+    jobs = _jobs(workflow)
     assert name in jobs, f"no `{name}` job in the workflow (jobs: {sorted(jobs)})"
     return jobs[name]
 
 
 def job_names(workflow: dict) -> list[str]:
-    return list((workflow.get("jobs") or {}).keys())
+    return list(_jobs(workflow).keys())
 
 
 def needs(workflow: dict, name: str) -> list[str]:

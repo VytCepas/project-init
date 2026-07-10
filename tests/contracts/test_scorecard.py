@@ -15,7 +15,7 @@ import pytest
 
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
-from tests.workflow import load_workflow, needs
+from tests.workflow import job, load_workflow, needs, schedule_crons
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
@@ -38,10 +38,13 @@ class TestScorecardJob:
         assert re.search(r"ossf/scorecard-action@[0-9a-f]{40} # v\d+\.\d+\.\d+", ci)
 
     def test_scheduled_not_per_pr(self, tmp_path: Path):
-        ci = _ci(_scaffold_language(tmp_path / "p", "python"))
-        # A weekly cron drives it, and the job itself is schedule-gated.
-        assert "0 4 * * 1" in ci
-        assert "if: github.event_name == 'schedule'" in ci
+        # A weekly cron drives it, and the SCORECARD job itself is schedule-gated
+        # — asserted against the parsed job, not `"if: ...schedule..." in ci`,
+        # which any schedule-gated job (e.g. fuzz) satisfies even if scorecard
+        # loses its own gate (PR #742 review; the #739 defect class).
+        wf = load_workflow(_scaffold_language(tmp_path / "p", "python"))
+        assert "0 4 * * 1" in schedule_crons(wf)
+        assert "github.event_name == 'schedule'" in str(job(wf, "scorecard").get("if", ""))
 
     def test_weekly_cron_renders_for_every_language(self, tmp_path: Path):
         # Unlike the Python-only nightly mutation cron, the weekly Scorecard cron
