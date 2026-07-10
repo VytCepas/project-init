@@ -762,6 +762,16 @@ class TestTypecheckParity:
         ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         assert "just typecheck" in ci
 
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_ci_alias_includes_typecheck(self, tmp_target: Path, language: str):
+        """`just ci` is documented as "what CI runs". Go and rust omitted
+        typecheck, so the local gate diverged from CI the moment CI gained the
+        step (PR #734 review).
+        """
+        justfile = self._justfile(tmp_target / language, language)
+        ci_line = next(ln for ln in justfile.splitlines() if ln.startswith("ci:"))
+        assert "typecheck" in ci_line, ci_line
+
     def test_go_typecheck_step_comes_after_just_is_installed(self, tmp_target: Path):
         """PR #734 review (P1): it invokes a justfile recipe. Ordered before
         `Install just`, it failed with `just: command not found` on a fresh runner.

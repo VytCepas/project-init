@@ -266,7 +266,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test-cov audit
+ci: lint typecheck test-cov audit
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
@@ -371,7 +371,7 @@ scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
 # what CI runs
-ci: lint test-cov audit
+ci: lint typecheck test-cov audit
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md

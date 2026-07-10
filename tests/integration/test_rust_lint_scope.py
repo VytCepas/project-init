@@ -26,8 +26,22 @@ from pathlib import Path
 
 import pytest
 
+def _has_clippy() -> bool:
+    """cargo alone is not enough — clippy is a separate rustup component, and it
+    is commonly absent on distro-packaged toolchains (PR #734 review).
+    """
+    if shutil.which("cargo") is None:
+        return False
+    return (
+        subprocess.run(
+            ["cargo", "clippy", "--version"], capture_output=True, check=False
+        ).returncode
+        == 0
+    )
+
+
 pytestmark = [
-    pytest.mark.skipif(shutil.which("cargo") is None, reason="no rust toolchain (CI ships none)"),
+    pytest.mark.skipif(not _has_clippy(), reason="no cargo+clippy (CI ships none)"),
     pytest.mark.slow,
 ]
 
