@@ -44,7 +44,9 @@ def on_triggers(workflow: dict) -> dict:
     trigger block lives under the key `True`, not `"on"`. Every caller would trip
     on this; centralise it here.
     """
-    return workflow.get(True) or workflow.get("on") or {}
+    triggers = workflow.get(True) or workflow.get("on") or {}
+    assert isinstance(triggers, dict), f"`on:` is not a mapping: {type(triggers).__name__}"
+    return triggers
 
 
 def schedule_crons(workflow: dict) -> list[str]:
