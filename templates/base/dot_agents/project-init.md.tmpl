@@ -67,8 +67,8 @@ acceptance tests first (the test is the contract), then implement:
 3. Implement until green
 4. Lint and clean up
 
-Then prove each guard can fail: break what it checks and watch it fail before
-you trust it — a test that passes on broken code is worse than none.
+Then prove each guard can fail: break what it checks, watch it fail, then
+restore — a test that passes on broken code is worse than none.
 {{#if python}}
 Test conventions: one assertion per test, name as `test_<unit>_<scenario>`, run with `uv run pytest`. Real DB/API instances — no mocks.
 {{/if}}

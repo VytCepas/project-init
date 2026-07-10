@@ -19,7 +19,7 @@ Canonical agent rules: [AGENTS.md](../AGENTS.md) | Workflow: [.agents/project-in
 
 ## Key rules
 
-- Test-first for design (a new interface or fix); then prove each guard can fail — break what it checks and watch it fail
+- Test-first for design (a new interface or fix); then prove each guard can fail — break what it checks, watch it fail, then restore
 - No secrets in code — use `os.environ` or `.env` (gitignored)
 {{#if lint_command}}- `just lint` must pass before closing a task (`just --list` shows all recipes)
 {{/if}}- Prefer deterministic bash/python over LLM calls for hooks and scripts

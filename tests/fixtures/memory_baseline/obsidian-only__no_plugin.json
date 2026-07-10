@@ -95,7 +95,7 @@
   ".github/ISSUE_TEMPLATE/docs.yml": "8e5fac3346c4336a32477a62ce3625aa31e8de33402728b8f281f810d285fa15",
   ".github/ISSUE_TEMPLATE/feature.yml": "6d323e761316d685d8377fa1b70005b2ce42fdbdd7e9a3129d09e97c8c916c8b",
   ".github/ISSUE_TEMPLATE/test.yml": "51d8f6c2ef60439b27853ff117f56f5adec17ba8ccb483ae02fc4ddeec18ccf5",
-  ".github/copilot-instructions.md": "9641d439153d4bf56be41068cd05d2e5257fa5ac8f6af3f4d2534ed711f572a3",
+  ".github/copilot-instructions.md": "090f31044cbce63242bf5f9d96cabf7e39a978ee07859b89342be918a65412d4",
   ".github/hooks/commit-msg": "16a267320eaa93bc0bcd9cac6547fd8292952ad9f98e28d347bb85a36556a480",
   ".github/hooks/pre-commit": "7bac0515cac4a08197beb01ba027e6a4c03eb8f7b24019c04cb6926e6e7d2317",
   ".github/hooks/pre-push": "a7d110c087e0917d08e72e24d5aacfd4c9505253df995876ad3e13f1484cf765",
