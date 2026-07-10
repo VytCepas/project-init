@@ -562,6 +562,7 @@ docs = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "coverage" },
     { name = "jsonschema" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -579,6 +580,7 @@ provides-extras = ["docs"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "coverage", specifier = ">=7.10" },
     { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-cov", specifier = ">=5.0" },

@@ -35,6 +35,24 @@ def test_coverage_measures_the_package_with_branch_coverage():
     assert run["parallel"] is True
 
 
+def test_subprocess_coverage_is_enabled():
+    """Without this the CLI reads as dead code — a wrong number, not a low one.
+
+    pytest-cov 7 ships no subprocess `.pth`; coverage's own `patch` option is
+    what instruments `python -m project_init` children (PR #718 review).
+    """
+    run = _config()["tool"]["coverage"]["run"]
+    assert "subprocess" in run.get("patch", []), run
+
+
+def test_coverage_is_pinned_new_enough_for_the_patch_option():
+    dev = _config()["dependency-groups"]["dev"]
+    pin = next((d for d in dev if d.startswith("coverage")), None)
+    assert pin, "coverage must be pinned directly; `patch` landed in 7.10"
+    floor = tuple(int(p) for p in pin.split(">=")[1].split("."))
+    assert floor >= (7, 10), pin
+
+
 def test_coverage_has_no_failure_threshold():
     """Visibility, not a gate — a floor would fail PRs that touch nothing."""
     cov = _config()["tool"]["coverage"]
@@ -42,11 +60,12 @@ def test_coverage_has_no_failure_threshold():
     assert "fail_under" not in cov.get("run", {})
 
 
-def test_conftest_enables_subprocess_coverage_only_when_requested():
+def test_no_conftest_env_hook_is_needed():
+    """`patch = ["subprocess"]` replaced a hand-rolled COVERAGE_PROCESS_START
+    export in conftest — declarative, and nothing to leak into `just test`.
+    """
     body = Path("tests/conftest.py").read_text(encoding="utf-8")
-    assert "COVERAGE_PROCESS_START" in body
-    # Guarded: `just test` must not start a recorder in every child process.
-    assert 'config.getoption("--cov", default=None)' in body
+    assert "COVERAGE_PROCESS_START" not in body
 
 
 def test_ci_reports_coverage_without_gating_on_it():

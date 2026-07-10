@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -13,24 +12,6 @@ _PATH_MARKERS = {
     "integration": "integration",
     "smoke": "smoke",
 }
-
-
-def pytest_configure(config: pytest.Config) -> None:
-    """Measure the scaffolder when the suite drives it as a subprocess (#636).
-
-    Most of the integration suite runs the CLI via ``python -m project_init``,
-    and coverage sees nothing inside a child process unless
-    ``COVERAGE_PROCESS_START`` is set — pytest-cov's ``.pth`` reads it and calls
-    ``coverage.process_startup()`` there. Without this, `__main__.py` reports a
-    fraction of its real coverage and `concerns.py` reads as dead code, which is
-    a worse signal than no number at all.
-
-    Only set when --cov was actually requested: otherwise every subprocess in
-    `just test` would start a coverage recorder and write .coverage.* files for
-    a report nobody asked for.
-    """
-    if config.getoption("--cov", default=None):
-        os.environ["COVERAGE_PROCESS_START"] = str(Path(__file__).parent.parent / "pyproject.toml")
 
 
 @pytest.fixture(scope="session", autouse=True)
