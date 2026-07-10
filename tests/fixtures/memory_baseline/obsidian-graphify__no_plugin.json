@@ -2,7 +2,7 @@
   ".agents/CAPABILITIES.md": "6aff96b4e6163256d4aa5d9ca3366a66d1995c1355d12e3257bede1351fdd60f",
   ".agents/agents/README.md": "3506bb3640ef057d3ee4b6359c315b1b59aa5f5de147b4f0ce3abd318a20d1e2",
   ".agents/agents/code-reviewer.md": "d384a5748dc54f49d0e4a763568abc2af7f6af7738d303b67007237e679b05c8",
-  ".agents/agents/explore.md": "aa1a4fcd1d0b3af36b1241f50a697bcb5443468b3561a2cd3f0ecd4156b4fed8",
+  ".agents/agents/explore.md": "7365179c18bc548b4fc488c49c08f586bff4304a529b2a78dff961df1ed2809a",
   ".agents/config.yaml": "24ee849b86aae94eb7a88a68a7c0ccb4836a84583bdde214925c23cc0f7f30e6",
   ".agents/docs/README.md": "62e435564824960f89fa4d8ba91b370f71f4a13c50ba12e0cc2e96a9facd8a7d",
   ".agents/docs/adr/adr-001-memory-stack.md": "e082c3082b6574d155359740800ea82d3db804ccf0e7dca32247435867602adf",

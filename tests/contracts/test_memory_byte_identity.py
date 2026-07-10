@@ -123,6 +123,15 @@ review. Deliberate content change, not move-drift — only the
 after verifying every other file still matched.
 The same PI-715 change reworded the `github_workflow` SKILL.md (`--no-review` is no longer the routine merge path); its hash was re-pinned in the no_plugin combos only, where the skill ships as a file rather than through the plugin.
 
+Exception (PI-687): `agents/explore.md` gained a four-step orientation contract —
+read CODE_MAP/MEMORY/CAPABILITIES first to pick targets, verify every specific
+against the source, treat a missing cited path as staleness, and report it. The
+discovery subagent previously named no orientation artifact, so AGENTS.md's
+"read CODE_MAP first, delegate sweeps to explore" threw the map away at the
+delegation boundary. Deliberate content change, not move-drift — only the
+`.agents/agents/explore.md` hash was re-pinned across all four combos, after
+verifying every other file still matched.
+
 """
 
 from __future__ import annotations
