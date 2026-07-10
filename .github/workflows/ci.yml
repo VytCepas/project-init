@@ -53,6 +53,15 @@ jobs:
         with:
           bun-version: latest
 
+      # Same reasoning again (#737). The two git pre-commit hook tests in
+      # test_commit_hook_gates.py drive the real hook, which shells out to
+      # `just lint` — the hook's two most interesting behaviours (block a bad
+      # STAGED commit; do NOT block a good staged commit when the worktree is
+      # dirty) were never exercised in CI because `just` was absent and the
+      # tests skipped. Pinned to the same SHA the scaffolded ci.yml.tmpl uses.
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4
+
       - name: Sync dev dependencies
         run: uv sync --group dev --locked
 

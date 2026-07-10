@@ -17,6 +17,7 @@ are bypassable with `--no-verify`, mirroring the existing gitleaks posture.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -25,6 +26,22 @@ import pytest
 
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import fallback_preset, fallback_variables, make_variables
+
+
+def _require_tool(name: str) -> None:
+    """Fail in CI, skip locally, when `name` is not on PATH.
+
+    `skipif` here meant these tests skipped in CI for as long as `just` was
+    absent from the runner (#737) — the hook's two most interesting behaviours
+    were never exercised by a gate. A skipped test is not a gate; the same shape
+    as #733 (bun) and #719 (actionlint). `ci.yml` installs both tools, so a
+    missing one is a broken workflow, not a reason to pass quietly.
+    """
+    if shutil.which(name):
+        return
+    if os.environ.get("CI"):
+        pytest.fail(f"{name} is not on PATH — CI must install it (ci.yml) or this gate tests nothing (#737).")
+    pytest.skip(f"{name} not available — install it to run this gate locally")
 
 
 def _git_hooks(target: Path) -> tuple[str, str]:
@@ -71,9 +88,9 @@ def test_pre_commit_gate_has_per_file_shell_block(tmp_target: Path):
     assert "Shell format errors (shfmt)" in gate
 
 
-@pytest.mark.skipif(shutil.which("shfmt") is None, reason="shfmt not available")
 def test_pre_commit_gate_autofixes_staged_shell(tmp_path: Path):
     """End-to-end: a badly-formatted staged .sh is shfmt-fixed and re-staged."""
+    _require_tool("shfmt")
     target = tmp_path / "proj"
     scaffold(target, fallback_preset(), fallback_variables(language="python", python="true"))
     hook = target / ".agents" / "hooks" / "pre_commit_gate.sh"
@@ -103,9 +120,9 @@ def test_pre_commit_gate_autofixes_staged_shell(tmp_path: Path):
     assert staged == bad.read_text()
 
 
-@pytest.mark.skipif(shutil.which("shfmt") is None, reason="shfmt not available")
 def test_pre_commit_gate_blocks_a_broken_staged_shell(tmp_path: Path):
     """A staged .sh shfmt can't parse must block the commit (deny), not slip through."""
+    _require_tool("shfmt")
     target = tmp_path / "proj"
     scaffold(target, fallback_preset(), fallback_variables(language="python", python="true"))
     hook = target / ".agents" / "hooks" / "pre_commit_gate.sh"
@@ -125,7 +142,6 @@ def test_pre_commit_gate_blocks_a_broken_staged_shell(tmp_path: Path):
     assert '"permissionDecision": "deny"' in result.stdout, result.stdout
 
 
-@pytest.mark.skipif(shutil.which("just") is None, reason="just not available")
 def test_git_pre_commit_lints_the_index_not_the_worktree(tmp_path: Path):
     """A staged lint error must not be masked by an unstaged fix (Codex #596).
 
@@ -133,6 +149,7 @@ def test_git_pre_commit_lints_the_index_not_the_worktree(tmp_path: Path):
     check is independent of the real ruff toolchain — the point under test is the
     stash-the-index mechanism, not what `just lint` runs.
     """
+    _require_tool("just")
     target = tmp_path / "proj"
     scaffold(target, load_preset("obsidian-only"), make_variables(language="python", python="true"))
     hook = target / ".github" / "hooks" / "pre-commit"
@@ -161,9 +178,9 @@ def test_git_pre_commit_lints_the_index_not_the_worktree(tmp_path: Path):
     assert (target / "x.txt").read_text() == "GOOD\n", "unstaged changes were not restored"
 
 
-@pytest.mark.skipif(shutil.which("just") is None, reason="just not available")
 def test_git_pre_commit_ignores_unstaged_mess_on_a_clean_index(tmp_path: Path):
     """The inverse of the above: unrelated dirty WIP must not fail a clean commit."""
+    _require_tool("just")
     target = tmp_path / "proj"
     scaffold(target, load_preset("obsidian-only"), make_variables(language="python", python="true"))
     hook = target / ".github" / "hooks" / "pre-commit"
