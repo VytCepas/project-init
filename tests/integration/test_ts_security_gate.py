@@ -12,13 +12,16 @@ then eslint the scaffolded config — and asserts exit codes:
     clean code                              -> exit 0
     no sources at all (fresh scaffold)      -> exit 0 (not born red)
 
-Honest limitation: this repo's CI does not install bun, so **these tests skip
-there**. A skipped test is not a gate. They exist to be run locally, and to
-document exactly how the gate was verified — see the PR for the captured output.
+CI installs bun (`ci.yml`, `Install Bun`), so these tests RUN there. If bun ever
+goes missing from the runner the guard below fails rather than skips: a skipped
+test is not a gate, and this module is the only one that exercises the TS
+toolchain instead of describing it (#733). Locally, a missing bun skips.
 """
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -28,13 +31,25 @@ import pytest
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
 
-pytestmark = [
-    pytest.mark.skipif(
-        shutil.which("bun") is None or shutil.which("bunx") is None,
-        reason="bun/bunx not installed (CI does not ship them; see #733)",
-    ),
-    pytest.mark.slow,
-]
+pytestmark = [pytest.mark.slow]
+
+
+def _require_bun() -> None:
+    """Fail in CI, skip locally, when bun is absent.
+
+    `skipif` would let a runner that quietly stopped installing bun report green
+    forever — the same failure shape as #719, where the actionlint gate skipped
+    in CI until actionlint became a declared dev dependency.
+    """
+    if shutil.which("bun") and shutil.which("bunx"):
+        return
+    message = "bun/bunx not on PATH"
+    if os.environ.get("CI"):
+        pytest.fail(
+            f"{message} — CI must install bun (ci.yml `Install Bun`) or this gate "
+            "silently tests nothing (#733)."
+        )
+    pytest.skip(f"{message} — install bun to run the TS toolchain gate locally")
 
 _INSECURE = """/** Runs user code. */
 export function run(userInput: string): unknown {
@@ -94,6 +109,7 @@ def test_dev_deps_match_the_scaffolded_setup_recipe(tmp_path: Path):
 
 @pytest.fixture(scope="module")
 def ts_project(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    _require_bun()
     target = tmp_path_factory.mktemp("ts") / "proj"
     scaffold(
         target,
@@ -128,18 +144,39 @@ def ts_project(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return target
 
 
-def _eslint(target: Path) -> subprocess.CompletedProcess:
+def _eslint(target: Path, *extra: str) -> subprocess.CompletedProcess:
     # `bunx eslint .` — byte-for-byte what the scaffolded `just lint` runs
     # (justfile.tmpl). Not node_modules/.bin/eslint: that shim is a shell script
     # on POSIX and a .cmd/.ps1 on Windows (PR #731 review).
     return subprocess.run(
-        ["bunx", "eslint", "."],
+        ["bunx", "eslint", ".", *extra],
         cwd=target,
         capture_output=True,
         text=True,
         check=False,
         timeout=600,
     )
+
+
+def _severities(target: Path) -> dict[str, int]:
+    """Map ruleId -> max severity eslint reported (1 = warn, 2 = error).
+
+    Exit code alone cannot tell a downgraded rule from an enforced one: the probe
+    trips several rules, so one surviving `error` keeps the exit at 1 while
+    another has silently become a `warn`. That gap let this module stay green
+    against a downgraded `detect-eval-with-expression` (#733). The JSON formatter
+    is eslint's stable machine surface — unlike the text formatter's column
+    spacing, which is what PR #731 rightly declined to assert on.
+    """
+    result = _eslint(target, "-f", "json")
+    report = json.loads(result.stdout)
+    severities: dict[str, int] = {}
+    for file_report in report:
+        for message in file_report["messages"]:
+            rule = message.get("ruleId")
+            if rule:
+                severities[rule] = max(severities.get(rule, 0), message["severity"])
+    return severities
 
 
 def test_typescript_is_not_seven(ts_project: Path):
@@ -166,12 +203,15 @@ def test_insecure_code_is_blocked(ts_project: Path):
         f"expected a lint failure (1), got {result.returncode} — exit 2 means an eslint "
         f"crash, the #732 regression\n{result.stdout}\n{result.stderr}"
     )
-    assert "security/detect-eval-with-expression" in result.stdout
-    assert "no-unsanitized/property" in result.stdout
-    # exit 1 already proves severity: eslint exits 0 when every finding is a
-    # warning, which is the defect #729 describes. Asserting the formatter's
-    # `"  error  "` column spacing on top of that is brittle across eslint
-    # versions and adds nothing (PR #731 review).
+    # Severity per rule, not just the exit code. Both rules must be `error`:
+    # with several rules tripping at once, one left at `error` masks another
+    # downgraded to `warn` and the exit code stays 1 either way (#733).
+    severities = _severities(ts_project)
+    for rule in ("security/detect-eval-with-expression", "no-unsanitized/property"):
+        assert severities.get(rule) == 2, (
+            f"{rule} reported severity {severities.get(rule)!r}, expected 2 (error). "
+            f"A security rule downgraded to `warn` does not block a merge.\n{severities}"
+        )
 
 
 def test_clean_code_passes(ts_project: Path):

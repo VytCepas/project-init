@@ -40,6 +40,19 @@ jobs:
           mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      # Same reasoning as shfmt above. test_ts_security_gate.py is the only test
+      # that RUNS the scaffolded TypeScript toolchain rather than asserting the
+      # text of eslint.config.mjs — and text assertions are what let #732 (an
+      # unpinned typescript resolving to 7.x, crashing eslint) ship. Without bun
+      # that gate skips, and a skipped test is not a gate (#733). The test does
+      # `bun add` against the npm registry; that network hop is ~3s warm and is
+      # the only thing between a broken TS toolchain and a green merge, so it
+      # runs on every PR rather than nightly.
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
+        with:
+          bun-version: latest
+
       - name: Sync dev dependencies
         run: uv sync --group dev --locked
 
