@@ -785,6 +785,23 @@ class TestTypeScriptSecurityGate:
         """
         assert 'plugins: { tsdoc, security, "no-unsanitized": noUnsanitized }' in self.config
 
+    def test_setup_recipe_is_a_single_valid_command(self):
+        """PR #731 review: a reviewer read the trailing `\\` as a shell parse error.
+
+        `just` joins backslash-continued recipe lines into ONE command — verified
+        with `just -n setup`, which prints a single `bun add -d …` line and exits
+        0. Pinned so the continuation is not "fixed" into a broken one-liner.
+        """
+        setup = self.justfile.split("\nsetup:", 1)[1].split("\n\n", 1)[0]
+        # Executable lines only — the recipe's own comments mention `bun add`.
+        commands = [
+            ln.strip() for ln in setup.splitlines() if ln.strip() and not ln.strip().startswith("#")
+        ]
+        assert commands, setup
+        assert commands[0].startswith("bun add -d"), commands
+        # One invocation, however the line is wrapped.
+        assert sum(c.startswith("bun add") for c in commands) == 1, commands
+
     def test_typescript_pinned_below_7(self):
         """PI-732: unpinned `bun add -d typescript` resolves to TS 7, which
         typescript-eslint cannot parse — eslint exits 2 (crash), not 1.

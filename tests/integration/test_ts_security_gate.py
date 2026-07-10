@@ -100,9 +100,9 @@ def ts_project(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 def _eslint(target: Path) -> subprocess.CompletedProcess:
-    # `bun x`, not node_modules/.bin/eslint: the .bin shim is a shell script on
-    # POSIX and a .cmd/.ps1 on Windows, and `bunx eslint .` is what the
-    # scaffolded `just lint` actually runs (PR #731 review).
+    # `bun x eslint .` — the subcommand form of `bunx`, which is exactly what the
+    # scaffolded `just lint` runs. Not node_modules/.bin/eslint: that shim is a
+    # shell script on POSIX and a .cmd/.ps1 on Windows (PR #731 review).
     return subprocess.run(
         ["bun", "x", "eslint", "."],
         cwd=target,
