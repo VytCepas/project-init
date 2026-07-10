@@ -473,8 +473,14 @@ REVIEW_DECISION=$(_get_review_decision)
 # choice about this script's cycles, not a licence to bypass branch protection.
 # Set before the max-cycles check below, which would otherwise read 0 >= 0 as
 # "cycles exhausted" and force an admin merge.
-if [ "$MAX_REVIEW_CYCLES" -eq 0 ] && [ "$MODE" = "--merge" ]; then
-  echo "PR #$PR_NUMBER: CI passed. review_cycles=0 — no review control; merging on green CI."
+# Not gated on --merge: a monitor-only run would otherwise sit in the reviewer
+# wait loop for a gate the operator switched off (PR #717 review).
+if [ "$MAX_REVIEW_CYCLES" -eq 0 ]; then
+  if [ "$MODE" = "--merge" ]; then
+    echo "PR #$PR_NUMBER: CI passed. review_cycles=0 — no review control; merging on green CI."
+  else
+    echo "PR #$PR_NUMBER: CI passed. review_cycles=0 — no review control; skipping the review gate."
+  fi
   REVIEW_DECISION="SKIPPED"
 fi
 

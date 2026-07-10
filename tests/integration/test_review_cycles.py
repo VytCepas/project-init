@@ -116,9 +116,12 @@ def test_monitor_pr_env_override_beats_config(tmp_target: Path):
     body = (tmp_target / ".agents" / "scripts" / "monitor_pr.sh").read_text()
     assert 'MAX_REVIEW_CYCLES="${PI_REVIEW_CYCLES:-$(review_cycles)}"' in body
     # 0 skips the review gate, and must not reach _admin_merge.
-    zero_block = body.split('if [ "$MAX_REVIEW_CYCLES" -eq 0 ]', 1)[1][:400]
+    zero_block = body.split('if [ "$MAX_REVIEW_CYCLES" -eq 0 ]', 1)[1][:500]
     assert 'REVIEW_DECISION="SKIPPED"' in zero_block
     assert "_admin_merge" not in zero_block
+    # PR #717 review: the branch must not be gated on --merge, or a monitor-only
+    # run waits for a reviewer the operator switched off.
+    assert 'if [ "$MAX_REVIEW_CYCLES" -eq 0 ] && [ "$MODE" = "--merge" ]' not in body
 
 
 def test_wizard_skips_the_prompt_when_lifecycle_is_declined(monkeypatch):
@@ -281,39 +284,51 @@ def test_review_cycles_explainer_states_its_value(capsys, monkeypatch):
     assert "Default: 2" in out
 
 
-def test_environment_override_is_honored(tmp_target: Path, tmp_path: Path):
-    """PI_REVIEW_CYCLES=0 must disable the gate without editing config.yaml."""
+def test_zero_cycles_skips_the_review_gate_without_merge(tmp_target: Path, tmp_path: Path):
+    """PR #717 review: monitor-only runs entered the reviewer wait loop anyway."""
+    result = _run_monitor_zero(tmp_target, tmp_path, merge=False)
+    assert "Waiting for reviewer" not in result.stdout, result.stdout
+    assert "skipping the review gate" in result.stdout
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+_ZERO_GH_STUB = """#!/bin/bash
+case "$*" in
+*"pr checks"*) echo '[{"name":"ci","state":"SUCCESS","bucket":"pass"}]' ;;
+*"--json headRefName"*) echo "feature true" ;;
+*"--json reviewDecision"*) echo "" ;;
+*"--json reviews"*) echo "0" ;;
+*"--json mergeStateStatus"*) echo "CLEAN" ;;
+*"--json state"*) echo "MERGED" ;;
+*"--json url"*) echo "https://example.invalid/pr/1" ;;
+*) exit 0 ;;
+esac
+"""
+
+
+def _run_monitor_zero(tmp_target: Path, tmp_path: Path, *, merge: bool):
+    """Drive the real script with PI_REVIEW_CYCLES=0 and a stubbed gh."""
     scaffold(tmp_target, fallback_preset(), fallback_variables())
     stub = tmp_path / "bin"
-    stub.mkdir()
-    (stub / "gh").write_text(
-        "#!/bin/bash\n"
-        'case "$*" in\n'
-        '*"pr checks"*) echo \'[{"name":"ci","state":"SUCCESS","bucket":"pass"}]\' ;;\n'
-        '*"--json headRefName"*) echo "feature true" ;;\n'
-        '*"--json reviewDecision"*) echo "" ;;\n'
-        '*"--json reviews"*) echo "0" ;;\n'
-        '*"--json mergeStateStatus"*) echo "CLEAN" ;;\n'
-        '*"--json state"*) echo "MERGED" ;;\n'
-        '*"--json url"*) echo "https://example.invalid/pr/1" ;;\n'
-        "*) exit 0 ;;\n"
-        "esac\n"
-    )
+    stub.mkdir(exist_ok=True)
+    (stub / "gh").write_text(_ZERO_GH_STUB)
     (stub / "gh").chmod(0o755)
     (stub / "sleep").write_text("#!/bin/sh\nexit 0\n")
     (stub / "sleep").chmod(0o755)
     env = os.environ.copy()
     env["PATH"] = f"{stub}:{env['PATH']}"
     env["PI_REVIEW_CYCLES"] = "0"
-    result = subprocess.run(
-        ["bash", str(tmp_target / ".agents" / "scripts" / "monitor_pr.sh"), "1", "--merge"],
-        capture_output=True,
-        text=True,
-        cwd=tmp_target,
-        env=env,
-        timeout=60,
-        check=False,
+    argv = ["bash", str(tmp_target / ".agents" / "scripts" / "monitor_pr.sh"), "1"]
+    if merge:
+        argv.append("--merge")
+    return subprocess.run(
+        argv, capture_output=True, text=True, cwd=tmp_target, env=env, timeout=60, check=False
     )
+
+
+def test_environment_override_is_honored(tmp_target: Path, tmp_path: Path):
+    """PI_REVIEW_CYCLES=0 must disable the gate without editing config.yaml."""
+    result = _run_monitor_zero(tmp_target, tmp_path, merge=True)
     # Zero reviews exist; with cycles=0 the gate is skipped entirely.
     assert "review_cycles=0" in result.stdout, result.stdout + result.stderr
     assert "Waiting for a review" not in result.stdout
