@@ -15,7 +15,7 @@ cargo cyclonedx --format json                     # CycloneDX SBOM (`just sbom`,
 cargo deny check licenses                         # license compliance (`just license`, #579) — allow-list in deny.toml (denies GPL/AGPL)
 cargo test                                        # property-based tests with proptest (`just fuzz`, #580)
 cargo clippy -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity -D missing_docs   # lint + complexity + public-API docs
-cargo fmt --check                                 # verifies only; `cargo fmt` (no flag) writes changes
+cargo fmt --check                                 # format gate — part of `just lint`, CI runs it (#726); `cargo fmt` writes
 ```
 
 ## Enforced complexity and docs (parity with Python's ruff gate)

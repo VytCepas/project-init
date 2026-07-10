@@ -15,7 +15,8 @@ just sbom           # CycloneDX SBOM via cyclonedx-gomod (#574) — release.yml 
 just license        # dependency license scan (#579) — deny copyleft; tune --disallowed_types
 just fuzz           # replay fuzz-test seed corpora (#580) — native go test -fuzz, CI-safe
 golangci-lint run   # revive, godoclint, gocognit, cyclop, dupl, errcheck, govet, staticcheck, gosec — see .golangci.yml
-golangci-lint fmt   # gofumpt (stricter than gofmt) — no separate binary needed
+                    # ALSO the format gate: `formatters: gofumpt` in .golangci.yml makes `run` fail on unformatted code (#726)
+golangci-lint fmt   # WRITES gofumpt formatting (stricter than gofmt) — no separate binary needed
 ```
 
 ## Fuzzing (native `go test -fuzz`, #580)

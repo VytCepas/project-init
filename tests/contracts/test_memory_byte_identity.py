@@ -132,6 +132,13 @@ delegation boundary. Deliberate content change, not move-drift — only the
 `.agents/agents/explore.md` hash was re-pinned across all four combos, after
 verifying every other file still matched.
 
+Exception (PI-726): `dag_workflow.py` was reformatted by `ruff format`. `just
+lint` now carries `ruff format --check .`, and the shipped hook was not
+format-clean — so every fresh python scaffold would have failed its own lint gate
+on day one (the #698 class of bug). Deliberate formatting change, not move-drift
+— only the `.agents/hooks/dag_workflow.py` hash was re-pinned across all four
+combos, after verifying every other file still matched.
+
 """
 
 from __future__ import annotations

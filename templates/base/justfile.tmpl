@@ -9,9 +9,12 @@
 setup:
     sh -c 'if [ ! -f pyproject.toml ]; then echo "No pyproject.toml yet — nothing to sync."; elif grep -q "^\[dependency-groups\]" pyproject.toml; then uv sync --group dev; else uv sync; fi'
 
-# lint project code (docstring + complexity gates per ruff.toml)
+# lint project code (docstring + complexity gates per ruff.toml).
+# `ruff format --check` verifies formatting without writing — `just format`
+# writes. Without this, an unformatted file merged green (#726).
 lint:
     uv run ruff check .
+    uv run ruff format --check .
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint_context_budget.sh
@@ -110,9 +113,15 @@ code-map:
 setup:
     bun add -d eslint typescript typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc @biomejs/biome
 
-# lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs)
+# lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs).
+# `biome format` without --write IS the check: verified against biome 2.x, it
+# leaves files byte-identical and exits 1 on a diff (#726). Do not "fix" this by
+# adding --check — biome rejects the flag ("`--check` is not expected in this
+# context"). Deliberately not `biome ci` either, which also runs biome's linter
+# and would duplicate eslint, the owner of the lint gates here.
 lint:
     bunx eslint .
+    bunx @biomejs/biome format .
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint_context_budget.sh
@@ -281,6 +290,7 @@ build:
 # with no pub items it only asks for a crate-level `//!` doc.
 lint:
     cargo clippy -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity -D missing_docs
+    cargo fmt --check
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint_context_budget.sh

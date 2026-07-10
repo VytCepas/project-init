@@ -451,8 +451,7 @@ def render_text(report: dict, transcript: Path) -> str:
     lines += ["", "== Top context contributors (tool_result volume) =="]
     if contributors:
         lines.extend(
-            f"    {name}: {chars:,} chars (≈{chars // 4:,} tokens)"
-            for name, chars in contributors
+            f"    {name}: {chars:,} chars (≈{chars // 4:,} tokens)" for name, chars in contributors
         )
     else:
         lines.append("    (none)")

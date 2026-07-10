@@ -31,6 +31,7 @@ Issue-ref prefix detection:
 
 stdlib only.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -168,7 +169,13 @@ def check_ci_green() -> tuple[bool, str]:
         # miscounted as "still running" forever — and a red one as pending —
         # while the CheckRun `conclusion`/`status` fields stay authoritative.
         state = (entry.get("state") or "").upper()
-        if conclusion in {"FAILURE", "TIMED_OUT", "CANCELLED", "ERROR", "ACTION_REQUIRED"} or state in {
+        if conclusion in {
+            "FAILURE",
+            "TIMED_OUT",
+            "CANCELLED",
+            "ERROR",
+            "ACTION_REQUIRED",
+        } or state in {
             "FAILURE",
             "ERROR",
         }:
@@ -527,7 +534,9 @@ def cmd_push(branch: str | None, max_retries: int, *, force: bool = False) -> in
         # running push_branch.sh while on main bypasses the direct-push guard,
         # since the internal `git push` subprocess is invisible to the
         # PreToolUse hook (PI-202).
-        sys.stderr.write("push: refusing to push main/master directly — open a feature branch + PR\n")
+        sys.stderr.write(
+            "push: refusing to push main/master directly — open a feature branch + PR\n"
+        )
         return 1
 
     code, sha_out = _git(["rev-parse", branch])
@@ -572,30 +581,22 @@ def cmd_promote(pr_number: int | None) -> int:
     if pr_number is None:
         pr_number = _detect_pr_number()
     if pr_number is None:
-        sys.stderr.write(
-            "promote: no PR found for current branch. Pass a PR number.\n"
-        )
+        sys.stderr.write("promote: no PR found for current branch. Pass a PR number.\n")
         return 1
-    code, out = _gh(
-        ["pr", "view", str(pr_number), "--json", "isDraft", "-q", ".isDraft"]
-    )
+    code, out = _gh(["pr", "view", str(pr_number), "--json", "isDraft", "-q", ".isDraft"])
     if code != 0:
         sys.stderr.write(f"promote: cannot read PR #{pr_number}\n")
         return 1
     if out.strip() == "false":
         _, url = _gh(["pr", "view", str(pr_number), "--json", "url", "-q", ".url"])
-        sys.stdout.write(
-            f"PR #{pr_number} is already ready for review: {url.strip()}\n"
-        )
+        sys.stdout.write(f"PR #{pr_number} is already ready for review: {url.strip()}\n")
         return 0
     code, _ = _gh(["pr", "ready", str(pr_number)])
     if code != 0:
         sys.stderr.write(f"promote: gh pr ready failed for #{pr_number}\n")
         return code
     _, url = _gh(["pr", "view", str(pr_number), "--json", "url", "-q", ".url"])
-    sys.stdout.write(
-        f"PR #{pr_number} is now ready for review: {url.strip()}\n"
-    )
+    sys.stdout.write(f"PR #{pr_number} is now ready for review: {url.strip()}\n")
     return 0
 
 
@@ -609,9 +610,7 @@ def cmd_finish(pr_number: int | None, review_cycle: int | None) -> int:
     if pr_number is None:
         sys.stderr.write("finish: no PR found for current branch.\n")
         return 1
-    code, head = _gh(
-        ["pr", "view", str(pr_number), "--json", "headRefName", "-q", ".headRefName"]
-    )
+    code, head = _gh(["pr", "view", str(pr_number), "--json", "headRefName", "-q", ".headRefName"])
     head = head.strip()
     if code != 0 or not head:
         sys.stderr.write(
@@ -658,9 +657,7 @@ def _slugify(text: str) -> str:
     return s.strip("-")
 
 
-def cmd_create_pr_nojira(
-    type_: str, title: str, branch: str | None, base: str | None
-) -> int:
+def cmd_create_pr_nojira(type_: str, title: str, branch: str | None, base: str | None) -> int:
     """Create a no-issue feature branch (if needed) and open a draft PR."""
     if type_ not in _VALID_TYPES:
         sys.stderr.write(
@@ -678,9 +675,7 @@ def cmd_create_pr_nojira(
         else:
             slug = _slugify(title)
             if not slug:
-                sys.stderr.write(
-                    "ERROR: title must contain at least one letter or number\n"
-                )
+                sys.stderr.write("ERROR: title must contain at least one letter or number\n")
                 return 1
             prefix = "nojira-"
             max_slug = max(12, 80 - len(type_) - 1 - len(prefix))
@@ -688,9 +683,7 @@ def cmd_create_pr_nojira(
             branch = f"{type_}/{prefix}{slug}"
 
     if not _BRANCH_RE.match(branch):
-        sys.stderr.write(
-            f"ERROR: branch '{branch}' must start with feat|fix|chore|docs|test/\n"
-        )
+        sys.stderr.write(f"ERROR: branch '{branch}' must start with feat|fix|chore|docs|test/\n")
         return 1
 
     if current == branch:

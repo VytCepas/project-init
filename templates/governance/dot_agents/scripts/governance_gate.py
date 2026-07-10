@@ -73,9 +73,7 @@ def find_cards(gov_dir: Path) -> list[Path]:
     still a real card.
     """
     return [
-        p
-        for p in gov_dir.rglob("SYSTEM_CARD.md")
-        if p.relative_to(gov_dir).parts[0] != "examples"
+        p for p in gov_dir.rglob("SYSTEM_CARD.md") if p.relative_to(gov_dir).parts[0] != "examples"
     ]
 
 
@@ -133,8 +131,14 @@ def validate_card(card: Path, root: Path, gov_dir: Path, max_age: int) -> list[s
     if role and not is_placeholder(role) and role not in ROLES:
         errs.append(f"role must be one of {sorted(ROLES)}; got {role!r}")
     classification = fm.get("classification", "")
-    if classification and not is_placeholder(classification) and classification not in CLASSIFICATIONS:
-        errs.append(f"classification must be one of {sorted(CLASSIFICATIONS)}; got {classification!r}")
+    if (
+        classification
+        and not is_placeholder(classification)
+        and classification not in CLASSIFICATIONS
+    ):
+        errs.append(
+            f"classification must be one of {sorted(CLASSIFICATIONS)}; got {classification!r}"
+        )
     allowed = fm.get("allowed", "").lower()
     if allowed and not is_placeholder(allowed) and allowed not in ALLOWED_VALUES:
         errs.append(f"allowed must be true|false; got {fm.get('allowed')!r}")
