@@ -169,7 +169,16 @@ def _severities(target: Path) -> dict[str, int]:
     spacing, which is what PR #731 rightly declined to assert on.
     """
     result = _eslint(target, "-f", "json")
-    report = json.loads(result.stdout)
+    try:
+        report = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        # A config or formatter error puts eslint's diagnostics on stderr and
+        # leaves stdout empty. Surface them: a bare JSONDecodeError traceback
+        # hides the one thing that explains the failure (PR #735 review).
+        raise AssertionError(
+            f"eslint -f json produced no parseable JSON ({exc}).\n"
+            f"exit={result.returncode}\nstdout={result.stdout!r}\nstderr={result.stderr}"
+        ) from exc
     severities: dict[str, int] = {}
     for file_report in report:
         for message in file_report["messages"]:
