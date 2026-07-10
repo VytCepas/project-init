@@ -689,11 +689,44 @@ jobs:
         with:
           bun-version: latest
 
+      # Two defects, both fixed here (#738).
+      #
+      # 1. `--frozen-lockfile 2>/dev/null || bun install` silently accepted a
+      #    STALE lockfile: the frozen install fails, `||` swallows it, and a
+      #    non-frozen install rewrites bun.lock and pulls the undeclared dep —
+      #    so the license scan inspected a dependency set the repo never
+      #    committed. Verified against bun 1.3.14. `lint-and-test` above already
+      #    runs frozen with no fallback, so failing fast here is consistency,
+      #    not an escalation.
+      # 2. A fresh scaffold has no package.json, and `bun install` exits 1 there
+      #    ("could not find a package.json file to install from") — this job was
+      #    born red on a project's first CI run.
+      #
+      # The scan step is skipped rather than left to no-op: `bunx
+      # license-checker` exits 0 when there is no package.json, which would turn
+      # "nothing was scanned" into a green gate (#688).
+      - name: Check for package.json
+        id: pkg
+        run: |
+          if [ -f package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No package.json yet — nothing to license-scan."
+          fi
+
       # license-checker reads node_modules, so install deps first.
       - name: Install dependencies
-        run: bun install --frozen-lockfile 2>/dev/null || bun install
+        if: steps.pkg.outputs.exists == 'true'
+        run: |
+          if [ -f bun.lock ] || [ -f bun.lockb ]; then
+            bun install --frozen-lockfile
+          else
+            bun install
+          fi
 
       - name: License scan (license-checker)
+        if: steps.pkg.outputs.exists == 'true'
         run: just license
 {{/if node}}{{#if go}}
       - name: Set up Go
