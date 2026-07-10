@@ -12,64 +12,26 @@ per run, so nightly is where repetition buys new inputs.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
 
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
+from tests.workflow import (
+    job,
+    job_runs_command,
+    load_workflow,
+    needs,
+    schedule_crons,
+    uses,
+)
 
 
 def _scaffold(target: Path, language: str = "python") -> Path:
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
     scaffold(target, load_preset("obsidian-only"), make_variables(language=language, **flags), strict=True)
     return target
-
-
-def _job_block(ci: str, job: str) -> str:
-    """Return the YAML block for `job`, sliced at the NEXT top-level job key.
-
-    Not at a comment marker: a reworded comment would then break the test with no
-    functional change (PR #736 review). Not via a YAML parse either — this repo
-    keeps pyyaml out of the test deps. Comment lines between jobs belong to the
-    job that follows, so the block may carry a trailing comment; that is fine,
-    every assertion here looks for a presence, not an absence.
-    """
-    match = re.search(rf"^  {re.escape(job)}:$", ci, flags=re.MULTILINE)
-    assert match is not None, f"no `{job}:` job in the rendered workflow"
-    rest = ci[match.start() :]
-    nxt = re.search(r"^  [a-z][a-z0-9-]*:$", rest[len(f"  {job}:") :], flags=re.MULTILINE)
-    return rest if nxt is None else rest[: len(f"  {job}:") + nxt.start()]
-
-
-def _needs(ci: str, job: str) -> str:
-    """Return `job`'s whole `needs:` section — inline list OR multiline items.
-
-    Reading only the `needs:` line would let a later reformat to a multiline list
-    hide `fuzz` in a `- fuzz` item while the test still passed (PR #736 review).
-    Continuation is decided by INDENT, not by a leading `-`: YAML allows comment
-    lines among the items, and stopping at the first one truncated the section
-    and reintroduced the same false negative (PR #736 review, cycle 7).
-
-    Comment lines are stripped from the result, so a comment mentioning a job
-    name cannot produce a false positive either.
-    """
-    block = _job_block(ci, job).splitlines()
-    start = next(
-        (i for i, line in enumerate(block) if line.strip().startswith("needs:")), None
-    )
-    assert start is not None, f"`{job}:` has no `needs:` section"
-    indent = len(block[start]) - len(block[start].lstrip())
-    section = [block[start]]
-    for line in block[start + 1 :]:
-        stripped = line.strip()
-        blank_or_comment = not stripped or stripped.startswith("#")
-        deeper = len(line) - len(line.lstrip()) > indent
-        if not (blank_or_comment or deeper):
-            break
-        section.append(line)
-    return "\n".join(line for line in section if not line.strip().startswith("#"))
 
 
 class TestFuzzRecipe:
@@ -99,17 +61,14 @@ class TestFuzzJob:
 
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_job_present_for_every_language(self, tmp_path: Path, language: str):
-        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
-        # _job_block asserts the job key exists, with a clearer message than a
-        # `"\n  fuzz:" in ci` check — which would also break if fuzz ever became
-        # the first job (PR #736 review).
-        job = _job_block(ci, "fuzz")
-        assert "name: Fuzz / property tests" in job
-        # `run:` — not a bare `"just fuzz" in ci`, which the job's own prose
-        # comment satisfies. That assertion passed with the run step gutted to
-        # `run: echo nothing` (PR #736 review): the whole point of #727 is a job
-        # that INVOKES the recipe, so assert the invocation (#688).
-        assert "run: just fuzz" in job, job
+        wf = load_workflow(_scaffold(tmp_path / language, language))
+        fuzz = job(wf, "fuzz")  # asserts the job exists
+        assert fuzz["name"] == "Fuzz / property tests"
+        # A `run:` step invoking the recipe — not `"just fuzz" in ci`, which the
+        # job's own prose comment satisfies. That text check passed with the run
+        # step gutted to `run: echo nothing` (PR #736 review); parsing the steps
+        # asserts the invocation, not the mention (#688/#739).
+        assert job_runs_command(fuzz, "just fuzz"), fuzz
 
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_job_runs_nightly_not_merely_on_some_schedule(self, tmp_path: Path, language: str):
@@ -119,15 +78,14 @@ class TestFuzzJob:
         job then fires on every cron in `on.schedule`. The nightly cron used to
         live inside `{{#if python}}`, so node/go/rust rendered a fuzz job that ran
         WEEKLY while the docs said nightly — the very map-not-territory defect
-        this issue is about, caught in review of PR #736 rather than by this test.
-        Pin both halves: the cron must exist, and the job must match on it.
+        this issue is about (PR #736 review). Pin both halves: the cron must
+        exist, and the job must match on it.
         """
-        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
-        assert '- cron: "0 3 * * *"' in ci, f"{language} has no nightly cron"
-        job = _job_block(ci, "fuzz")
-        assert (
-            "if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'" in job
-        ), job
+        wf = load_workflow(_scaffold(tmp_path / language, language))
+        assert "0 3 * * *" in schedule_crons(wf), f"{language} has no nightly cron"
+        assert job(wf, "fuzz")["if"] == (
+            "github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'"
+        )
 
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_no_schedule_gated_job_matches_every_cron(self, tmp_path: Path, language: str):
@@ -138,27 +96,23 @@ class TestFuzzJob:
         run to nightly too (PR #736 review). Every schedule-gated job must name
         the cron it wants.
 
-        Scans `if:` lines ONLY. The workflow's own prose comments quote
-        `github.event_name == 'schedule'` while explaining this very rule, so a
-        whole-file scan would flag them — today it passes only because those
-        quotes happen to fall on lines that also mention `github.event.schedule`
-        or wrap mid-expression (PR #736 review).
+        Reads each job's parsed `if:` expression, so a prose comment quoting the
+        bare gate cannot be mistaken for one — the string scan this replaced
+        passed only by luck of line wrapping (#739).
         """
-        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
+        wf = load_workflow(_scaffold(tmp_path / language, language))
         offenders = [
-            line.strip()
-            for line in ci.splitlines()
-            if line.strip().startswith("if:")
-            and "github.event_name == 'schedule'" in line
-            and "github.event.schedule" not in line
+            name
+            for name, spec in (wf.get("jobs") or {}).items()
+            if "github.event_name == 'schedule'" in str(spec.get("if", ""))
+            and "github.event.schedule" not in str(spec.get("if", ""))
         ]
         assert not offenders, f"schedule-gated jobs must match their own cron: {offenders}"
 
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_fuzz_non_blocking(self, tmp_path: Path, language: str):
-        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
-        needs = _needs(ci, "ci-gate")
-        assert "fuzz" not in needs, f"the fuzz job must stay non-blocking:\n{needs}"
+        wf = load_workflow(_scaffold(tmp_path / language, language))
+        assert "fuzz" not in needs(wf, "ci-gate"), "the fuzz job must stay non-blocking"
 
     @pytest.mark.parametrize(
         "language,setup_step",
@@ -174,9 +128,8 @@ class TestFuzzJob:
     ):
         """A fuzz job that cannot run its own recipe is the skipped-test defect
         in another costume (#733). Assert the toolchain is actually installed."""
-        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
-        job = _job_block(ci, "fuzz")
-        assert setup_step in job, job
+        wf = load_workflow(_scaffold(tmp_path / language, language))
+        assert any(setup_step in ref for ref in uses(job(wf, "fuzz"))), uses(job(wf, "fuzz"))
 
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_renders_cleanly(self, tmp_path: Path, language: str):

@@ -8,29 +8,13 @@ non-blocking (not in ci-gate's needs), the same rollout semgrep/scorecard used.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
 
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
-
-
-def _job_code(ci: str, job: str) -> str:
-    """`job`'s block with comment lines removed.
-
-    Asserting the ABSENCE of a command over the raw block is a trap: this job's
-    own comment quotes the very command it must not run
-    (`--frozen-lockfile 2>/dev/null || bun install`, #738), so a naive
-    `not in job` check fails on the prose. Strip comments and assert over code.
-    """
-    match = re.search(rf"^  {re.escape(job)}:$", ci, flags=re.MULTILINE)
-    assert match is not None, f"no `{job}:` job in the rendered workflow"
-    rest = ci[match.start() :]
-    nxt = re.search(r"^  [a-z][a-z0-9-]*:$", rest[len(f"  {job}:") :], flags=re.MULTILINE)
-    block = rest if nxt is None else rest[: len(f"  {job}:") + nxt.start()]
-    return "\n".join(line for line in block.splitlines() if not line.strip().startswith("#"))
+from tests.workflow import job, load_workflow, needs, run_commands, steps
 
 
 def _scaffold(target: Path, language: str = "python", **overrides: str) -> Path:
@@ -56,12 +40,8 @@ class TestLicenseScanJob:
         assert "license-scan:" in ci
 
     def test_non_blocking_not_in_ci_gate_needs(self, tmp_path: Path):
-        ci = _ci(_scaffold(tmp_path / "p", "python"))
-        gate_start = ci.index("ci-gate:")
-        needs_line = next(
-            line for line in ci[gate_start:].splitlines() if line.lstrip().startswith("needs:")
-        )
-        assert "license-scan" not in needs_line, "license-scan must stay non-blocking initially"
+        wf = load_workflow(_scaffold(tmp_path / "p", "python"))
+        assert "license-scan" not in needs(wf, "ci-gate"), "license-scan must stay non-blocking initially"
 
     @pytest.mark.parametrize(
         "language,tool",
@@ -127,32 +107,32 @@ class TestNodeLicenseScanInstall:
     must not be born red on a fresh scaffold.
     """
 
-    def _job(self, tmp_path: Path) -> str:
-        return _job_code(_ci(_scaffold(tmp_path / "n", "node")), "license-scan")
+    def _job(self, tmp_path: Path) -> dict:
+        return job(load_workflow(_scaffold(tmp_path / "n", "node")), "license-scan")
 
     def test_no_silent_fallback_off_frozen_lockfile(self, tmp_path: Path):
         """`--frozen-lockfile 2>/dev/null || bun install` rewrites bun.lock and
         installs the undeclared dep, so the scan inspects a dependency set the
-        repo never committed. Verified against bun 1.3.14.
+        repo never committed. Verified against bun 1.3.14. Asserting over parsed
+        `run:` scripts, not raw text — the job comment quotes this command, and a
+        text `not in` check false-positived on the prose (#738/#739).
         """
-        job = self._job(tmp_path)
-        assert "|| bun install" not in job, job
-        assert "2>/dev/null" not in job, job
+        scripts = "\n".join(run_commands(self._job(tmp_path)))
+        assert "|| bun install" not in scripts, scripts
+        assert "2>/dev/null" not in scripts, scripts
 
     def test_frozen_only_when_a_lockfile_exists(self, tmp_path: Path):
-        job = self._job(tmp_path)
-        assert "bun install --frozen-lockfile" in job
-        assert "[ -f bun.lock ]" in job
+        scripts = "\n".join(run_commands(self._job(tmp_path)))
+        assert "bun install --frozen-lockfile" in scripts
+        assert "[ -f bun.lock ]" in scripts
 
     def test_install_and_scan_are_skipped_without_a_package_json(self, tmp_path: Path):
         """A fresh scaffold has no package.json: `bun install` exits 1 there, and
-        `bunx license-checker` exits 0 — born red, then vacuously green. Both
-        steps gate on the manifest check instead.
+        `bunx license-checker` exits 0 — born red, then vacuously green. So the
+        install and scan steps both gate on the package.json presence check.
         """
-        job = self._job(tmp_path)
-        assert "steps.pkg.outputs.exists == 'true'" in job
-        gated = [
-            line for line in job.splitlines()
-            if line.strip().startswith("if: steps.pkg.outputs.exists")
-        ]
-        assert len(gated) == 2, f"expected install + scan gated, got {len(gated)}:\n{job}"
+        job_steps = steps(self._job(tmp_path))
+        gated = [s for s in job_steps if s.get("if") == "steps.pkg.outputs.exists == 'true'"]
+        names = {s.get("name") for s in gated}
+        assert "Install dependencies" in names, [s.get("name") for s in job_steps]
+        assert "License scan (license-checker)" in names, [s.get("name") for s in job_steps]
