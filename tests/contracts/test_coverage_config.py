@@ -17,7 +17,10 @@ import tomllib
 from importlib.metadata import version
 from pathlib import Path
 
-_PYPROJECT = Path("pyproject.toml")
+# Repo-root anchored, not cwd-relative: pytest may be invoked from a
+# subdirectory or by tooling that chdirs (PR #718 review).
+_ROOT = Path(__file__).resolve().parents[2]
+_PYPROJECT = _ROOT / "pyproject.toml"
 
 
 def _config() -> dict:
@@ -74,7 +77,7 @@ def test_no_conftest_env_hook_is_needed():
     """`patch = ["subprocess"]` replaced a hand-rolled COVERAGE_PROCESS_START
     export in conftest — declarative, and nothing to leak into `just test`.
     """
-    body = Path("tests/conftest.py").read_text(encoding="utf-8")
+    body = (_ROOT / "tests" / "conftest.py").read_text(encoding="utf-8")
     assert "COVERAGE_PROCESS_START" not in body
 
 
@@ -88,6 +91,6 @@ def test_ci_reports_coverage_without_gating_on_it():
     review). `test_coverage_measures_the_package_with_branch_coverage` pins the
     source that makes this safe.
     """
-    ci = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+    ci = (_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "--cov" in ci
     assert "--cov-fail-under" not in ci
