@@ -777,8 +777,12 @@ class TestTypecheckParity:
         step (PR #734 review).
         """
         justfile = self._justfile(tmp_target / language, language)
-        ci_line = next(ln for ln in justfile.splitlines() if ln.startswith("ci:"))
-        assert "typecheck" in ci_line, ci_line
+        # Assert the alias exists before reading it — a bare `next()` would raise
+        # StopIteration and read as a test error, not a contract failure
+        # (PR #734 review; same shape as the _recipe_body fix above).
+        ci_lines = [ln for ln in justfile.splitlines() if ln.startswith("ci:")]
+        assert ci_lines, f"{language}: no `ci:` alias in the scaffolded justfile"
+        assert "typecheck" in ci_lines[0], ci_lines[0]
 
     def test_go_typecheck_step_comes_after_just_is_installed(self, tmp_target: Path):
         """PR #734 review (P1): it invokes a justfile recipe. Ordered before
