@@ -29,7 +29,10 @@ from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
 
 pytestmark = [
-    pytest.mark.skipif(shutil.which("bun") is None, reason="bun not installed (CI does not ship it)"),
+    pytest.mark.skipif(
+        shutil.which("bun") is None or shutil.which("bunx") is None,
+        reason="bun/bunx not installed (CI does not ship them; see #733)",
+    ),
     pytest.mark.slow,
 ]
 
@@ -126,11 +129,11 @@ def ts_project(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 def _eslint(target: Path) -> subprocess.CompletedProcess:
-    # `bun x eslint .` — the subcommand form of `bunx`, which is exactly what the
-    # scaffolded `just lint` runs. Not node_modules/.bin/eslint: that shim is a
-    # shell script on POSIX and a .cmd/.ps1 on Windows (PR #731 review).
+    # `bunx eslint .` — byte-for-byte what the scaffolded `just lint` runs
+    # (justfile.tmpl). Not node_modules/.bin/eslint: that shim is a shell script
+    # on POSIX and a .cmd/.ps1 on Windows (PR #731 review).
     return subprocess.run(
-        ["bun", "x", "eslint", "."],
+        ["bunx", "eslint", "."],
         cwd=target,
         capture_output=True,
         text=True,
