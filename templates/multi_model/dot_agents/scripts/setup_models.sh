@@ -11,7 +11,15 @@
 # is user-run, in your project, exactly like the graphify setup script.
 set -euo pipefail
 
-# --- pinned, vetted versions (ADR-016 §5; bumped via upgrade-as-PR) -----------
+# --- external packages --------------------------------------------------------
+# CCR sits on the scaffolded project's request path, so its version is *pinned
+# and vetted* (ADR-016 §5; bumped via upgrade-as-PR by
+# tools/check_third_party_updates.py, which reads tools/pinned_third_party.toml).
+#
+# Claude Code is deliberately NOT pinned (#689): it is the operator's own CLI,
+# not something this scaffold puts in the request path, and freezing it would
+# hold every scaffolded project behind a bump PR on a fast-moving tool. It is
+# installed at upstream latest and is absent from the manifest by design.
 CCR_PKG="@musistudio/claude-code-router"
 CCR_VERSION="2.0.0"
 CLAUDE_PKG="@anthropic-ai/claude-code"
