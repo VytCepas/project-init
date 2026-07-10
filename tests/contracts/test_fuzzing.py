@@ -12,6 +12,7 @@ per run, so nightly is where repetition buys new inputs.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,21 @@ def _scaffold(target: Path, language: str = "python") -> Path:
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
     scaffold(target, load_preset("obsidian-only"), make_variables(language=language, **flags), strict=True)
     return target
+
+
+def _job_block(ci: str, job: str) -> str:
+    """Return the YAML block for `job`, sliced at the NEXT top-level job key.
+
+    Not at a comment marker: a reworded comment would then break the test with no
+    functional change (PR #736 review). Not via a YAML parse either — this repo
+    keeps pyyaml out of the test deps. Comment lines between jobs belong to the
+    job that follows, so the block may carry a trailing comment; that is fine,
+    every assertion here looks for a presence, not an absence.
+    """
+    start = ci.index(f"\n  {job}:")
+    rest = ci[start + 1 :]
+    nxt = re.search(r"^  [a-z][a-z0-9-]*:$", rest[len(f"  {job}:") :], flags=re.MULTILINE)
+    return rest if nxt is None else rest[: len(f"  {job}:") + nxt.start()]
 
 
 class TestFuzzRecipe:
@@ -71,8 +87,7 @@ class TestFuzzJob:
         """
         ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
         assert '- cron: "0 3 * * *"' in ci, f"{language} has no nightly cron"
-        job = ci[ci.index("\n  fuzz:") :]
-        job = job[: job.index("\n    steps:")]
+        job = _job_block(ci, "fuzz")
         assert (
             "if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'" in job
         ), job
@@ -118,8 +133,7 @@ class TestFuzzJob:
         """A fuzz job that cannot run its own recipe is the skipped-test defect
         in another costume (#733). Assert the toolchain is actually installed."""
         ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
-        job = ci[ci.index("\n  fuzz:") :]
-        job = job[: job.index("\n  # OpenSSF Scorecard")]
+        job = _job_block(ci, "fuzz")
         assert setup_step in job, job
 
     @pytest.mark.parametrize("language", _LANGUAGES)

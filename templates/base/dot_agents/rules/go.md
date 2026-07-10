@@ -13,7 +13,7 @@ just test-cov       # tests + coverage gate (>= 70%, per justfile) — CI always
 just audit          # dependency CVE/advisory scan (govulncheck) — CI always runs this
 just sbom           # CycloneDX SBOM via cyclonedx-gomod (#574) — release.yml attaches it to Releases
 just license        # dependency license scan (#579) — deny copyleft; tune --disallowed_types
-just fuzz           # replay fuzz-test seed corpora (#580) — native go test -fuzz; CI runs it nightly, not per-PR
+just fuzz           # replay fuzz-test seed corpora: `go test -run=Fuzz` (#580) — NOT active `-fuzz`; CI runs it nightly, not per-PR
 just typecheck      # `go vet ./...` — type-only pass; redundant with golangci-lint by design (#725)
 golangci-lint run   # revive, godoclint, gocognit, cyclop, dupl, errcheck, govet, staticcheck, gosec — see .golangci.yml
                     # ALSO the format gate: `formatters: gofumpt` in .golangci.yml makes `run` fail on unformatted code (#726)
