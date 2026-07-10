@@ -495,8 +495,10 @@ class TestCiQualityGates:
         # names its own cron via `github.event.schedule`, so a shared cron does
         # not imply a shared job.
         assert "mutation-tests:" not in ci
-        # `mutmut` as a bare word also appears in the scorecard job's prose
-        # comment in every language — assert the command, not the mention.
+        # The bare word `mutmut` renders for EVERY language in two prose comments
+        # — the `fuzz` job's (explaining the nightly cron's history) and the
+        # scorecard job's ("mirroring how semgrep/mutmut were introduced").
+        # Assert the command, not the mention.
         assert "mutmut run" not in ci
 
 

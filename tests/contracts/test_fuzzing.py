@@ -48,16 +48,28 @@ def _needs(ci: str, job: str) -> str:
 
     Reading only the `needs:` line would let a later reformat to a multiline list
     hide `fuzz` in a `- fuzz` item while the test still passed (PR #736 review).
+    Continuation is decided by INDENT, not by a leading `-`: YAML allows comment
+    lines among the items, and stopping at the first one truncated the section
+    and reintroduced the same false negative (PR #736 review, cycle 7).
+
+    Comment lines are stripped from the result, so a comment mentioning a job
+    name cannot produce a false positive either.
     """
     block = _job_block(ci, job).splitlines()
-    start = next(i for i, line in enumerate(block) if line.strip().startswith("needs:"))
+    start = next(
+        (i for i, line in enumerate(block) if line.strip().startswith("needs:")), None
+    )
+    assert start is not None, f"`{job}:` has no `needs:` section"
+    indent = len(block[start]) - len(block[start].lstrip())
     section = [block[start]]
     for line in block[start + 1 :]:
-        if line.strip().startswith("-") or not line.strip():
-            section.append(line)
-        else:
+        stripped = line.strip()
+        blank_or_comment = not stripped or stripped.startswith("#")
+        deeper = len(line) - len(line.lstrip()) > indent
+        if not (blank_or_comment or deeper):
             break
-    return "\n".join(section)
+        section.append(line)
+    return "\n".join(line for line in section if not line.strip().startswith("#"))
 
 
 class TestFuzzRecipe:
