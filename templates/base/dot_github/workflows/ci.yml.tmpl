@@ -298,16 +298,17 @@ jobs:
           find .agents -name '*.sh' -exec shellcheck -S error -x {} +
           find .agents -name '*.sh' -exec shfmt -d -i 2 {} +
 
-      # #725: `just typecheck` must mean the same thing in every language, since
-      # this is the step CI and agents call. For go it is `go vet ./...` —
-      # redundant with golangci-lint's go/analysis pass by design.
-      - name: Typecheck
-        run: just typecheck
-
       # Tests run via the justfile recipe agents and humans use (PI-139);
       # lint stays on the action above, which installs and caches the binary.
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      # #725: `just typecheck` must mean the same thing in every language, since
+      # this is the step CI and agents call. For go it is `go vet ./...`, guarded
+      # for a module with no sources yet. MUST come after `Install just` — it
+      # invokes a justfile recipe (PR #734 review).
+      - name: Typecheck
+        run: just typecheck
 
       # Coverage-gated (PI-569) — go tool cover ships with the Go toolchain
       # the setup-go action just installed, nothing extra to provision.

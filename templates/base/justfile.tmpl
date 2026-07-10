@@ -206,7 +206,7 @@ lint:
 # go/analysis, which type-checks. `just typecheck` exists so the command means
 # the same thing in every language, which is what CI and agents call (#725).
 typecheck:
-    go vet ./...
+    sh -c 'if find . -name "*.go" | grep -q .; then go vet ./...; else echo "No Go sources yet — nothing to type-check."; fi'
 
 # auto-format project code (gofumpt via golangci-lint fmt — no separate binary
 # to provision; golangci-lint is already required for `just lint`)

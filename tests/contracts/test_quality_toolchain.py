@@ -761,3 +761,21 @@ class TestTypecheckParity:
         target = _scaffold_language(tmp_target / language, language)
         ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         assert "just typecheck" in ci
+
+    def test_go_typecheck_step_comes_after_just_is_installed(self, tmp_target: Path):
+        """PR #734 review (P1): it invokes a justfile recipe. Ordered before
+        `Install just`, it failed with `just: command not found` on a fresh runner.
+        """
+        target = _scaffold_language(tmp_target, "go")
+        ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        assert ci.index("- name: Install just") < ci.index("- name: Typecheck")
+
+    def test_go_typecheck_is_guarded_for_a_source_less_module(self, tmp_target: Path):
+        """PR #734 review (P2): `go vet ./...` exits 1 on a module with no .go
+        files (`no packages to vet`, verified). A fresh scaffold must not be red;
+        the sibling recipes (test-cov, license, fuzz) already guard the same way.
+        """
+        justfile = self._justfile(tmp_target, "go")
+        recipe = justfile.split("\ntypecheck:", 1)[1].split("\n\n", 1)[0]
+        assert 'find . -name "*.go"' in recipe
+        assert "nothing to type-check" in recipe
