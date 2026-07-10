@@ -54,6 +54,10 @@ Pattern/tooling, **not** a blocking gate — property tests live alongside unit 
 For coverage-guided binary fuzzing, `cargo-fuzz` (libFuzzer, nightly) is the
 heavier option; proptest is the stable-toolchain default.
 
+**When it runs:** the CI `fuzz` job is schedule-only (nightly) and non-blocking —
+never on a PR (#727). proptest draws fresh seeds each run, so nightly explores
+inputs a per-PR run would only repeat. Run `just fuzz` locally at will.
+
 `cargo llvm-cov` needs `cargo install cargo-llvm-cov` + `rustup component add
 llvm-tools-preview` once locally; `cargo audit` only needs `cargo install
 cargo-audit` (no llvm-tools-preview — that component is specific to

@@ -78,7 +78,9 @@ license:
 
 # property-based tests with Hypothesis (#580). Property tests are opt-in per file
 # (import hypothesis); this recipe makes Hypothesis available without adding it as
-# a permanent dependency. Pattern/tooling, NOT a blocking gate.
+# a permanent dependency. Pattern/tooling, NOT a blocking gate: CI runs this in
+# the nightly `fuzz` job, never on a PR (#727). Hypothesis draws fresh seeds each
+# run, so the nightly job explores inputs a per-PR run would only repeat.
 fuzz:
     uv run --with hypothesis --with pytest-xdist pytest -n auto --tb=short -q
 
@@ -171,7 +173,9 @@ license:
 
 # property-based tests with fast-check (#580). Add the dep once: bun add -d
 # fast-check. Property tests are opt-in per file and run under `bun test`.
-# Pattern/tooling, NOT a blocking gate.
+# Pattern/tooling, NOT a blocking gate: CI runs this in the nightly `fuzz` job,
+# never on a PR (#727). fast-check draws fresh seeds each run, so the nightly job
+# explores inputs a per-PR run would only repeat.
 fuzz:
     bun test
 
@@ -260,7 +264,11 @@ license:
 # (short, CI-safe; no unbounded input generation). For active fuzzing that
 # generates new inputs, target one function:
 #   go test -run='^$' -fuzz=FuzzMyTarget -fuzztime=30s ./...
-# Built into the toolchain (go 1.18+). Pattern/tooling, NOT a blocking gate.
+# Built into the toolchain (go 1.18+). Pattern/tooling, NOT a blocking gate: CI
+# runs this in the nightly `fuzz` job, never on a PR (#727). Seed replay is
+# deterministic, so repeating it nightly surfaces no NEW inputs (unlike the other
+# three languages) — it still uses CI minutes; it runs nightly to keep the four
+# languages uniform.
 fuzz:
     sh -c 'if find . -name "*.go" | grep -q .; then go test -run="Fuzz" ./...; else echo "No Go sources yet — nothing to fuzz."; fi'
 
@@ -365,7 +373,9 @@ license:
 
 # property-based tests with proptest (#580). Add the dep once: cargo add --dev
 # proptest. Property tests are opt-in per file (proptest! macro) and run under
-# `cargo test`. Pattern/tooling, NOT a blocking gate.
+# `cargo test`. Pattern/tooling, NOT a blocking gate: CI runs this in the nightly
+# `fuzz` job, never on a PR (#727). proptest draws fresh seeds each run, so the
+# nightly job explores inputs a per-PR run would only repeat.
 fuzz:
     cargo test
 
