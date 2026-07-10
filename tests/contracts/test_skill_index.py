@@ -221,6 +221,14 @@ class TestScaffoldedAgentConventions:
         assert "A test that cannot fail is worse than no test" in agents
 
     def test_claude_md_still_redirects_to_agents_md(self, tmp_path: Path):
+        """The redirect sentence, not just the substring `AGENTS.md`.
+
+        A mere mention would pass while CLAUDE.md stopped being an entrypoint —
+        the conventions would then live in a file nothing points at (PR #730
+        review).
+        """
         target = tmp_path / "proj"
         scaffold(target, fallback_preset(), fallback_variables())
-        assert "AGENTS.md" in (target / "CLAUDE.md").read_text(encoding="utf-8")
+        claude = (target / "CLAUDE.md").read_text(encoding="utf-8")
+        assert "Canonical agent instructions live in [AGENTS.md](AGENTS.md)" in claude
+        assert "source of truth" in claude
