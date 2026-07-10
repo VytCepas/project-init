@@ -38,16 +38,23 @@ class TestSkillIndex:
         skill added under this repo's `.agents/skills/` and forgotten in its
         INDEX passed CI. Only `test_wiki_skill.py` touched the own-repo INDEX, and
         only to assert the literal string "wiki".
+
+        Matches the *link*, not the bare directory name (PR #724 review): "wiki"
+        appearing in prose — or as a substring of a longer word — would satisfy a
+        name-only check while the skill went unindexed.
         """
         own_skills = _REPO_ROOT / ".agents" / "skills"
         own_index = own_skills / "INDEX.md"
         assert own_index.exists(), ".agents/skills/INDEX.md missing"
         index_text = own_index.read_text(encoding="utf-8")
         missing = [
-            d.name for d in sorted(own_skills.iterdir()) if d.is_dir() and d.name not in index_text
+            d.name
+            for d in sorted(own_skills.iterdir())
+            if d.is_dir() and f".agents/skills/{d.name}/SKILL.md" not in index_text
         ]
         assert not missing, (
-            "skill directories missing from .agents/skills/INDEX.md: " + ", ".join(missing)
+            "skill directories not linked from .agents/skills/INDEX.md "
+            "(expected `.agents/skills/<dir>/SKILL.md`): " + ", ".join(missing)
         )
 
     def test_index_scaffolded_into_project(self, tmp_path: Path):
