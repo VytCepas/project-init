@@ -18,14 +18,23 @@ already dev-only test tools.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
 
 
 def load_workflow(target: Path, name: str = "ci.yml") -> dict:
-    """Parse a scaffolded workflow file into a dict."""
-    return yaml.safe_load((target / ".github" / "workflows" / name).read_text())
+    """Parse a scaffolded workflow file into a mapping.
+
+    Asserts the top level is a mapping: an empty or malformed file parses to
+    None/str, and every downstream helper would then raise an opaque
+    AttributeError instead of a clear failure (PR #742 review).
+    """
+    text = (target / ".github" / "workflows" / name).read_text(encoding="utf-8")
+    parsed = yaml.safe_load(text)
+    assert isinstance(parsed, dict), f"{name} did not parse to a mapping: {type(parsed).__name__}"
+    return parsed
 
 
 def on_triggers(workflow: dict) -> dict:
@@ -62,7 +71,11 @@ def needs(workflow: dict, name: str) -> list[str]:
 
 
 def steps(job_dict: dict) -> list[dict]:
-    return job_dict.get("steps") or []
+    raw = job_dict.get("steps") or []
+    assert isinstance(raw, list) and all(isinstance(s, dict) for s in raw), (
+        f"`steps:` is not a list of mappings: {type(raw).__name__}"
+    )
+    return raw
 
 
 def run_commands(job_dict: dict) -> list[str]:
@@ -75,10 +88,33 @@ def uses(job_dict: dict) -> list[str]:
     return [step["uses"] for step in steps(job_dict) if "uses" in step]
 
 
-def job_runs_command(job_dict: dict, needle: str) -> bool:
-    """True if any step's `run:` script contains `needle`.
+def _strip_shell_comments(script: str) -> str:
+    """Drop shell comments from a `run:` script before matching against it.
 
-    Unlike `needle in ci_text`, this cannot be satisfied by a comment: `run:`
-    scripts are values, and a `#` inside one is shell, not a stripped comment.
+    Parsing `run:` from YAML removes the *workflow* comments, but the value is a
+    shell script that can carry its OWN `#` comments — so `job_runs_command`
+    would match a command kept only as a comment (`echo x  # just fuzz`),
+    reintroducing the exact defect #739 fixes inside the helper that fixes it
+    (PR #742 review, Codex). Conservative and line-based: drop full-line comments
+    and inline comments introduced by whitespace-then-`#`. A `#` inside a quoted
+    string or `${#var}` is not stripped, so a needle hiding there could still
+    match — but that errs toward a false NEGATIVE (a real command not found ->
+    the test fails loudly), never a silent false positive.
     """
-    return any(needle in cmd for cmd in run_commands(job_dict))
+    out = []
+    for line in script.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            continue
+        marker = re.search(r"\s#", line)
+        out.append(line[: marker.start()] if marker else line)
+    return "\n".join(out)
+
+
+def job_runs_command(job_dict: dict, needle: str) -> bool:
+    """True if any step's `run:` script actually INVOKES `needle`.
+
+    Shell comments are stripped first, so a command preserved only as a comment
+    does not count (PR #742 review).
+    """
+    return any(needle in _strip_shell_comments(cmd) for cmd in run_commands(job_dict))
