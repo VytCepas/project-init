@@ -6,13 +6,15 @@ unrelated PRs on a number nobody chose, so the config reports and never fails.
 
 The subtle part is subprocess capture: most integration tests drive the CLI via
 `python -m project_init`, and coverage records nothing in a child process unless
-COVERAGE_PROCESS_START is exported. Without it the scaffolder reads as
-mostly-dead code — a misleading number is worse than no number.
+`[tool.coverage.run] patch = ["subprocess"]` is set (coverage>=7.10). Without it
+the scaffolder reads as mostly-dead code — 11% total, `concerns.py` at 0% — and a
+misleading number is worse than no number.
 """
 
 from __future__ import annotations
 
 import tomllib
+from importlib.metadata import version
 from pathlib import Path
 
 _PYPROJECT = Path("pyproject.toml")
@@ -45,12 +47,20 @@ def test_subprocess_coverage_is_enabled():
     assert "subprocess" in run.get("patch", []), run
 
 
-def test_coverage_is_pinned_new_enough_for_the_patch_option():
+def test_coverage_is_new_enough_for_the_patch_option():
+    """`patch` landed in coverage 7.10.
+
+    Asserts the *resolved* version rather than parsing the requirement string —
+    a spec like `==7.15.0` or `>=7.10,<8` would defeat string surgery, and the
+    installed version is what actually decides whether `patch` is honored
+    (PR #718 review).
+    """
     dev = _config()["dependency-groups"]["dev"]
-    pin = next((d for d in dev if d.startswith("coverage")), None)
-    assert pin, "coverage must be pinned directly; `patch` landed in 7.10"
-    floor = tuple(int(p) for p in pin.split(">=")[1].split("."))
-    assert floor >= (7, 10), pin
+    assert any(d.startswith("coverage") for d in dev), (
+        "coverage must be a direct dev dependency; `patch` is its option, not pytest-cov's"
+    )
+    installed = tuple(int(p) for p in version("coverage").split(".")[:2])
+    assert installed >= (7, 10), version("coverage")
 
 
 def test_coverage_has_no_failure_threshold():
@@ -69,6 +79,15 @@ def test_no_conftest_env_hook_is_needed():
 
 
 def test_ci_reports_coverage_without_gating_on_it():
+    """Bare `--cov` is deliberate: scope lives in [tool.coverage.run] source.
+
+    pytest-cov 7 does not rewrite the configured source when `--cov` is passed
+    without a value — measured, the report covers 10 `src/project_init` files and
+    no `tests/` or `tools/` rows. Repeating the path in the justfile and the
+    workflow would just be two more places to drift from the config (PR #718
+    review). `test_coverage_measures_the_package_with_branch_coverage` pins the
+    source that makes this safe.
+    """
     ci = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
     assert "--cov" in ci
     assert "--cov-fail-under" not in ci
