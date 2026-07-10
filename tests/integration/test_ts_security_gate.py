@@ -81,13 +81,30 @@ def ts_project(tmp_path_factory: pytest.TempPathFactory) -> Path:
         timeout=600,
     )
     if result.returncode != 0:
-        pytest.skip(f"bun add failed (offline?): {result.stderr[-200:]}")
+        # Skip ONLY for a network failure. A dependency conflict, a bad package
+        # name, or an unsatisfiable range is exactly the regression these tests
+        # exist to catch — skipping there would hide it behind a green run
+        # (PR #731 review, Codex P2).
+        stderr = result.stderr.lower()
+        offline = any(
+            token in stderr
+            for token in ("getaddrinfo", "enotfound", "econnrefused", "network", "timed out")
+        )
+        if offline:
+            pytest.skip(f"npm registry unreachable: {result.stderr[-200:]}")
+        raise AssertionError(
+            "`bun add` failed for a non-network reason — the scaffolded dev-dep "
+            f"set is broken:\n{result.stdout}\n{result.stderr}"
+        )
     return target
 
 
 def _eslint(target: Path) -> subprocess.CompletedProcess:
+    # `bun x`, not node_modules/.bin/eslint: the .bin shim is a shell script on
+    # POSIX and a .cmd/.ps1 on Windows, and `bunx eslint .` is what the
+    # scaffolded `just lint` actually runs (PR #731 review).
     return subprocess.run(
-        [str(target / "node_modules" / ".bin" / "eslint"), "."],
+        ["bun", "x", "eslint", "."],
         cwd=target,
         capture_output=True,
         text=True,
@@ -109,7 +126,10 @@ def test_insecure_code_is_blocked(ts_project: Path):
     src.mkdir(exist_ok=True)
     (src / "probe.ts").write_text(_INSECURE, encoding="utf-8")
     result = _eslint(ts_project)
-    assert result.returncode == 1, f"expected a lint failure, got {result.returncode}\n{result.stdout}"
+    assert result.returncode == 1, (
+        f"expected a lint failure (1), got {result.returncode} — exit 2 means an eslint "
+        f"crash, the #732 regression\n{result.stdout}\n{result.stderr}"
+    )
     assert "security/detect-eval-with-expression" in result.stdout
     assert "no-unsanitized/property" in result.stdout
     # `error`, not `warn` — eslint exits 0 on warnings, which would be a gate

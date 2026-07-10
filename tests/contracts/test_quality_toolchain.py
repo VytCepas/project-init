@@ -769,6 +769,22 @@ class TestTypeScriptSecurityGate:
         """They come from strictTypeChecked today; an upstream change could drop them."""
         assert f'"{rule}": "error"' in self.config
 
+    def test_ci_seeds_the_lint_toolchain_for_upgraded_projects(self):
+        """PR #731 review (Codex P1): `bun install` cannot add what package.json
+        never listed. An upgraded project's lockfile predates the new eslint
+        plugins, so eslint.config.mjs fails to import and `just lint` exits 2 —
+        a crash, before any gate runs. Verified: exit 2 before, 1 after.
+        """
+        ci = (self.target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        assert 'grep -q "eslint-plugin-security"' in ci
+        assert "just setup" in ci.split("Install dependencies", 1)[1].split("- name:", 1)[0]
+
+    def test_security_plugins_registered_in_the_typescript_block(self):
+        """Pinning a rule whose plugin was registered by a preset re-couples the
+        gate to that preset's shape — the coupling the pins remove.
+        """
+        assert 'plugins: { tsdoc, security, "no-unsanitized": noUnsanitized }' in self.config
+
     def test_typescript_pinned_below_7(self):
         """PI-732: unpinned `bun add -d typescript` resolves to TS 7, which
         typescript-eslint cannot parse — eslint exits 2 (crash), not 1.

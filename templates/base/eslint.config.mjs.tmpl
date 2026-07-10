@@ -57,7 +57,12 @@ export default tseslint.config(
         tsconfigRootDir: __dirname,
       },
     },
-    plugins: { tsdoc },
+    // security/no-unsanitized registered explicitly here, not left to the
+    // presets above. Pinning a rule whose plugin was registered elsewhere
+    // couples this block to the presets' shape — the coupling the pins exist
+    // to remove (PR #731 review). Verified: re-registration is accepted by
+    // flat config and the gate still exits 1 on eval().
+    plugins: { tsdoc, security, "no-unsanitized": noUnsanitized },
     rules: {
       // --- security gates (#729) -------------------------------------------
       // Pinned to `error`: eslint-plugin-security's recommended preset sets
