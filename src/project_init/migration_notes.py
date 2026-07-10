@@ -15,6 +15,22 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.0.2": {
+        "summary": (
+            "TypeScript projects gain a BLOCKING security lint "
+            "(eslint-plugin-security + eslint-plugin-no-unsanitized, severities "
+            "pinned to error), and `typescript` is pinned to ^5 because "
+            "typescript-eslint cannot parse TypeScript 7 — unpinned, `just lint` "
+            "crashed with exit 2 on every fresh Node scaffold (#729, #732)."
+        ),
+        "action_required": (
+            "Node projects: run `just setup` after upgrading. Your package.json "
+            "predates the new eslint plugins, and `bun install` cannot add what "
+            "it never listed — without this, eslint.config.mjs fails to import "
+            "and `just lint` exits 2. The scaffolded CI now seeds them "
+            "automatically, but local runs need the one-time install."
+        ),
+    },
     "1.0.1": {
         "summary": (
             "Patch release from live E2E testing against real mini-projects. "

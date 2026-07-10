@@ -1,12 +1,16 @@
 {{#if node}}// eslint.config.mjs — quality gates for project code (scaffolded by project-init).
 // Install the toolchain once:
-//   bun add -d eslint typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc
+//   bun add -d eslint "typescript@^5" typescript-eslint eslint-plugin-jsdoc \
+//     eslint-plugin-tsdoc eslint-plugin-security eslint-plugin-no-unsanitized
+// typescript@^5: typescript-eslint cannot parse with TS 7 (#732).
 // Biome stays formatter-only — it lacks gate-grade complexity/doc rules.
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import tseslint from "typescript-eslint";
 import jsdoc from "eslint-plugin-jsdoc";
 import tsdoc from "eslint-plugin-tsdoc";
+import security from "eslint-plugin-security";
+import noUnsanitized from "eslint-plugin-no-unsanitized";
 
 // fileURLToPath(import.meta.url), not import.meta.dirname: this config can
 // run under plain Node (npx eslint, CI, editor integrations), not just Bun —
@@ -23,6 +27,14 @@ export default tseslint.config(
   },
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
+  // Blocking security lint (#729) — parity with ruff's `S` (bandit) rules, which
+  // Python runs on every `just lint`. Before this, TS's only SAST was the
+  // non-blocking semgrep CI job, so a repo could merge with OWASP-class findings
+  // and nothing caught them. `security.configs.recommended` ships its rules at
+  // WARNING, which eslint exits 0 on — the severities are pinned to error below,
+  // or this would be a gate that never blocks.
+  security.configs.recommended,
+  noUnsanitized.configs.recommended,
   // Enforced JSDoc on exported/public symbols (TypeScript-aware preset).
   jsdoc.configs["flat/recommended-typescript"],
   {
@@ -45,8 +57,34 @@ export default tseslint.config(
         tsconfigRootDir: __dirname,
       },
     },
-    plugins: { tsdoc },
+    // security/no-unsanitized registered explicitly here, not left to the
+    // presets above. Pinning a rule whose plugin was registered elsewhere
+    // couples this block to the presets' shape — the coupling the pins exist
+    // to remove (PR #731 review). Verified: re-registration is accepted by
+    // flat config and the gate still exits 1 on eval().
+    plugins: { tsdoc, security, "no-unsanitized": noUnsanitized },
     rules: {
+      // --- security gates (#729) -------------------------------------------
+      // Pinned to `error`: eslint-plugin-security's recommended preset sets
+      // these to `warn`, and eslint exits 0 on warnings — a non-blocking
+      // "gate". Verified: eval(userInput) and `el.innerHTML = dirty` both exit 1.
+      "security/detect-eval-with-expression": "error",
+      "security/detect-child-process": "error",
+      "security/detect-non-literal-fs-filename": "error",
+      "security/detect-unsafe-regex": "error",
+      "no-unsanitized/method": "error",
+      "no-unsanitized/property": "error",
+      // Pinned, not inherited (#729). These come from strictTypeChecked today,
+      // so a preset change upstream could silently downgrade them. Python's
+      // `select = [..., "S"]` is explicit; make these explicit too.
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      // ----------------------------------------------------------------------
       // Mechanical guards against noodly generated code — mirror the
       // thresholds the Python preset uses in ruff.toml.
       complexity: ["error", 10],

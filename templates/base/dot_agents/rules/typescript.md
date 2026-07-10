@@ -22,7 +22,15 @@ disabled on purpose — that carve-out is for config, not for product code.
 
 ```bash
 bunx tsc --noEmit   # type check (strict mode, per tsconfig.base.json)
-bunx eslint .        # lint (type-aware: no-floating-promises, no-unsafe-*, per eslint.config.mjs)
+bunx eslint .        # lint + SECURITY gate (#729), blocking. Pinned to `error` in eslint.config.mjs:
+                     #   security/detect-eval-with-expression, detect-child-process,
+                     #   detect-non-literal-fs-filename, detect-unsafe-regex
+                     #   no-unsanitized/method, no-unsanitized/property   (DOM XSS sinks)
+                     # and the type-aware rules no-floating-promises, no-misused-promises,
+                     # no-unsafe-* — pinned explicitly, NOT inherited from strictTypeChecked,
+                     # so an upstream preset change cannot silently downgrade them.
+                     # eslint-plugin-security's own preset sets these to `warn`, and eslint
+                     # exits 0 on warnings — a gate that never blocks. Hence the pins.
 bunx @biomejs/biome format .   # format gate — exits 1 on unformatted, leaves files untouched.
                                # Part of `just lint` (#726). There is NO `--check` flag: biome
                                # rejects it ("`--check` is not expected in this context") — the

@@ -203,3 +203,32 @@ class TestCodeMapStaleness:
         scaffold(target, fallback_preset(), variables)
         ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         assert "CODE_MAP is current" not in ci
+
+
+class TestScaffoldedAgentConventions:
+    """The two conventions this repo earned must ship to scaffolded projects.
+
+    `templates/` is the product: a convention recorded only in this repo's
+    CLAUDE.md helps one project; in AGENTS.md.tmpl it reaches every generated
+    one. The scaffolded CLAUDE.md is a redirect — AGENTS.md is canonical.
+    """
+
+    def test_agents_md_carries_the_conventions(self, tmp_path: Path):
+        target = tmp_path / "proj"
+        scaffold(target, fallback_preset(), fallback_variables())
+        agents = (target / "AGENTS.md").read_text(encoding="utf-8")
+        assert "Verify the premise before you plan against it" in agents
+        assert "A test that cannot fail is worse than no test" in agents
+
+    def test_claude_md_still_redirects_to_agents_md(self, tmp_path: Path):
+        """The redirect sentence, not just the substring `AGENTS.md`.
+
+        A mere mention would pass while CLAUDE.md stopped being an entrypoint —
+        the conventions would then live in a file nothing points at (PR #730
+        review).
+        """
+        target = tmp_path / "proj"
+        scaffold(target, fallback_preset(), fallback_variables())
+        claude = (target / "CLAUDE.md").read_text(encoding="utf-8")
+        assert "Canonical agent instructions live in [AGENTS.md](AGENTS.md)" in claude
+        assert "source of truth" in claude
