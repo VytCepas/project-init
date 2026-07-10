@@ -175,6 +175,20 @@ class TestCodeMapStaleness:
         assert "cmp -s" in ci
         assert "run 'just code-map' and commit" in ci
 
+    def test_missing_generator_fails_rather_than_skipping(self, tmp_path: Path):
+        """PR #724 review: a broken scaffold must not pass a check that can't run.
+
+        A missing map means "not generated yet" (skip); a missing generator means
+        the scaffold is broken (fail). The first guard conflated them.
+        """
+        ci = self._ci(tmp_path, "python")
+        step = ci.split("name: CODE_MAP is current", 1)[1].split("- name:", 1)[0]
+        assert "the CODE_MAP staleness check cannot run" in step
+        assert 'if [ ! -f "$gen" ]; then' in step
+        assert 'if [ ! -f "$map" ]; then' in step
+        # The two conditions are no longer OR-ed into one skip.
+        assert '[ ! -f "$map" ] || [ ! -f "$gen" ]' not in step
+
     def test_non_python_ci_omits_the_check(self, tmp_path: Path):
         """The generator is a Python AST walker; there is nothing to map."""
         target = tmp_path / "proj-go"
