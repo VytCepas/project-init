@@ -633,3 +633,75 @@ class TestQualityPlugins:
         content = (target / "AGENTS.md").read_text()
         assert "pr-review-toolkit" in content
         assert "code-review@claude-plugins-official" in content
+
+
+class TestFormatGate:
+    """PI-726: `just lint` must reject an unformatted file, in every language.
+
+    Every `format` recipe *writes*; none checked. So an unformatted file merged
+    green for python, node and rust. Go was the exception all along —
+    `.golangci.yml` enables `gofumpt` under `formatters:`, and `golangci-lint
+    run` exits 1 on unformatted code (verified against golangci-lint 2.1.6).
+    Adding a fourth gate there would be redundant, so Go gets docs, not a check.
+
+    `rust.md` documented `cargo fmt --check` while nothing ran it — a rules file
+    promising a gate that did not exist (the map-not-territory failure, #688).
+    """
+
+    def _justfile(self, target: Path, language: str) -> str:
+        return (_scaffold_language(target, language) / "justfile").read_text(encoding="utf-8")
+
+    def _lint_recipe(self, justfile: str) -> str:
+        body = justfile.split("\nlint:", 1)[1]
+        return body.split("\n\n", 1)[0]
+
+    def test_python_lint_checks_formatting(self, tmp_target: Path):
+        assert "ruff format --check ." in self._lint_recipe(self._justfile(tmp_target, "python"))
+
+    def test_node_lint_checks_formatting(self, tmp_target: Path):
+        recipe = self._lint_recipe(self._justfile(tmp_target, "node"))
+        assert "@biomejs/biome format ." in recipe
+        # `biome ci` would also run biome's linter and duplicate eslint.
+        assert "biome ci" not in recipe
+
+    def test_rust_lint_checks_formatting(self, tmp_target: Path):
+        assert "cargo fmt --check" in self._lint_recipe(self._justfile(tmp_target, "rust"))
+
+    def test_go_relies_on_gofumpt_in_golangci_run(self, tmp_target: Path):
+        """Not a missing gate: `run` reports gofumpt findings and exits non-zero."""
+        target = _scaffold_language(tmp_target, "go")
+        golangci = (target / ".golangci.yml").read_text(encoding="utf-8")
+        assert "formatters:" in golangci
+        assert "gofumpt" in golangci
+        # No redundant `cargo fmt`-style step bolted onto the go lint recipe.
+        assert "gofumpt" not in self._lint_recipe((target / "justfile").read_text(encoding="utf-8"))
+
+    def test_format_recipes_still_write(self, tmp_target: Path):
+        """The check belongs to `lint`; `format` remains the fixer."""
+        for language, writer in (
+            ("python", "ruff format ."),
+            ("rust", "cargo fmt"),
+        ):
+            justfile = self._justfile(tmp_target / language, language)
+            format_recipe = justfile.split("\nformat:", 1)[1].split("\n\n", 1)[0]
+            assert writer in format_recipe
+
+    def test_shipped_python_templates_are_format_clean(self):
+        """A fresh scaffold must pass the gate it ships (#698 shipped this bug once).
+
+        `.agents/hooks/dag_workflow.py` was not ruff-format clean, so every new
+        python project would have failed `just lint` on day one.
+        """
+        import subprocess
+        import sys
+
+        root = Path(__file__).resolve().parents[2]
+        result = subprocess.run(
+            [sys.executable, "-m", "ruff", "format", "--check", str(root / "templates")],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 2:  # ruff not importable as a module here
+            pytest.skip("ruff not available as a module")
+        assert result.returncode == 0, result.stdout + result.stderr

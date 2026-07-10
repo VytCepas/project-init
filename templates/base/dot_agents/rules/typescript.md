@@ -23,6 +23,8 @@ disabled on purpose — that carve-out is for config, not for product code.
 ```bash
 bunx tsc --noEmit   # type check (strict mode, per tsconfig.base.json)
 bunx eslint .        # lint (type-aware: no-floating-promises, no-unsafe-*, per eslint.config.mjs)
+bunx @biomejs/biome format .   # format gate — exits 1 on unformatted; part of `just lint` (#726).
+                               # `biome format --write .` (i.e. `just format`) writes the fixes.
 bun test             # tests + coverage gate (>= 70%, per bunfig.toml) — always on, no extra flag needed
 bun audit            # dependency CVE/advisory scan — CI always runs this
 ```

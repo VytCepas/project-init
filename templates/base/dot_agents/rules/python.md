@@ -12,7 +12,8 @@ Uses [`uv`](https://docs.astral.sh/uv/).
 uv sync                           # install deps
 uv run <command>                  # run in the project venv
 uv run ruff check .               # lint
-uv run ruff format .              # format
+uv run ruff format .              # WRITES formatting; `ruff format --check .` is the gate,
+                                  # part of `just lint` — CI runs it (#726)
 uv run --with "mypy>=1.10" mypy src/  # type check (strict mode, per mypy.ini)
 uv run pytest -n auto -q          # tests (parallel mode, requires pytest-xdist)
 uv run pytest -q --tb=short       # tests (single-threaded fallback)
