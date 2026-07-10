@@ -145,7 +145,14 @@ def _eslint(target: Path) -> subprocess.CompletedProcess:
 def test_typescript_is_not_seven(ts_project: Path):
     """PI-732: TS 7 makes typescript-eslint crash — eslint exits 2, not 1."""
     result = subprocess.run(
-        ["bun", "pm", "ls"], cwd=ts_project, capture_output=True, text=True, check=False
+        ["bun", "pm", "ls"],
+        cwd=ts_project,
+        capture_output=True,
+        text=True,
+        check=False,
+        # Every other bun subprocess here is bounded; a hung `pm ls` would stall
+        # the whole pytest run (PR #731 review).
+        timeout=600,
     )
     assert "typescript@5" in result.stdout, result.stdout
 
