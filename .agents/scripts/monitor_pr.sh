@@ -58,6 +58,9 @@ case "$MAX_REVIEW_CYCLES" in
   exit 2
   ;;
 esac
+# Base-10, so a config.yaml or PI_REVIEW_CYCLES carrying "08" can never reach an
+# arithmetic context as octal (PR #717 review).
+MAX_REVIEW_CYCLES=$((10#$MAX_REVIEW_CYCLES))
 NO_REVIEW=0
 ALLOW_ADMIN=0
 
@@ -110,6 +113,11 @@ case "$REVIEW_CYCLE" in
   exit 2
   ;;
 esac
+# The digits-only check above accepts "08", which arithmetic expansion then reads
+# as octal: `NEXT=$((REVIEW_CYCLE + 1))` dies with "value too great for base"
+# (PR #717 review). `[ ]` comparisons parse base-10 and are unaffected, but the
+# $(( )) sites are not — normalize once, here, rather than at each use.
+REVIEW_CYCLE=$((10#$REVIEW_CYCLE))
 
 # --admin, --no-review and --review-cycle only take effect while merging. Warn
 # loudly if they were passed without --merge (e.g. `monitor_pr.sh 12 --admin`)

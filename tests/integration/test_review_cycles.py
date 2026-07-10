@@ -326,6 +326,64 @@ def _run_monitor_zero(tmp_target: Path, tmp_path: Path, *, merge: bool):
     )
 
 
+# reviews=1 + unresolved=2 drives the script into the unresolved-comments branch,
+# which is where `NEXT=$((REVIEW_CYCLE + 1))` lives — the octal crash site.
+_OCTAL_GH_STUB = """#!/bin/bash
+case "$*" in
+*"pr checks"*) echo '[{"name":"ci","state":"SUCCESS","bucket":"pass"}]' ;;
+*"--json headRefName"*) echo "feature true" ;;
+*"--json reviewDecision"*) echo "" ;;
+*"--json reviews"*) echo "1" ;;
+*"--json nameWithOwner"*) echo "o/r" ;;
+*"api graphql"*) echo "2" ;;
+*"--json mergeStateStatus"*) echo "CLEAN" ;;
+*"--json url"*) echo "https://example.invalid/pr/1" ;;
+*) exit 0 ;;
+esac
+"""
+
+
+@pytest.mark.parametrize("value", ["08", "09"])
+def test_leading_zero_cycle_counts_are_not_read_as_octal(
+    tmp_target: Path, tmp_path: Path, value: str
+):
+    """PR #717 review: the digits-only guard accepts "08".
+
+    `[ ]` comparisons parse base-10 and are fine, but `$((REVIEW_CYCLE + 1))`
+    dies with "value too great for base". Normalize at parse time.
+    """
+    scaffold(tmp_target, fallback_preset(), fallback_variables())
+    stub = tmp_path / "bin"
+    stub.mkdir(exist_ok=True)
+    (stub / "gh").write_text(_OCTAL_GH_STUB)
+    (stub / "gh").chmod(0o755)
+    (stub / "sleep").write_text("#!/bin/sh\nexit 0\n")
+    (stub / "sleep").chmod(0o755)
+    env = os.environ.copy()
+    env["PATH"] = f"{stub}:{env['PATH']}"
+    result = subprocess.run(
+        [
+            "bash",
+            str(tmp_target / ".agents" / "scripts" / "monitor_pr.sh"),
+            "1",
+            "--merge",
+            "--review-cycle",
+            value,
+        ],
+        capture_output=True,
+        text=True,
+        cwd=tmp_target,
+        env=env,
+        timeout=60,
+        check=False,
+    )
+    combined = result.stdout + result.stderr
+    assert "value too great for base" not in combined, combined
+    # It reached the review-cycle branch, so the arithmetic really did execute.
+    assert "unresolved review comment(s)" in result.stdout, combined
+    assert f"--review-cycle {int(value, 10) + 1}" in result.stdout, combined
+
+
 def test_environment_override_is_honored(tmp_target: Path, tmp_path: Path):
     """PI_REVIEW_CYCLES=0 must disable the gate without editing config.yaml."""
     result = _run_monitor_zero(tmp_target, tmp_path, merge=True)
