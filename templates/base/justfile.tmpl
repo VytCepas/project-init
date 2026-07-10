@@ -114,9 +114,11 @@ setup:
     bun add -d eslint typescript typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc @biomejs/biome
 
 # lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs).
-# `biome format` without --write is a check: it exits 1 on an unformatted file
-# (#726). Deliberately not `biome ci`, which also runs biome's linter and would
-# duplicate eslint, the owner of the lint gates here.
+# `biome format` without --write IS the check: verified against biome 2.x, it
+# leaves files byte-identical and exits 1 on a diff (#726). Do not "fix" this by
+# adding --check — biome rejects the flag ("`--check` is not expected in this
+# context"). Deliberately not `biome ci` either, which also runs biome's linter
+# and would duplicate eslint, the owner of the lint gates here.
 lint:
     bunx eslint .
     bunx @biomejs/biome format .

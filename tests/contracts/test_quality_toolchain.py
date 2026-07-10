@@ -661,6 +661,11 @@ class TestFormatGate:
     def test_node_lint_checks_formatting(self, tmp_target: Path):
         recipe = self._lint_recipe(self._justfile(tmp_target, "node"))
         assert "@biomejs/biome format ." in recipe
+        # Must not WRITE from the lint gate. Verified against biome 2.x:
+        # `format .` leaves files byte-identical and exits 1 on a diff, while
+        # `--write` mutates. There is no `format --check` flag — biome rejects it
+        # with "`--check` is not expected in this context" (PR #728 review).
+        assert "--write" not in recipe
         # `biome ci` would also run biome's linter and duplicate eslint.
         assert "biome ci" not in recipe
 
@@ -702,6 +707,10 @@ class TestFormatGate:
             text=True,
             check=False,
         )
-        if result.returncode == 2:  # ruff not importable as a module here
-            pytest.skip("ruff not available as a module")
-        assert result.returncode == 0, result.stdout + result.stderr
+        # No skip: ruff is a declared dev dependency, so a non-zero exit here is
+        # either real drift or a broken invocation. Skipping on rc==2 would let
+        # the gate vanish silently — the failure mode this whole PR is about
+        # (PR #728 review).
+        assert result.returncode == 0, (
+            f"ruff format --check exited {result.returncode}\n{result.stdout}{result.stderr}"
+        )
