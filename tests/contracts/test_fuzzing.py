@@ -71,8 +71,13 @@ class TestFuzzJob:
     def test_job_present_for_every_language(self, tmp_path: Path, language: str):
         ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
         assert "\n  fuzz:" in ci
-        assert "Fuzz / property tests" in ci
-        assert "just fuzz" in ci
+        job = _job_block(ci, "fuzz")
+        assert "name: Fuzz / property tests" in job
+        # `run:` — not a bare `"just fuzz" in ci`, which the job's own prose
+        # comment satisfies. That assertion passed with the run step gutted to
+        # `run: echo nothing` (PR #736 review): the whole point of #727 is a job
+        # that INVOKES the recipe, so assert the invocation (#688).
+        assert "run: just fuzz" in job, job
 
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_job_runs_nightly_not_merely_on_some_schedule(self, tmp_path: Path, language: str):
