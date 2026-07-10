@@ -27,16 +27,29 @@ from tests.helpers import make_variables
 _ROOT = Path(__file__).resolve().parents[2]
 _ACTIONLINT = shutil.which("actionlint")
 
+# actionlint-py is a declared dev dependency, so `uv run pytest` always has the
+# binary and this gate never silently skips — in CI or locally. The guard only
+# fires for someone running pytest outside the project environment (PR #720
+# review: the previous message claimed CI installed it, and CI did not).
 pytestmark = pytest.mark.skipif(
     _ACTIONLINT is None,
-    reason="actionlint not installed (CI installs it; run via `uvx --from actionlint-py actionlint`)",
+    reason="actionlint not on PATH — run under `uv run` so the dev group is active",
 )
 
 
 def _lint(paths: list[Path]) -> subprocess.CompletedProcess:
+    """Schema validity only — triggers, expressions, contexts.
+
+    `-shellcheck=` / `-pyflakes=` disable actionlint's embedded linters, which
+    fire only when those tools happen to be on PATH. CI runners preinstall
+    shellcheck and developer machines usually don't, so leaving them enabled
+    makes this gate pass locally and fail in CI on `run:` style findings
+    (SC2016/SC2086 "info") unrelated to whether the workflow loads. The
+    scaffolded shell scripts get a real shellcheck run in `test_shell_lint_gate`.
+    """
     assert paths, "no workflow files found — the glob is wrong, not the repo"
     return subprocess.run(
-        [_ACTIONLINT, *[str(p) for p in paths]],
+        [_ACTIONLINT, "-shellcheck=", "-pyflakes=", *[str(p) for p in paths]],
         capture_output=True,
         text=True,
         check=False,

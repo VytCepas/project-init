@@ -157,17 +157,6 @@ jobs:
           printf '%s\n' "${files[@]}"
           uvx --from 'shellcheck-py==0.11.0.1' shellcheck --severity=warning "${files[@]}"
 
-      # PI-719: an invalid trigger name made GitHub reject review-status.yml at
-      # load time — every run a startup failure with no jobs, for a full day,
-      # because YAML parsed fine and nothing linted the workflow schema. Lint
-      # this repo's workflows AND the rendered scaffold's, so a broken trigger
-      # can neither land here nor ship to a new project. Pinned for determinism.
-      - name: actionlint workflow files (this repo + rendered scaffold)
-        run: |
-          set -euo pipefail
-          uvx --from 'actionlint-py==1.7.12.24' actionlint \
-            .github/workflows/*.yml /tmp/sc-target/.github/workflows/*.yml
-
   # PI-363 Layer 3 gate: only spend the 10x-billed macOS minutes when shell or
   # template files actually change. Ordinary PRs skip the macOS job entirely.
   changes:
