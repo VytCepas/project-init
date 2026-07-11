@@ -11,7 +11,8 @@ jobs via its `needs:` list. If the two diverge, either the policy doc is stale o
 required gate was added/removed without updating the policy — this test fails so the
 divergence is caught in CI, not in production `main`.
 
-Stdlib only (no pyyaml, per repo convention); both sides are parsed with regexes
+Both sides are parsed with stdlib regexes — the marker isn't YAML and the ci-gate
+`needs:` list is a single well-known line, so a full YAML parse buys nothing here —
 tight enough to fail loudly if the shapes they target change.
 """
 
@@ -32,16 +33,25 @@ _CI_GATE_NEEDS_RE = re.compile(
 )
 
 
+def _split_gates(raw: str, source: str) -> set[str]:
+    # Return a set for comparison, but fail loudly on a duplicate first — a set
+    # would silently swallow a doubled gate and hide the drift it should catch.
+    items = [g.strip() for g in raw.split(",") if g.strip()]
+    dupes = [g for g in set(items) if items.count(g) > 1]
+    assert not dupes, f"duplicate gate(s) {sorted(dupes)} in {source}"
+    return set(items)
+
+
 def _declared_required_gates() -> set[str]:
-    m = _MARKER_RE.search(_POLICY.read_text())
+    m = _MARKER_RE.search(_POLICY.read_text(encoding="utf-8"))
     assert m, "required-gates marker missing from quality-gates.md"
-    return {g.strip() for g in m.group(1).split(",") if g.strip()}
+    return _split_gates(m.group(1), "quality-gates.md marker")
 
 
 def _ci_gate_needs() -> set[str]:
-    m = _CI_GATE_NEEDS_RE.search(_CI.read_text())
+    m = _CI_GATE_NEEDS_RE.search(_CI.read_text(encoding="utf-8"))
     assert m, "ci-gate job with an inline `needs: [...]` list not found in ci.yml"
-    return {g.strip() for g in m.group(1).split(",") if g.strip()}
+    return _split_gates(m.group(1), "ci.yml ci-gate.needs")
 
 
 def test_policy_marker_is_parseable_and_nonempty():
@@ -66,5 +76,5 @@ def test_required_set_matches_ci_gate_needs():
 
 def test_policy_doc_is_linked_from_claude_md():
     # The policy is only discoverable if CLAUDE.md points at it (acceptance criterion).
-    claude_md = (_REPO_ROOT / "CLAUDE.md").read_text()
+    claude_md = (_REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
     assert "docs/development/quality-gates.md" in claude_md
