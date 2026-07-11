@@ -14,6 +14,7 @@ from pathlib import Path
 
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
+from tests.workflow import load_workflow
 
 _EXPR = "${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}"
 
@@ -50,6 +51,32 @@ class TestCiRunsOnEscapeHatch:
             if job == "scorecard":
                 continue
             assert _EXPR in runs_on, f"{job} should read CI_RUNS_ON: {runs_on}"
+
+    def test_concurrency_cancels_only_pull_requests(self, tmp_target: Path):
+        """PI-589: the scaffolded ci.yml cancels a superseded PR run to save
+        runner-minutes, but ONLY for pull_request events — a nightly/weekly cron
+        or a base-branch push must never be cancelled mid-flight. A bare
+        `cancel-in-progress: true` would kill scheduled fuzz/mutation/scorecard
+        runs, so the gate on `github.event_name == 'pull_request'` is load-bearing.
+        """
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
+        concurrency = load_workflow(tmp_target).get("concurrency")
+        assert isinstance(concurrency, dict), "ci.yml has no concurrency block"
+        assert "cancel-in-progress" in concurrency, "concurrency block omits cancel-in-progress"
+        cip = concurrency["cancel-in-progress"]
+        # yaml parses a bare `true` to the boolean True; the gated expression
+        # parses to its string. Assert structurally so a comment mentioning
+        # "cancel-in-progress: true" can't fool the check, and a real bare-true
+        # (which would cancel scheduled fuzz/mutation/scorecard runs) fails.
+        assert cip is not True, "cancel-in-progress must be pull_request-gated, not a bare true"
+        assert cip == "${{ github.event_name == 'pull_request' }}"
+        # Lock the exact group shape: github.ref keeps distinct PRs in distinct
+        # groups (so they don't cancel each other), and github.event_name keeps
+        # push/schedule/PR runs from sharing a group and serializing. Asserting
+        # the whole string catches any of the three being dropped in a refactor.
+        assert concurrency.get("group") == (
+            "${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}"
+        )
 
     def test_scorecard_stays_pinned_but_gate_follows(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())

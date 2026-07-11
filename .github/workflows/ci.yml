@@ -9,6 +9,15 @@ on:
 permissions:
   contents: read
 
+# Cancel a superseded run when a new commit is pushed to the SAME pull request
+# (PI-589). Review cycles re-push often; finishing an obsolete run just burns
+# runner-minutes. Gated to pull_request events so a `main` push is never
+# cancelled. `github.event_name` is in the group key so push and PR runs never
+# share a group — same schedule-safe form the template ships.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint-and-test:
     name: Lint and test

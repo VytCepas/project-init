@@ -40,6 +40,50 @@ drift-guard test asserts this list equals `ci-gate.needs`:
 - `secret-scan` — gitleaks full-history scan
 - `shellcheck` — shellcheck over rendered scaffold scripts
 
+## CI clustering policy (jobs & workflows) — #589
+
+"Consolidate the checks" splits into two things that pull opposite ways; only one
+is worth doing.
+
+**DO — one required check.** The `ci-gate` aggregator is the endorsed cluster:
+many jobs run and show individually, exactly one context (`ci-gate`) gates the
+merge. Already in place. This is the whole of "reduce what blocks a merge."
+
+**DON'T — merge jobs into one mega-job.** Collapsing `lint-and-test` /
+`secret-scan` / `shellcheck` / `wheel-smoke` into a single job is a regression:
+- kills parallelism (they run concurrently on separate runners; serialized, wall-clock = sum, not max — directly fights time-to-merge),
+- can't span OSes (`macos-portability`/`windows-portability` need their own runners),
+- loses failure isolation (one red X instead of "gitleaks vs shellcheck"),
+- loses per-piece conditional/scheduled triggers,
+- a flaky step re-runs the whole blob (no per-job re-run).
+
+**DON'T — merge the workflow files.** Folding `validate-pr` / `review-status` /
+`board-automation` into `ci.yml` doesn't reduce the visible rows (jobs still
+render separately) and it widens the permission scope (board/review jobs need
+`projects`/`statuses` write), entangles triggers, and enlarges the blast radius
+of a single YAML error (#719).
+
+**Supersedes the original #589 proposal.** #589 first suggested regrouping jobs
+into ~3 workflow files to get GitHub checks-UI headings. That's the "merge the
+workflow files" move above — investigating it showed it doesn't reduce the visible
+rows and costs permission scope + trigger clarity, so we deliberately *don't* do
+it. Closing #589 with this policy is the reasoned resolution, not a dropped
+requirement: the cognitive-load goal is met by the one-required-gate model plus
+the drift guard, without the file reshuffle.
+
+**Adopted low-risk wins (both surfaces):** `concurrency: cancel-in-progress` on
+`ci.yml` — a new PR push cancels the superseded run, saving runner-minutes on
+review-cycle churn. `cancel-in-progress` is gated to pull-request events (its
+value is `${{ github.event_name == 'pull_request' }}`), so scheduled
+(nightly/weekly) and base-branch-push runs are never cancelled — schedule-safe,
+so the template ships the same form. The group key includes `github.event_name`
+so push/schedule/PR runs don't share a group and serialize.
+
+**Considered, not adopted — a composite "setup" action.** The only step repeated
+across jobs is `Install uv` (5×, identical pinned SHA); renovate keeps those pins
+in sync automatically, so extracting a composite action adds indirection for
+negligible DRY gain. Revisit if per-job setup grows.
+
 ## Inventory & decisions
 
 Decision legend: **keep** (unchanged), **promote** (make stronger / adopt onto the repo),
