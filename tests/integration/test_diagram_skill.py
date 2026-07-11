@@ -46,6 +46,17 @@ class TestDiagramSkill:
         assert "docs/diagrams/<slug>/<slug>.mmd" in content
         assert "Always render a picture file" in content
         assert "source **and** rendered picture" in content
+        # Dataviz routing boundary (PI-682): this skill is structural diagrams,
+        # not data charts — scaffolded projects have no dataviz skill to fall to.
+        assert "Not for data charts" in content
+        # Worked grounding example + labels-carry-paths (PI-684): file-backed
+        # nodes carry their repo-relative path so a later check can catch drift
+        # (this is what makes PI-688's dangling-path lint effective on diagrams).
+        assert "Worked grounding pass" in content
+        assert "(src/project_init/scaffold.py)" in content
+        # Git-tracking policy for rendered assets (PI-680): commit the render,
+        # marked linguist-generated, not gitignored.
+        assert "Commit the render, don't gitignore it" in content
         # Quality rules.
         assert "25 nodes" in content
         assert "subgraph" in content
