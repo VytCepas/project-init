@@ -11,6 +11,12 @@ Diagrams here are **source files first** (Mermaid by default): diffable,
 regenerable, and reviewable like code. Renders are previews; the committed
 source is the artifact.
 
+> **Not for data charts.** This skill draws *structural* diagrams — components,
+> flows, states, schemas, ideas. If the request is a chart/plot/dashboard over
+> *data* (numbers → bars, lines, points), it does not apply: reach for a
+> plotting library suited to the stack (matplotlib/plotly, Vega-Lite, Recharts,
+> or a spreadsheet) rather than forcing the data into Mermaid.
+
 ## 1. Pick the notation by diagram type
 
 | The user wants to see… | Use |
@@ -36,8 +42,30 @@ source is the artifact.
   `CODE_MAP.md` (if present), imports, and directory structure. Never invent
   a component; if a box isn't backed by a file/module/service you can name,
   it doesn't go on the diagram.
+- **Label file-backed nodes with their repo-relative path** — a "scaffold
+  engine" box reads `scaffold engine\n(src/project_init/scaffold.py)`. The path
+  is a *verifiable* fact, so a later check can flag a diagram that still points
+  at a moved or deleted file. Keep volatile specifics — thresholds, version
+  pins, line numbers — *out* of labels: point at their source, don't restate
+  them (map-not-territory; they rot silently).
 - **Idea mode:** one interview round first — what are the entities, what
   relations matter, what question should the diagram answer?
+
+**Worked grounding pass** (a repo's module layout):
+
+1. Enumerate what actually exists — `ls src/` (or the stack's source root) and
+   read `CODE_MAP.md` if present. Don't guess from memory.
+2. Keep ≤25 real nodes; group or drop the rest into an overview diagram.
+3. Every file-backed node carries its path, so each box is checkable:
+
+   ```mermaid
+   flowchart LR
+     cli["wizard CLI\n(src/project_init/__main__.py)"] --> engine["scaffold engine\n(src/project_init/scaffold.py)"]
+     engine --> tmpl["templates/ — the product"]
+   ```
+
+4. A box you cannot back with a real path or service name does not go on the
+   diagram.
 
 ## 3. The iteration loop
 
@@ -78,8 +106,15 @@ source is the artifact.
 - Commit the whole `<slug>/` folder: source **and** rendered picture
   together. The source is the artifact of record for diffing/regeneration;
   the picture is what a human opens without tooling — both ship, always.
+  **Commit the render, don't gitignore it:** GitHub renders ```` ```mermaid ``` ````
+  fences but not `.mmd` files as images, so the checked-in picture is the only
+  way a human sees the diagram on the forge without local tooling. It's
+  collapsed in `.gitattributes` — `docs/diagrams/**/*.svg` as
+  `linguist-generated`, and a vault render under `.agents/vault/**` already as
+  `linguist-vendored` — so it doesn't inflate diffs or language stats, and the
+  always-re-render rule (§3) keeps it from going stale.
 - Embedding:
-  - GitHub/GitLab render ```` ```mermaid ```` fences in markdown natively —
+  - GitHub/GitLab render ```` ```mermaid ``` ```` fences in markdown natively —
     inline the source in docs/README where useful.
   - mkdocs needs one-time config; offer to add it:
 

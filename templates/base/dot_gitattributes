@@ -15,3 +15,7 @@ package-lock.json linguist-generated=true
 bun.lock linguist-generated=true
 bun.lockb binary linguist-generated=true
 .agents/vault/** linguist-vendored=true
+# Rendered diagram pictures (PI-680): the .mmd source is the artifact of record
+# and stays diffable; the committed .svg render is regenerable (diagram skill's
+# always-re-render rule), so collapse its diffs and keep it out of language stats.
+docs/diagrams/**/*.svg linguist-generated=true
