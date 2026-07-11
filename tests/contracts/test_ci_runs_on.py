@@ -51,6 +51,19 @@ class TestCiRunsOnEscapeHatch:
                 continue
             assert _EXPR in runs_on, f"{job} should read CI_RUNS_ON: {runs_on}"
 
+    def test_concurrency_cancels_only_pull_requests(self, tmp_target: Path):
+        """PI-589: the scaffolded ci.yml cancels a superseded PR run to save
+        runner-minutes, but ONLY for pull_request events — a nightly/weekly cron
+        or a base-branch push must never be cancelled mid-flight. A bare
+        `cancel-in-progress: true` would kill scheduled fuzz/mutation/scorecard
+        runs, so the gate on `github.event_name == 'pull_request'` is load-bearing.
+        """
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
+        text = (tmp_target / ".github" / "workflows" / "ci.yml").read_text()
+        assert "concurrency:" in text
+        assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in text
+        assert "cancel-in-progress: true" not in text
+
     def test_scorecard_stays_pinned_but_gate_follows(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         jobs = _jobs_with_runs_on(

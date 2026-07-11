@@ -9,13 +9,13 @@ on:
 permissions:
   contents: read
 
-# Cancel a superseded run when a new commit is pushed to the same ref (PI-589).
-# Review cycles re-push often; without this, every push leaves its predecessor
-# running to completion, burning runner-minutes on results nobody will read.
-# Keyed by workflow + ref; `main` pushes are not grouped with any PR's ref.
+# Cancel a superseded run when a new commit is pushed to the SAME pull request
+# (PI-589). Review cycles re-push often; finishing an obsolete run just burns
+# runner-minutes. Gated to pull_request events so a `main` push is never
+# cancelled — same schedule-safe form the template ships.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint-and-test:

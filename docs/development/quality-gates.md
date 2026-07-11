@@ -63,8 +63,12 @@ render separately) and it widens the permission scope (board/review jobs need
 `projects`/`statuses` write), entangles triggers, and enlarges the blast radius
 of a single YAML error (#719).
 
-**Adopted low-risk wins:** `concurrency: cancel-in-progress` on `ci.yml` (a new
-push cancels the superseded run — saves runner-minutes on review-cycle churn).
+**Adopted low-risk wins (both surfaces):** `concurrency: cancel-in-progress` on
+`ci.yml` — a new PR push cancels the superseded run, saving runner-minutes on
+review-cycle churn. Gated to `pull_request` events (`cancel-in-progress: ${{
+github.event_name == 'pull_request' }}`) so scheduled (nightly/weekly) and
+base-branch-push runs are never cancelled — schedule-safe, so the template ships
+the same form.
 
 **Considered, not adopted — a composite "setup" action.** The only step repeated
 across jobs is `Install uv` (5×, identical pinned SHA); renovate keeps those pins

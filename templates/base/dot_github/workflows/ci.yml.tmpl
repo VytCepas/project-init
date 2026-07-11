@@ -35,6 +35,15 @@ permissions:
   contents: read
   pull-requests: write
 
+# Cancel a superseded run when a new commit is pushed to the SAME pull request
+# (PI-589) — review cycles re-push often, and finishing an obsolete run just
+# burns runner-minutes. `cancel-in-progress` is gated to pull_request events, so
+# scheduled (nightly fuzz/mutation, weekly scorecard) and {{base_branch}}-push
+# runs are NEVER cancelled — they always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
 {{#if python}}
   # PI-214: derive the test matrix from requires-python at runtime, so the
