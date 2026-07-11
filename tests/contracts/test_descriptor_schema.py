@@ -7,7 +7,6 @@ producer test pinned the schema-conformance AND the physical location of each
 surface. These tests do both, so a future relocation or schema drift fails here.
 """
 
-import json
 from pathlib import Path
 
 import jsonschema
@@ -16,6 +15,12 @@ import yaml
 
 from project_init.__main__ import ScaffoldInputs, _build_variables
 from project_init.scaffold import _PROJECTION_EXCLUDE, CONTRACT_VERSION, load_preset, scaffold
+from project_init.schema import (
+    descriptor_schema_path,
+    load_descriptor_schema,
+    load_usage_event_schema,
+    usage_event_schema_path,
+)
 
 
 def _render_full(tmp_path: Path) -> dict:
@@ -83,10 +88,9 @@ def test_scaffolded_config_validates_against_descriptor_schema(tmp_path: Path):
     with config_file.open(encoding="utf-8") as f:
         descriptor = yaml.safe_load(f)
 
-    # Read the JSON Schema
-    root = Path(__file__).resolve().parent.parent.parent
-    schema_file = root / "schemas" / "descriptor.schema.json"
-    schema = json.loads(schema_file.read_text(encoding="utf-8"))
+    # Load the JSON Schema through the public accessor (#786) — the same entry
+    # point a downstream consumer pins against.
+    schema = load_descriptor_schema()
 
     # Validate
     try:
@@ -146,3 +150,32 @@ class TestContractVersionAndBlocks:
         config = _render_full(tmp_path)
         assert config["hooks"]["expected"]
         assert config["observability"]["path"]
+
+
+class TestSchemaAccessor:
+    """PI-786: the schemas are a consumable, versioned artifact a downstream
+    consumer pins against — not a private copy it re-derives."""
+
+    def test_descriptor_schema_loads_with_v2_surfaces(self):
+        schema = load_descriptor_schema()
+        props = schema["properties"]
+        # The v2 contract surfaces a root orchestrator reads must be defined.
+        assert {"deploy", "observability", "hooks", "tooling", "memory"} <= set(props)
+        assert "v2" in schema["title"]
+
+    def test_usage_event_schema_loads(self):
+        assert load_usage_event_schema()["type"] == "object"
+
+    def test_schema_files_resolve_to_existing_paths(self):
+        assert descriptor_schema_path().is_file()
+        assert usage_event_schema_path().is_file()
+
+    def test_schemas_are_force_included_in_the_wheel(self):
+        # The accessor resolves from an installed package only if the JSON ships
+        # inside the wheel (force-include maps schemas -> project_init/schemas).
+        import tomllib
+
+        root = Path(__file__).resolve().parent.parent.parent
+        pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+        force_include = pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]["force-include"]
+        assert force_include.get("schemas") == "project_init/schemas"
