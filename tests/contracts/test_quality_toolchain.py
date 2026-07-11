@@ -454,6 +454,21 @@ class TestAdrToolchain:
         ):
             assert section in content
 
+    def test_madr_template_links_diagrams_not_pastes_them(self):
+        """PI-683: ADRs must link the diagram-skill folder, not paste a render
+        (so the ADR can't drift on re-render), and the example hrefs must be
+        written relative to the ADR's own location (.agents/docs/adr/) so a
+        reader following them doesn't 404. Assert every load-bearing part, so
+        dropping the anti-paste rule, a folder path, or a relative href fails.
+        """
+        content = (self.target / ".agents" / "docs" / "adr" / "adr-template.md").read_text()
+        assert "link that folder" in content  # link, ...
+        assert "don't paste" in content  # ... don't paste a render
+        # The example hrefs are ADR-relative — a bare repo-root path would
+        # resolve under .agents/docs/adr/ and 404.
+        assert "../../../docs/diagrams/<slug>/" in content  # non-vault folder
+        assert "../../vault/design/<slug>/" in content  # vault folder
+
     def test_add_adr_skill_scaffolded_and_indexed(self):
         skill = self.target / ".agents" / "skills" / "add_adr" / "SKILL.md"
         assert skill.is_file()

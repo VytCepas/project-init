@@ -104,6 +104,20 @@ class TestVaultStarterContent:
         for name in ("decision.md", "session-note.md", "knowledge-note.md", "design-note.md"):
             assert (templates / name).is_file(), f"missing template: {name}"
 
+    def test_design_readme_states_folder_per_diagram_convention(self):
+        """PI-683: the vault design/ README must not contradict the diagram
+        skill. Assert every load-bearing part of the convention so the README
+        can't silently drop the folder-per-diagram rule, the .mmd/.svg pair,
+        the re-render rule, or the commit-both rule (PR #753 review).
+        """
+        raw = (self.target / ".agents" / "vault" / "design" / "README.md").read_text()
+        readme = " ".join(raw.split())  # collapse line wraps so phrases match
+        assert "folder each" in readme  # one folder per diagram
+        assert "`.mmd` source" in readme  # source of record
+        assert "`.svg`" in readme  # the rendered picture, named as the skill does
+        assert "re-rendered on every source change" in readme  # never stale
+        assert "both are committed" in readme  # source AND render ship
+
     def test_templater_templates_use_tp_syntax(self):
         templates = self.target / ".agents" / "vault" / "templates"
         for name in ("decision.md", "session-note.md", "knowledge-note.md", "design-note.md"):

@@ -2,7 +2,16 @@
 
 <!-- MADR-style template (https://adr.github.io/madr/). Copy to
      adr-NNN-<kebab-slug>.md with the next free number — the add_adr skill
-     does this for you. Delete comments before committing. -->
+     does this for you. Delete comments before committing.
+
+     Diagrams: don't paste a render into the ADR. Draw it with the diagram
+     skill (source + picture live at the repo-root paths docs/diagrams/<slug>/,
+     or .agents/vault/design/<slug>/ in a vault) and link that folder. Write
+     the href relative to THIS file's home (.agents/docs/adr/), so the
+     repo-root path docs/diagrams/<slug>/ is linked as
+     ../../../docs/diagrams/<slug>/ (vault: ../../vault/design/<slug>/).
+     Linking, not pasting, keeps the ADR from drifting when the diagram is
+     re-rendered (map-not-territory). -->
 
 - Status: proposed <!-- proposed | accepted | rejected | deprecated | superseded by ADR-XXX -->
 - Date: YYYY-MM-DD
