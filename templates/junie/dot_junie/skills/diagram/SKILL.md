@@ -108,9 +108,11 @@ source is the artifact.
   the picture is what a human opens without tooling — both ship, always.
   **Commit the render, don't gitignore it:** GitHub renders ```` ```mermaid ``` ````
   fences but not `.mmd` files as images, so the checked-in picture is the only
-  way a human sees the diagram on the forge without local tooling. It's marked
-  `linguist-generated` in `.gitattributes` so it doesn't inflate diffs or
-  language stats, and the always-re-render rule (§3) keeps it from going stale.
+  way a human sees the diagram on the forge without local tooling. It's
+  collapsed in `.gitattributes` — `docs/diagrams/**/*.svg` as
+  `linguist-generated`, and a vault render under `.agents/vault/**` already as
+  `linguist-vendored` — so it doesn't inflate diffs or language stats, and the
+  always-re-render rule (§3) keeps it from going stale.
 - Embedding:
   - GitHub/GitLab render ```` ```mermaid ``` ```` fences in markdown natively —
     inline the source in docs/README where useful.
