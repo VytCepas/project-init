@@ -55,7 +55,13 @@ def check_scaffold_record(target: Path) -> tuple[Check, dict[str, str] | None]:
     checks can tell plugin mode from ``--no-plugin`` and lifecycle on from off
     without re-reading the file.
     """
-    from project_init.upgrade import _CONFIG_REL, UpgradeError, _parse_record_block
+    from project_init.upgrade import (
+        _CONFIG_REL,
+        UpgradeError,
+        _backfill_variables,
+        _migrate_agents,
+        _parse_record_block,
+    )
 
     config = target / _CONFIG_REL
     if not config.is_file():
@@ -98,6 +104,12 @@ def check_scaffold_record(target: Path) -> tuple[Check, dict[str, str] | None]:
             None,
         )
     _preset, variables, _manifest = parsed
+    # Backfill variables introduced after this record was written, exactly as
+    # read_scaffold_record does — a pre-ADR-010 record lacks plugin_mode/no_plugin,
+    # and the raw parse would leave the plugin check to misread it as plugin mode
+    # and false-FAIL a valid copied-hooks project (Codex review). The backfill
+    # defaults such records to no_plugin, which is what pre-plugin scaffolds were.
+    variables = _migrate_agents(_backfill_variables(variables))
     return Check("PASS", "scaffold record", f"{_CONFIG_REL} records preset {_preset!r}"), variables
 
 
@@ -282,12 +294,17 @@ def check_git_hooks(target: Path) -> Check:
         )
     expected = sorted(p.name for p in src.iterdir() if p.is_file())
     dst = target / ".git" / "hooks"
-    missing = [name for name in expected if not (dst / name).exists()]
-    if missing:
+    # Git silently ignores a hook that lacks the executable bit, so a present but
+    # non-+x file is as good as absent — a `PASS` there would falsely claim the
+    # pre-commit/pre-push enforcement is live when it is disabled (Codex review).
+    not_ready = [
+        name for name in expected if not (dst / name).exists() or not os.access(dst / name, os.X_OK)
+    ]
+    if not_ready:
         return Check(
             "WARN",
             "git hooks",
-            f"git hook(s) not installed: {', '.join(missing)}",
+            f"git hook(s) not installed or not executable: {', '.join(not_ready)}",
             hint=".agents/scripts/install_hooks.sh",
         )
     return Check("PASS", "git hooks", f"all {len(expected)} git hooks installed")

@@ -125,6 +125,28 @@ def test_non_executable_shell_hook_fails(tmp_path: Path) -> None:
     assert _levels(tmp_path)["hook scripts executable"] == "PASS"  # restore proves it moves
 
 
+def test_old_record_without_plugin_keys_is_not_false_failed(tmp_path: Path) -> None:
+    # A pre-ADR-010 record has no plugin_mode/no_plugin keys; those scaffolds
+    # were copied-hooks (no-plugin). doctor must backfill like read_scaffold_record
+    # so the plugin check treats it as no-plugin and does not false-FAIL for a
+    # missing project-init plugin (Codex review). Simulate by stripping the keys
+    # from the recorded variables JSON.
+    _scaffold(tmp_path)
+    config = tmp_path / ".agents" / "config.yaml"
+    lines = config.read_text().splitlines()
+    for i, line in enumerate(lines):
+        if line.strip().startswith("variables:"):
+            data = json.loads(line.split(":", 1)[1])
+            data.pop("plugin_mode", None)
+            data.pop("no_plugin", None)
+            lines[i] = f"  variables: {json.dumps(data)}"
+            break
+    config.write_text("\n".join(lines) + "\n")
+    levels = _levels(tmp_path)
+    assert levels["scaffold record"] == "PASS"
+    assert levels["plugin enabled"] == "PASS"  # backfilled to no-plugin, not false-FAIL
+
+
 def test_disabled_plugin_fails(tmp_path: Path) -> None:
     _scaffold(tmp_path)  # plugin mode
     settings = tmp_path / ".claude" / "settings.json"
@@ -145,13 +167,30 @@ def test_git_hooks_warn_without_git(tmp_path: Path) -> None:
     assert _levels(tmp_path)["git hooks"] == "WARN"
 
 
+def _install_git_hooks(target: Path, *, executable: bool = True) -> None:
+    src = target / ".github" / "hooks"
+    dst = target / ".git" / "hooks"
+    dst.mkdir(parents=True, exist_ok=True)
+    for hook in src.iterdir():
+        installed = dst / hook.name
+        installed.write_text("#!/bin/sh\n")
+        installed.chmod(0o755 if executable else 0o644)
+
+
 def test_git_hooks_pass_when_installed(tmp_path: Path) -> None:
     _scaffold(tmp_path)
-    src = tmp_path / ".github" / "hooks"
-    dst = tmp_path / ".git" / "hooks"
-    dst.mkdir(parents=True)
-    for hook in src.iterdir():
-        (dst / hook.name).write_text("#!/bin/sh\n")
+    _install_git_hooks(tmp_path)
+    assert _levels(tmp_path)["git hooks"] == "PASS"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX executable bit not meaningful on Windows")
+def test_git_hooks_warn_when_not_executable(tmp_path: Path) -> None:
+    # Git ignores a non-+x hook, so a present-but-not-executable hook must not
+    # read as installed (Codex review).
+    _scaffold(tmp_path)
+    _install_git_hooks(tmp_path, executable=False)
+    assert _levels(tmp_path)["git hooks"] == "WARN"
+    _install_git_hooks(tmp_path, executable=True)  # restore proves the assertion moves
     assert _levels(tmp_path)["git hooks"] == "PASS"
 
 
