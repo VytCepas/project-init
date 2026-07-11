@@ -138,7 +138,15 @@ Documented so their absence is a decision, not an oversight:
 
 ## CI cost note
 
-The repo's required path is a single Python job matrix plus three light jobs (wheel-smoke,
-gitleaks, shellcheck). The advisory scans added under gap 3 run in parallel off the critical
-path and do not extend `ci-gate` wall-clock. Runner-minute deltas from each follow-up PR are
-noted in that PR rather than measured as a separate study.
+The repo's required path is `checks` (lint/typecheck/audit) plus a 4-way sharded `test` job
+(PI-762: pytest-split, race-free, ~5min→~1.5min wall-clock) and three light jobs (wheel-smoke,
+gitleaks, shellcheck). The advisory scans (semgrep, license) run in parallel off the critical
+path and do not extend `ci-gate` wall-clock. The full Python matrix and coverage floor run
+nightly (`nightly.yml`), not per-PR.
+
+**Levers applied.** Test wall-clock: sharded parallel jobs (repo, PI-762). Runner-minutes:
+per-PR runs one Python version, the full matrix runs nightly — in the repo (PI-762) and, for
+scaffolded projects, the template resolves its matrix per event (PI-761: floor on PR/push,
+full window on the nightly `schedule`). Review-cycle churn: `concurrency: cancel-in-progress`
+on PR pushes (PI-589). None of these drop a gate — the nightly run restores full-matrix
+testing and coverage within a day.

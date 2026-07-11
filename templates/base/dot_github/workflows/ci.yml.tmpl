@@ -71,6 +71,10 @@ jobs:
 
       - name: Resolve versions satisfying requires-python
         id: resolve
+        env:
+          # Which cron fired (empty for push/pull_request). The resolver runs the
+          # full matrix ONLY on the nightly cron — not the weekly Scorecard one.
+          GITHUB_EVENT_SCHEDULE: ${{ github.event.schedule }}
         run: |
           uv run --no-project --with packaging python - <<'PY'
           import json
@@ -115,6 +119,18 @@ jobs:
               # requires-python excludes every KNOWN version — fall back to the
               # newest so CI still runs instead of erroring on an empty matrix.
               versions = [KNOWN[-1]]
+
+          # Per-PR/push test only the FLOOR version for fast, cheap feedback
+          # (PI-761). ONLY the nightly cron runs the full matrix — a version-
+          # specific break is caught within a day. A cron triggers the whole
+          # workflow, so gate on the specific schedule (github.event.schedule),
+          # not event_name==schedule, or the WEEKLY Scorecard cron would fan out
+          # too. "0 3 * * *" must match the nightly entry in `on.schedule` below;
+          # test_ci_matrix_per_event asserts they agree.
+          event = os.environ.get("GITHUB_EVENT_NAME", "")
+          nightly = event == "schedule" and os.environ.get("GITHUB_EVENT_SCHEDULE", "") == "0 3 * * *"
+          if not nightly and len(versions) > 1:
+              versions = [min(versions, key=_key)]
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write("versions=" + json.dumps(versions) + "\n")

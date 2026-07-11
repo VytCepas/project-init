@@ -454,6 +454,12 @@ class TestPythonMatrixResolution:
         out.write_text("")
         monkeypatch.chdir(proj)
         monkeypatch.setenv("GITHUB_OUTPUT", str(out))
+        # These tests exercise version RESOLUTION (floor/upper/missing/malformed),
+        # so run as the NIGHTLY cron where the full resolved set is emitted
+        # untrimmed. The per-PR/weekly floor-only trim is covered separately by
+        # tests/contracts/test_ci_matrix_per_event.py (PI-761).
+        monkeypatch.setenv("GITHUB_EVENT_NAME", "schedule")
+        monkeypatch.setenv("GITHUB_EVENT_SCHEDULE", "0 3 * * *")
         exec(compile(self.resolver, "<ci-resolver>", "exec"), {})  # noqa: S102
         line = next(ln for ln in out.read_text().splitlines() if ln.startswith("versions="))
         return json.loads(line.split("=", 1)[1])
