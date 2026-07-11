@@ -35,7 +35,9 @@ def _require_just() -> None:
     if shutil.which("just"):
         return
     if os.environ.get("CI"):
-        pytest.fail("just is not on PATH — CI must install it (ci.yml) or this gate tests nothing (#737).")
+        pytest.fail(
+            "just is not on PATH — CI must install it (ci.yml) or this gate tests nothing (#737)."
+        )
     pytest.skip("just not available — install it to run this gate locally")
 
 
@@ -83,7 +85,9 @@ def test_go_recipe_skips_cleanly_day_one(tmp_path: Path, recipe: str, marker: st
     target = tmp_path / "go-proj"
     _scaffold(target, "go")
     result = _run(target, recipe)
-    assert result.returncode == 0, f"just {recipe} failed day-one:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, (
+        f"just {recipe} failed day-one:\n{result.stdout}\n{result.stderr}"
+    )
     assert marker in result.stdout, f"just {recipe} did not skip cleanly:\n{result.stdout}"
 
 
@@ -93,7 +97,9 @@ def test_rust_recipe_skips_cleanly_day_one(tmp_path: Path, recipe: str, marker: 
     target = tmp_path / "rust-proj"
     _scaffold(target, "rust")
     result = _run(target, recipe)
-    assert result.returncode == 0, f"just {recipe} failed day-one:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, (
+        f"just {recipe} failed day-one:\n{result.stdout}\n{result.stderr}"
+    )
     assert marker in result.stdout, f"just {recipe} did not skip cleanly:\n{result.stdout}"
 
 
@@ -107,4 +113,6 @@ def test_aggregate_gate_is_day_one_green(tmp_path: Path, language: str, recipe: 
     target = tmp_path / f"{language}-proj"
     _scaffold(target, language)
     result = _run(target, recipe)
-    assert result.returncode == 0, f"{language} just {recipe} was day-one red:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, (
+        f"{language} just {recipe} was day-one red:\n{result.stdout}\n{result.stderr}"
+    )
