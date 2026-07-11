@@ -13,6 +13,17 @@ jobs:
   lint-and-test:
     name: Lint and test
     runs-on: ubuntu-24.04
+    # Test across the full declared support window (#638). pyproject sets
+    # requires-python >=3.11 with 3.11-3.13 classifiers, but this job used to pin
+    # only 3.12 — a break on 3.11 or 3.13 would ship uncaught. The matrix must
+    # stay in sync with the classifiers; tests/contracts/test_repo_ci_python_matrix.py
+    # fails CI if they drift. Matrixing renames the check to "Lint and test
+    # (3.xx)", which is why "CI gate" (below) is the single required context, not
+    # this job — see its comment.
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
@@ -22,7 +33,7 @@ jobs:
           version: "0.11.7"
           enable-cache: true
           cache-dependency-glob: "uv.lock"
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       # shellcheck ships preinstalled on ubuntu-24.04; shfmt does not. The
       # scaffolded-output lint guard (test_shell_lint_gate.py) skips when its
@@ -325,3 +336,36 @@ jobs:
           cd "$WIN_TARGET"
           out=$(bash .agents/hooks/_py.sh -c "print('resolver-ok')")
           test "$out" = "resolver-ok"
+
+  # All-green gate (#638/#589): the SINGLE required status check for branch
+  # protection. Branch protection requires only "CI gate", so the required
+  # context is robust to the matrix — adding/removing a Python version never
+  # renames it, and there is no un-expanded matrix name (e.g. "Lint and test
+  # (3.11)") for GitHub to fail to match against, which would leave main
+  # permanently blocked on a missing context. `if: always()` so the gate runs
+  # even when an upstream job fails, then fails itself unless every dependency
+  # succeeded. Mirrors the ci-gate the scaffolded ci.yml.tmpl ships (the repo's
+  # own CI was behind its own product).
+  #
+  # needs = only jobs that ALWAYS run: a skipped need counts as not-success and
+  # would red the gate. wheel-smoke skips only when lint-and-test fails (gate
+  # should be red then anyway); the conditional portability jobs are deliberately
+  # out (they skip on non-shell PRs and were never required contexts).
+  ci-gate:
+    name: CI gate
+    runs-on: ubuntu-24.04
+    needs: [lint-and-test, wheel-smoke, secret-scan, shellcheck]
+    if: always()
+    steps:
+      - name: Require all upstream jobs to succeed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Upstream job results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::A required job did not succeed (got: $result)."
+              exit 1
+            fi
+          done
+          echo "All required jobs passed."
