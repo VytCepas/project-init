@@ -206,13 +206,16 @@ ci-local-off:
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
 
-# download module dependencies
+# download module dependencies. Skips cleanly before any Go source exists —
+# every go recipe that shells out to the toolchain errors on a fresh module
+# (no go.mod), so a fresh scaffold's `just ci` / `just fast-ci` would fail
+# day-one without these guards (parity with the existing typecheck/test-cov skips).
 setup:
-    go mod download
+    sh -c 'if find . -name "*.go" | grep -q .; then go mod download; else echo "No Go sources yet — nothing to download."; fi'
 
 # lint project code (revive/godoclint/gocognit/cyclop/dupl/errcheck/govet/staticcheck gates per .golangci.yml)
 lint:
-    golangci-lint run
+    sh -c 'if find . -name "*.go" | grep -q .; then golangci-lint run; else echo "No Go sources yet — nothing to lint."; fi'
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint_context_budget.sh
@@ -226,15 +229,18 @@ typecheck:
 # auto-format project code (gofumpt via golangci-lint fmt — no separate binary
 # to provision; golangci-lint is already required for `just lint`)
 format:
-    golangci-lint fmt
+    sh -c 'if find . -name "*.go" | grep -q .; then golangci-lint fmt; else echo "No Go sources yet — nothing to format."; fi'
 
-# run the test suite
+# run the test suite. Skips cleanly before any Go source exists — `go test ./...`
+# errors on a fresh module (no go.mod), so a fresh scaffold's `just test` /
+# pre-push `fast-ci` would fail day-one without this guard (matches typecheck).
 test:
-    go test ./...
+    sh -c 'if find . -name "*.go" | grep -q .; then go test ./...; else echo "No Go sources yet — nothing to test."; fi'
 
-# fail-fast run for the edit-test loop (token-efficiency; PI-641)
+# fail-fast run for the edit-test loop (token-efficiency; PI-641). Same day-one
+# guard as `test`.
 test-quick:
-    go test -failfast ./...
+    sh -c 'if find . -name "*.go" | grep -q .; then go test -failfast ./...; else echo "No Go sources yet — nothing to test."; fi'
 
 # tests with the coverage gate (CI always runs this, not `test` — PI-569).
 # tune the "70" threshold to your project's baseline. Skips cleanly before any
@@ -253,13 +259,13 @@ docs:
 # requires govulncheck: `go install golang.org/x/vuln/cmd/govulncheck@latest`
 # once, on your machine (CI installs it per-run).
 audit:
-    govulncheck ./...
+    sh -c 'if find . -name "*.go" | grep -q .; then govulncheck ./...; else echo "No Go sources yet — nothing to audit."; fi'
 
 # generate a CycloneDX SBOM of the module dependency tree (#574). release.yml
 # attaches this to GitHub Releases.
 # requires cyclonedx-gomod: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
 sbom:
-    cyclonedx-gomod mod -json -output sbom.cdx.json
+    sh -c 'if find . -name "*.go" | grep -q .; then cyclonedx-gomod mod -json -output sbom.cdx.json; else echo "No Go sources yet — nothing to inventory."; fi'
 
 # dependency license compliance scan (#579) — fail on forbidden/restricted
 # (copyleft: GPL/LGPL/AGPL) per go-licenses' classification. Tune
@@ -305,11 +311,13 @@ ci-local-off:
 
 # fetch dependencies
 setup:
-    cargo fetch
+    sh -c 'if [ -f Cargo.toml ]; then cargo fetch; else echo "No Cargo project yet — run cargo init."; fi'
 
-# build the project
+# build the project. All cargo recipes skip cleanly before `cargo init` — cargo
+# errors without a Cargo.toml, so a fresh scaffold's `just ci` / `just fast-ci`
+# would fail day-one without these guards (parity with the go/node day-one skips).
 build:
-    cargo build
+    sh -c 'if [ -f Cargo.toml ]; then cargo build; else echo "No Cargo project yet — run cargo init."; fi'
 
 # lint project code (clippy pedantic + cognitive-complexity + public-API docs).
 # -D clippy::cognitive_complexity activates the threshold in clippy.toml — it's
@@ -321,13 +329,13 @@ lint:
     # Two passes, because -D missing_docs and --all-targets do not mix (#725).
     # 1. Public API: docs enforced on lib/bin only. Applied to --all-targets it
     #    demands a crate-level `//!` in every integration test file — verified.
-    cargo clippy --all-features -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity -D missing_docs
+    sh -c 'if [ -f Cargo.toml ]; then cargo clippy --all-features -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity -D missing_docs; else echo "No Cargo project yet — run cargo init."; fi'
     # 2. Everything else: without --all-targets clippy never sees tests/, benches/
     #    or examples/, so a test module with an outright TYPE ERROR passed
     #    `just lint` with exit 0. --all-features also reaches code behind a
     #    non-default feature flag. Verified against clippy 0.1.97.
-    cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity
-    cargo fmt --check
+    sh -c 'if [ -f Cargo.toml ]; then cargo clippy --all-targets --all-features -- -D warnings -D clippy::pedantic -D clippy::cognitive_complexity; else echo "No Cargo project yet — run cargo init."; fi'
+    sh -c 'if [ -f Cargo.toml ]; then cargo fmt --check; else echo "No Cargo project yet — run cargo init."; fi'
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint_context_budget.sh
@@ -337,27 +345,27 @@ lint:
 # because that is what CI and agents call (#725). `cargo check` skips codegen,
 # so it is fast.
 typecheck:
-    cargo check --all-targets --all-features
+    sh -c 'if [ -f Cargo.toml ]; then cargo check --all-targets --all-features; else echo "No Cargo project yet — run cargo init."; fi'
 
 # auto-format project code
 format:
-    cargo fmt
+    sh -c 'if [ -f Cargo.toml ]; then cargo fmt; else echo "No Cargo project yet — run cargo init."; fi'
 
 # run the test suite
 test:
-    cargo test
+    sh -c 'if [ -f Cargo.toml ]; then cargo test; else echo "No Cargo project yet — run cargo init."; fi'
 
 # quiet run for the edit-test loop (token-efficiency; PI-641; cargo has no
 # stable fail-fast flag, so quiet output is the lever here)
 test-quick:
-    cargo test -q
+    sh -c 'if [ -f Cargo.toml ]; then cargo test -q; else echo "No Cargo project yet — run cargo init."; fi'
 
 # tests with the coverage gate (CI always runs this, not `test` — PI-569).
 # requires cargo-llvm-cov: `cargo install cargo-llvm-cov` + `rustup component
 # add llvm-tools-preview`, once, on your machine (CI installs it per-run).
 # tune the "70" threshold to your project's baseline.
 test-cov:
-    cargo llvm-cov --fail-under-lines 70
+    sh -c 'if [ -f Cargo.toml ]; then cargo llvm-cov --fail-under-lines 70; else echo "No Cargo project yet — nothing to test."; fi'
 
 # docs: nothing to build locally — docs.rs renders published crate docs
 docs:
@@ -367,13 +375,13 @@ docs:
 # requires cargo-audit: `cargo install cargo-audit` once, on your machine
 # (CI installs it per-run as a prebuilt binary).
 audit:
-    cargo audit
+    sh -c 'if [ -f Cargo.toml ]; then cargo audit; else echo "No Cargo project yet — run cargo init."; fi'
 
 # generate a CycloneDX SBOM of the crate dependency tree (#574). release.yml
 # attaches this (<crate>.cdx.json) to GitHub Releases.
 # requires cargo-cyclonedx: cargo install cargo-cyclonedx
 sbom:
-    cargo cyclonedx --format json --spec-version 1.5
+    sh -c 'if [ -f Cargo.toml ]; then cargo cyclonedx --format json --spec-version 1.5; else echo "No Cargo project yet — run cargo init."; fi'
 
 # dependency license compliance scan (#579) — cargo-deny checks licenses against
 # deny.toml (deny GPL/AGPL by default; everything else allowed). cargo-deny can
@@ -381,7 +389,7 @@ sbom:
 # as the dedicated CVE gate for now — run `cargo deny check` (all) to consolidate.
 # requires cargo-deny: cargo install cargo-deny
 license:
-    cargo deny check licenses
+    sh -c 'if [ -f Cargo.toml ]; then cargo deny check licenses; else echo "No Cargo project yet — run cargo init."; fi'
 
 # property-based tests with proptest (#580). Add the dep once: cargo add --dev
 # proptest. Property tests are opt-in per file (proptest! macro) and run under
@@ -389,7 +397,7 @@ license:
 # `fuzz` job, never on a PR (#727). proptest draws fresh seeds each run, so the
 # nightly job explores inputs a per-PR run would only repeat.
 fuzz:
-    cargo test
+    sh -c 'if [ -f Cargo.toml ]; then cargo test; else echo "No Cargo project yet — nothing to fuzz."; fi'
 
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
