@@ -88,3 +88,10 @@ CI optimization strategies, the extend-the-infrastructure table (skill vs
 hook vs agent spec), and this repo's non-goals live in
 [`docs/development/repo-reference.md`](docs/development/repo-reference.md)
 — consult when adding capabilities or tuning CI, not needed per turn.
+
+The canonical quality/security-gate policy — every gate the repo and the
+scaffolded template run, each with a keep/promote/demote/drop decision, and the
+repo's single required-check set — lives in
+[`docs/development/quality-gates.md`](docs/development/quality-gates.md)
+(epic #751). Update it in the same PR when you change a gate; a contract test
+fails if the repo's required checks drift from it.
