@@ -7,11 +7,27 @@ name: Board automation
 #   2. Store it as PROJECT_TOKEN.
 #   3. Set `github_project_number` in .agents/config.yaml to the target board
 #      (the single source of truth shared with create_issue.sh / setup_github.sh).
-#   4. Optional project fields: Status, Priority, Area, Size.
+#   4. Status field options (single-select): Backlog, To Do, In Progress,
+#      In Review, Done. Optional metadata fields: Priority, Area, Size,
+#      Agent ready, Confidence, Type.
+#
+# Status transitions:
+#   issue opened        -> Backlog   (a new ticket lands in the backlog to triage)
+#   issue reopened      -> To Do     (re-enters the actionable pipeline)
+#   issue closed        -> Done      (ANY close reason: merged PR, manual, dup,
+#                                     not-planned, or an epic closed once its
+#                                     children finish — the board must not lie)
+#   PR opened (draft)   -> In Progress  (linked issue, via "Closes #N" in body)
+#   PR ready_for_review -> In Review    (linked issue)
+#   PR merged           -> Done         (linked issue)
+#
+# The `issues: closed` trigger is what keeps the board honest: without it a card
+# only ever reached Done through a merged "Closes #N" PR, so every issue closed
+# any other way stayed frozen in its previous column (PI board-visibility fix).
 
 on:
   issues:
-    types: [opened, edited, reopened, labeled, unlabeled]
+    types: [opened, edited, reopened, labeled, unlabeled, closed]
   pull_request:
     types: [opened, ready_for_review, closed]
 
@@ -67,8 +83,12 @@ jobs:
 
           if [ "$EVENT" = "issues" ]; then
             issue="$ISSUE_NUMBER"
-            if [ "$ACTION" = "opened" ] || [ "$ACTION" = "reopened" ]; then
+            if [ "$ACTION" = "opened" ]; then
+              status="Backlog"
+            elif [ "$ACTION" = "reopened" ]; then
               status="To Do"
+            elif [ "$ACTION" = "closed" ]; then
+              status="Done"
             else
               status="metadata"
             fi

@@ -209,6 +209,10 @@ _ADDED_SINCE_BASELINE = {
     # PI-694: token-budget lint gate — new always-copied script (justfile
     # wiring already excluded above)
     ".agents/scripts/lint_context_budget.sh",
+    # Board-visibility fix: one-time backfill that reconciles the Projects board
+    # with closed-issue state (new lifecycle script; board-automation.yml already
+    # excluded above).
+    ".agents/scripts/backfill_board_done.sh",
     # PI-696: PostToolUse tool-output compressor (settings.json/AGENTS.md
     # wiring already excluded above)
     ".agents/hooks/tool_output_compressor.py",

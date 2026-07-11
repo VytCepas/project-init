@@ -149,6 +149,72 @@ class TestIssueMetadataScaffold:
         for field in ("Priority", "Size", "Agent ready", "Confidence", "Area"):
             assert f'parse_body_field "{field}"' in content
 
+    def test_board_automation_listens_for_issue_closed(self):
+        """Board-visibility fix: the workflow must handle `issues: closed` so a
+        card reaches Done even when the issue is closed without a merged
+        `Closes #N` PR (manual, duplicate, not-planned, epic-closed-on-children).
+        Without the trigger every such issue stayed frozen in its old column."""
+        content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
+        # The trigger list must include closed alongside the existing issue events.
+        trigger = next(
+            line for line in content.splitlines() if line.strip().startswith("types: [opened")
+        )
+        assert "closed]" in trigger, trigger
+        # New start-of-pipeline and close mappings are present.
+        assert 'status="Backlog"' in content
+        assert 'status="Done"' in content
+
+    def test_board_automation_status_mapping_executes(self):
+        """Run the *shipped* status-determination block for each issue action and
+        assert the resulting (issue, status) pair — a text-only check would pass
+        even if the branch logic were wrong."""
+        import textwrap
+
+        bash = shutil.which("bash")
+        if bash is None:
+            pytest.skip("bash not available")
+        wf = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
+        lines = wf.splitlines()
+        start = next(i for i, line in enumerate(lines) if 'status="skip"' in line)
+        end = next(i for i, line in enumerate(lines) if 'echo "issue=$issue"' in line)
+        block = textwrap.dedent("\n".join(lines[start:end]))
+
+        def run(event: str, action: str, issue_number: str = "") -> str:
+            harness = (
+                "set -euo pipefail\n"
+                f'EVENT="{event}"\nACTION="{action}"\n'
+                f'ISSUE_NUMBER="{issue_number}"\nPR_BODY=""\nPR_MERGED=""\n'
+                + block
+                + '\nprintf "%s|%s" "$issue" "$status"\n'
+            )
+            return subprocess.run(
+                [bash, "-c", harness], capture_output=True, text=True, check=True
+            ).stdout
+
+        assert run("issues", "opened", "5") == "5|Backlog"
+        assert run("issues", "reopened", "5") == "5|To Do"
+        assert run("issues", "closed", "5") == "5|Done"
+        assert run("issues", "labeled", "5") == "5|metadata"
+
+    def test_board_backfill_script_created(self):
+        """The one-time backfill script ships with the lifecycle overlay, is
+        executable, paginates past the 100-item board cap, and only touches
+        CLOSED cards not already at the target status."""
+        script = self.target / ".agents" / "scripts" / "backfill_board_done.sh"
+        assert script.is_file()
+        assert os.access(script, os.X_OK), "backfill script must be executable"
+        content = script.read_text()
+        # Paginates (the board can exceed the 100-item GraphQL cap).
+        assert "hasNextPage" in content
+        assert "endCursor" in content
+        assert "after: $after" in content
+        # Only closed, not-already-done cards are moved.
+        assert 'state") != "CLOSED"' in content
+        assert "updateProjectV2ItemFieldValue" in content
+        # Safe preview mode and board-number SSOT.
+        assert "--dry-run" in content
+        assert "github_project_number" in content
+
     def test_validate_pr_checks_issue_readiness(self):
         content = (self.target / ".github" / "workflows" / "validate-pr.yml").read_text()
         assert "status:needs-info" in content
