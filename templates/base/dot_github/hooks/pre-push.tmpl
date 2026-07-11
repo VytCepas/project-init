@@ -62,8 +62,10 @@ while read -r _ local_sha remote_ref _; do
 # so this catches the common break (a failing test or lint error) without
 # duplicating the whole suite on every push. Only fires for a real branch push
 # (not tag/delete). Fail-CLOSED when `just`/the recipe are present (block the
-# push, bypassable with `git push --no-verify`); fail-open when the toolchain is
-# absent — CI stays the hard backstop.
+# push, bypassable with `git push --no-verify`); fail-open when `just` or the
+# `fast-check` recipe is absent — CI stays the hard backstop. (If `just` and the
+# recipe are present but a language tool is missing, the recipe itself decides:
+# the day-one guards skip cleanly, a genuinely missing linter fails closed.)
 if [[ "$PUSHING_BRANCH" == "1" ]]; then
   REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/../.." && pwd))"
   if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&

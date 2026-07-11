@@ -12,7 +12,7 @@
 # Bypass in an emergency with: git push --no-verify
 set -euo pipefail
 
-if command -v just >/dev/null 2>&1; then
+if command -v just >/dev/null 2>&1 && just --show fast-check >/dev/null 2>&1; then
   # `just fast-check` tests the working tree, but the push ships the committed
   # tree. Skip (fail-open) on a dirty worktree rather than test a tree that isn't
   # what gets pushed — a WIP fix could mask a failure, or unrelated WIP fail a
@@ -31,5 +31,5 @@ if command -v just >/dev/null 2>&1; then
     fi
   fi
 else
-  echo "pre-push: 'just' not found — skipping local CI gate (CI still runs)." >&2
+  echo "pre-push: 'just'/the 'fast-check' recipe not available — skipping local gate (CI still runs)." >&2
 fi

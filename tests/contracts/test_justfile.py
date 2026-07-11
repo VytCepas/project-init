@@ -104,8 +104,13 @@ class TestJustfilePerLanguage:
         target = _scaffold_language(tmp_path / language, language)
         text = (target / "justfile").read_text()
         assert re.search(r"^fast-check: lint test\s*$", text, re.MULTILINE)
-        # Guard against silently promoting it back to the heavy gate.
+        # Guard against silently promoting it back to the heavy gate — on the
+        # header line...
         assert not re.search(r"^fast-check:.*\b(typecheck|audit|test-cov)\b", text, re.MULTILINE)
+        # ...and in a body: `fast-check` must stay dependency-only, so a stray
+        # `just typecheck`/`audit` line can't sneak the heavy gate back in
+        # while the header still reads `lint test` (Copilot review, PR #760).
+        assert _recipe_body(text, "fast-check").strip() == ""
 
     def test_node_ci_recipe_includes_typecheck(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "node")
