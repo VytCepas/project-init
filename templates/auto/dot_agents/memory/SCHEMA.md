@@ -49,6 +49,18 @@ One fact per file — move longer material to the vault.
 - Anything already in `CLAUDE.md` or `project-init.md`
 - Large documents (put those in `vault/`)
 
+## Map, not territory
+
+A memory — like any cached artifact (a diagram, a doc) — may assert only facts
+that are **mechanically verifiable** (repo-relative paths, module boundaries,
+ownership) or **immune to change** (a rationale, a decision and its date).
+Volatile specifics — tool names, thresholds, version pins, line numbers — must
+be **pointed at, not restated**: name the file that owns the value, don't copy
+the value in. Restated "territory" rots silently the moment its source moves,
+and no gate catches it: `lint_memory.sh` can flag a dangling backtick-`path.ext`
+but not a threshold that has drifted from the `justfile`. Cheap-to-regenerate
+artifacts get regenerated, not cached; underivable rationale goes here or to an ADR.
+
 ## Relationship to vault
 
 `memory/` holds small structured facts for fast agent recall. `vault/` holds richer human-authored documentation (Obsidian). When a vault note distills into a reusable fact, create a memory file and link back to the vault note for context.

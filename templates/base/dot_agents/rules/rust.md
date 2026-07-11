@@ -9,7 +9,7 @@ alwaysApply: false
 ```bash
 cargo build
 cargo test
-cargo llvm-cov --fail-under-lines 70              # tests + coverage gate — CI always runs this (`just test-cov`)
+cargo llvm-cov                                    # tests + coverage gate — threshold + flags per justfile's test-cov, which CI always runs
 cargo audit                                       # dependency CVE/advisory scan (`just audit`) — CI always runs this
 cargo cyclonedx --format json                     # CycloneDX SBOM (`just sbom`, #574) — release.yml attaches it to Releases
 cargo deny check licenses                         # license compliance (`just license`, #579) — allow-list in deny.toml (denies GPL/AGPL)

@@ -9,7 +9,7 @@ alwaysApply: false
 ```bash
 go build ./...
 go test ./... -count=1
-just test-cov       # tests + coverage gate (>= 70%, per justfile) — CI always runs this
+just test-cov       # tests + coverage gate (threshold per justfile) — CI always runs this
 just audit          # dependency CVE/advisory scan (govulncheck) — CI always runs this
 just sbom           # CycloneDX SBOM via cyclonedx-gomod (#574) — release.yml attaches it to Releases
 just license        # dependency license scan (#579) — deny copyleft; tune --disallowed_types
