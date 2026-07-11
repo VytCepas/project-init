@@ -453,6 +453,23 @@ def _scalar(line: str) -> str:
     return value.strip("\"'")
 
 
+def _str_map(raw: object) -> dict[str, str] | None:
+    """Accept a json.loads result as a record field only if it is flat str->str.
+
+    config.yaml is hand-editable, so json can return a non-dict or a dict with
+    non-string keys/values; those are malformed, and returning None here makes
+    ``_parse_record_block`` raise ``UpgradeError`` rather than leak a non-str
+    value that later crashes code assuming string template variables/hashes
+    (Copilot review). Unlike ``read_base`` (which filters bad merge-base
+    entries), a record must fail loud — a dropped variable would mis-scaffold.
+    """
+    if not isinstance(raw, dict):
+        return None
+    if not all(isinstance(k, str) and isinstance(v, str) for k, v in raw.items()):
+        return None
+    return dict(raw)
+
+
 def _record_fields(
     lines: list[str],
 ) -> tuple[str | None, dict[str, str] | None, dict[str, str] | None]:
@@ -471,9 +488,9 @@ def _record_fields(
         if stripped.startswith("preset:"):
             preset = _scalar(stripped)
         elif stripped.startswith("variables:"):
-            variables = json.loads(stripped.split(":", 1)[1])
+            variables = _str_map(json.loads(stripped.split(":", 1)[1]))
         elif stripped.startswith("manifest:"):
-            manifest = json.loads(stripped.split(":", 1)[1])
+            manifest = _str_map(json.loads(stripped.split(":", 1)[1]))
     return preset, variables, manifest
 
 
