@@ -13,6 +13,7 @@ import json
 import os
 import re
 import subprocess
+import textwrap
 from pathlib import Path
 
 from project_init.scaffold import scaffold
@@ -46,7 +47,11 @@ def _resolve_script(target: Path) -> str:
     ci = (target / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     m = _SCRIPT_RE.search(ci)
     assert m, "resolve heredoc not found in scaffolded ci.yml"
-    return m.group(1)
+    # The heredoc keeps its YAML block indentation in the file; GitHub's `run: |`
+    # dedents it at runtime, so dedent here too before feeding it to `python -c`
+    # (otherwise every line is indented and Python raises IndentationError — which
+    # is what CI's stricter path caught, #761 review of the first cut).
+    return textwrap.dedent(m.group(1))
 
 
 def test_matrix_is_floor_only_on_pr_full_on_schedule(tmp_path: Path):
