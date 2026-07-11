@@ -33,9 +33,10 @@ sync uses (`tools/sync_agents_from_templates.py`, PI-685).
 The `ci-gate` job in `.github/workflows/ci.yml` must require exactly these contexts. The
 drift-guard test asserts this list equals `ci-gate.needs`:
 
-<!-- required-gates: lint-and-test, wheel-smoke, secret-scan, shellcheck -->
+<!-- required-gates: checks, test, wheel-smoke, secret-scan, shellcheck -->
 
-- `lint-and-test` — ruff check + mypy `--strict` + pytest (with coverage) + pip-audit, across the Python matrix
+- `checks` — ruff check + mypy `--strict` + pip-audit, across the full Python matrix
+- `test` — the suite sharded into 4 parallel jobs (pytest-split), single Python version per PR; the full matrix runs nightly (PI-762, `nightly.yml`)
 - `wheel-smoke` — build the wheel, scaffold from it, assert no unrendered placeholders / exec bits
 - `secret-scan` — gitleaks full-history scan
 - `shellcheck` — shellcheck over rendered scaffold scripts
