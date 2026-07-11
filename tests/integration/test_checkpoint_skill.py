@@ -18,9 +18,7 @@ from tests.helpers import fallback_preset, fallback_variables
 class TestCheckpointSkill:
     def test_present_and_default_on_no_plugin(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        content = (
-            tmp_target / ".agents" / "skills" / "checkpoint" / "SKILL.md"
-        ).read_text()
+        content = (tmp_target / ".agents" / "skills" / "checkpoint" / "SKILL.md").read_text()
         assert "name: checkpoint" in content
         assert "user-invocable: true" in content
         # The handoff structure is prescribed, not improvised.
@@ -38,9 +36,7 @@ class TestCheckpointSkill:
     def test_checkpoint_path_is_gitignored(self, tmp_target: Path):
         """The scaffold's .gitignore must make the handoff file uncommittable."""
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        subprocess.run(
-            ["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True
-        )
+        subprocess.run(["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True)
         checkpoint = tmp_target / ".agents" / "tmp" / "checkpoint.md"
         checkpoint.parent.mkdir(parents=True)
         checkpoint.write_text("# Checkpoint\nsession state\n")

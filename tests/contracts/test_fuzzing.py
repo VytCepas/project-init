@@ -30,7 +30,12 @@ from tests.workflow import (
 
 def _scaffold(target: Path, language: str = "python") -> Path:
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
-    scaffold(target, load_preset("obsidian-only"), make_variables(language=language, **flags), strict=True)
+    scaffold(
+        target,
+        load_preset("obsidian-only"),
+        make_variables(language=language, **flags),
+        strict=True,
+    )
     return target
 
 
@@ -133,7 +138,9 @@ class TestFuzzJob:
 
     @pytest.mark.parametrize("language", _LANGUAGES)
     def test_renders_cleanly(self, tmp_path: Path, language: str):
-        ci = (_scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml").read_text()
+        ci = (
+            _scaffold(tmp_path / language, language) / ".github" / "workflows" / "ci.yml"
+        ).read_text()
         assert "{{#if" not in ci and "{{/if" not in ci
 
 
@@ -147,8 +154,12 @@ class TestFuzzDocumented:
             ("rust", "rust.md", "proptest"),
         ],
     )
-    def test_rules_document_pattern(self, tmp_path: Path, language: str, rules_file: str, tool: str):
-        rules = (_scaffold(tmp_path / language, language) / ".agents" / "rules" / rules_file).read_text()
+    def test_rules_document_pattern(
+        self, tmp_path: Path, language: str, rules_file: str, tool: str
+    ):
+        rules = (
+            _scaffold(tmp_path / language, language) / ".agents" / "rules" / rules_file
+        ).read_text()
         assert tool in rules
         # Explicitly scoped as pattern/tooling, not a blocking gate.
         assert "not** a blocking gate" in rules or "not a blocking gate" in rules
@@ -164,7 +175,9 @@ class TestFuzzDocumented:
         nothing at all — a doc restating a gate that does not exist as written is
         the map-not-territory failure (#688).
         """
-        rules = (_scaffold(tmp_path / language, language) / ".agents" / "rules" / rules_file).read_text()
+        rules = (
+            _scaffold(tmp_path / language, language) / ".agents" / "rules" / rules_file
+        ).read_text()
         assert "**When it runs:**" in rules, f"{rules_file} does not say when fuzzing runs"
         assert "schedule-only (nightly)" in rules
         assert "never on a PR" in rules

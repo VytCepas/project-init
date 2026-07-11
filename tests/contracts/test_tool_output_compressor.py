@@ -105,15 +105,11 @@ class TestCompressorBehavior:
         assert "updatedToolOutput" in result.stdout
 
     def test_env_disable(self):
-        result = self._run(
-            json.dumps(_payload("git diff")), {"PI_COMPRESS_TOOL_OUTPUT": "0"}
-        )
+        result = self._run(json.dumps(_payload("git diff")), {"PI_COMPRESS_TOOL_OUTPUT": "0"})
         assert result.stdout == ""
 
     def test_threshold_is_env_overridable(self):
-        result = self._run(
-            json.dumps(_payload("git diff")), {"PI_COMPRESS_MIN_CHARS": "100000"}
-        )
+        result = self._run(json.dumps(_payload("git diff")), {"PI_COMPRESS_MIN_CHARS": "100000"})
         assert result.stdout == ""
 
     def test_fails_open_on_garbage_stdin(self):

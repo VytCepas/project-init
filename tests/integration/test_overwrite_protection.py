@@ -278,9 +278,7 @@ class TestFileDirCollision:
         (target / "CLAUDE.md").mkdir()
         conflicts: list[tuple[Path, Path]] = []
 
-        scaffold(
-            target, fallback_preset(), fallback_variables(), strict=True, conflicts=conflicts
-        )
+        scaffold(target, fallback_preset(), fallback_variables(), strict=True, conflicts=conflicts)
 
         assert (target / "CLAUDE.md").is_dir()
         assert (target / "CLAUDE.md.new").is_file()

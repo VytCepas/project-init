@@ -70,7 +70,9 @@ class TestContainerDeploy:
 
     def test_fly_and_k8s_stubs(self, tmp_path: Path):
         assert "flyctl deploy" in _deploy_yml(_service_deploy(tmp_path / "f", "fly")).read_text()
-        assert "kubectl set image" in _deploy_yml(_service_deploy(tmp_path / "k", "k8s")).read_text()
+        assert (
+            "kubectl set image" in _deploy_yml(_service_deploy(tmp_path / "k", "k8s")).read_text()
+        )
 
     @pytest.mark.parametrize("deploy", ["cloud-run", "fly", "k8s"])
     def test_ship_stubs_use_project_slug(self, tmp_path: Path, deploy: str):
@@ -139,10 +141,10 @@ class TestDeployGateScripts:
 
     def test_gate_is_tiered(self, tmp_path: Path):
         text = _envprot(_service_deploy(tmp_path / "svc", "cloud-run")).read_text()
-        assert "prevent_self_review" in text          # org: hard human gate
+        assert "prevent_self_review" in text  # org: hard human gate
         assert "reviewers" in text
-        assert "wait_timer" in text                   # individual/standalone: advisory
-        assert "PUBLIC repo" in text                  # plan caveat documented
+        assert "wait_timer" in text  # individual/standalone: advisory
+        assert "PUBLIC repo" in text  # plan caveat documented
 
     def test_absent_for_registry_none_and_prototype(self, tmp_path: Path):
         reg = _service_deploy(tmp_path / "reg", "registry")

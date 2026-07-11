@@ -19,8 +19,12 @@ from tools.benchmark.record import RunRecord, read_records, write_records
 def _write_transcript(path: Path) -> None:
     """A small but representative Claude Code transcript."""
     entries = [
-        {"type": "user", "timestamp": "2026-06-23T10:00:00Z", "version": "2.1.181",
-         "message": {"content": "hi"}},
+        {
+            "type": "user",
+            "timestamp": "2026-06-23T10:00:00Z",
+            "version": "2.1.181",
+            "message": {"content": "hi"},
+        },
         {
             "type": "assistant",
             "timestamp": "2026-06-23T10:00:05Z",
@@ -46,8 +50,12 @@ def _write_transcript(path: Path) -> None:
             "version": "2.1.181",
             "message": {
                 "model": "claude-opus-4-8",
-                "usage": {"input_tokens": 20, "output_tokens": 10,
-                          "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0},
+                "usage": {
+                    "input_tokens": 20,
+                    "output_tokens": 10,
+                    "cache_read_input_tokens": 0,
+                    "cache_creation_input_tokens": 0,
+                },
                 "content": [{"type": "text", "text": "done"}],
             },
         },
@@ -82,11 +90,23 @@ class TestTranscriptParse:
 class TestRecord:
     def test_jsonl_round_trip(self, tmp_path: Path):
         rec = RunRecord(
-            task="feat", target="bare", run_index=0, model="claude-opus-4-8",
-            agents_version="2.1.181", session_id="s1", transcript_path="/t.jsonl",
-            input_tokens=120, output_tokens=60, cache_read_tokens=800,
-            cache_creation_tokens=200, total_tokens=1180, tool_calls=2, turns=2,
-            wall_clock_s=9.0, first_ts="a", last_ts="b",
+            task="feat",
+            target="bare",
+            run_index=0,
+            model="claude-opus-4-8",
+            agents_version="2.1.181",
+            session_id="s1",
+            transcript_path="/t.jsonl",
+            input_tokens=120,
+            output_tokens=60,
+            cache_read_tokens=800,
+            cache_creation_tokens=200,
+            total_tokens=1180,
+            tool_calls=2,
+            turns=2,
+            wall_clock_s=9.0,
+            first_ts="a",
+            last_ts="b",
         )
         out = tmp_path / "records.jsonl"
         write_records([rec], out)
@@ -98,14 +118,28 @@ class TestRecord:
 
     def test_from_dict_tolerant(self):
         # Unknown keys ignored, missing optional keys default — forward/backward compat.
-        rec = RunRecord.from_dict({
-            "task": "qa", "target": "bare", "run_index": 1, "model": "m",
-            "agents_version": "v", "session_id": "", "transcript_path": "/t",
-            "input_tokens": 1, "output_tokens": 2, "cache_read_tokens": 3,
-            "cache_creation_tokens": 4, "total_tokens": 10, "tool_calls": 0, "turns": 1,
-            "wall_clock_s": None, "first_ts": None, "last_ts": None,
-            "future_field_from_a_later_issue": 123,  # ignored
-        })
+        rec = RunRecord.from_dict(
+            {
+                "task": "qa",
+                "target": "bare",
+                "run_index": 1,
+                "model": "m",
+                "agents_version": "v",
+                "session_id": "",
+                "transcript_path": "/t",
+                "input_tokens": 1,
+                "output_tokens": 2,
+                "cache_read_tokens": 3,
+                "cache_creation_tokens": 4,
+                "total_tokens": 10,
+                "tool_calls": 0,
+                "turns": 1,
+                "wall_clock_s": None,
+                "first_ts": None,
+                "last_ts": None,
+                "future_field_from_a_later_issue": 123,  # ignored
+            }
+        )
         assert rec.task == "qa" and rec.cost_usd is None
 
     def test_read_missing_file_is_empty(self, tmp_path: Path):
@@ -118,8 +152,12 @@ class TestBuildRecord:
         _write_transcript(tx)
         rec = harness.build_record(
             harness.RunContext(
-                task="feat", target="obsidian-only", run_index=2,
-                model="claude-opus-4-8", session_id="sess-1", wall_clock_s=12.3,
+                task="feat",
+                target="obsidian-only",
+                run_index=2,
+                model="claude-opus-4-8",
+                session_id="sess-1",
+                wall_clock_s=12.3,
             ),
             tx,
         )
@@ -217,13 +255,22 @@ class TestUnpricedWarning:
     def test_record_from_warns_on_unpriced_model(self, tmp_path: Path, capsys):
         """Both CLI paths must warn (not silently emit null cost) — Copilot review."""
         tx = tmp_path / "t.jsonl"
-        tx.write_text(json.dumps(
-            {"type": "assistant", "message": {"model": "gpt-4o", "usage": {}}}
-        ) + "\n")
-        rc = harness.main([
-            "record-from", "--task", "qa", "--target", "bare",
-            "--transcript", str(tx), "--out", str(tmp_path / "r.jsonl"),
-        ])
+        tx.write_text(
+            json.dumps({"type": "assistant", "message": {"model": "gpt-4o", "usage": {}}}) + "\n"
+        )
+        rc = harness.main(
+            [
+                "record-from",
+                "--task",
+                "qa",
+                "--target",
+                "bare",
+                "--transcript",
+                str(tx),
+                "--out",
+                str(tmp_path / "r.jsonl"),
+            ]
+        )
         assert rc == 0
         assert "no price row for model 'gpt-4o'" in capsys.readouterr().err
 

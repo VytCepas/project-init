@@ -258,7 +258,9 @@ def _check() -> int:
                 shutil.copytree(snapshot / str(i), root)
     if drifted:
         sys.stderr.write(
-            "plugin payload is out of sync — run `just sync-plugin`:\n  " + "\n  ".join(drifted) + "\n"
+            "plugin payload is out of sync — run `just sync-plugin`:\n  "
+            + "\n  ".join(drifted)
+            + "\n"
         )
         return 1
     sys.stdout.write("plugin payload is in sync\n")

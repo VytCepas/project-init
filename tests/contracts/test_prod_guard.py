@@ -109,9 +109,7 @@ class TestVerdicts:
     def test_allowlist_suppresses_flag(self, tmp_path: Path):
         config = tmp_path / ".agents" / "config.yaml"
         config.parent.mkdir(parents=True)
-        config.write_text(
-            'safety:\n  allow: ["kubectl delete .* --context kind-dev"]\n'
-        )
+        config.write_text('safety:\n  allow: ["kubectl delete .* --context kind-dev"]\n')
         command = "kubectl delete pod web --context kind-dev"
         assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
         # Same verb without the allowed context is still blocked.
@@ -135,9 +133,7 @@ class TestVerdicts:
         — the old parser silently dropped it to []."""
         config = tmp_path / ".agents" / "config.yaml"
         config.parent.mkdir(parents=True)
-        config.write_text(
-            'safety:\n  allow:\n    - "kubectl delete .* --context kind-dev"\n'
-        )
+        config.write_text('safety:\n  allow:\n    - "kubectl delete .* --context kind-dev"\n')
         command = "kubectl delete pod web --context kind-dev"
         assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
         # A verb not on the list is still blocked.
@@ -190,9 +186,7 @@ class TestVerdicts:
         config = tmp_path / ".agents" / "config.yaml"
         config.parent.mkdir(parents=True)
         config.write_text("safety:\n  allow: [broken json\n")
-        verdict = _run_hook(
-            _payload("terraform destroy", "bypassPermissions", tmp_path), tmp_path
-        )
+        verdict = _run_hook(_payload("terraform destroy", "bypassPermissions", tmp_path), tmp_path)
         assert verdict is not None, "broken allowlist must not disable the guard"
 
     def test_scalar_inline_allow_does_not_overpermit(self, tmp_path: Path):
@@ -202,9 +196,7 @@ class TestVerdicts:
         config = tmp_path / ".agents" / "config.yaml"
         config.parent.mkdir(parents=True)
         config.write_text('safety:\n  allow: "terraform destroy"\n')
-        verdict = _run_hook(
-            _payload("terraform destroy", "bypassPermissions", tmp_path), tmp_path
-        )
+        verdict = _run_hook(_payload("terraform destroy", "bypassPermissions", tmp_path), tmp_path)
         assert verdict is not None, "a scalar allow must not disable the guard"
 
 
@@ -218,9 +210,7 @@ class TestWiring:
         scaffold(target, fallback_preset(), fallback_variables(), strict=True)
         settings = json.loads((target / ".agents" / "settings.json").read_text())
         commands = [
-            h["command"]
-            for entry in settings["hooks"]["PreToolUse"]
-            for h in entry["hooks"]
+            h["command"] for entry in settings["hooks"]["PreToolUse"] for h in entry["hooks"]
         ]
         assert any("prod_guard.py" in c for c in commands)
         assert (target / ".agents" / "hooks" / "prod_guard.py").is_file()
@@ -237,9 +227,7 @@ class TestWiring:
             (_REPO_ROOT / "plugins/project-init-workflow/hooks/hooks.json").read_text()
         )
         commands = [
-            h["command"]
-            for entry in plugin_hooks["hooks"]["PreToolUse"]
-            for h in entry["hooks"]
+            h["command"] for entry in plugin_hooks["hooks"]["PreToolUse"] for h in entry["hooks"]
         ]
         assert any("prod_guard.py" in c for c in commands)
 

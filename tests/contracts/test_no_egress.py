@@ -20,9 +20,7 @@ from tests.helpers import make_variables, memory_preset
 
 def _settings(tmp_path: Path, **overrides: str) -> dict:
     target = tmp_path / "p"
-    scaffold(
-        target, memory_preset("obsidian-only"), make_variables(**overrides), strict=True
-    )
+    scaffold(target, memory_preset("obsidian-only"), make_variables(**overrides), strict=True)
     return json.loads((target / ".agents" / "settings.json").read_text())
 
 

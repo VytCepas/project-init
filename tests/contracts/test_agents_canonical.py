@@ -31,7 +31,12 @@ class TestCanonicality:
         content = (target / "AGENTS.md").read_text()
         # "cannot fail" keys on the durable break-it rule, not a methodology name
         # that gets reworded (PI-745 changed "TDD" -> "Test-first for design").
-        for marker in ("Key rules for agents", "cannot fail", "GitHub workflow", "Skills (load on demand)"):
+        for marker in (
+            "Key rules for agents",
+            "cannot fail",
+            "GitHub workflow",
+            "Skills (load on demand)",
+        ):
             assert marker in content, f"AGENTS.md missing canonical content: {marker}"
 
     def test_claude_md_is_a_thin_redirect(self, target: Path):
@@ -128,8 +133,12 @@ class TestSkillNeutrality:
         # github_workflow moved to the lifecycle_fallback overlay (#476).
         gw = (
             Path(__file__).resolve().parents[2]
-            / "templates" / "lifecycle_fallback" / "dot_agents" / "skills"
-            / "github_workflow" / "SKILL.md"
+            / "templates"
+            / "lifecycle_fallback"
+            / "dot_agents"
+            / "skills"
+            / "github_workflow"
+            / "SKILL.md"
         )
         content = gw.read_text()
         frontmatter = content.split("---")[1]

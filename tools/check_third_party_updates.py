@@ -146,7 +146,10 @@ def apply(tool_id: str, version: str, *, manifest_path: Path = MANIFEST) -> list
     # missing version_var fails fast and never leaves a half-applied lockstep
     # bump on disk (2026-07 review).
     pending: list[tuple[Path, str]] = [
-        (manifest_path, _replace_in_toml(manifest_path.read_text(encoding="utf-8"), tool_id, version))
+        (
+            manifest_path,
+            _replace_in_toml(manifest_path.read_text(encoding="utf-8"), tool_id, version),
+        )
     ]
     var = tool.get("version_var")
     if var:

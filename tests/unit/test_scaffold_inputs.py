@@ -15,8 +15,17 @@ def test_resolve_inputs_returns_named_record():
     parser = _build_parser()
     args = parser.parse_args(
         [
-            "x", "--non-interactive", "--preset", "obsidian-only",
-            "--name", "demo", "--description", "d", "--language", "python", "--no-plugin",
+            "x",
+            "--non-interactive",
+            "--preset",
+            "obsidian-only",
+            "--name",
+            "demo",
+            "--description",
+            "d",
+            "--language",
+            "python",
+            "--no-plugin",
         ]
     )
     inputs = _resolve_inputs(args, parser, Path("x"))
@@ -36,7 +45,17 @@ def test_resolve_inputs_none_when_interactive():
 
 def test_scaffold_inputs_is_frozen():
     si = ScaffoldInputs(
-        "n", "d", "python", [], "", "none", False, False, False, ["claude"], False,
+        "n",
+        "d",
+        "python",
+        [],
+        "",
+        "none",
+        False,
+        False,
+        False,
+        ["claude"],
+        False,
         "individual",
     )
     with pytest.raises(dataclasses.FrozenInstanceError):
@@ -91,7 +110,9 @@ class TestDeliveryModel:
         from tests.helpers import make_variables
 
         target = tmp_path / "p"
-        scaffold(target, load_preset("obsidian-only"), make_variables(delivery="library"), strict=True)
+        scaffold(
+            target, load_preset("obsidian-only"), make_variables(delivery="library"), strict=True
+        )
         config = (target / ".agents" / "config.yaml").read_text()
         assert "delivery: library" in config
 

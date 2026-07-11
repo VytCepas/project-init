@@ -215,9 +215,7 @@ class TestScaffoldObsidianOnly:
         assert seed_idx < pr_idx, "seed must precede gh pr create"
         # A plain --allow-empty would capture staged work — it must not be
         # invoked (a comment may still reference it to explain the choice).
-        command_lines = [
-            ln for ln in content.splitlines() if not ln.lstrip().startswith("#")
-        ]
+        command_lines = [ln for ln in content.splitlines() if not ln.lstrip().startswith("#")]
         assert not any("git commit --allow-empty" in ln for ln in command_lines), (
             "seed must not use `git commit --allow-empty` (captures staged work)"
         )
@@ -311,6 +309,7 @@ class TestScaffoldObsidianOnly:
 
     def test_settings_json_has_autocompact(self):
         import json
+
         settings = self.target / ".agents" / "settings.json"
         data = json.loads(settings.read_text())
         assert data.get("env", {}).get("CLAUDE_AUTOCOMPACT_PCT_OVERRIDE") == "70"

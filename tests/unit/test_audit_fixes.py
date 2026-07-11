@@ -141,18 +141,8 @@ class TestCarryRagEndpoint:
     memory.rag_endpoint — the template always renders it empty and
     setup_rag.sh explicitly instructs the user to set it (2026-07 review)."""
 
-    _OLD = (
-        "memory:\n"
-        "  tier: 3\n"
-        '  rag_endpoint: "ccc mcp"  # user-set per setup_rag.sh\n'
-        "\n"
-    )
-    _NEW = (
-        "memory:\n"
-        "  tier: 3\n"
-        "  rag_endpoint:        # tier 3: set after running setup_rag.sh\n"
-        "\n"
-    )
+    _OLD = 'memory:\n  tier: 3\n  rag_endpoint: "ccc mcp"  # user-set per setup_rag.sh\n\n'
+    _NEW = "memory:\n  tier: 3\n  rag_endpoint:        # tier 3: set after running setup_rag.sh\n\n"
 
     def test_user_value_survives_the_splice(self):
         out = _carry_rag_endpoint(self._OLD, self._NEW)
@@ -190,9 +180,7 @@ class TestWizardHonorsMcpsFlag:
         assert offered, "browser concern must still be offered (ADR-023)"
 
     def test_cli_mcps_browser_prompt_accept_adds_playwright(self, monkeypatch):
-        monkeypatch.setattr(
-            "project_init.__main__._choose_browser_interactive", lambda: True
-        )
+        monkeypatch.setattr("project_init.__main__._choose_browser_interactive", lambda: True)
         selected = _gather_mcps_interactive("context7", False)
         assert [m["id"] for m in selected] == ["context7", "playwright"]
 
@@ -226,7 +214,9 @@ class TestRunCommandModuleName:
     def test_render_empty_slug_falls_back(self):
         from project_init.__main__ import render_run_command
 
-        assert render_run_command("uv run python -m {project_slug}", "") == "uv run python -m my_app"
+        assert (
+            render_run_command("uv run python -m {project_slug}", "") == "uv run python -m my_app"
+        )
 
     def test_upgrade_paths_call_the_shared_renderer(self):
         # Both upgrade backfill sites assign run_command via the shared renderer,

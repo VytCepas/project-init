@@ -24,9 +24,7 @@ from tests.helpers import make_variables, memory_preset
 
 
 def _declined(target: Path) -> dict:
-    m = re.search(
-        r"declined_additions:\s*(\{.*\})", (target / ".agents/config.yaml").read_text()
-    )
+    m = re.search(r"declined_additions:\s*(\{.*\})", (target / ".agents/config.yaml").read_text())
     return json.loads(m.group(1)) if m else {}
 
 

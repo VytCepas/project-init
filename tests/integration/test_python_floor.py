@@ -24,6 +24,7 @@ agents: claude
 
     assert variables["python_floor"] == "3.13", "Should extract 3.13 from ^3.13"
 
+
 def test_poetry_python_floor_extracted_during_build_variables(tmp_path: Path):
 
     pyproject = tmp_path / "pyproject.toml"
@@ -35,7 +36,28 @@ python = "~=3.14"
     import subprocess
     import sys
 
-    subprocess.run([sys.executable, "-m", "project_init", str(tmp_path), "--name", "foo", "--preset", "core", "--agents", "claude", "--description", "test", "--language", "python", "--non-interactive"], check=True)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "project_init",
+            str(tmp_path),
+            "--name",
+            "foo",
+            "--preset",
+            "core",
+            "--agents",
+            "claude",
+            "--description",
+            "test",
+            "--language",
+            "python",
+            "--non-interactive",
+        ],
+        check=True,
+    )
 
     mypy = tmp_path / "mypy.ini"
-    assert "python_version = 3.14" in mypy.read_text(), "mypy.ini must use 3.14 extracted from ~=3.14"
+    assert "python_version = 3.14" in mypy.read_text(), (
+        "mypy.ini must use 3.14 extracted from ~=3.14"
+    )

@@ -65,9 +65,13 @@ class TestMemoryLayerDerivation:
 
     def test_memory_layers_precede_fallback_and_agents(self):
         # Historical order: base → auto → obsidian → graphify → fallback → agents.
-        assert overlay_layers(
-            "claude,codex", no_plugin=True, memory_stack="obsidian-graphify"
-        ) == ["auto", "obsidian", "graphify", "fallback", "codex"]
+        assert overlay_layers("claude,codex", no_plugin=True, memory_stack="obsidian-graphify") == [
+            "auto",
+            "obsidian",
+            "graphify",
+            "fallback",
+            "codex",
+        ]
 
 
 class TestVariableContract:
@@ -76,12 +80,22 @@ class TestVariableContract:
     @pytest.mark.parametrize("stack,mem,obs,gfy", CONTRACT)
     def test_build_variables(self, stack, mem, obs, gfy):
         v = _build_variables(load_preset("core"), _inputs(stack))
-        assert (v["memory_stack"], v["memory"], v["obsidian"], v["graphify"]) == (stack, mem, obs, gfy)
+        assert (v["memory_stack"], v["memory"], v["obsidian"], v["graphify"]) == (
+            stack,
+            mem,
+            obs,
+            gfy,
+        )
 
     @pytest.mark.parametrize("stack,mem,obs,gfy", CONTRACT)
     def test_backfill_variables(self, stack, mem, obs, gfy):
         v = _backfill_variables({"memory_stack": stack})
-        assert (v["memory_stack"], v["memory"], v["obsidian"], v["graphify"]) == (stack, mem, obs, gfy)
+        assert (v["memory_stack"], v["memory"], v["obsidian"], v["graphify"]) == (
+            stack,
+            mem,
+            obs,
+            gfy,
+        )
 
     def test_backfill_legacy_record_gains_memory_gate(self):
         # A pre-#466 record has memory_stack but no `memory` gate var; backfill
@@ -99,7 +113,8 @@ class TestVariableContract:
         assert preset_name == ("core" if stack == "none" else stack)
 
     @pytest.mark.parametrize(
-        "stack,tier", [("none", ""), ("auto", "0"), ("obsidian-only", "1"), ("obsidian-graphify", "2")]
+        "stack,tier",
+        [("none", ""), ("auto", "0"), ("obsidian-only", "1"), ("obsidian-graphify", "2")],
     )
     def test_memory_tier_parity(self, stack, tier):
         """`memory_tier` (#498) must be emitted identically by all three paths."""

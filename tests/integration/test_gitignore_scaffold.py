@@ -72,7 +72,9 @@ def test_codex_wiring_is_trackable(tmp_path: Path):
     target = tmp_path / "proj"
     assert _scaffold(target, "--agents", "claude,codex", "--mcps", "context7") == 0
     subprocess.run(["git", "init", "-q"], cwd=target, check=True)
-    codex_files = [p.relative_to(target).as_posix() for p in target.rglob(".codex/*") if p.is_file()]
+    codex_files = [
+        p.relative_to(target).as_posix() for p in target.rglob(".codex/*") if p.is_file()
+    ]
     assert codex_files, "expected .codex/ config to be emitted"
     assert not _ignored(target, codex_files)
 

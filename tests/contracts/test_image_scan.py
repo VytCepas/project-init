@@ -73,7 +73,5 @@ class TestTrivyImageScanAbsent:
         assert "aquasecurity/trivy-action" not in ci
 
     def test_absent_for_library(self, tmp_path: Path):
-        ci = _ci(
-            _scaffold(tmp_path / "lib", delivery="library", delivery_library="true")
-        )
+        ci = _ci(_scaffold(tmp_path / "lib", delivery="library", delivery_library="true"))
         assert "aquasecurity/trivy-action" not in ci

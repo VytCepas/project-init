@@ -64,9 +64,7 @@ class TestDevcontainerOverlay:
         self, tmp_path: Path, language: str, marker: str, absent: str
     ):
         flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go")}
-        target = _scaffold(
-            tmp_path / language, devcontainer="true", language=language, **flags
-        )
+        target = _scaffold(tmp_path / language, devcontainer="true", language=language, **flags)
         script = (target / ".devcontainer" / "post-create.sh").read_text()
         assert marker in script
         assert absent not in script
@@ -75,8 +73,11 @@ class TestDevcontainerOverlay:
 
     def test_go_uses_official_feature(self, tmp_path: Path):
         target = _scaffold(
-            tmp_path / "go", devcontainer="true",
-            language="go", python="", go="true",
+            tmp_path / "go",
+            devcontainer="true",
+            language="go",
+            python="",
+            go="true",
         )
         config = json.loads((target / ".devcontainer" / "devcontainer.json").read_text())
         assert "ghcr.io/devcontainers/features/go:1" in config.get("features", {})

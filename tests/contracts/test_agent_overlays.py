@@ -216,7 +216,6 @@ class TestAntigravityOverlay:
         assert not (target / ".gemini-extension").exists()
         assert not (target / ".agents" / "scripts" / "setup_gemini.sh").exists()
 
-
     def test_scaffolds_agents_md(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "antigravity")
         agents_md = target / ".agents" / "AGENTS.md"

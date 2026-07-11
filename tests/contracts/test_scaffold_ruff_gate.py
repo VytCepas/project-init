@@ -35,6 +35,5 @@ def test_scaffolded_agents_dir_passes_its_own_ruff_gate(tmp_target: Path):
         timeout=120,
     )
     assert result.returncode == 0, (
-        "fresh scaffold fails its own ruff gate:\n"
-        f"{result.stdout}\n{result.stderr}"
+        f"fresh scaffold fails its own ruff gate:\n{result.stdout}\n{result.stderr}"
     )

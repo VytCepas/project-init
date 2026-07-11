@@ -81,13 +81,17 @@ class TestDockerfilePassesClean:
         assert "uv:latest" in dockerfile
         # The ignore directive must sit immediately above the COPY it applies to.
         lines = dockerfile.splitlines()
-        copy_idx = next(i for i, ln in enumerate(lines) if ln.startswith("COPY --from=ghcr.io/astral-sh/uv"))
+        copy_idx = next(
+            i for i, ln in enumerate(lines) if ln.startswith("COPY --from=ghcr.io/astral-sh/uv")
+        )
         assert lines[copy_idx - 1].strip() == "# hadolint ignore=DL3007"
 
     def test_rust_pipe_guarded(self, tmp_path: Path):
         dockerfile = (_service(tmp_path / "svc", "rust") / "Dockerfile").read_text()
         lines = dockerfile.splitlines()
-        run_idx = next(i for i, ln in enumerate(lines) if ln.startswith("RUN cargo build --release"))
+        run_idx = next(
+            i for i, ln in enumerate(lines) if ln.startswith("RUN cargo build --release")
+        )
         assert lines[run_idx - 1].strip() == "# hadolint ignore=DL4006"
 
     @pytest.mark.parametrize("language", ["node", "go"])

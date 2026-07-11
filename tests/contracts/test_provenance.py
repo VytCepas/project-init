@@ -21,7 +21,9 @@ def _scaffold(target: Path, **overrides: str) -> Path:
 
 def _library(target: Path, language: str = "python") -> Path:
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
-    return _scaffold(target, delivery="library", delivery_library="true", language=language, **flags)
+    return _scaffold(
+        target, delivery="library", delivery_library="true", language=language, **flags
+    )
 
 
 def _service_deploy(target: Path, deploy: str) -> Path:
@@ -66,7 +68,9 @@ class TestReleaseArtifactProvenance:
 
 class TestContainerImageProvenance:
     def test_deploy_attests_image_digest(self, tmp_path: Path):
-        deploy = (_service_deploy(tmp_path / "svc", "cloud-run") / ".github" / "workflows" / "deploy.yml").read_text()
+        deploy = (
+            _service_deploy(tmp_path / "svc", "cloud-run") / ".github" / "workflows" / "deploy.yml"
+        ).read_text()
         assert "actions/attest-build-provenance" in deploy
         assert "subject-digest: ${{ steps.build.outputs.digest }}" in deploy
         assert "push-to-registry: true" in deploy
@@ -74,7 +78,12 @@ class TestContainerImageProvenance:
         assert "attestations: write" in deploy
 
     def test_registry_publish_attests_image_digest(self, tmp_path: Path):
-        reg = (_service_deploy(tmp_path / "reg", "registry") / ".github" / "workflows" / "registry-publish.yml").read_text()
+        reg = (
+            _service_deploy(tmp_path / "reg", "registry")
+            / ".github"
+            / "workflows"
+            / "registry-publish.yml"
+        ).read_text()
         assert "actions/attest-build-provenance" in reg
         # The build step needs an id so its digest output can be referenced.
         assert "id: build" in reg
@@ -84,5 +93,7 @@ class TestContainerImageProvenance:
         assert "attestations: write" in reg
 
     def test_renders_cleanly(self, tmp_path: Path):
-        deploy = (_service_deploy(tmp_path / "svc", "fly") / ".github" / "workflows" / "deploy.yml").read_text()
+        deploy = (
+            _service_deploy(tmp_path / "svc", "fly") / ".github" / "workflows" / "deploy.yml"
+        ).read_text()
         assert "{{#if" not in deploy and "{{/if" not in deploy

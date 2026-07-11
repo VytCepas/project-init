@@ -567,9 +567,7 @@ def _prompt_menu_index(question: str, count: int, *, default: int) -> int:
         choice = IntPrompt.ask(question, default=default)
         if 1 <= choice <= count:
             return choice
-        console.print(
-            f"[red]Invalid choice {choice}. Enter a number between 1 and {count}.[/red]"
-        )
+        console.print(f"[red]Invalid choice {choice}. Enter a number between 1 and {count}.[/red]")
 
 
 def _prompt_validated(label: str, *, default: str, flag: str, allow_empty: bool = False) -> str:
@@ -643,7 +641,7 @@ def _choose_mcps_interactive(catalog: list[dict[str, Any]]) -> list[dict[str, An
         "can call (Model Context Protocol):"
     )
     for i, m in enumerate(catalog, 1):
-        console.print(option_line(i, m['name'], m['description']))
+        console.print(option_line(i, m["name"], m["description"]))
     console.print()
 
     while True:
@@ -884,9 +882,7 @@ def _print_summary(
     # git repo; say so instead of scaffolding into a bare dir silently
     # (2026-07 QA). Checked structurally (.git up the tree — a valid dir, or a
     # file for worktrees/submodules) — the scaffolder never shells out to git.
-    git_missing = not any(
-        _is_git_marker(p / ".git") for p in (target, *target.resolve().parents)
-    )
+    git_missing = not any(_is_git_marker(p / ".git") for p in (target, *target.resolve().parents))
 
     # Off a TTY (piped/captured/CI) render plain, unwrapped text — no borders to
     # word-wrap mid-phrase, and nothing decorative to bloat a transcript.
@@ -1482,7 +1478,6 @@ def _resolve_iac_interactive(iac: str | None) -> str:
         try:
             return resolve_iac(iac)
         except ValueError as e:
-
             console.print(f"[red]{e}[/red]")
     return _choose_iac_interactive()
 
@@ -1536,7 +1531,6 @@ def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict[str,
         try:
             selected = _resolve_mcps_non_interactive(cli_mcps, cli_browser)
         except ValueError as e:
-
             console.print(f"[red]{e}[/red] — choose from the catalog instead.")
         else:
             # --mcps pins the catalog picks, but browser automation is its own
@@ -1745,7 +1739,6 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         try:
             agents = resolve_agents(cli_agents)
         except ValueError as e:
-
             console.print(f"[red]{e}[/red]")
             agents = _choose_agents_interactive()
     else:

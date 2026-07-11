@@ -203,9 +203,7 @@ def test_canonical_hooks_warns_on_invalid_json(monkeypatch, capsys):
     """Invalid rendered settings.json means broken wiring, not zero hooks — it
     must warn on stderr (visible in CLI use, unlike warnings.warn) rather than
     silently return an empty inventory (2026-07 review)."""
-    monkeypatch.setattr(
-        "project_init.scaffold._render", lambda *a, **k: "{ not valid json,"
-    )
+    monkeypatch.setattr("project_init.scaffold._render", lambda *a, **k: "{ not valid json,")
     hooks = capabilities.canonical_hooks(make_variables())
     assert hooks == []
     assert "invalid JSON" in capsys.readouterr().err

@@ -64,9 +64,7 @@ class TestOverlayLayers:
         assert overlay_layers("claude", no_plugin=False, governance=False) == []
 
     def test_composes_with_agents_fallback_and_multi_model(self):
-        layers = overlay_layers(
-            "claude,codex", no_plugin=True, multi_model=True, governance=True
-        )
+        layers = overlay_layers("claude,codex", no_plugin=True, multi_model=True, governance=True)
         # Order is stable: fallback, agents, then the opt-in overlays.
         assert layers == ["fallback", "codex", "multi_model", "governance"]
 

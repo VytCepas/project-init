@@ -23,7 +23,14 @@ def _iac(target: Path) -> Path:
 class TestIacOverlayPresent:
     def test_hcl_skeleton_renders(self, tmp_path: Path):
         t = _iac(tmp_path / "p")
-        for f in ("versions.tf", "main.tf", "variables.tf", "outputs.tf", "backend.tf", "README.md"):
+        for f in (
+            "versions.tf",
+            "main.tf",
+            "variables.tf",
+            "outputs.tf",
+            "backend.tf",
+            "README.md",
+        ):
             assert (t / "infra" / f).is_file(), f"missing infra/{f}"
 
     def test_backend_is_commented_stub(self, tmp_path: Path):
@@ -31,7 +38,7 @@ class TestIacOverlayPresent:
         # Every backend line is commented — no uncommented backend/terraform block
         # anywhere, including the file's first line (column 0).
         assert 'backend "s3"' in backend
-        assert '# terraform {' in backend
+        assert "# terraform {" in backend
         for line in backend.splitlines():
             stripped = line.lstrip()
             assert not stripped.startswith("terraform {"), f"uncommented: {line!r}"
@@ -40,15 +47,17 @@ class TestIacOverlayPresent:
     def test_gitignore_keeps_lockfile_tracked(self, tmp_path: Path):
         gi = (_iac(tmp_path / "p") / "infra" / ".gitignore").read_text()
         assert "*.tfstate" in gi
-        assert ".terraform.lock.hcl" not in gi.replace("# NOT ignored: .terraform.lock.hcl is committed (provider checksum pinning).", "")
+        assert ".terraform.lock.hcl" not in gi.replace(
+            "# NOT ignored: .terraform.lock.hcl is committed (provider checksum pinning).", ""
+        )
 
     def test_workflow_uses_opentofu_and_gated_apply(self, tmp_path: Path):
         wf = (_iac(tmp_path / "p") / ".github" / "workflows" / "infra.yml").read_text()
         assert "opentofu/setup-opentofu" in wf
         assert "tofu plan" in wf and "tofu validate" in wf
-        assert "environment: infra-apply" in wf          # gated apply
-        assert "workflow_dispatch" in wf                  # manual, not on merge
-        assert "id-token: write" in wf                    # OIDC
+        assert "environment: infra-apply" in wf  # gated apply
+        assert "workflow_dispatch" in wf  # manual, not on merge
+        assert "id-token: write" in wf  # OIDC
 
     def test_infra_apply_gate_documented_as_advisory(self, tmp_path: Path):
         """#439: the infra-apply environment is referenced but no scaffolded

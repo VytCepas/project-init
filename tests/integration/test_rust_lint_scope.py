@@ -53,7 +53,7 @@ pytestmark = [
     pytest.mark.slow,
 ]
 
-_CLEAN_LIB = '//! Probe.\n\n/// Adds two numbers.\n#[must_use]\npub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n'
+_CLEAN_LIB = "//! Probe.\n\n/// Adds two numbers.\n#[must_use]\npub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n"
 _CLEAN_TEST = "#[test]\nfn t() {\n    assert_eq!(probe::add(1, 2), 3);\n}\n"
 # A type error, not a style nit: `&str` where `i32` is required.
 _BROKEN_TEST = '#[test]\nfn t() {\n    let x: i32 = "not an integer";\n    assert_eq!(probe::add(1, 2), x);\n}\n'

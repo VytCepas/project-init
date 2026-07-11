@@ -84,12 +84,8 @@ def _run(tmp_target: Path, tmp_path: Path, api_sha: str, **overrides: str):
     )
 
 
-def test_stale_api_head_never_reaches_the_check_verdict(
-    tmp_target: Path, tmp_path: Path
-):
-    result = _run(
-        tmp_target, tmp_path, api_sha=_OLD_SHA, PI_HEAD_SYNC_TIMEOUT="10"
-    )
+def test_stale_api_head_never_reaches_the_check_verdict(tmp_target: Path, tmp_path: Path):
+    result = _run(tmp_target, tmp_path, api_sha=_OLD_SHA, PI_HEAD_SYNC_TIMEOUT="10")
     assert result.returncode == 1
     assert "Refusing to judge check results" in result.stderr
     assert _OLD_SHA in result.stderr and _NEW_SHA in result.stderr
@@ -97,9 +93,7 @@ def test_stale_api_head_never_reaches_the_check_verdict(
     assert "CI failed" not in result.stdout
 
 
-def test_synced_api_head_passes_through_to_the_check_verdict(
-    tmp_target: Path, tmp_path: Path
-):
+def test_synced_api_head_passes_through_to_the_check_verdict(tmp_target: Path, tmp_path: Path):
     result = _run(tmp_target, tmp_path, api_sha=_NEW_SHA)
     assert result.returncode == 1
     assert "CI failed on PR #1" in result.stdout
@@ -120,17 +114,13 @@ def test_cross_repo_pr_skips_the_gate(tmp_target: Path, tmp_path: Path):
     `feature`, and the gate would wait out its timeout against a SHA from the
     wrong repository. Skip instead of guessing (PR #712 review).
     """
-    result = _run(
-        tmp_target, tmp_path, api_sha=_OLD_SHA, PI_TEST_CROSS_REPO="true"
-    )
+    result = _run(tmp_target, tmp_path, api_sha=_OLD_SHA, PI_TEST_CROSS_REPO="true")
     assert result.returncode == 1
     assert "CI failed on PR #1" in result.stdout
     assert "Refusing to judge check results" not in result.stderr
 
 
 def test_invalid_head_sync_timeout_fails_closed(tmp_target: Path, tmp_path: Path):
-    result = _run(
-        tmp_target, tmp_path, api_sha=_NEW_SHA, PI_HEAD_SYNC_TIMEOUT="soon"
-    )
+    result = _run(tmp_target, tmp_path, api_sha=_NEW_SHA, PI_HEAD_SYNC_TIMEOUT="soon")
     assert result.returncode == 2
     assert "non-negative integer" in result.stderr

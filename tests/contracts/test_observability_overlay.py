@@ -108,7 +108,7 @@ class TestObservabilityOn:
             encoding="utf-8"
         )
         assert "candidates.extend(" in text
-        assert "shutil.which(\"git\")" in text
+        assert 'shutil.which("git")' in text
         assert "# noqa: S603" in text
 
 

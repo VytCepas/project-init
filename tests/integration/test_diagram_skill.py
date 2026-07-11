@@ -16,18 +16,14 @@ from tests.helpers import fallback_preset, fallback_variables
 class TestDiagramSkill:
     def test_present_and_default_on_no_plugin(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        content = (
-            tmp_target / ".agents" / "skills" / "diagram" / "SKILL.md"
-        ).read_text()
+        content = (tmp_target / ".agents" / "skills" / "diagram" / "SKILL.md").read_text()
         assert "name: diagram" in content
         assert "user-invocable: true" in content
         assert len(content.splitlines()) < 500
 
     def test_body_covers_the_method(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        content = (
-            tmp_target / ".agents" / "skills" / "diagram" / "SKILL.md"
-        ).read_text()
+        content = (tmp_target / ".agents" / "skills" / "diagram" / "SKILL.md").read_text()
         # Notation table with the mermaid diagram types + dense-graph escape.
         assert "erDiagram" in content
         assert "sequenceDiagram" in content

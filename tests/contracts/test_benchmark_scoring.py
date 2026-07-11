@@ -86,8 +86,7 @@ class TestPytestArgv:
             "uv run pytest -q test_calc.py",
             ["test_calc.py::test_a", "test_calc.py::test_b"],
         )
-        assert argv == ["uv", "run", "pytest", "-q",
-                        "test_calc.py::test_a", "test_calc.py::test_b"]
+        assert argv == ["uv", "run", "pytest", "-q", "test_calc.py::test_a", "test_calc.py::test_b"]
 
     def test_no_nodes_runs_command_as_authored(self):
         argv = scoring._pytest_argv("uv run pytest -q test_slug.py", [])
@@ -123,12 +122,26 @@ class TestNoneCheck:
 
 class TestRework:
     def _transcript(self, path: Path, n_errors: int) -> None:
-        entries = [{"type": "assistant", "message": {"model": "m", "usage": {},
-                    "content": [{"type": "tool_use", "id": f"t{i}", "name": "Bash", "input": {}}]}}
-                   for i in range(n_errors)]
-        entries += [{"type": "user", "message": {"content": [
-            {"type": "tool_result", "tool_use_id": f"t{i}", "is_error": True}]}}
-            for i in range(n_errors)]
+        entries = [
+            {
+                "type": "assistant",
+                "message": {
+                    "model": "m",
+                    "usage": {},
+                    "content": [{"type": "tool_use", "id": f"t{i}", "name": "Bash", "input": {}}],
+                },
+            }
+            for i in range(n_errors)
+        ]
+        entries += [
+            {
+                "type": "user",
+                "message": {
+                    "content": [{"type": "tool_result", "tool_use_id": f"t{i}", "is_error": True}]
+                },
+            }
+            for i in range(n_errors)
+        ]
         path.write_text("\n".join(json.dumps(e) for e in entries) + "\n")
 
     def test_counts_error_tool_results(self, tmp_path: Path):
@@ -150,21 +163,38 @@ class TestScoreOrchestrator:
     def test_first_try_when_success_and_no_rework(self, tmp_path: Path):
         tx = tmp_path / "t.jsonl"
         tx.write_text(json.dumps({"type": "assistant", "message": {"model": "m"}}) + "\n")
-        s = scoring.score(load_task("qa"), target_dir=Path("."),
-                          transcript_path=tx, agent_output="see the justfile")
+        s = scoring.score(
+            load_task("qa"),
+            target_dir=Path("."),
+            transcript_path=tx,
+            agent_output="see the justfile",
+        )
         assert s.success is True and s.rework_cycles == 0 and s.first_try is True
 
     def test_not_first_try_when_rework(self, tmp_path: Path):
         tx = tmp_path / "t.jsonl"
         entries = [
-            {"type": "assistant", "message": {"model": "m", "content": [
-                {"type": "tool_use", "id": "t0", "name": "Bash", "input": {}}]}},
-            {"type": "user", "message": {"content": [
-                {"type": "tool_result", "tool_use_id": "t0", "is_error": True}]}},
+            {
+                "type": "assistant",
+                "message": {
+                    "model": "m",
+                    "content": [{"type": "tool_use", "id": "t0", "name": "Bash", "input": {}}],
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [{"type": "tool_result", "tool_use_id": "t0", "is_error": True}]
+                },
+            },
         ]
         tx.write_text("\n".join(json.dumps(e) for e in entries) + "\n")
-        s = scoring.score(load_task("qa"), target_dir=Path("."),
-                          transcript_path=tx, agent_output="see the justfile")
+        s = scoring.score(
+            load_task("qa"),
+            target_dir=Path("."),
+            transcript_path=tx,
+            agent_output="see the justfile",
+        )
         assert s.success is True and s.rework_cycles == 1 and s.first_try is False
 
     def test_no_target_leaves_success_none(self, tmp_path: Path):

@@ -36,6 +36,7 @@ def _source_dir(hook: str) -> Path:
 def _plugin_dir(hook: str) -> Path:
     return _LIFECYCLE_PLUGIN_HOOKS if hook in _LIFECYCLE_HOOK_NAMES else _PLUGIN_HOOKS
 
+
 # The five always-on shell hooks that must self-log, with the (hook, event) each
 # should record.
 _WIRED_HOOKS = {
@@ -150,7 +151,7 @@ class TestHelperGating:
         command = 'echo "hello\nworld" && curl https://user:pass@example.com'
         quoted_decision = shlex.quote(decision)
         quoted_command = shlex.quote(command)
-        script = f". {shlex.quote(str(_HELPER))}\nusage_log pre_commit_gate PreToolUse \"\" {quoted_decision} {quoted_command}\n"
+        script = f'. {shlex.quote(str(_HELPER))}\nusage_log pre_commit_gate PreToolUse "" {quoted_decision} {quoted_command}\n'
         subprocess.run(
             ["bash", "-c", script],
             capture_output=True,
@@ -277,7 +278,10 @@ class TestPackageGuardSelfLog:
         assert rows[0]["command"] == "npm install totally-nonexistent-package-name-1234"
 
     def test_dormant_without_marker(self, tmp_path: Path):
-        payload = {"tool_input": {"command": "npm install totally-nonexistent-package-name-1234"}, "cwd": str(tmp_path)}
+        payload = {
+            "tool_input": {"command": "npm install totally-nonexistent-package-name-1234"},
+            "cwd": str(tmp_path),
+        }
         _, log = _run_package_guard(payload, tmp_path)
         assert not log.exists()
 

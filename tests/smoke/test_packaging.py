@@ -67,6 +67,7 @@ class TestInstalledWheel:
         # PI-144: the installed release artifact must report its version —
         # this is what install pinning and the upgrade path key off.
         import tomllib
+
         pkg_version = tomllib.loads(
             (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text()
         )["project"]["version"]
@@ -79,12 +80,17 @@ class TestInstalledWheel:
         # Scaffold using the installed binary, with --strict.
         result = subprocess.run(
             [
-                str(venv_bin), str(scaffold_target),
+                str(venv_bin),
+                str(scaffold_target),
                 "--non-interactive",
-                "--preset", "obsidian-only",
-                "--name", "wheel-smoke",
-                "--description", "test",
-                "--language", "python",
+                "--preset",
+                "obsidian-only",
+                "--name",
+                "wheel-smoke",
+                "--description",
+                "test",
+                "--language",
+                "python",
                 "--no-plugin",
                 "--strict",
             ],
@@ -93,8 +99,7 @@ class TestInstalledWheel:
             timeout=60,
         )
         assert result.returncode == 0, (
-            f"installed binary failed:\nSTDOUT: {result.stdout}\n"
-            f"STDERR: {result.stderr}"
+            f"installed binary failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
         )
 
         # Essentials present.
@@ -108,6 +113,4 @@ class TestInstalledWheel:
         ]:
             hook_path = scaffold_target / ".agents" / "hooks" / hook
             assert hook_path.is_file()
-            assert hook_path.stat().st_mode & 0o111, (
-                f"{hook} lost executable bit"
-            )
+            assert hook_path.stat().st_mode & 0o111, f"{hook} lost executable bit"

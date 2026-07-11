@@ -48,7 +48,9 @@ def _project(tmp_path: Path) -> Path:
     (tmp_path / "mypy.ini").write_text("[mypy]\nstrict = True\n")
     src = tmp_path / "src"
     src.mkdir()
-    (src / "bad.py").write_text('def add(a: int, b: int) -> int:\n    return a + b\n\nadd("x", "y")\n')
+    (src / "bad.py").write_text(
+        'def add(a: int, b: int) -> int:\n    return a + b\n\nadd("x", "y")\n'
+    )
     return tmp_path
 
 

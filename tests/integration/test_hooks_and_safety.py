@@ -217,9 +217,7 @@ class TestInstallHooks:
 
     def test_installs_all_enforcement_hooks(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        subprocess.run(
-            ["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True
-        )
+        subprocess.run(["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True)
         result = subprocess.run(
             ["bash", str(tmp_target / ".agents" / "scripts" / "install_hooks.sh")],
             cwd=tmp_target,
@@ -236,9 +234,7 @@ class TestInstallHooks:
         """PI-204: when .git/hooks/<hook> is a symlink (e.g. a hooks manager),
         install must replace the link, not write through to its referent."""
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        subprocess.run(
-            ["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True
-        )
+        subprocess.run(["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True)
         referent = tmp_target / "shared-pre-commit"
         referent.write_text("USER SHARED HOOK - DO NOT CLOBBER\n")
         dst = tmp_target / ".git" / "hooks" / "pre-commit"
@@ -306,7 +302,4 @@ class TestShellLineEndings:
             data = sh.read_bytes()
             if b"\r\n" in data:
                 offenders.append(str(sh.relative_to(repo_root)))
-        assert not offenders, (
-            "Shell scripts with CRLF line endings:\n  "
-            + "\n  ".join(offenders)
-        )
+        assert not offenders, "Shell scripts with CRLF line endings:\n  " + "\n  ".join(offenders)

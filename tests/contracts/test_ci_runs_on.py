@@ -43,9 +43,7 @@ def _jobs_with_runs_on(text: str) -> dict[str, str]:
 class TestCiRunsOnEscapeHatch:
     def test_compute_jobs_use_the_variable(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        jobs = _jobs_with_runs_on(
-            (tmp_target / ".github" / "workflows" / "ci.yml").read_text()
-        )
+        jobs = _jobs_with_runs_on((tmp_target / ".github" / "workflows" / "ci.yml").read_text())
         assert jobs, "no jobs parsed from ci.yml"
         for job, runs_on in jobs.items():
             if job == "scorecard":
@@ -80,9 +78,7 @@ class TestCiRunsOnEscapeHatch:
 
     def test_scorecard_stays_pinned_but_gate_follows(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        jobs = _jobs_with_runs_on(
-            (tmp_target / ".github" / "workflows" / "ci.yml").read_text()
-        )
+        jobs = _jobs_with_runs_on((tmp_target / ".github" / "workflows" / "ci.yml").read_text())
         # scorecard: OSSF-hosted requirement; schedule-gated so it never
         # blocks a PR — safe to pin.
         if "scorecard" in jobs:
@@ -113,9 +109,7 @@ class TestCiRunsOnEscapeHatch:
         from tests.helpers import make_variables
 
         preset = load_preset("obsidian-only")
-        extra = overlay_layers(
-            [], no_plugin=True, memory_stack="obsidian-only", lifecycle=False
-        )
+        extra = overlay_layers([], no_plugin=True, memory_stack="obsidian-only", lifecycle=False)
         preset = {**preset, "layers": [*preset["layers"], *extra]}
         target = tmp_path / "p"
         scaffold(
@@ -144,9 +138,7 @@ class TestCiRunsOnEscapeHatch:
         ci = (tmp_target / ".github" / "workflows" / "ci.yml").read_text()
         # Executable lines only — the explanatory comment legitimately names
         # the failure mode ("pip install semgrep fails there").
-        runnable = [
-            ln for ln in ci.splitlines() if not ln.lstrip().startswith("#")
-        ]
+        runnable = [ln for ln in ci.splitlines() if not ln.lstrip().startswith("#")]
         assert not [ln for ln in runnable if "pip install" in ln], (
             "pip must not be executed in scaffolded CI"
         )

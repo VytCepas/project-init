@@ -36,7 +36,9 @@ def _nightly_matrix_pythons() -> list[str]:
     nightly = load_workflow(_ROOT, "nightly.yml")
     matrix = job(nightly, "full-matrix-tests").get("strategy", {}).get("matrix", {})
     versions = matrix.get("python-version")
-    assert isinstance(versions, list), "nightly full-matrix-tests has no python-version matrix (#638)"
+    assert isinstance(versions, list), (
+        "nightly full-matrix-tests has no python-version matrix (#638)"
+    )
     return sorted(str(v) for v in versions)
 
 
@@ -69,7 +71,9 @@ def test_tests_are_sharded_into_parallel_jobs():
     assert shards == [1, 2, 3, 4], f"test job must shard [1, 2, 3, 4], got {shards!r}"
     run = " ".join(str(s.get("run", "")) for s in steps(test_job))
     assert "--splits" in run and "--group" in run, "test job must run pytest --splits/--group"
-    assert "-n auto" not in run, "shards run serially (no xdist) — that is what makes them race-free"
+    assert "-n auto" not in run, (
+        "shards run serially (no xdist) — that is what makes them race-free"
+    )
 
 
 def test_semgrep_and_license_scan_are_advisory():
@@ -84,4 +88,6 @@ def test_semgrep_and_license_scan_are_advisory():
     assert "license-scan" in jobs, "license-scan job missing from ci.yml"
     gate_needs = needs(wf, "ci-gate")
     assert "semgrep" not in gate_needs, "semgrep must stay advisory (not in ci-gate.needs)"
-    assert "license-scan" not in gate_needs, "license-scan must stay advisory (not in ci-gate.needs)"
+    assert "license-scan" not in gate_needs, (
+        "license-scan must stay advisory (not in ci-gate.needs)"
+    )

@@ -22,7 +22,9 @@ def _human_section(config_text: str) -> str:
 
 class TestMarketplaceVarsIncludeHost:
     def test_host_is_derived(self):
-        assert marketplace_source_vars("https://github.com/o/r")["project_init_host"] == "github.com"
+        assert (
+            marketplace_source_vars("https://github.com/o/r")["project_init_host"] == "github.com"
+        )
         assert (
             marketplace_source_vars("https://ghes.example.com/o/r")["project_init_host"]
             == "ghes.example.com"

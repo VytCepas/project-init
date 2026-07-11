@@ -73,4 +73,3 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         marker_name = _PATH_MARKERS.get(rel_path.parts[0])
         if marker_name:
             item.add_marker(getattr(pytest.mark, marker_name))
-

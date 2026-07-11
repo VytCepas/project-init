@@ -117,7 +117,9 @@ class TestOldRecordUpgrade:
         recorded = json.loads(m.group(2))
         for k in ("lifecycle", "lifecycle_tier", "lifecycle_off"):
             recorded.pop(k, None)
-        text = text[: m.start()] + m.group(1) + json.dumps(recorded, sort_keys=True) + text[m.end() :]
+        text = (
+            text[: m.start()] + m.group(1) + json.dumps(recorded, sort_keys=True) + text[m.end() :]
+        )
         config.write_text(text)
 
         capsys.readouterr()

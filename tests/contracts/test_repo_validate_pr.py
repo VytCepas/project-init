@@ -36,9 +36,7 @@ fi
 
 def _run(title: str, body: str, branch: str = "") -> subprocess.CompletedProcess:
     env = {**os.environ, "PR_TITLE": title, "PR_BODY": body, "PR_BRANCH": branch}
-    return subprocess.run(
-        ["bash", "-c", _CHECK], env=env, capture_output=True, text=True
-    )
+    return subprocess.run(["bash", "-c", _CHECK], env=env, capture_output=True, text=True)
 
 
 def test_workflow_keeps_the_key_match_check():

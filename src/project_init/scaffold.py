@@ -863,9 +863,7 @@ def _coerce_preset_var(value: object) -> str:
 # the .agents/observability/ layer stays absent — config.yaml would advertise a
 # retrieval surface the project never scaffolded. (multi_model deliberately stays
 # out: it has no base-template gate and its preset-var flow is intended, #252.)
-_PRESET_CONTROL_KEYS = frozenset(
-    {"memory_stack", "lifecycle", "governance", "observability"}
-)
+_PRESET_CONTROL_KEYS = frozenset({"memory_stack", "lifecycle", "governance", "observability"})
 
 
 def _apply_preset_vars(variables: dict[str, str], preset: dict[str, Any]) -> dict[str, str]:
@@ -1173,7 +1171,9 @@ def _generate_claude_projection(
     # it is our own generated projection: a real dir is rebuilt, and a stale
     # symlink / git-materialized symlink-file is removed with unlink().
     real_dir = claude_dir.is_dir() and not claude_dir.is_symlink()
-    user_config = claude_dir.is_symlink() or claude_dir.is_file() or (real_dir and any(claude_dir.iterdir()))
+    user_config = (
+        claude_dir.is_symlink() or claude_dir.is_file() or (real_dir and any(claude_dir.iterdir()))
+    )
     if first_scaffold and user_config:
         backup = _unique_backup_dir(claude_dir)
         claude_dir.rename(backup)  # rename moves a dir, symlink, or file alike

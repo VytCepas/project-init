@@ -27,9 +27,7 @@ class TestTokenEfficiencySkill:
 
     def test_body_covers_input_and_output_side(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        content = (
-            tmp_target / ".agents" / "skills" / "token_efficiency" / "SKILL.md"
-        ).read_text()
+        content = (tmp_target / ".agents" / "skills" / "token_efficiency" / "SKILL.md").read_text()
         # Input side: filter before ingest, ranged reads, delegated sweeps.
         assert "test-quick" in content
         assert "tail -n 40" in content

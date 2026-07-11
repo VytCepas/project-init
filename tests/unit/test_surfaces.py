@@ -134,9 +134,7 @@ def test_amp_junie_not_experimental():
 
 def test_planned_files_for_selection():
     servers = servers_for_ids(["context7"])
-    files = surfaces.planned_files(
-        ["claude", "cursor", "antigravity", "vscode", "codex"], servers
-    )
+    files = surfaces.planned_files(["claude", "cursor", "antigravity", "vscode", "codex"], servers)
     assert set(files) >= {
         ".mcp.json",
         ".cursor/hooks.json",
