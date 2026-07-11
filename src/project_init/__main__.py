@@ -2590,6 +2590,30 @@ def _preset_main(argv: list[str]) -> int:
     return 0
 
 
+def _doctor_main(argv: list[str]) -> int:
+    """Parse and run `project-init doctor` — health-check a scaffolded project (#544)."""
+    from project_init.doctor import run_doctor
+
+    p = argparse.ArgumentParser(
+        prog="project-init doctor",
+        description=(
+            "Health-check a scaffolded project's .claude/.agents wiring: "
+            "settings.json validity, referenced hooks present and executable, "
+            "plugin enablement, git hooks, and a resolvable Python. Prints "
+            "PASS/WARN/FAIL per check and exits non-zero on any FAIL. "
+            "Deterministic — no LLM, no network."
+        ),
+    )
+    p.add_argument(
+        "target",
+        nargs="?",
+        default=".",
+        help="Scaffolded project directory (default: current directory)",
+    )
+    args = p.parse_args(argv)
+    return run_doctor(Path(args.target).resolve())
+
+
 def _text_field_error(flag: str, value: str, *, allow_empty: bool = False) -> str | None:
     """Return why *value* would corrupt config.yaml, or None if it is clean.
 
@@ -2729,7 +2753,7 @@ def _resolve_preset_lifecycle(preset: dict[str, Any], parser: argparse.ArgumentP
 
 # Subcommand names, single-sourced for _cli dispatch AND the bare-target
 # rejection below — adding a subcommand must update both behaviors together.
-_SUBCOMMANDS = ("upgrade", "add", "remove", "preset")
+_SUBCOMMANDS = ("upgrade", "add", "remove", "preset", "doctor")
 
 
 def _record_scaffold(
@@ -2771,6 +2795,7 @@ def _cli(argv: list[str]) -> int:
         "add": lambda a: _concern_main(a, enable=True),
         "remove": lambda a: _concern_main(a, enable=False),
         "preset": lambda a: _preset_main(a),
+        "doctor": lambda a: _doctor_main(a),
     }
     assert set(_dispatch) == set(_SUBCOMMANDS)  # keep bare-target rejection in sync
     if argv[:1] and argv[0] in _dispatch:

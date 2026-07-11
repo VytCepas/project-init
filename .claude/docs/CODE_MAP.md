@@ -48,6 +48,21 @@ Central rich styling for the interactive wizard.
 - `def render_presets` — Print the preset options as an aligned table (plain list off-TTY).
 - `def scaffolding` — Spinner for the duration of a long, single-shot operation.
 
+### `project_init/doctor.py`
+
+``project-init doctor`` — deterministic health-check for a scaffolded project (#544).
+
+- `class Check` — One checklist line: its outcome, a human title, and a fix hint.
+- `def check_scaffold_record` — ``.agents/config.yaml`` exists and carries a parseable scaffold record.
+- `def check_settings_json` — ``.claude/settings.json`` exists and is valid JSON.
+- `def check_referenced_scripts_exist` — Every hook/statusline script settings.json points at is present on disk.
+- `def check_referenced_scripts_executable` — Referenced ``.sh`` hooks carry the executable bit.
+- `def check_plugin_enablement` — Plugin-mode projects enable the project-init plugin(s) in settings.json.
+- `def check_git_hooks` — Git hooks are installed when a ``.github/hooks/`` source ships them.
+- `def check_python_available` — A Python 3 interpreter is resolvable, mirroring ``_py.sh``.
+- `def collect_checks` — Run every check against *target* and return the results in report order.
+- `def run_doctor` — Print the health-check report for *target*; return 1 if any check FAILs.
+
 ### `project_init/governance.py`
 
 Deterministic AIBOM generation for the governance overlay (ADR-018, #412).
