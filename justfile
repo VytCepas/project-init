@@ -23,19 +23,19 @@ format:
 typecheck:
     uv run --with "mypy>=1.10" --with pip mypy --install-types --non-interactive src/
 
-# The suite is xdist-safe: the upgrade drift checks that once forced serial
-# execution were isolated (#668 frozen-templates fixture), so `-n auto` runs
-# green and roughly halves wall-clock.
+# Parallel locally for dev-loop speed (~halves wall-clock). CI runs this suite
+# SERIALLY on purpose — a rare cross-test interference surfaces under parallel
+# scheduling (PI-762); a local flake is low-stakes (re-run), but CI must stay
+# deterministic. Remove `-n auto` here too if a local flake ever bites.
 # run the test suite in parallel (xdist)
 test:
     uv run pytest -n auto --tb=short -q
 
 # Coverage (#636) is drift visibility, no floor. Kept off `just test` so the
-# default loop stays fast; CI runs this one. pytest-cov combines the per-worker
-# data files (coverage `parallel = true`).
-# run the test suite in parallel with a coverage report
+# default loop stays fast; CI runs this one (serially — see `test`).
+# run the test suite with a coverage report
 test-cov:
-    uv run pytest -n auto --tb=short -q --cov --cov-report=term-missing
+    uv run pytest --tb=short -q --cov --cov-report=term-missing
 
 # fast iterate loop — stop at first failure, minimal output. Use while
 # debugging to keep test noise out of agent context; run `just test` for the
