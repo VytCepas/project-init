@@ -1,11 +1,17 @@
 """PI-781: a freshly scaffolded go/rust project must be day-one green.
 
 No `go.mod`/`Cargo.toml` is scaffolded (like node has no `package.json`), so
-every recipe that shells out to the toolchain must skip cleanly until the user
+each recipe that shells out to the toolchain must skip cleanly until the user
 runs `go mod init` / `cargo init`. Before this guard, `just test` ran
 `go test ./...` / `cargo test` unconditionally and a fresh rust scaffold's `just
 ci` (`cargo check` in `typecheck`) was day-one CI red, while go's `just fast-ci`
 (`go test ./...`) failed the pre-push hook.
+
+Coverage: every guarded toolchain recipe is exercised below — `setup`,
+`typecheck`, `test`, `test-quick`, `test-cov`, `audit`, `format`, `sbom`,
+`license` (go), `fuzz` — plus the `ci`/`fast-ci` aggregates that fold in `lint`
+(which also runs shellcheck/shfmt/lint_context_budget, so it is asserted only
+through the aggregate, not standalone).
 
 Contract tests assert the *text* of the justfile — the weak class this repo
 keeps getting burned by (#732/#734). So this module runs the real `just`
@@ -60,13 +66,19 @@ def _run(target: Path, *recipe: str) -> subprocess.CompletedProcess[str]:
 # (recipe, substring the day-one skip must print). Excludes `lint`, which also
 # runs shellcheck/shfmt/lint_context_budget — covered by the `ci`/`fast-ci`
 # aggregate assertions below.
+# `setup` is keyed off go.mod (not *.go) — `go mod download` syncs the cache with
+# a go.mod and zero sources, so it must not be a source-gated no-op (PR #782 review).
 _GO_SKIPS = [
-    ("setup", "No Go sources yet"),
+    ("setup", "No Go module yet"),
     ("typecheck", "No Go sources yet"),
     ("test", "No Go sources yet"),
     ("test-quick", "No Go sources yet"),
     ("test-cov", "No Go sources yet"),
     ("audit", "No Go sources yet"),
+    ("format", "No Go sources yet"),
+    ("sbom", "No Go sources yet"),
+    ("license", "No Go sources yet"),
+    ("fuzz", "No Go sources yet"),
 ]
 _RUST_SKIPS = [
     ("setup", "No Cargo project yet"),
@@ -76,6 +88,10 @@ _RUST_SKIPS = [
     ("test-quick", "No Cargo project yet"),
     ("test-cov", "No Cargo project yet"),
     ("audit", "No Cargo project yet"),
+    ("format", "No Cargo project yet"),
+    ("sbom", "No Cargo project yet"),
+    ("license", "No Cargo project yet"),
+    ("fuzz", "No Cargo project yet"),
 ]
 
 

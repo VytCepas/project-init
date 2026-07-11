@@ -206,12 +206,14 @@ ci-local-off:
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
 
-# download module dependencies. Skips cleanly before any Go source exists —
-# every go recipe that shells out to the toolchain errors on a fresh module
-# (no go.mod), so a fresh scaffold's `just ci` / `just fast-ci` would fail
-# day-one without these guards (parity with the existing typecheck/test-cov skips).
+# download module dependencies. Keyed off go.mod, not *.go: `go mod download`
+# syncs the module cache and succeeds with a go.mod and zero .go files, so a
+# dependency-only or generated-code workflow must not be skipped once the module
+# is initialized. Every other go recipe below shells out to the toolchain, which
+# errors on a fresh module — so those guards keep `just ci`/`just fast-ci` and the
+# rest green until the first source appears (parity with typecheck/test-cov).
 setup:
-    sh -c 'if find . -name "*.go" | grep -q .; then go mod download; else echo "No Go sources yet — nothing to download."; fi'
+    sh -c 'if [ -f go.mod ]; then go mod download; else echo "No Go module yet — run go mod init."; fi'
 
 # lint project code (revive/godoclint/gocognit/cyclop/dupl/errcheck/govet/staticcheck gates per .golangci.yml)
 lint:
@@ -365,7 +367,7 @@ test-quick:
 # add llvm-tools-preview`, once, on your machine (CI installs it per-run).
 # tune the "70" threshold to your project's baseline.
 test-cov:
-    sh -c 'if [ -f Cargo.toml ]; then cargo llvm-cov --fail-under-lines 70; else echo "No Cargo project yet — nothing to test."; fi'
+    sh -c 'if [ -f Cargo.toml ]; then cargo llvm-cov --fail-under-lines 70; else echo "No Cargo project yet — run cargo init."; fi'
 
 # docs: nothing to build locally — docs.rs renders published crate docs
 docs:
@@ -397,7 +399,7 @@ license:
 # `fuzz` job, never on a PR (#727). proptest draws fresh seeds each run, so the
 # nightly job explores inputs a per-PR run would only repeat.
 fuzz:
-    sh -c 'if [ -f Cargo.toml ]; then cargo test; else echo "No Cargo project yet — nothing to fuzz."; fi'
+    sh -c 'if [ -f Cargo.toml ]; then cargo test; else echo "No Cargo project yet — run cargo init."; fi'
 
 # scan staged changes for secrets (same scan as the pre-commit git hook)
 scan:
