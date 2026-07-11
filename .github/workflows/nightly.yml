@@ -60,7 +60,11 @@ jobs:
       - name: Sync dev dependencies
         run: uv sync --group dev --locked
 
-      - name: Tests (full suite, with coverage)
+      - name: Tests (full suite, coverage gated at 85%)
         # Serial, whole suite, one process — accurate coverage without a
-        # cross-shard combine. Coverage is reported (#636), not gated here.
-        run: uv run pytest --tb=short -q --cov --cov-report=term-missing
+        # cross-shard combine, so it can carry the floor. 85% is deliberately
+        # below the current ~92% (PI-765): it catches a real regression without
+        # blocking an unrelated PR on a number nobody chose. The gate lives in the
+        # nightly run (not per-PR) because per-PR tests are sharded — each shard
+        # sees only a slice, and a cross-shard combine would add cost for no gain.
+        run: uv run pytest --tb=short -q --cov --cov-report=term-missing --cov-fail-under=85
