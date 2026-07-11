@@ -103,6 +103,15 @@ Core scaffolding logic — pure functions, no user interaction.
 - `def hash_bytes` — Content hash used by the scaffold-record manifest (shared with upgrade).
 - `def scaffold` — Copy + render template layers into *target*. Return created file paths.
 
+### `project_init/schema.py`
+
+Stable access to the machine-readable descriptor contract schemas (#786).
+
+- `def descriptor_schema_path` — Absolute path to the descriptor (``config.yaml``) JSON Schema.
+- `def usage_event_schema_path` — Absolute path to the usage-event (``usage.jsonl`` line) JSON Schema.
+- `def load_descriptor_schema` — Parsed descriptor JSON Schema — validate an emitted ``config.yaml`` against it.
+- `def load_usage_event_schema` — Parsed usage-event JSON Schema — validate one ``usage.jsonl`` line against it.
+
 ### `project_init/surfaces.py`
 
 Per-surface agent-config generation (ADR-017, PI-366).

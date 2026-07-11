@@ -69,6 +69,10 @@ packages = ["src/project_init"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "templates" = "project_init/templates"
+# Ship the machine-readable contract schemas inside the wheel (#786) so a
+# downstream consumer (a root orchestrator) can load and pin them from an
+# installed project-init — see project_init.schema.
+"schemas" = "project_init/schemas"
 
 [tool.ruff]
 line-length = 100
