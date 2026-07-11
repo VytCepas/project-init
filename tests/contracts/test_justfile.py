@@ -94,6 +94,19 @@ class TestJustfilePerLanguage:
         text = (target / "justfile").read_text()
         assert re.search(r"^ci: setup lint typecheck test-cov audit\s*$", text, re.MULTILINE)
 
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_fast_check_is_lighter_than_ci(self, tmp_path: Path, language):
+        """PI-759: every language ships a `fast-check: lint test` recipe for the
+        pre-push hook — the fast local gate. It must be strictly lighter than
+        `ci` (no typecheck/audit/coverage), so pushing stays fast while CI runs
+        the full gate. The pre-push hook invokes exactly this recipe.
+        """
+        target = _scaffold_language(tmp_path / language, language)
+        text = (target / "justfile").read_text()
+        assert re.search(r"^fast-check: lint test\s*$", text, re.MULTILINE)
+        # Guard against silently promoting it back to the heavy gate.
+        assert not re.search(r"^fast-check:.*\b(typecheck|audit|test-cov)\b", text, re.MULTILINE)
+
     def test_node_ci_recipe_includes_typecheck(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "node")
         text = (target / "justfile").read_text()

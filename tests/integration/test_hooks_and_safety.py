@@ -163,12 +163,12 @@ class TestPrePushLifecycleGate:
         self.target = tmp_target
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         self.hook = self.target / ".github" / "hooks" / "pre-push"
-        # Neutralize the hook's `just ci` gate: the hook runs from pytest's
-        # cwd (this repo), so with a real `just` on PATH and a CLEAN worktree
-        # the gate would run THIS repo's full suite — which re-runs this test,
+        # Neutralize the hook's `just fast-check` gate: the hook runs from
+        # pytest's cwd (this repo), so with a real `just` on PATH and a CLEAN
+        # worktree the gate would run THIS repo's suite — which re-runs this test,
         # recursively, forever (PI-649 discovery; only the branch-naming rules
         # are under test here). A stub `just` that exits nonzero makes the
-        # gate's `just --show ci` probe fail → deterministic fail-open.
+        # gate's `just --show fast-check` probe fail → deterministic fail-open.
         stub_bin = tmp_path / "stub-bin"
         stub_bin.mkdir(exist_ok=True)
         stub = stub_bin / "just"

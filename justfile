@@ -2,8 +2,8 @@
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
 
-# install/sync dev dependencies + enable the local pre-push CI gate (dogfood).
-# core.hooksPath points git at .githooks/, so `just ci` runs before every push.
+# install/sync dev dependencies + enable the local pre-push gate (dogfood).
+# core.hooksPath points git at .githooks/, so `just fast-check` runs before every push.
 setup:
     uv sync --group dev
     git config core.hooksPath .githooks
@@ -23,14 +23,19 @@ format:
 typecheck:
     uv run --with "mypy>=1.10" --with pip mypy --install-types --non-interactive src/
 
-# run the test suite
+# The suite is xdist-safe: the upgrade drift checks that once forced serial
+# execution were isolated (#668 frozen-templates fixture), so `-n auto` runs
+# green and roughly halves wall-clock.
+# run the test suite in parallel (xdist)
 test:
-    uv run pytest --tb=short -q
+    uv run pytest -n auto --tb=short -q
 
-# run the test suite with a coverage report (#636) — drift visibility, no floor.
-# Kept off `just test` so the default loop stays fast; CI runs this one.
+# Coverage (#636) is drift visibility, no floor. Kept off `just test` so the
+# default loop stays fast; CI runs this one. pytest-cov combines the per-worker
+# data files (coverage `parallel = true`).
+# run the test suite in parallel with a coverage report
 test-cov:
-    uv run pytest --tb=short -q --cov --cov-report=term-missing
+    uv run pytest -n auto --tb=short -q --cov --cov-report=term-missing
 
 # fast iterate loop — stop at first failure, minimal output. Use while
 # debugging to keep test noise out of agent context; run `just test` for the
@@ -56,8 +61,14 @@ docs:
 audit:
     uv run --all-extras --with pip-audit pip-audit
 
-# what CI runs
+# what CI runs (the full gate)
 ci: lint typecheck test audit
+
+# Deliberately lighter than `ci` — no typecheck/audit here; CI is the full
+# backstop, so we don't re-run the whole gate before every push (PI-759). Keeps
+# the push→CI loop fast while still catching the common break (a failing test).
+# fast local gate for the pre-push hook: lint + parallel tests
+fast-check: lint test
 
 # sync the plugin payload from templates (PI-129)
 sync-plugin:

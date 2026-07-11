@@ -83,11 +83,13 @@ jobs:
         run: just typecheck
 
       - name: Tests (pytest)
-        # Serial execution avoids xdist cross-test interference in upgrade
-        # drift checks while preserving the same assertions CI enforces.
+        # Parallel execution (xdist) is the CI wall-clock long pole's fix (PI-759):
+        # the upgrade drift checks that once forced serial were isolated (#668),
+        # so `-n auto` runs green and roughly halves this step. pytest-cov combines
+        # the per-worker data files (coverage `parallel = true`).
         # --cov reports coverage (#636) without gating on it: no fail_under, so
         # a dip is visible in the log and never blocks an unrelated PR.
-        run: uv run pytest --tb=short -q --cov --cov-report=term-missing
+        run: uv run pytest -n auto --tb=short -q --cov --cov-report=term-missing
 
       # Dependency vulnerability scan (#637). gitleaks (secret-scan job) catches
       # committed secrets; nothing else here catches a correctly-spelled dep
