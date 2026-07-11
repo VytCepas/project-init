@@ -47,9 +47,11 @@ def test_reminder_ascii_dag_matches_graph():
     reminder = (_HOOKS / "workflow_state_reminder.sh").read_text(encoding="utf-8")
     arrow_lines = [ln for ln in reminder.splitlines() if "->" in ln]
     ascii_nodes = set(re.findall(r"[a-z]+\.[a-z]+", " ".join(arrow_lines)))
-    assert ascii_nodes == _graph_nodes(), (
-        "lifecycle DAG drift: the reminder's ASCII diagram and dag_workflow.py's "
-        f"GRAPH name different node sets (ascii={sorted(ascii_nodes)})"
+    graph_nodes = _graph_nodes()
+    assert ascii_nodes == graph_nodes, (
+        "lifecycle DAG drift between the reminder's ASCII diagram and "
+        f"dag_workflow.py's GRAPH: only in GRAPH={sorted(graph_nodes - ascii_nodes)}, "
+        f"only in ASCII={sorted(ascii_nodes - graph_nodes)}"
     )
 
 
