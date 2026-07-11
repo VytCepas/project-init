@@ -95,7 +95,7 @@ class TestJustfilePerLanguage:
         assert re.search(r"^ci: setup lint typecheck test-cov audit\s*$", text, re.MULTILINE)
 
     @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
-    def test_fast_check_is_lighter_than_ci(self, tmp_path: Path, language):
+    def test_fast_ci_is_lighter_than_ci(self, tmp_path: Path, language):
         """PI-759: every language ships a `fast-ci: lint test` recipe for the
         pre-push hook — the fast local gate. It must be strictly lighter than
         `ci` (no typecheck/audit/coverage), so pushing stays fast while CI runs
