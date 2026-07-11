@@ -1200,9 +1200,11 @@ def _print_migration_notes(prev: str | None, current: str | None) -> None:
     # (missing/unparseable prev). Format from the parsed tuple so a recorded "v"
     # prefix or "-rc" suffix can't leak as "vv1.2.3" (Copilot review) — notes is
     # non-empty, so current is guaranteed parseable here.
-    # notes is non-empty, so current is guaranteed parseable; the ``or`` fallback
-    # is inert and only narrows the type away from None for the checker.
-    parsed = _parse_version(current) or (0, 0, 0)
+    # notes is non-empty, so current is guaranteed parseable. Assert the
+    # invariant rather than masking a break behind a `or (0,0,0)` fallback that
+    # would silently format as "v0.0.0" (Codex review).
+    parsed = _parse_version(current)
+    assert parsed is not None, f"non-empty notes imply a parseable current: {current!r}"
     span = _describe_version_span(prev, current) or f"v{'.'.join(map(str, parsed))}"
     console.print(f"\n[bold]Upgrade notes[/bold] — {span}:")
     for version, entry in notes:
