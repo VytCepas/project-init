@@ -36,8 +36,15 @@ test-quick:
 docs:
     uv run --extra docs mkdocs serve
 
+# scan dependencies for known CVEs (#637). pip-audit is pulled in ephemerally
+# via `uv run --with`, mirroring the pattern the scaffolded ci.yml.tmpl ships —
+# no dev-dependency to forget. Complements gitleaks (which scans for secrets,
+# not vulnerable-but-correctly-spelled deps already in the lockfile).
+audit:
+    uv run --with pip-audit pip-audit
+
 # what CI runs
-ci: lint test
+ci: lint test audit
 
 # sync the plugin payload from templates (PI-129)
 sync-plugin:
