@@ -48,8 +48,10 @@ jobs:
       - name: Sync dev dependencies
         run: uv sync --group dev --locked
 
-      - name: Lint (ruff)
-        run: uv run ruff check .
+      - name: Lint (ruff check + format check)
+        # `just lint` runs `ruff check` AND `ruff format --check` (PI-772) — one
+        # callsite, so CI, pre-push (fast-ci) and local all enforce the same gate.
+        run: just lint
 
       - name: Typecheck (mypy --strict)
         run: just typecheck

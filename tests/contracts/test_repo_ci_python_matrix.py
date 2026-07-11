@@ -76,6 +76,18 @@ def test_tests_are_sharded_into_parallel_jobs():
     )
 
 
+def test_repo_lint_gate_includes_ruff_format_check():
+    """PI-772: the repo dogfoods the ruff-format gate its python scaffold ships.
+    `just lint` runs `ruff format --check` (not just `ruff check`), and CI's
+    `checks` job invokes `just lint` (single callsite), so an unformatted file
+    fails CI here the same way it does in a generated project.
+    """
+    justfile = (_ROOT / "justfile").read_text(encoding="utf-8")
+    assert "ruff format --check ." in justfile, "`just lint` must run `ruff format --check`"
+    checks_run = " ".join(str(s.get("run", "")) for s in steps(job(load_workflow(_ROOT), "checks")))
+    assert "just lint" in checks_run, "CI `checks` job must run `just lint` (which format-checks)"
+
+
 def test_semgrep_and_license_scan_are_advisory():
     """PI-769: semgrep + license-scan run on the repo (security-scan parity) but
     are ADVISORY — present as jobs, deliberately NOT in ci-gate's needs. They fail

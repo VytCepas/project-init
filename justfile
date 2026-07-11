@@ -9,9 +9,12 @@ setup:
     git config core.hooksPath .githooks
     uv run python tools/sync_claude_dir.py
 
-# lint (docstring + complexity gates per pyproject.toml)
+# lint + format check (docstring + complexity gates per pyproject.toml). The
+# format check dogfoods the gate the template's python scaffold ships (PI-772),
+# so `ruff format .` is now the expected fix — no longer a footgun.
 lint:
     uv run ruff check .
+    uv run ruff format --check .
 
 # auto-format
 format:

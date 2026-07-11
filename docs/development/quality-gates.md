@@ -94,7 +94,7 @@ Decision legend: **keep** (unchanged), **promote** (make stronger / adopt onto t
 |---|---|---|---|---|
 | `ci-gate` aggregator | ✅ single required check | ✅ single required check | **keep** both | One gate, matrix-rename-robust. |
 | ruff `check` (lint + `S`/bandit) | ✅ blocking | ✅ blocking | **keep** both | Lint + in-linter SAST. |
-| ruff `format --check` | ✅ in `just lint` | ❌ (#726) | **promote** repo → add | Repo ships a format gate it doesn't run on itself. |
+| ruff `format --check` | ✅ in `just lint` | ✅ in `just lint` (PI-772) | **done** (promoted) | Repo now dogfoods the format gate it ships; CI's `checks` job runs `just lint` (check + format-check). |
 | mypy `--strict` | ✅ blocking | ✅ blocking | **keep** both | Type gate, dogfooded (#639). |
 | Test coverage floor | ✅ 70% blocking (×4 langs) | ✅ 85% nightly (PI-765) | **done** (promoted) | Gated in the nightly full-suite run (accurate single-process); 85% keeps headroom below ~92%. Per-PR shards stay ungated (a floor there needs a cross-shard combine for little gain). |
 | pip-audit (SCA) | ✅ blocking | ✅ blocking | **keep** both | Dependency CVE scan. |
@@ -109,9 +109,10 @@ Decision legend: **keep** (unchanged), **promote** (make stronger / adopt onto t
 
 ## The four known gaps — decisions
 
-1. **ruff format** (#726) — **promote**: add `ruff format --check .` to the repo's lint step.
-   A one-time repo-wide `ruff format .` reformat commit precedes the check (large mechanical
-   diff is expected). Follow-up PR under #751.
+1. **ruff format** — **done** (PI-772): the repo's `just lint` now runs `ruff format --check`
+   (a one-time `ruff format .` reformat preceded it), and CI's `checks` job invokes `just lint`,
+   so the repo dogfoods the format gate its python scaffold ships. (#726 was a separate
+   *template* audit — no format-*check* in some languages — already resolved by PR #728.)
 2. **Coverage floor** — **done** (PI-765): the repo is gated at **85%** via
    `--cov-fail-under=85` in the nightly full-suite run (`nightly.yml`), where coverage is
    measured accurately in one process. Per-PR CI shards the tests (PI-762), so each shard sees
