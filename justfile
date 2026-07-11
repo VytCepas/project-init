@@ -40,8 +40,15 @@ docs:
 # via `uv run --with`, mirroring the pattern the scaffolded ci.yml.tmpl ships —
 # no dev-dependency to forget. Complements gitleaks (which scans for secrets,
 # not vulnerable-but-correctly-spelled deps already in the lockfile).
+#
+# --all-extras is load-bearing: pip-audit scans the *installed* environment, and
+# the advisories this recipe first caught (idna/urllib3) live in the `docs`
+# extra (mkdocs-material -> requests), which is a real CI path (docs.yml) but is
+# NOT synced by `lint-and-test`'s `uv sync --group dev`. Without --all-extras the
+# gate would run in an env where those packages aren't even installed and report
+# clean while a docs-extra CVE ships — a gate that can't fire (#637 review).
 audit:
-    uv run --with pip-audit pip-audit
+    uv run --all-extras --with pip-audit pip-audit
 
 # what CI runs
 ci: lint test audit
