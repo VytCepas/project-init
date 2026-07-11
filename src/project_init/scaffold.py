@@ -5,12 +5,17 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
+import os
 import re
 import shutil
 import time
 import tomllib
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, TypeVar
+
+_T = TypeVar("_T")
 
 _PACKAGE_DIR = Path(__file__).resolve().parent
 _TEMPLATES_DIR = _PACKAGE_DIR / "templates"
@@ -68,10 +73,10 @@ class TemplateRenderError(Exception):
     """Raised in strict mode when unrendered placeholders survive scaffolding."""
 
 
-def list_presets() -> list[dict]:
+def list_presets() -> list[dict[str, Any]]:
     """Return all available presets as parsed dicts, sorted by name."""
     presets_dir = _TEMPLATES_DIR / "presets"
-    results = []
+    results: list[dict[str, Any]] = []
     for p in sorted(presets_dir.glob("*.toml")):
         with p.open("rb") as f:
             results.append(tomllib.load(f))
@@ -93,7 +98,9 @@ def _version_tuple(value: str) -> tuple[int, int, int]:
     return parse_version(value) or (0, 0, 0)
 
 
-def _merge_deps(parent: dict, child: dict) -> dict:
+def _merge_deps(
+    parent: dict[str, dict[str, list[str]]], child: dict[str, dict[str, list[str]]]
+) -> dict[str, dict[str, list[str]]]:
     """Union ``scaffolded_project_dependencies`` per language and core/dev kind."""
     merged = {lang: {k: list(v) for k, v in spec.items()} for lang, spec in parent.items()}
     for lang, spec in child.items():
@@ -104,7 +111,7 @@ def _merge_deps(parent: dict, child: dict) -> dict:
     return merged
 
 
-def _merge_presets(parent: dict, child: dict) -> dict:
+def _merge_presets(parent: dict[str, Any], child: dict[str, Any]) -> dict[str, Any]:
     """Merge a child preset onto its parent (#252).
 
     Layers append + dedup; vars and deps union with the child winning; other keys
@@ -126,7 +133,7 @@ def _merge_presets(parent: dict, child: dict) -> dict:
     return merged
 
 
-def _check_preset_compat(preset: dict) -> None:
+def _check_preset_compat(preset: dict[str, Any]) -> None:
     """Enforce a preset's ``min_project_init_version`` compat marker (#252)."""
     minimum = preset.get("min_project_init_version")
     if not minimum:
@@ -150,7 +157,7 @@ def _check_preset_compat(preset: dict) -> None:
         raise ValueError(msg)
 
 
-def load_preset(name: str, _seen: tuple[str, ...] = ()) -> dict:
+def load_preset(name: str, _seen: tuple[str, ...] = ()) -> dict[str, Any]:
     """Load a preset by name, resolving ``extends`` inheritance (#252).
 
     A company preset may ``extends`` a base preset; layers/vars/deps merge with
@@ -388,7 +395,7 @@ def _render(text: str, variables: dict[str, str]) -> str:
 def _process_blocks(text: str, variables: dict[str, str]) -> str:
     """Resolve {{#if var}}...{{/if var}} blocks, innermost-first, to a fixpoint."""
 
-    def _replace_block(m: re.Match) -> str:
+    def _replace_block(m: re.Match[str]) -> str:
         key = m.group(1)
         return m.group(2) if variables.get(key) else ""
 
@@ -716,7 +723,7 @@ def _emit_file(
     return rendered
 
 
-def _retry_template_io(fn):
+def _retry_template_io(fn: Callable[[], _T]) -> _T:
     """Retry a source-template read that races with an editable checkout."""
     for attempt in range(3):
         try:
@@ -736,7 +743,7 @@ def _copy_template_file(src: Path, dest: Path) -> None:
     _retry_template_io(lambda: shutil.copy2(src, dest))
 
 
-def _template_stat(src: Path):
+def _template_stat(src: Path) -> os.stat_result:
     return _retry_template_io(src.stat)
 
 
@@ -749,7 +756,7 @@ def _validate_no_placeholders(offenders: list[str]) -> None:
         raise TemplateRenderError(msg)
 
 
-def _iter_layer_files(layers: list[str]):
+def _iter_layer_files(layers: list[str]) -> Iterator[tuple[Path, Path]]:
     """Yield (src, layer_dir) for every file across the preset's template layers.
 
     Python bytecode caches are skipped: a developer's local templates/ tree
@@ -809,6 +816,9 @@ def _commit_staged(
         if protect and dest.exists() and (collision or dest.read_bytes() != src.read_bytes()):
             sibling = _new_sibling(dest, src.read_bytes())
             shutil.copy2(src, sibling)
+            # `protect` is only True when `conflicts is not None`; assert so the
+            # type checker sees the narrowing the boolean already guarantees.
+            assert conflicts is not None
             conflicts.append((rel_path, sibling.relative_to(target)))
             continue
         shutil.copy2(src, dest)
@@ -858,7 +868,7 @@ _PRESET_CONTROL_KEYS = frozenset(
 )
 
 
-def _apply_preset_vars(variables: dict[str, str], preset: dict) -> dict[str, str]:
+def _apply_preset_vars(variables: dict[str, str], preset: dict[str, Any]) -> dict[str, str]:
     """Merge preset ``[vars]`` (#252) into the render variables.
 
     The single chokepoint every engine (scaffold/upgrade/add/remove) funnels
@@ -902,7 +912,7 @@ def _apply_preset_vars(variables: dict[str, str], preset: dict) -> dict[str, str
 
 def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
     target: Path,
-    preset: dict,
+    preset: dict[str, Any],
     variables: dict[str, str],
     *,
     strict: bool = False,

@@ -7,13 +7,14 @@ PI-15 (replace npx with bun) is satisfied by construction here.
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 # Core MCPs always offered as a multi-select in the wizard.
 # Absent intentionally (PI-25 / PI-26):
 #   linear     — gh CLI + GitHub Issues covers all needs (~15 tools saved)
 #   github     — gh CLI covers PR/issue management (~35 tools saved)
 #   filesystem — Claude Code built-in Read/Write/Edit/Glob/Grep overlap entirely (~10 tools saved)
-MCP_CATALOG: list[dict] = [
+MCP_CATALOG: list[dict[str, Any]] = [
     {
         "id": "context7",
         "name": "Context7",
@@ -45,7 +46,7 @@ MCP_CATALOG: list[dict] = [
 # filesystem above). Projects needing one can add it themselves.
 
 # Browser automation MCP — offered as a yes/no follow-up.
-PLAYWRIGHT_MCP: dict = {
+PLAYWRIGHT_MCP: dict[str, Any] = {
     "id": "playwright",
     "name": "Playwright",
     "command": "claude mcp add playwright -- bunx @playwright/mcp",
@@ -53,15 +54,15 @@ PLAYWRIGHT_MCP: dict = {
 }
 
 
-def servers_for_ids(ids: list[str]) -> dict[str, dict]:
+def servers_for_ids(ids: list[str]) -> dict[str, dict[str, Any]]:
     """Canonical MCP server specs for the given catalog ids.
 
     Returns ``{name: {command,args}|{url}}`` — the source the per-surface
     generators render from (PI-366).
     """
-    by_id: dict[str, dict] = {m["id"]: m for m in MCP_CATALOG}
+    by_id: dict[str, dict[str, Any]] = {m["id"]: m for m in MCP_CATALOG}
     by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
-    out: dict[str, dict] = {}
+    out: dict[str, dict[str, Any]] = {}
     unknown: list[str] = []
     for i in ids:
         entry = by_id.get(i)
@@ -79,14 +80,14 @@ def servers_for_ids(ids: list[str]) -> dict[str, dict]:
     return out
 
 
-def format_installed_mcps(selected: list[dict]) -> str:
+def format_installed_mcps(selected: list[dict[str, Any]]) -> str:
     """Human-readable comma-separated list for template substitution."""
     if not selected:
         return "none"
     return ", ".join(m["id"] for m in selected)
 
 
-def format_installed_mcps_yaml(selected: list[dict]) -> str:
+def format_installed_mcps_yaml(selected: list[dict[str, Any]]) -> str:
     """Inline YAML list string for config.yaml template."""
     if not selected:
         return "[]"

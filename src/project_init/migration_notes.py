@@ -167,7 +167,9 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
 }
 
 
-def notes_for_span(prev: str | None, current: str | None) -> list[tuple[str, dict]]:
+def notes_for_span(
+    prev: str | None, current: str | None
+) -> list[tuple[str, dict[str, str | None]]]:
     """Return ``[(version, entry)]`` for the span, newest version first.
 
     Selects versions ``v`` with ``prev < v <= current``. When *prev* is missing
@@ -180,12 +182,15 @@ def notes_for_span(prev: str | None, current: str | None) -> list[tuple[str, dic
     if c is None:
         return []
     p = _parse(prev)
+    # Carry the parsed tuple ``v`` through so the sort never re-parses and never
+    # needs a None fallback: an unparseable version can't reach the sort because
+    # the comprehension already dropped it (Codex review).
     selected = [
-        (version, entry)
+        (v, version, entry)
         for version, entry in MIGRATION_NOTES.items()
         if (v := _parse(version)) is not None and v <= c and (p is None or v > p)
     ]
     if p is None:
-        selected = [(version, entry) for version, entry in selected if _parse(version) == c]
-    selected.sort(key=lambda item: _parse(item[0]), reverse=True)
-    return selected
+        selected = [(v, version, entry) for v, version, entry in selected if v == c]
+    selected.sort(key=lambda item: item[0], reverse=True)
+    return [(version, entry) for _v, version, entry in selected]

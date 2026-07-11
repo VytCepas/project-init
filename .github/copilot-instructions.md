@@ -14,7 +14,8 @@ Full agent rules: [CLAUDE.md](../CLAUDE.md). For any push, PR, review, or merge 
 
 ## Python tooling
 - `uv run …` — never `pip install` or `python -m venv`
-- Linter: `uv run ruff check .` — no black, isort, or mypy
+- Linter/formatter: `uv run ruff check .` (+ `ruff format`) — no black or isort
+- Types: `just typecheck` — `mypy --strict` on `src/` (config in `mypy.ini`; #639)
 - Tests: `uv run pytest`
 
 ## Repo rules

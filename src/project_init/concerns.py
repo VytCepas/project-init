@@ -18,11 +18,13 @@ from __future__ import annotations
 import shutil
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 from project_init import __version__
 from project_init.scaffold import _GOVERNANCE_USER_FILES, memory_tier, read_preserve_globs
 from project_init.upgrade import (
+    DriftReport,
     UpgradeError,
     _hash_bytes,
     _is_preserved,
@@ -47,7 +49,7 @@ class ConcernError(Exception):
     """A bad concern name or value supplied to add/remove."""
 
 
-def _set_memory(v: dict, stack: str) -> None:
+def _set_memory(v: dict[str, str], stack: str) -> None:
     # Accept the friendly `obsidian` alias the main CLI's --memory takes (#466)
     # so `project-init add memory obsidian` matches the documented flag surface.
     if stack == "obsidian":
@@ -64,14 +66,14 @@ def _set_memory(v: dict, stack: str) -> None:
     v["memory_tier"] = memory_tier(stack)
 
 
-def _set_lifecycle(v: dict, *, enable: bool) -> None:
+def _set_lifecycle(v: dict[str, str], *, enable: bool) -> None:
     v["lifecycle_tier"] = "github" if enable else "none"
     v["lifecycle"] = "true" if enable else ""
     v["lifecycle_off"] = "" if enable else "true"
 
 
-def _flag_setter(name: str):
-    def setter(v: dict, *, enable: bool) -> None:
+def _flag_setter(name: str) -> Callable[..., None]:
+    def setter(v: dict[str, str], *, enable: bool) -> None:
         v[name] = "true" if enable else ""
 
     return setter
@@ -79,7 +81,7 @@ def _flag_setter(name: str):
 
 # Boolean concerns: flipped ON by `add`, OFF by `remove`. Each maps to the
 # template variable(s) that gate its overlay layer + its {{#if}} blocks.
-_BOOL_CONCERNS = {
+_BOOL_CONCERNS: dict[str, Callable[..., None]] = {
     "lifecycle": _set_lifecycle,
     "governance": _flag_setter("governance"),
     "observability": _flag_setter("observability"),
@@ -92,7 +94,7 @@ _BOOL_CONCERNS = {
 CONCERNS = ("memory", *_BOOL_CONCERNS)
 
 
-def _mutate(variables: dict, concern: str, *, enable: bool, value: str | None) -> None:
+def _mutate(variables: dict[str, str], concern: str, *, enable: bool, value: str | None) -> None:
     """Apply the concern toggle to *variables* in place."""
     if concern == "memory":
         # `add memory <stack>` needs a stack; `remove memory` → none. A value
@@ -128,7 +130,7 @@ def _advisory(concern: str, *, enable: bool) -> str | None:
 
 
 def _delete_orphans(
-    target: Path, removed: list[Path], manifest: dict
+    target: Path, removed: list[Path], manifest: dict[str, str]
 ) -> tuple[list[Path], list[Path]]:
     """Delete concern files that are byte-identical to the recorded manifest.
 
@@ -295,7 +297,13 @@ def _validate_flags(
 
 
 def _apply_source(  # noqa: PLR0913 — mirrors apply_concern's flag surface
-    target: Path, report, concern: str, *, apply: bool, purge: bool, export_dir: Path | None
+    target: Path,
+    report: DriftReport,
+    concern: str,
+    *,
+    apply: bool,
+    purge: bool,
+    export_dir: Path | None,
 ) -> list[Path]:
     """Compute orphaned preserved source data; delete/move it when *apply*."""
     if not (purge or export_dir is not None):
@@ -392,7 +400,7 @@ def apply_concern(  # noqa: PLR0913 — flags map 1:1 to the add/remove CLI opti
 def _print_summary(  # noqa: PLR0913 — one list per drift category, all distinct
     verb: str,
     concern: str,
-    report,
+    report: DriftReport,
     deleted: list[Path],
     kept: list[Path],
     seeded: list[Path],
@@ -421,7 +429,7 @@ def _print_summary(  # noqa: PLR0913 — one list per drift category, all distin
         print("  (re-run with --apply to make these changes)")
 
 
-def _file_list(paths, limit: int = 8) -> str:
+def _file_list(paths: list[Path], limit: int = 8) -> str:
     """First *limit* sorted paths, with an explicit marker for the rest.
 
     The count prefix and the listing must never silently disagree

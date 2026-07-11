@@ -79,6 +79,9 @@ jobs:
       - name: Lint (ruff)
         run: uv run ruff check .
 
+      - name: Typecheck (mypy --strict)
+        run: just typecheck
+
       - name: Tests (pytest)
         # Serial execution avoids xdist cross-test interference in upgrade
         # drift checks while preserving the same assertions CI enforces.
