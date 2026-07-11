@@ -98,7 +98,7 @@ Decision legend: **keep** (unchanged), **promote** (make stronger / adopt onto t
 | mypy `--strict` | ✅ blocking | ✅ blocking | **keep** both | Type gate, dogfooded (#639). |
 | Test coverage floor | ✅ 70% blocking (×4 langs) | ✅ 85% nightly (PI-765) | **done** (promoted) | Gated in the nightly full-suite run (accurate single-process); 85% keeps headroom below ~92%. Per-PR shards stay ungated (a floor there needs a cross-shard combine for little gain). |
 | pip-audit (SCA) | ✅ blocking | ✅ blocking | **keep** both | Dependency CVE scan. |
-| gitleaks secret-scan | ✅ blocking | ✅ blocking | **keep** both | Full-history secret scan. |
+| gitleaks secret-scan | ✅ CI + pre-commit | ✅ CI + pre-commit (PI-767) | **keep** both | CI scans full history (blocking); a git pre-commit hook scans the staged diff locally (fail-open). The repo previously scanned only in CI — the local half was the parity gap. |
 | wheel-smoke | — (repo-specific) | ✅ blocking | **keep** repo | Proves the built wheel scaffolds; no template analogue. |
 | semgrep SAST | ✅ advisory | ❌ | **promote** repo → advisory | Semantic SAST; advisory until calibrated, matching the template. |
 | license-scan | ✅ advisory | ❌ | **promote** repo → advisory | Deny GPL/AGPL; advisory while the deny-list is calibrated. |
