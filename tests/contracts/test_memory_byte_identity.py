@@ -225,6 +225,8 @@ _ADDED_SINCE_BASELINE = {
     # PI-665: diagram skill (collaborative Mermaid-first diagramming);
     # INDEX/README/project-init.md rows already excluded above
     ".agents/skills/diagram/SKILL.md",
+    # PI-747: verify-test-strength skill (mutation-feedback loop)
+    ".agents/skills/verify-test-strength/SKILL.md",
     # PI-671: local_ci skill (Actions billing-lockout escape hatch)
     ".agents/skills/local_ci/SKILL.md",
     # #605: Guards log the governance signal (decision + command)
