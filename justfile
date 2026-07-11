@@ -61,6 +61,12 @@ docs:
 audit:
     uv run --all-extras --with pip-audit pip-audit
 
+# dependency license compliance scan (#579) — fail on copyleft (GPL/AGPL; also
+# LGPL, since --partial-match is substring-based). Advisory in CI (not in
+# ci-gate), matching the template's rollout. Mirrors the scaffolded `just license`.
+license:
+    uv run --with pip-licenses pip-licenses --from=mixed --fail-on "GPL;AGPL" --partial-match
+
 # what CI runs (the full gate)
 ci: lint typecheck test audit
 

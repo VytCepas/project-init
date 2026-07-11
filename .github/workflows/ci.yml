@@ -219,6 +219,58 @@ jobs:
           printf '%s\n' "${files[@]}"
           uvx --from 'shellcheck-py==0.11.0.1' shellcheck --severity=warning "${files[@]}"
 
+  # Semantic security scan (semgrep) over the scaffolder's own src/. ADVISORY —
+  # deliberately NOT in ci-gate's needs (security-scan parity, PI-769) while the
+  # ruleset is calibrated; the step still fails on a finding so it stays visible.
+  # Mirrors the scaffolded semgrep job the product ships.
+  semgrep:
+    name: Semgrep (semantic security scan)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+        with:
+          # Full history: --baseline-commit (PR-only, below) needs the base
+          # commit reachable.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          version: "0.11.7"
+
+      - name: Run Semgrep
+        env:
+          SEMGREP_ENABLE_VERSION_CHECK: "0"
+        run: |
+          SEMGREP="uvx semgrep@1.168.0"
+          RULESETS="--config p/secrets --config p/owasp-top-ten --config p/python"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            $SEMGREP scan --error --metrics=off $RULESETS \
+              --baseline-commit "${{ github.event.pull_request.base.sha }}"
+          else
+            $SEMGREP scan --error --metrics=off $RULESETS
+          fi
+
+  # Dependency license compliance (#579): flag copyleft (GPL/AGPL) deps.
+  # ADVISORY — not in ci-gate's needs — while the deny-list is calibrated. The
+  # deny-list lives in the justfile's `license` recipe. Mirrors the template.
+  license-scan:
+    name: Dependency license scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          version: "0.11.7"
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4
+
+      - name: License scan (pip-licenses)
+        run: just license
+
   # PI-363 Layer 3 gate: only spend the 10x-billed macOS minutes when shell or
   # template files actually change. Ordinary PRs skip the macOS job entirely.
   changes:
