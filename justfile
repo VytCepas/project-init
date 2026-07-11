@@ -80,3 +80,8 @@ sync-agents:
 code-map:
     uv run python .agents/scripts/gen_code_map.py
     uv run python tools/sync_claude_dir.py
+
+# advisory: show drift between personal ~/.claude/skills copies and their
+# template source (PI-681). Not a gate — the personal dir is outside VCS.
+skill-drift:
+    uv run python tools/skill_drift.py
