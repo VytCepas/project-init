@@ -116,6 +116,14 @@ jobs:
               # newest so CI still runs instead of erroring on an empty matrix.
               versions = [KNOWN[-1]]
 
+          # Per-PR/push, test only the FLOOR version for fast, cheap feedback
+          # (PI-761); the nightly cron (schedule) tests the full matrix, so a
+          # version-specific break is caught within a day rather than on every PR.
+          # GITHUB_EVENT_NAME is set automatically by the runner.
+          event = os.environ.get("GITHUB_EVENT_NAME", "")
+          if event != "schedule" and len(versions) > 1:
+              versions = [min(versions, key=_key)]
+
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write("versions=" + json.dumps(versions) + "\n")
           print("requires-python:", spec or '(none) -> floor {{python_floor}} from project-init')
