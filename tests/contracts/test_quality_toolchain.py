@@ -127,6 +127,7 @@ class TestPythonToolchain:
         assert not (self.target / "clippy.toml").exists()
         assert not (self.target / "tsconfig.base.json").exists()
         assert not (self.target / "bunfig.toml").exists()
+        assert not (self.target / "biome.json").exists()
 
 
 class TestNodeToolchain:
@@ -246,6 +247,20 @@ class TestNodeToolchain:
         # a *.test.ts file must never count toward the application-code gate.
         assert config["test"]["coverageSkipTestFiles"] is True
 
+    def test_biome_config_rendered_and_scoped(self):
+        """PI-779: biome.json must ship for node and scope the formatter to
+        project source. Without it, `biome format .` rescanned `.agents/` and
+        the JSON configs (none biome-formatted) and a fresh scaffold's `just
+        lint` was day-one red. Scoping keeps eslint the owner of the gates while
+        biome only formats what the user writes.
+        """
+        config = json.loads((self.target / "biome.json").read_text())
+        includes = config["files"]["includes"]
+        assert "src/**" in includes
+        # Never the generated/config trees eslint already ignores.
+        assert not any(inc.startswith(".agents") for inc in includes)
+        assert config["formatter"]["enabled"] is True
+
 
 class TestGoToolchain:
     @pytest.fixture(autouse=True)
@@ -295,6 +310,7 @@ class TestGoToolchain:
         assert not (self.target / "clippy.toml").exists()
         assert not (self.target / "tsconfig.base.json").exists()
         assert not (self.target / "bunfig.toml").exists()
+        assert not (self.target / "biome.json").exists()
 
     def test_coverage_gate_wired(self):
         """PI-569: blocking, not conditional — go tool cover ships with the
@@ -346,6 +362,7 @@ class TestRustToolchain:
         assert not (self.target / ".golangci.yml").exists()
         assert not (self.target / "tsconfig.base.json").exists()
         assert not (self.target / "bunfig.toml").exists()
+        assert not (self.target / "biome.json").exists()
 
     def test_coverage_gate_wired(self):
         """PI-569: blocking, not conditional — CI installs cargo-llvm-cov as
