@@ -83,8 +83,13 @@ jobs:
         run: just typecheck
 
       - name: Tests (pytest)
-        # Serial execution avoids xdist cross-test interference in upgrade
-        # drift checks while preserving the same assertions CI enforces.
+        # Serial in CI, deliberately (PI-759/PI-762). Parallel (`-n auto`) cut this
+        # step ~5m→~2m, but surfaced a rare cross-test interference under CI's
+        # worker scheduling (a memory-lint test read a wrong/corrupt tree) that
+        # local runs did not reproduce. CI must stay deterministic — a flaky red on
+        # an unrelated PR costs more than the minutes saved — so parallelizing CI
+        # safely (root-cause the interference, or split tests into parallel jobs)
+        # is tracked in PI-762. `just test` runs `-n auto` locally for dev speed.
         # --cov reports coverage (#636) without gating on it: no fail_under, so
         # a dip is visible in the log and never blocks an unrelated PR.
         run: uv run pytest --tb=short -q --cov --cov-report=term-missing

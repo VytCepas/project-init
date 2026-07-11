@@ -1,34 +1,35 @@
 #!/usr/bin/env bash
 # pre-push gate for the project-init repo itself (dogfood).
 #
-# Runs the SAME `just ci` (lint + tests) that CI runs, before the push leaves
-# the machine — so nothing red reaches a PR and the push→CI-fail→fix→re-push
-# loop is caught locally. This is the local↔CI parity gate whose absence let a
-# fresh-scaffold lint failure ship (the scaffolder's CI caught it only after a
-# push, and even then incompletely).
+# Runs the fast local gate `just fast-ci` (lint + parallel tests) before the
+# push leaves the machine — so the common break (a failing test or lint error)
+# is caught locally instead of via the push→CI-fail→fix→re-push loop. It is
+# deliberately lighter than the full `just ci`: typecheck + audit run in CI,
+# which stays the hard backstop, so we don't re-run the whole gate on every push
+# (PI-759).
 #
 # Enabled automatically by `just setup` (git config core.hooksPath .githooks).
 # Bypass in an emergency with: git push --no-verify
 set -euo pipefail
 
-if command -v just >/dev/null 2>&1; then
-  # `just ci` tests the working tree, but the push ships the committed tree.
-  # Skip (fail-open) on a dirty worktree rather than test a tree that isn't what
-  # gets pushed — a WIP fix could mask a failure, or unrelated WIP fail a clean
-  # push. CI stays the backstop.
+if command -v just >/dev/null 2>&1 && just --show fast-ci >/dev/null 2>&1; then
+  # `just fast-ci` tests the working tree, but the push ships the committed
+  # tree. Skip (fail-open) on a dirty worktree rather than test a tree that isn't
+  # what gets pushed — a WIP fix could mask a failure, or unrelated WIP fail a
+  # clean push. CI stays the backstop.
   if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-    echo "pre-push: working tree is dirty — skipping the 'just ci' gate" >&2
+    echo "pre-push: working tree is dirty — skipping the 'just fast-ci' gate" >&2
     echo "  (it would test the worktree, not the commit being pushed)." >&2
     echo "  Commit or stash your changes to run the gate before pushing." >&2
   else
-    echo "pre-push: running 'just ci' (lint + tests)…"
-    if ! just ci; then
+    echo "pre-push: running 'just fast-ci' (lint + tests)…"
+    if ! just fast-ci; then
       echo ""
-      echo "❌ pre-push: 'just ci' failed — fix the errors above before pushing."
+      echo "❌ pre-push: 'just fast-ci' failed — fix the errors above before pushing."
       echo "   (bypass in an emergency with: git push --no-verify)"
       exit 1
     fi
   fi
 else
-  echo "pre-push: 'just' not found — skipping local CI gate (CI still runs)." >&2
+  echo "pre-push: 'just'/the 'fast-ci' recipe not available — skipping local gate (CI still runs)." >&2
 fi
