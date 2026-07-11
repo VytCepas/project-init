@@ -73,10 +73,11 @@ the drift guard, without the file reshuffle.
 
 **Adopted low-risk wins (both surfaces):** `concurrency: cancel-in-progress` on
 `ci.yml` — a new PR push cancels the superseded run, saving runner-minutes on
-review-cycle churn. Gated to `pull_request` events (`cancel-in-progress: ${{
-github.event_name == 'pull_request' }}`) so scheduled (nightly/weekly) and
-base-branch-push runs are never cancelled — schedule-safe, so the template ships
-the same form.
+review-cycle churn. `cancel-in-progress` is gated to pull-request events (its
+value is `${{ github.event_name == 'pull_request' }}`), so scheduled
+(nightly/weekly) and base-branch-push runs are never cancelled — schedule-safe,
+so the template ships the same form. The group key includes `github.event_name`
+so push/schedule/PR runs don't share a group and serialize.
 
 **Considered, not adopted — a composite "setup" action.** The only step repeated
 across jobs is `Install uv` (5×, identical pinned SHA); renovate keeps those pins
