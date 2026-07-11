@@ -62,6 +62,7 @@ class TestCiRunsOnEscapeHatch:
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         concurrency = load_workflow(tmp_target).get("concurrency")
         assert isinstance(concurrency, dict), "ci.yml has no concurrency block"
+        assert "cancel-in-progress" in concurrency, "concurrency block omits cancel-in-progress"
         cip = concurrency["cancel-in-progress"]
         # yaml parses a bare `true` to the boolean True; the gated expression
         # parses to its string. Assert structurally so a comment mentioning

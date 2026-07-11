@@ -39,9 +39,12 @@ permissions:
 # (PI-589) — review cycles re-push often, and finishing an obsolete run just
 # burns runner-minutes. `cancel-in-progress` is gated to pull_request events, so
 # scheduled (nightly fuzz/mutation, weekly scorecard) and {{base_branch}}-push
-# runs are NEVER cancelled — they always complete.
+# runs are NEVER cancelled — they always complete. `github.event_name` is in the
+# group key so those non-PR runs don't share a group (they'd otherwise serialize:
+# a long nightly on {{base_branch}} would make a {{base_branch}} push CI queue
+# behind it).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
