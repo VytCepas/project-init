@@ -47,6 +47,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from rich.console import Console
+    from rich.text import Text
 
 from project_init.scaffold import (
     _ALWAYS_OVERWRITE,
@@ -868,6 +869,35 @@ def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:
     )
 
 
+def _colorize_diff(diff: str) -> Text:
+    """A unified-diff string as a rich ``Text`` with +/-/@@ lines styled (#545).
+
+    Added lines are green, removed red, hunk headers (``@@``) cyan, and the
+    file-header lines (``---``/``+++``) bold. Returning a ``Text`` (not markup)
+    means diff content is treated literally — a ``[red]`` inside a changed line
+    is never mis-parsed — which is why the old plain path passed
+    ``markup=False``. Colour degrades automatically: a plain ``Console()``
+    drops styling when the sink is not a TTY or ``NO_COLOR`` is set, so piped
+    and CI output stay clean.
+    """
+    from rich.text import Text
+
+    text = Text()
+    for line in diff.splitlines(keepends=True):
+        if line.startswith("+++") or line.startswith("---"):
+            style = "bold"
+        elif line.startswith("+"):
+            style = "green"
+        elif line.startswith("-"):
+            style = "red"
+        elif line.startswith("@@"):
+            style = "cyan"
+        else:
+            style = ""
+        text.append(line, style=style)
+    return text
+
+
 def _render_staging(
     preset_name: str, variables: dict[str, str], staging: Path, detect_root: Path | None = None
 ) -> list[Path]:
@@ -1277,7 +1307,7 @@ def _print_report(report: DriftReport, applied: bool) -> None:
         diff = report.diffs.get(rel)
         if diff:
             console.print(f"\n[bold]--- drift: {rel} ---[/bold]")
-            console.print(diff, markup=False, highlight=False)
+            console.print(_colorize_diff(diff))
 
     if not applied:
         console.print("\nRun [bold]project-init upgrade --apply[/bold] to apply.")
@@ -1666,7 +1696,7 @@ def _show_interactive_diff(console: Console, report: DriftReport, rel: Path) -> 
     """Print the drift (and any merge result) for one file during the walk."""
     diff = report.diffs.get(rel)
     if diff:
-        console.print(diff, markup=False, highlight=False)
+        console.print(_colorize_diff(diff))
     merged = report.merge_results.get(rel)
     if merged is not None:
         console.print(f"\n[dim]--- 3-way merge result for {rel} ---[/dim]")
