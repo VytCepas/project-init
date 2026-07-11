@@ -454,6 +454,14 @@ class TestAdrToolchain:
         ):
             assert section in content
 
+    def test_madr_template_links_diagrams_not_pastes_them(self):
+        """PI-683: ADRs reference diagrams by linking the diagram-skill folder,
+        not by pasting a render — keeps the ADR from drifting on re-render.
+        """
+        content = (self.target / ".agents" / "docs" / "adr" / "adr-template.md").read_text()
+        assert "docs/diagrams/<slug>/" in content
+        assert "link that folder" in content
+
     def test_add_adr_skill_scaffolded_and_indexed(self):
         skill = self.target / ".agents" / "skills" / "add_adr" / "SKILL.md"
         assert skill.is_file()

@@ -104,6 +104,14 @@ class TestVaultStarterContent:
         for name in ("decision.md", "session-note.md", "knowledge-note.md", "design-note.md"):
             assert (templates / name).is_file(), f"missing template: {name}"
 
+    def test_design_readme_states_folder_per_diagram_convention(self):
+        """PI-683: the vault design/ README must not contradict the diagram
+        skill — diagrams get a folder holding source AND rendered picture.
+        """
+        readme = (self.target / ".agents" / "vault" / "design" / "README.md").read_text()
+        assert "folder each" in readme
+        assert "rendered picture" in readme
+
     def test_templater_templates_use_tp_syntax(self):
         templates = self.target / ".agents" / "vault" / "templates"
         for name in ("decision.md", "session-note.md", "knowledge-note.md", "design-note.md"):
