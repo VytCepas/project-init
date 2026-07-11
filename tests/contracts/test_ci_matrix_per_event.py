@@ -18,22 +18,29 @@ from pathlib import Path
 
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
+from tests.workflow import load_workflow, schedule_crons
 
 _SCRIPT_RE = re.compile(r"<<'PY'\n(.*?)\n\s*PY\b", re.DOTALL)
 
 
-def _resolve_versions(script: str, workdir: Path, event: str) -> list[str]:
+_NIGHTLY_CRON = "0 3 * * *"
+
+
+def _resolve_versions(script: str, workdir: Path, event: str, schedule: str = "") -> list[str]:
     out_file = workdir / "gh_output"
     out_file.write_text("", encoding="utf-8")
+    # Start from the real environment (uv may need proxy/SSL vars, Windows needs
+    # SystemRoot) and override only what the resolver reads.
+    env = {
+        **os.environ,
+        "GITHUB_OUTPUT": str(out_file),
+        "GITHUB_EVENT_NAME": event,
+        "GITHUB_EVENT_SCHEDULE": schedule,
+    }
     result = subprocess.run(
         ["uv", "run", "--no-project", "--with", "packaging", "python", "-c", script],
         cwd=str(workdir),
-        env={
-            "PATH": os.environ["PATH"],
-            "HOME": os.environ.get("HOME", str(workdir)),
-            "GITHUB_OUTPUT": str(out_file),
-            "GITHUB_EVENT_NAME": event,
-        },
+        env=env,
         capture_output=True,
         text=True,
     )
@@ -54,21 +61,34 @@ def _resolve_script(target: Path) -> str:
     return textwrap.dedent(m.group(1))
 
 
-def test_matrix_is_floor_only_on_pr_full_on_schedule(tmp_path: Path):
+def test_full_matrix_only_on_the_nightly_cron(tmp_path: Path):
     target = tmp_path / "proj"
     scaffold(target, fallback_preset(), fallback_variables())
     script = _resolve_script(target)
 
+    nightly = _resolve_versions(script, target, "schedule", _NIGHTLY_CRON)
     pr = _resolve_versions(script, target, "pull_request")
     push = _resolve_versions(script, target, "push")
-    schedule = _resolve_versions(script, target, "schedule")
+    # The WEEKLY Scorecard cron is also a `schedule` event but must NOT fan out —
+    # only the nightly cron does (Codex review: else the weekly run defeats the saving).
+    weekly = _resolve_versions(script, target, "schedule", "0 4 * * 1")
 
     # Nightly runs the full support window; a fresh scaffold's floor fans out
     # across every KNOWN version at/above the pinned floor, so this is > 1.
-    assert len(schedule) > 1, f"schedule should test the full matrix, got {schedule}"
-    # PR/push test exactly one version — the floor (minimum) of the full set.
-    assert len(pr) == 1 and len(push) == 1, f"pr={pr} push={push} should each be one version"
-    floor = min(schedule, key=lambda v: tuple(int(p) for p in v.split(".")))
-    assert pr == [floor] and push == [floor], (
-        f"per-PR/push must be the floor {floor}, got {pr}/{push}"
+    assert len(nightly) > 1, f"nightly cron should test the full matrix, got {nightly}"
+    floor = min(nightly, key=lambda v: tuple(int(p) for p in v.split(".")))
+    for name, got in (("pr", pr), ("push", push), ("weekly-cron", weekly)):
+        assert got == [floor], f"{name} must be floor-only [{floor}], got {got}"
+
+
+def test_resolver_nightly_cron_matches_on_schedule(tmp_path: Path):
+    """The resolver hardcodes the nightly cron to decide when to run the full
+    matrix; it must match an actual `on.schedule` entry, or the full matrix would
+    never run (silent coverage loss). Guards the coupling the resolver comments.
+    """
+    target = tmp_path / "proj"
+    scaffold(target, fallback_preset(), fallback_variables())
+    assert _NIGHTLY_CRON in _resolve_script(target), "resolver must reference the nightly cron"
+    assert _NIGHTLY_CRON in schedule_crons(load_workflow(target)), (
+        f"{_NIGHTLY_CRON} is not an on.schedule entry — the full matrix would never run"
     )
