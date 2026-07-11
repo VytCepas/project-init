@@ -213,7 +213,7 @@ ci-local-off:
 # errors on a fresh module — so those guards keep `just ci`/`just fast-ci` and the
 # rest green until the first source appears (parity with typecheck/test-cov).
 setup:
-    sh -c 'if [ -f go.mod ]; then go mod download; else echo "No Go module yet — run go mod init."; fi'
+    sh -c 'if [ -f go.mod ]; then go mod download; else echo "No Go module yet — run go mod init <module-path>."; fi'
 
 # lint project code (revive/godoclint/gocognit/cyclop/dupl/errcheck/govet/staticcheck gates per .golangci.yml)
 lint:
