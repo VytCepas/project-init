@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# pre-commit gate for the project-init repo itself (dogfood).
+#
+# Scans STAGED changes for secrets with gitleaks before the commit is written —
+# the local half of the secret-scan CI runs on full history (ADR-007 posture:
+# the git hook is fast local feedback, CI is the hard backstop). Fail-OPEN when
+# gitleaks is absent so a missing tool never blocks a commit; bypassable in an
+# emergency with `git commit --no-verify`.
+#
+# Enabled by `just setup` (git config core.hooksPath .githooks). Mirrors the
+# gitleaks half of the richer pre-commit the scaffolder ships
+# (templates/base/dot_github/hooks/pre-commit); the `just lint` half is omitted
+# here because this repo lints at pre-push (fast-ci) instead.
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "WARNING: gitleaks not installed — skipping local secret scan." >&2
+  echo "  CI still scans full history; install for fast local feedback:" >&2
+  echo "    https://github.com/gitleaks/gitleaks#installing" >&2
+  exit 0
+fi
+
+exec gitleaks git --pre-commit --staged --redact --no-banner --verbose
