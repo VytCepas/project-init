@@ -81,20 +81,22 @@ def test_no_conftest_env_hook_is_needed():
     assert "COVERAGE_PROCESS_START" not in body
 
 
-def test_ci_reports_coverage_without_gating_on_it():
-    """Coverage is measured in the nightly full-suite run, not per-PR (PI-762).
+def test_coverage_measured_per_pr_visibility_gated_nightly():
+    """Coverage is measured in the nightly full-suite run, gated at 85% (PI-765).
 
     Per-PR CI shards the tests across parallel jobs for speed (ci.yml `test`
-    job) — each shard sees only a slice, so per-PR coverage would need a
-    cross-shard combine for no gating benefit. The nightly full-suite run
-    (nightly.yml) measures coverage accurately in one process. Bare `--cov` is
-    deliberate: scope lives in [tool.coverage.run] source (pytest-cov does not
-    rewrite it when `--cov` is valueless). No `--cov-fail-under` anywhere —
-    coverage is drift visibility (#636), not a gate.
+    job) — each shard sees only a slice, so a per-PR floor would need a
+    cross-shard combine for little benefit. The nightly full-suite run
+    (nightly.yml) measures coverage accurately in one process and carries the 85%
+    regression floor. Bare `--cov` is deliberate: scope lives in
+    [tool.coverage.run] source (pytest-cov does not rewrite it when `--cov` is
+    valueless). Per-PR runs stay ungated (`--cov-fail-under` absent from ci.yml).
     """
     nightly = (_ROOT / ".github" / "workflows" / "nightly.yml").read_text(encoding="utf-8")
     assert "--cov" in nightly
-    assert "--cov-fail-under" not in nightly
-    # Per-PR CI shards without coverage — no combine step to maintain.
+    # The 85% regression floor lives in the nightly full-suite run (PI-765),
+    # where coverage is measured accurately in one process.
+    assert "--cov-fail-under=85" in nightly
+    # Per-PR CI shards without coverage — no floor, no combine step to maintain.
     ci = (_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "--cov-fail-under" not in ci

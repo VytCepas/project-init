@@ -96,7 +96,7 @@ Decision legend: **keep** (unchanged), **promote** (make stronger / adopt onto t
 | ruff `check` (lint + `S`/bandit) | ✅ blocking | ✅ blocking | **keep** both | Lint + in-linter SAST. |
 | ruff `format --check` | ✅ in `just lint` | ❌ (#726) | **promote** repo → add | Repo ships a format gate it doesn't run on itself. |
 | mypy `--strict` | ✅ blocking | ✅ blocking | **keep** both | Type gate, dogfooded (#639). |
-| Test coverage floor | ✅ 70% blocking (×4 langs) | ❌ ~92% measured, no `fail_under` | **promote** repo → 85% floor | Catch regressions; 85% keeps headroom below current ~92% so unrelated PRs don't red on a number nobody chose. |
+| Test coverage floor | ✅ 70% blocking (×4 langs) | ✅ 85% nightly (PI-765) | **done** (promoted) | Gated in the nightly full-suite run (accurate single-process); 85% keeps headroom below ~92%. Per-PR shards stay ungated (a floor there needs a cross-shard combine for little gain). |
 | pip-audit (SCA) | ✅ blocking | ✅ blocking | **keep** both | Dependency CVE scan. |
 | gitleaks secret-scan | ✅ blocking | ✅ blocking | **keep** both | Full-history secret scan. |
 | wheel-smoke | — (repo-specific) | ✅ blocking | **keep** repo | Proves the built wheel scaffolds; no template analogue. |
@@ -112,9 +112,11 @@ Decision legend: **keep** (unchanged), **promote** (make stronger / adopt onto t
 1. **ruff format** (#726) — **promote**: add `ruff format --check .` to the repo's lint step.
    A one-time repo-wide `ruff format .` reformat commit precedes the check (large mechanical
    diff is expected). Follow-up PR under #751.
-2. **Coverage floor** — **promote**: gate the repo at **85%** via `--cov-fail-under=85` in the
-   CI pytest step and `just test-cov` (fast `just test`/`test-quick` stay floor-free). The
-   template keeps 70% (a fresh scaffold's baseline). Follow-up PR under #751.
+2. **Coverage floor** — **done** (PI-765): the repo is gated at **85%** via
+   `--cov-fail-under=85` in the nightly full-suite run (`nightly.yml`), where coverage is
+   measured accurately in one process. Per-PR CI shards the tests (PI-762), so each shard sees
+   only a slice — a per-PR floor would need a cross-shard combine for little benefit. The
+   template keeps its per-language 70% (a fresh scaffold's baseline).
 3. **Security-scan parity** — **promote (advisory)**: add semgrep + license-scan jobs to the
    repo, advisory (not in `ci-gate.needs`), mirroring the template posture. scorecard/fuzz stay
    template-only (see table). Follow-up PR under #751.

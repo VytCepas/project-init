@@ -110,10 +110,12 @@ markers = [
     "slow: needs a non-python toolchain (bun, cargo); skipped where absent",
 ]
 
-# Coverage (#636): drift VISIBILITY, not a gate. No `fail_under` — a hard floor
-# would block unrelated PRs on a number nobody chose, and this repo's real
-# coverage contract is "every templates/ change gets a test", which no percentage
-# can express. Deliberately not wired into `just test-quick`: that recipe is the
+# Coverage (#636): drift visibility per-PR, a regression floor nightly. There is
+# no `fail_under` HERE — the floor lives in the nightly workflow's pytest
+# invocation (`--cov-fail-under=85`, PI-765), not in this config, so per-PR runs
+# (and `just test-cov`) stay ungated while the nightly full-suite run catches a
+# real drop. 85% is below the current ~92% so it never blocks a PR on a number
+# nobody chose. Deliberately not wired into `just test-quick`: that recipe is the
 # fail-fast iterate loop, and coverage costs a measurable slice of its runtime.
 [tool.coverage.run]
 source = ["src/project_init"]
