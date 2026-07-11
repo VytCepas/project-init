@@ -35,7 +35,7 @@ bunx @biomejs/biome format .   # format gate — exits 1 on unformatted, leaves 
                                # Part of `just lint` (#726). There is NO `--check` flag: biome
                                # rejects it ("`--check` is not expected in this context") — the
                                # no-flag form IS the check. `--write` (i.e. `just format`) fixes.
-bun test             # tests + coverage gate (>= 70%, per bunfig.toml) — always on, no extra flag needed
+bun test             # tests + coverage gate (threshold per bunfig.toml) — always on, no extra flag needed
 bun audit            # dependency CVE/advisory scan — CI always runs this
 ```
 

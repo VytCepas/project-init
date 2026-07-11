@@ -57,6 +57,9 @@ class TestDiagramSkill:
         # Git-tracking policy for rendered assets (PI-680): commit the render,
         # marked linguist-generated, not gitignored.
         assert "Commit the render, don't gitignore it" in content
+        # Map-not-territory is codified here (PI-684/PI-688): volatile specifics
+        # are pointed at, not restated in labels.
+        assert "map-not-territory" in content
         # Quality rules.
         assert "25 nodes" in content
         assert "subgraph" in content
