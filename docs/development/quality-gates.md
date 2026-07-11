@@ -100,8 +100,8 @@ Decision legend: **keep** (unchanged), **promote** (make stronger / adopt onto t
 | pip-audit (SCA) | ✅ blocking | ✅ blocking | **keep** both | Dependency CVE scan. |
 | gitleaks secret-scan | ✅ CI + pre-commit | ✅ CI + pre-commit (PI-767) | **keep** both | CI scans full history (blocking); a git pre-commit hook scans the staged diff locally (fail-open). The repo previously scanned only in CI — the local half was the parity gap. |
 | wheel-smoke | — (repo-specific) | ✅ blocking | **keep** repo | Proves the built wheel scaffolds; no template analogue. |
-| semgrep SAST | ✅ advisory | ❌ | **promote** repo → advisory | Semantic SAST; advisory until calibrated, matching the template. |
-| license-scan | ✅ advisory | ❌ | **promote** repo → advisory | Deny GPL/AGPL; advisory while the deny-list is calibrated. |
+| semgrep SAST | ✅ advisory | ✅ advisory (PI-769) | **done** (promoted) | Semantic SAST over the scaffolder's `src/`; advisory (not in ci-gate) until calibrated, matching the template. |
+| license-scan | ✅ advisory | ✅ advisory (PI-769) | **done** (promoted) | Deny GPL/AGPL via `just license`; advisory while the deny-list is calibrated. |
 | scorecard | ✅ weekly cron, advisory | ❌ | **keep** template; **not adopted** by repo | OSSF posture score is low-ROI on a solo scaffolder repo. |
 | fuzz | ✅ nightly cron, advisory | ❌ | **keep** template; **not adopted** by repo | Property/fuzz targets are a per-project concern, not this repo's. |
 | Mutation gate | ✅ nightly, 80% kill (Python) | ❌ | **keep** template; repo uses the on-demand skill | Test-strength on the repo is covered by the `verify-test-strength` skill (#747, PR #756); a nightly mutation *gate* on this repo is not worth the runtime. |
@@ -117,9 +117,10 @@ Decision legend: **keep** (unchanged), **promote** (make stronger / adopt onto t
    measured accurately in one process. Per-PR CI shards the tests (PI-762), so each shard sees
    only a slice — a per-PR floor would need a cross-shard combine for little benefit. The
    template keeps its per-language 70% (a fresh scaffold's baseline).
-3. **Security-scan parity** — **promote (advisory)**: add semgrep + license-scan jobs to the
-   repo, advisory (not in `ci-gate.needs`), mirroring the template posture. scorecard/fuzz stay
-   template-only (see table). Follow-up PR under #751.
+3. **Security-scan parity** — **done** (PI-769 semgrep + license-scan; PI-767 gitleaks
+   pre-commit): the repo now runs semgrep + license-scan as advisory jobs (not in
+   `ci-gate.needs`), plus a local gitleaks pre-commit. scorecard/fuzz stay template-only (see
+   table).
 4. **Test-strength** (#747) — **resolved**: the `verify-test-strength` skill ships and is the
    on-demand mechanism for both repo and output; the template additionally runs a nightly
    mutation gate. No repo mutation *gate* is added (calibrated-not-maximal).

@@ -70,3 +70,18 @@ def test_tests_are_sharded_into_parallel_jobs():
     run = " ".join(str(s.get("run", "")) for s in steps(test_job))
     assert "--splits" in run and "--group" in run, "test job must run pytest --splits/--group"
     assert "-n auto" not in run, "shards run serially (no xdist) — that is what makes them race-free"
+
+
+def test_semgrep_and_license_scan_are_advisory():
+    """PI-769: semgrep + license-scan run on the repo (security-scan parity) but
+    are ADVISORY — present as jobs, deliberately NOT in ci-gate's needs. They fail
+    their own step so a finding is visible, but don't block a merge while the
+    ruleset / deny-list is calibrated (the same rollout the template uses).
+    """
+    wf = load_workflow(_ROOT)
+    jobs = wf.get("jobs", {})
+    assert "semgrep" in jobs, "semgrep job missing from ci.yml"
+    assert "license-scan" in jobs, "license-scan job missing from ci.yml"
+    gate_needs = needs(wf, "ci-gate")
+    assert "semgrep" not in gate_needs, "semgrep must stay advisory (not in ci-gate.needs)"
+    assert "license-scan" not in gate_needs, "license-scan must stay advisory (not in ci-gate.needs)"
