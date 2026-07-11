@@ -43,6 +43,10 @@ dev = [
     # `patch = ["subprocess"]` in [tool.coverage.run] landed in coverage 7.10.
     "coverage>=7.10",
     "pytest-xdist>=3.0",
+    # Deterministic, race-free CI test sharding across parallel jobs (PI-762):
+    # each shard is a separate serial process, so the xdist in-process
+    # interference (#668/PI-759) cannot occur. `just test` still uses xdist locally.
+    "pytest-split>=0.8",
     # Workflow-schema gate (#719): an invalid trigger made GitHub reject a whole
     # workflow file at load time. Declared here so tests/integration/
     # test_workflow_lint_gate.py never silently skips.

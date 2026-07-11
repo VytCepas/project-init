@@ -82,15 +82,19 @@ def test_no_conftest_env_hook_is_needed():
 
 
 def test_ci_reports_coverage_without_gating_on_it():
-    """Bare `--cov` is deliberate: scope lives in [tool.coverage.run] source.
+    """Coverage is measured in the nightly full-suite run, not per-PR (PI-762).
 
-    pytest-cov 7 does not rewrite the configured source when `--cov` is passed
-    without a value — measured, the report covers 10 `src/project_init` files and
-    no `tests/` or `tools/` rows. Repeating the path in the justfile and the
-    workflow would just be two more places to drift from the config (PR #718
-    review). `test_coverage_measures_the_package_with_branch_coverage` pins the
-    source that makes this safe.
+    Per-PR CI shards the tests across parallel jobs for speed (ci.yml `test`
+    job) — each shard sees only a slice, so per-PR coverage would need a
+    cross-shard combine for no gating benefit. The nightly full-suite run
+    (nightly.yml) measures coverage accurately in one process. Bare `--cov` is
+    deliberate: scope lives in [tool.coverage.run] source (pytest-cov does not
+    rewrite it when `--cov` is valueless). No `--cov-fail-under` anywhere —
+    coverage is drift visibility (#636), not a gate.
     """
+    nightly = (_ROOT / ".github" / "workflows" / "nightly.yml").read_text(encoding="utf-8")
+    assert "--cov" in nightly
+    assert "--cov-fail-under" not in nightly
+    # Per-PR CI shards without coverage — no combine step to maintain.
     ci = (_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert "--cov" in ci
     assert "--cov-fail-under" not in ci

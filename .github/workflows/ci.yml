@@ -19,16 +19,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  lint-and-test:
-    name: Lint and test
+  # Fast static gates across the full support window (#638) — cheap, so all three
+  # versions run per PR. Tests are NOT here: they are sharded into parallel jobs
+  # below (PI-762), and the full-matrix TEST run is nightly (nightly.yml). A
+  # version-specific test break is therefore caught within a day rather than
+  # per-PR — the deliberate speed/coverage trade of epic #751.
+  checks:
+    name: Lint, typecheck, audit
     runs-on: ubuntu-24.04
-    # Test across the full declared support window (#638). pyproject sets
-    # requires-python >=3.11 with 3.11-3.13 classifiers, but this job used to pin
-    # only 3.12 — a break on 3.11 or 3.13 would ship uncaught. The matrix must
-    # stay in sync with the classifiers; tests/contracts/test_repo_ci_python_matrix.py
-    # fails CI if they drift. Matrixing renames the check to "Lint and test
-    # (3.xx)", which is why "CI gate" (below) is the single required context, not
-    # this job — see its comment.
     strategy:
       fail-fast: false
       matrix:
@@ -44,41 +42,6 @@ jobs:
           cache-dependency-glob: "uv.lock"
           python-version: ${{ matrix.python-version }}
 
-      # shellcheck ships preinstalled on ubuntu-24.04; shfmt does not. The
-      # scaffolded-output lint guard (test_shell_lint_gate.py) skips when its
-      # tool is absent, so without this step the shfmt guard would silently
-      # no-op in CI — a green check that tested nothing. Pinned + checksum-
-      # verified, mirroring the install the scaffolded ci.yml.tmpl ships.
-      - name: Install shfmt
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          tmp="$(mktemp -d)"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
-          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
-          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
-          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      # Same reasoning as shfmt above. test_ts_security_gate.py is the only test
-      # that RUNS the scaffolded TypeScript toolchain rather than asserting the
-      # text of eslint.config.mjs — and text assertions are what let #732 (an
-      # unpinned typescript resolving to 7.x, crashing eslint) ship. Without bun
-      # that gate skips, and a skipped test is not a gate (#733). The test does
-      # `bun add` against the npm registry; that network hop is ~3s warm and is
-      # the only thing between a broken TS toolchain and a green merge, so it
-      # runs on every PR rather than nightly.
-      - name: Install Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
-        with:
-          bun-version: latest
-
-      # Same reasoning again (#737). The two git pre-commit hook tests in
-      # test_commit_hook_gates.py drive the real hook, which shells out to
-      # `just lint` — the hook's two most interesting behaviours (block a bad
-      # STAGED commit; do NOT block a good staged commit when the worktree is
-      # dirty) were never exercised in CI because `just` was absent and the
-      # tests skipped. Pinned to the same SHA the scaffolded ci.yml.tmpl uses.
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4
 
@@ -91,30 +54,71 @@ jobs:
       - name: Typecheck (mypy --strict)
         run: just typecheck
 
-      - name: Tests (pytest)
-        # Serial in CI, deliberately (PI-759/PI-762). Parallel (`-n auto`) cut this
-        # step ~5m→~2m, but surfaced a rare cross-test interference under CI's
-        # worker scheduling (a memory-lint test read a wrong/corrupt tree) that
-        # local runs did not reproduce. CI must stay deterministic — a flaky red on
-        # an unrelated PR costs more than the minutes saved — so parallelizing CI
-        # safely (root-cause the interference, or split tests into parallel jobs)
-        # is tracked in PI-762. `just test` runs `-n auto` locally for dev speed.
-        # --cov reports coverage (#636) without gating on it: no fail_under, so
-        # a dip is visible in the log and never blocks an unrelated PR.
-        run: uv run pytest --tb=short -q --cov --cov-report=term-missing
-
       # Dependency vulnerability scan (#637). gitleaks (secret-scan job) catches
       # committed secrets; nothing else here catches a correctly-spelled dep
       # already in uv.lock with a known CVE. pip-audit is pulled in ephemerally
-      # via `uv run --with`, the same pattern the scaffolded ci.yml.tmpl uses —
-      # no dev-dependency to forget. Mirrors the template's `just audit` step.
+      # via `uv run --with`, the same pattern the scaffolded ci.yml.tmpl uses.
       - name: Dependency vulnerability scan (pip-audit)
         run: just audit
+
+  # Tests, sharded into parallel jobs with pytest-split (PI-762). Each shard is a
+  # separate SERIAL process, so the xdist in-process interference that once forced
+  # serial CI (#668/PI-759) cannot occur — deterministic AND ~4x faster wall-clock
+  # than one serial run. Single Python version per PR (the full matrix runs
+  # nightly). The shfmt/bun/just toolchain is installed because several tests
+  # DRIVE the scaffolded toolchain rather than asserting text (ts/hook gates,
+  # #732/#733/#737) — without it they skip, and a skipped test is not a gate.
+  test:
+    name: Tests (shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          version: "0.11.7"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.11"
+
+      - name: Install shfmt
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          tmp="$(mktemp -d)"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
+          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
+          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
+          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
+          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
+        with:
+          bun-version: latest
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4
+
+      - name: Sync dev dependencies
+        run: uv sync --group dev --locked
+
+      - name: Tests (pytest, shard ${{ matrix.shard }})
+        # pytest-split partitions the suite deterministically; --splits/--group
+        # select this shard. Serial within the shard (no -n) — that is what makes
+        # it race-free. Coverage is measured in the nightly full-suite run
+        # (nightly.yml), not here, so a shard needs no combine step.
+        run: uv run pytest --splits 4 --group ${{ matrix.shard }} --tb=short -q
 
   wheel-smoke:
     name: Wheel smoke test
     runs-on: ubuntu-24.04
-    needs: lint-and-test
+    needs: checks
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
 
@@ -365,13 +369,15 @@ jobs:
   # own CI was behind its own product).
   #
   # needs = only jobs that ALWAYS run: a skipped need counts as not-success and
-  # would red the gate. wheel-smoke skips only when lint-and-test fails (gate
-  # should be red then anyway); the conditional portability jobs are deliberately
-  # out (they skip on non-shell PRs and were never required contexts).
+  # would red the gate. `checks` and `test` (all 4 shards) always run; wheel-smoke
+  # skips only when `checks` fails (gate should be red then anyway); the
+  # conditional portability jobs are deliberately out (they skip on non-shell PRs
+  # and were never required contexts). The nightly full-matrix test job is not a
+  # merge gate (it runs on schedule only, in nightly.yml).
   ci-gate:
     name: CI gate
     runs-on: ubuntu-24.04
-    needs: [lint-and-test, wheel-smoke, secret-scan, shellcheck]
+    needs: [checks, test, wheel-smoke, secret-scan, shellcheck]
     if: always()
     steps:
       - name: Require all upstream jobs to succeed

@@ -4,7 +4,7 @@ documented quality-gate policy.
 `docs/development/quality-gates.md` declares the single source of truth for which
 CI contexts gate a merge, in a machine-readable marker:
 
-    <!-- required-gates: lint-and-test, wheel-smoke, secret-scan, shellcheck -->
+    <!-- required-gates: checks, test, wheel-smoke, secret-scan, shellcheck -->
 
 The `ci-gate` aggregator job in `.github/workflows/ci.yml` fans in exactly those
 jobs via its `needs:` list. If the two diverge, either the policy doc is stale or a
