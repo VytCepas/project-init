@@ -15,6 +15,8 @@ produces, not just the barest preset.
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -24,6 +26,19 @@ from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import find_uv, make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _require_bun() -> None:
+    """Fail in CI, skip locally, when bun is absent — a skipped test is not a
+    gate (#733/#737). ci.yml installs bun for the Tests shards.
+    """
+    if shutil.which("bunx"):
+        return
+    if os.environ.get("CI"):
+        pytest.fail(
+            "bunx is not on PATH — CI must install it (ci.yml) or this gate tests nothing (#733)."
+        )
+    pytest.skip("bunx not available — install bun to run this gate locally")
 
 
 def _ruff_check(target: Path) -> subprocess.CompletedProcess:
@@ -92,3 +107,49 @@ def test_ruff_passes_with_lifecycle_hooks(tmp_target: Path):
     assert result.returncode == 0, (
         f"lifecycle-on scaffold does not pass its own lint gate:\n{result.stdout}{result.stderr}"
     )
+
+
+def _biome_format_check(target: Path) -> subprocess.CompletedProcess:
+    """Run the scaffolded biome gate exactly as node's ``just lint`` does:
+    ``biome format .`` in check mode (no ``--write``) from the target."""
+    return subprocess.run(
+        ["bunx", "@biomejs/biome", "format", "."],
+        cwd=target,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_biome_passes_on_freshly_scaffolded_node_project(tmp_target: Path):
+    """PI-779: a fresh node scaffold must pass ``biome format .`` day-one.
+
+    Without a scaffolded ``biome.json``, biome scanned the whole tree —
+    ``.agents/.upgrade-base.json``, ``tsconfig.json``, ``typedoc.json`` and the
+    rest — none biome-formatted, so a fresh node scaffold's ``just lint`` (and
+    thus CI) was day-one red. The scaffolded ``biome.json`` scopes the formatter
+    to project source. Runs the real ``biome format .``, not a text assertion —
+    it fails on the pre-fix template.
+    """
+    _require_bun()
+    scaffold(
+        tmp_target,
+        load_preset("auto"),
+        make_variables(language="node", node="true", python="", go=""),
+    )
+    biome_cfg = tmp_target / "biome.json"
+    assert biome_cfg.is_file(), "node scaffold must ship a biome.json"
+    # Scoped to project source so it never rescans generated/config files.
+    assert '"src/**"' in biome_cfg.read_text()
+
+    result = _biome_format_check(tmp_target)
+    assert result.returncode == 0, (
+        f"fresh node scaffold is day-one red on `biome format .`:\n{result.stdout}{result.stderr}"
+    )
+
+    # Break it: a badly-formatted source file must still be caught — a gate that
+    # skips its own subject is worse than none (AGENTS.md).
+    src = tmp_target / "src"
+    src.mkdir(exist_ok=True)
+    (src / "bad.ts").write_text("export const  x=1\n")
+    broken = _biome_format_check(tmp_target)
+    assert broken.returncode != 0, "biome must still catch unformatted project source"
