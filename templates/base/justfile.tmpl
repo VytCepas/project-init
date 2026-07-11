@@ -6,12 +6,14 @@
 # A fresh scaffold has no pyproject.toml (or one without [dependency-groups])
 # yet — `uv sync --group dev` hard-fails on both, which would break CI's first
 # step before the day-one guards in typecheck/test-cov can even run.
+[doc("install/sync dev dependencies (PEP 735 dependency-group; add tools with `uv add --dev`).")]
 setup:
     sh -c 'if [ ! -f pyproject.toml ]; then echo "No pyproject.toml yet — nothing to sync."; elif grep -q "^\[dependency-groups\]" pyproject.toml; then uv sync --group dev; else uv sync; fi'
 
 # lint project code (docstring + complexity gates per ruff.toml).
 # `ruff format --check` verifies formatting without writing — `just format`
 # writes. Without this, an unformatted file merged green (#726).
+[doc("lint project code (docstring + complexity gates per ruff.toml).")]
 lint:
     uv run ruff check .
     uv run ruff format --check .
@@ -24,6 +26,7 @@ lint:
 # --install-types fetches missing dependency stubs (types-PyYAML etc.) so
 # untyped deps don't fail the strict gate with import-untyped (#592); it
 # shells out to pip, which uv-managed environments omit — hence --with pip.
+[doc("static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)")]
 typecheck:
     if [ -d src ]; then uv run --with "mypy>=1.10" --with pip mypy --install-types --non-interactive src/; else echo "No src/ directory yet — nothing to type-check."; fi
 
@@ -37,6 +40,7 @@ test:
 
 # fail-fast quiet run for the edit-test loop (token-efficiency; PI-641) —
 # stops at the first failure so agents ingest one traceback, not the suite's
+[doc("fail-fast quiet run for the edit-test loop (token-efficiency; PI-641)")]
 test-quick:
     sh -c 'if find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run --with pytest pytest -x -q --tb=short; else echo "No test files yet — nothing to test."; fi'
 
@@ -46,12 +50,14 @@ test-quick:
 # 0% coverage on zero application code would trip --cov-fail-under before any
 # code exists. Silently skipping pytest entirely here would let a real test
 # failure through `just ci` unnoticed.
+[doc("tests with the coverage gate (CI always runs this, not `test` — PI-569).")]
 test-cov:
     sh -c 'if [ -d src ]; then uv run --with pytest-xdist --with pytest-cov pytest -n auto --tb=short -q --cov=src --cov-fail-under=70; elif find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run --with pytest-xdist pytest -n auto --tb=short -q; else echo "No src/ or test files yet — nothing to test."; fi'
 
 # mutation testing on core logic (slow; requires [tool.mutmut] source_paths
 # in your own pyproject.toml, scoped to deterministic pure-logic modules —
 # skip I/O-heavy code, hooks, template renderers). CI runs this nightly.
+[doc("mutation testing on core logic")]
 test-mutation:
     uv run --with mutmut mutmut run
     uv run --with mutmut mutmut export-cicd-stats
@@ -60,12 +66,14 @@ test-mutation:
 # complements package_guard.py, which only blocks installing a package that
 # doesn't exist or looks typosquatted — this catches a real, correctly-
 # spelled dependency with a known vulnerability already in the lockfile.
+[doc("dependency vulnerability scan against known CVEs/advisories (PI-568).")]
 audit:
     sh -c 'if [ -f pyproject.toml ] || [ -f requirements.txt ] || [ -f uv.lock ]; then uv run --with pip-audit pip-audit; else echo "No Python dependency manifest yet — nothing to audit."; fi'
 
 # generate a CycloneDX SBOM of the runtime dependency tree (#574). release.yml
 # attaches this to GitHub Releases; run locally on demand. --no-dev so it
 # reflects what ships; uvx keeps cyclonedx-py out of the scanned .venv.
+[doc("generate a CycloneDX SBOM of the runtime dependency tree (#574)")]
 sbom:
     uv sync --no-dev
     uvx --from cyclonedx-bom cyclonedx-py environment .venv -o sbom.cdx.json
@@ -73,6 +81,7 @@ sbom:
 # dependency license compliance scan (#579) — fail on copyleft (GPL/AGPL; also
 # LGPL, since --partial-match is substring-based). Tune the --fail-on deny-list
 # to your policy. Non-blocking in CI initially (see ci.yml's license-scan job).
+[doc("dependency license compliance scan (#579)")]
 license:
     uv run --with pip-licenses pip-licenses --from=mixed --fail-on "GPL;AGPL" --partial-match
 
@@ -81,6 +90,7 @@ license:
 # a permanent dependency. Pattern/tooling, NOT a blocking gate: CI runs this in
 # the nightly `fuzz` job, never on a PR (#727). Hypothesis draws fresh seeds each
 # run, so the nightly job explores inputs a per-PR run would only repeat.
+[doc("property-based tests with Hypothesis (#580)")]
 fuzz:
     uv run --with hypothesis --with pytest-xdist pytest -n auto --tb=short -q
 
@@ -89,10 +99,12 @@ ci: setup lint typecheck test-cov audit
 
 # fast local gate for the pre-push hook: lint + parallel tests (CI is the full
 # backstop, so pre-push stays fast and doesn't re-run typecheck/coverage/audit)
+[doc("fast local gate for the pre-push hook")]
 fast-ci: lint test
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+[doc("route CI to a self-hosted runner when Actions minutes run out (PI-666)")]
 ci-local-on:
     gh variable set CI_RUNS_ON --body self-hosted
 
@@ -128,6 +140,7 @@ setup:
 # adding --check — biome rejects the flag ("`--check` is not expected in this
 # context"). Deliberately not `biome ci` either, which also runs biome's linter
 # and would duplicate eslint, the owner of the lint gates here.
+[doc("lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs).")]
 lint:
     bunx eslint .
     bunx @biomejs/biome format .
@@ -138,6 +151,7 @@ lint:
 # static type check (strict mode per tsconfig.base.json)
 # no-op on a fresh scaffold with no .ts sources yet — tsc errors with TS18003
 # ("No inputs were found") instead of passing (the #592-adjacent day-one gap)
+[doc("static type check (strict mode per tsconfig.base.json)")]
 typecheck:
     sh -c 'if find . \( -name "*.ts" -o -name "*.tsx" \) -not -path "*/node_modules/*" | grep -q .; then bunx tsc --noEmit; else echo "No TypeScript sources yet — nothing to type-check."; fi'
 
@@ -149,6 +163,7 @@ format:
 # `bun test` exits 1 when it finds zero test files, which would fail `just ci`
 # (and the pre-push gate) on a fresh scaffold before the first test exists — so
 # skip cleanly until a test file appears, like the go/rust day-one guards.
+[doc("run the test suite (coverage-gated per bunfig.toml — PI-569).")]
 test:
     sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bun test; else echo "No test files yet — nothing to test."; fi'
 
@@ -166,12 +181,14 @@ audit:
 
 # generate a CycloneDX SBOM of the dependency tree (#574). release.yml attaches
 # this to GitHub Releases. cdxgen reads bun's lockfile (cyclonedx-npm rejects bun).
+[doc("generate a CycloneDX SBOM of the dependency tree (#574)")]
 sbom:
     bunx @cyclonedx/cdxgen -t bun -o sbom.cdx.json
 
 # dependency license compliance scan (#579) — fail on GPL/AGPL (SPDX ids). Tune
 # the --failOn deny-list to your policy. Non-blocking in CI initially (see
 # ci.yml's license-scan job).
+[doc("dependency license compliance scan (#579)")]
 license:
     bunx license-checker --production --failOn "GPL-1.0;GPL-1.0+;GPL-2.0;GPL-2.0-only;GPL-2.0-or-later;GPL-3.0;GPL-3.0-only;GPL-3.0-or-later;AGPL-1.0;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later"
 
@@ -180,6 +197,7 @@ license:
 # Pattern/tooling, NOT a blocking gate: CI runs this in the nightly `fuzz` job,
 # never on a PR (#727). fast-check draws fresh seeds each run, so the nightly job
 # explores inputs a per-PR run would only repeat.
+[doc("property-based tests with fast-check (#580)")]
 fuzz:
     bun test
 
@@ -192,10 +210,12 @@ ci: setup lint typecheck test audit
 
 # fast local gate for the pre-push hook: lint + parallel tests (CI is the full
 # backstop, so pre-push stays fast and doesn't re-run typecheck/audit)
+[doc("fast local gate for the pre-push hook")]
 fast-ci: lint test
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+[doc("route CI to a self-hosted runner when Actions minutes run out (PI-666)")]
 ci-local-on:
     gh variable set CI_RUNS_ON --body self-hosted
 
@@ -212,6 +232,7 @@ ci-local-off:
 # is initialized. Every other go recipe below shells out to the toolchain, which
 # errors on a fresh module — so those guards keep `just ci`/`just fast-ci` and the
 # rest green until the first source appears (parity with typecheck/test-cov).
+[doc("download module dependencies")]
 setup:
     sh -c 'if [ -f go.mod ]; then go mod download; else echo "No Go module yet — run go mod init <module-path>."; fi'
 
@@ -225,22 +246,26 @@ lint:
 # type-only pass. Redundant with `just lint` by design: golangci-lint runs
 # go/analysis, which type-checks. `just typecheck` exists so the command means
 # the same thing in every language, which is what CI and agents call (#725).
+[doc("type-only pass")]
 typecheck:
     sh -c 'if find . -name "*.go" | grep -q .; then go vet ./...; else echo "No Go sources yet — nothing to type-check."; fi'
 
 # auto-format project code (gofumpt via golangci-lint fmt — no separate binary
 # to provision; golangci-lint is already required for `just lint`)
+[doc("auto-format project code")]
 format:
     sh -c 'if find . -name "*.go" | grep -q .; then golangci-lint fmt; else echo "No Go sources yet — nothing to format."; fi'
 
 # run the test suite. Skips cleanly before any Go source exists — `go test ./...`
 # errors on a fresh module (no go.mod), so a fresh scaffold's `just test` /
 # pre-push `fast-ci` would fail day-one without this guard (matches typecheck).
+[doc("run the test suite")]
 test:
     sh -c 'if find . -name "*.go" | grep -q .; then go test ./...; else echo "No Go sources yet — nothing to test."; fi'
 
 # fail-fast run for the edit-test loop (token-efficiency; PI-641). Same day-one
 # guard as `test`.
+[doc("fail-fast run for the edit-test loop (token-efficiency; PI-641)")]
 test-quick:
     sh -c 'if find . -name "*.go" | grep -q .; then go test -failfast ./...; else echo "No Go sources yet — nothing to test."; fi'
 
@@ -250,6 +275,7 @@ test-quick:
 # fuzz). The awk END gate is fail-closed: a missing/unreadable coverage.out
 # yields zero input lines and fails the recipe instead of silently passing
 # (a bare `... | awk '{...}'` returned awk's 0 exit when the cover tool failed).
+[doc("tests with the coverage gate (CI always runs this, not `test` — PI-569).")]
 test-cov:
     sh -c 'set -e; if ! find . -name "*.go" | grep -q .; then echo "No Go sources yet — nothing to test."; exit 0; fi; go test -coverprofile=coverage.out ./...; go tool cover -func=coverage.out | awk '\''END { if (NR == 0 || $1 != "total:") { print "Coverage gate: could not read coverage totals"; exit 1 } pct = $3; sub("%", "", pct); if (pct + 0 < 70) { print "Coverage " pct "% is below the 70% gate"; exit 1 } else { print "Coverage " pct "% meets the 70% gate" } }'\'''
 
@@ -260,12 +286,14 @@ docs:
 # dependency vulnerability scan against known CVEs/advisories (PI-568).
 # requires govulncheck: `go install golang.org/x/vuln/cmd/govulncheck@latest`
 # once, on your machine (CI installs it per-run).
+[doc("dependency vulnerability scan against known CVEs/advisories (PI-568).")]
 audit:
     sh -c 'if find . -name "*.go" | grep -q .; then govulncheck ./...; else echo "No Go sources yet — nothing to audit."; fi'
 
 # generate a CycloneDX SBOM of the module dependency tree (#574). release.yml
 # attaches this to GitHub Releases.
 # requires cyclonedx-gomod: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+[doc("generate a CycloneDX SBOM of the module dependency tree (#574)")]
 sbom:
     sh -c 'if find . -name "*.go" | grep -q .; then cyclonedx-gomod mod -json -output sbom.cdx.json; else echo "No Go sources yet — nothing to inventory."; fi'
 
@@ -273,6 +301,7 @@ sbom:
 # (copyleft: GPL/LGPL/AGPL) per go-licenses' classification. Tune
 # --disallowed_types to your policy. Skips cleanly before any Go source exists.
 # requires go-licenses: go install github.com/google/go-licenses@latest
+[doc("dependency license compliance scan (#579)")]
 license:
     sh -c 'if find . -name "*.go" | grep -q .; then go-licenses check ./... --disallowed_types=forbidden,restricted; else echo "No Go sources yet — skipping license scan."; fi'
 
@@ -285,6 +314,7 @@ license:
 # deterministic, so repeating it nightly surfaces no NEW inputs (unlike the other
 # three languages) — it still uses CI minutes; it runs nightly to keep the four
 # languages uniform.
+[doc("native Go fuzzing (#580)")]
 fuzz:
     sh -c 'if find . -name "*.go" | grep -q .; then go test -run="Fuzz" ./...; else echo "No Go sources yet — nothing to fuzz."; fi'
 
@@ -297,10 +327,12 @@ ci: lint typecheck test-cov audit
 
 # fast local gate for the pre-push hook: lint + parallel tests (CI is the full
 # backstop, so pre-push stays fast and doesn't re-run typecheck/coverage/audit)
+[doc("fast local gate for the pre-push hook")]
 fast-ci: lint test
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+[doc("route CI to a self-hosted runner when Actions minutes run out (PI-666)")]
 ci-local-on:
     gh variable set CI_RUNS_ON --body self-hosted
 
@@ -318,6 +350,7 @@ setup:
 # build the project. All cargo recipes skip cleanly before `cargo init` — cargo
 # errors without a Cargo.toml, so a fresh scaffold's `just ci` / `just fast-ci`
 # would fail day-one without these guards (parity with the go/node day-one skips).
+[doc("build the project")]
 build:
     sh -c 'if [ -f Cargo.toml ]; then cargo build; else echo "No Cargo project yet — run cargo init."; fi'
 
@@ -327,6 +360,7 @@ build:
 # clippy.toml threshold is dead config. -D missing_docs enforces docs on public
 # items (parity with ruff's D gate and revive's `exported`); for a binary crate
 # with no pub items it only asks for a crate-level `//!` doc.
+[doc("lint project code (clippy pedantic + cognitive-complexity + public-API docs).")]
 lint:
     # Two passes, because -D missing_docs and --all-targets do not mix (#725).
     # 1. Public API: docs enforced on lib/bin only. Applied to --all-targets it
@@ -346,6 +380,7 @@ lint:
 # type-checks, but `just typecheck` must mean the same thing in every language,
 # because that is what CI and agents call (#725). `cargo check` skips codegen,
 # so it is fast.
+[doc("type-only compile pass")]
 typecheck:
     sh -c 'if [ -f Cargo.toml ]; then cargo check --all-targets --all-features; else echo "No Cargo project yet — run cargo init."; fi'
 
@@ -359,6 +394,7 @@ test:
 
 # quiet run for the edit-test loop (token-efficiency; PI-641; cargo has no
 # stable fail-fast flag, so quiet output is the lever here)
+[doc("quiet run for the edit-test loop")]
 test-quick:
     sh -c 'if [ -f Cargo.toml ]; then cargo test -q; else echo "No Cargo project yet — run cargo init."; fi'
 
@@ -366,6 +402,7 @@ test-quick:
 # requires cargo-llvm-cov: `cargo install cargo-llvm-cov` + `rustup component
 # add llvm-tools-preview`, once, on your machine (CI installs it per-run).
 # tune the "70" threshold to your project's baseline.
+[doc("tests with the coverage gate (CI always runs this, not `test` — PI-569).")]
 test-cov:
     sh -c 'if [ -f Cargo.toml ]; then cargo llvm-cov --fail-under-lines 70; else echo "No Cargo project yet — run cargo init."; fi'
 
@@ -376,12 +413,14 @@ docs:
 # dependency vulnerability scan against known CVEs/advisories (PI-568).
 # requires cargo-audit: `cargo install cargo-audit` once, on your machine
 # (CI installs it per-run as a prebuilt binary).
+[doc("dependency vulnerability scan against known CVEs/advisories (PI-568).")]
 audit:
     sh -c 'if [ -f Cargo.toml ]; then cargo audit; else echo "No Cargo project yet — run cargo init."; fi'
 
 # generate a CycloneDX SBOM of the crate dependency tree (#574). release.yml
 # attaches this (<crate>.cdx.json) to GitHub Releases.
 # requires cargo-cyclonedx: cargo install cargo-cyclonedx
+[doc("generate a CycloneDX SBOM of the crate dependency tree (#574)")]
 sbom:
     sh -c 'if [ -f Cargo.toml ]; then cargo cyclonedx --format json --spec-version 1.5; else echo "No Cargo project yet — run cargo init."; fi'
 
@@ -390,6 +429,7 @@ sbom:
 # ALSO check advisories, subsuming `cargo audit` (#568); we keep `cargo audit`
 # as the dedicated CVE gate for now — run `cargo deny check` (all) to consolidate.
 # requires cargo-deny: cargo install cargo-deny
+[doc("dependency license compliance scan (#579)")]
 license:
     sh -c 'if [ -f Cargo.toml ]; then cargo deny check licenses; else echo "No Cargo project yet — run cargo init."; fi'
 
@@ -398,6 +438,7 @@ license:
 # `cargo test`. Pattern/tooling, NOT a blocking gate: CI runs this in the nightly
 # `fuzz` job, never on a PR (#727). proptest draws fresh seeds each run, so the
 # nightly job explores inputs a per-PR run would only repeat.
+[doc("property-based tests with proptest (#580)")]
 fuzz:
     sh -c 'if [ -f Cargo.toml ]; then cargo test; else echo "No Cargo project yet — run cargo init."; fi'
 
@@ -410,10 +451,12 @@ ci: lint typecheck test-cov audit
 
 # fast local gate for the pre-push hook: lint + parallel tests (CI is the full
 # backstop, so pre-push stays fast and doesn't re-run typecheck/coverage/audit)
+[doc("fast local gate for the pre-push hook")]
 fast-ci: lint test
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+[doc("route CI to a self-hosted runner when Actions minutes run out (PI-666)")]
 ci-local-on:
     gh variable set CI_RUNS_ON --body self-hosted
 
@@ -429,6 +472,7 @@ up:
 
 # build the container image only (named `image` so it never collides with a
 # language `build` recipe in a rust/go/node+service scaffold — 2026-07 review)
+[doc("build the container image only")]
 image:
     docker compose build
 
@@ -438,6 +482,7 @@ down:
 
 # lint the Dockerfile (the same hadolint check CI runs — #578).
 # install once: https://github.com/hadolint/hadolint#install
+[doc("lint the Dockerfile (the same hadolint check CI runs — #578).")]
 lint-docker:
     hadolint Dockerfile
 {{/if delivery_service}}

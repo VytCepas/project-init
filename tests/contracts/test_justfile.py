@@ -7,7 +7,10 @@ get no justfile at all.
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -17,6 +20,39 @@ from tests.helpers import fallback_preset, fallback_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _RECIPES = ("setup", "lint", "format", "test", "docs", "ci", "scan")
+
+_RECIPE_RE = re.compile(r"^(?:\{\{[^}]*\}\})*([a-zA-Z_][a-zA-Z0-9_-]*):(?:\s|$)")
+
+
+def _recipes_missing_doc(justfile_text: str) -> list[str]:
+    """Recipes whose comment block is multi-line but that carry no `[doc(...)]`.
+
+    `just --list` shows only the comment line *immediately* above a recipe, so a
+    multi-line rationale block (summary first) surfaces its trailing fragment as
+    the description (#780). The fix is an explicit `[doc()]` attribute; this finds
+    any recipe that would regress to the fragment behaviour.
+    """
+    lines = justfile_text.split("\n")
+    offenders = []
+    for i, line in enumerate(lines):
+        m = _RECIPE_RE.match(line)
+        if not m:
+            continue
+        j = i - 1
+        has_doc = False
+        comment_lines = 0
+        while j >= 0:
+            stripped = lines[j].lstrip()
+            if stripped.startswith("[doc("):
+                has_doc = True
+            elif stripped.startswith("#") and "{{" not in lines[j]:
+                comment_lines += 1
+            else:
+                break
+            j -= 1
+        if comment_lines >= 2 and not has_doc:
+            offenders.append(m.group(1))
+    return offenders
 
 
 # Mirrors _LANGUAGE_COMMANDS in __main__.py: empty commands for language=none.
@@ -325,3 +361,44 @@ class TestDogfoodJustfile:
             assert re.search(rf"^{recipe}:", text, re.MULTILINE), f"{recipe} missing"
         assert "uv run ruff check ." in text
         assert "uv run pytest" in text
+
+
+class TestListDescriptions:
+    """PI-780: `just --list` must show a complete description per recipe.
+
+    `just` uses only the comment line immediately above a recipe, so a
+    multi-line rationale block (summary first) leaked its trailing fragment —
+    e.g. `lint  # writes. Without this, an unformatted file merged green`. Each
+    such recipe now carries an explicit `[doc(...)]` summary.
+    """
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_scaffolded_multiline_recipes_carry_doc(self, tmp_path: Path, language: str):
+        target = _scaffold_language(tmp_path / language, language)
+        offenders = _recipes_missing_doc((target / "justfile").read_text())
+        assert not offenders, (
+            f"{language}: recipes with a multi-line comment but no [doc()] — "
+            f"`just --list` will show a fragment for: {offenders}"
+        )
+
+    def test_repo_justfile_recipes_carry_doc(self):
+        """The repo dogfoods the scaffold — its own justfile must be clean too."""
+        offenders = _recipes_missing_doc((_REPO_ROOT / "justfile").read_text())
+        assert not offenders, f"repo justfile recipes missing [doc()]: {offenders}"
+
+    @pytest.mark.skipif(shutil.which("just") is None, reason="just not installed")
+    def test_just_list_shows_summaries_not_fragments(self, tmp_path: Path):
+        """Behavioural proof: run the real `just --list` and confirm the fixed
+        recipes show their summary, not the old trailing-comment fragment."""
+        target = _scaffold_language(tmp_path / "py", "python")
+        env = {**os.environ}
+        env.pop("XDG_RUNTIME_DIR", None)  # unrelated `just` breakage locally
+        out = subprocess.run(
+            ["just", "--list"], cwd=target, capture_output=True, text=True, check=False, env=env
+        ).stdout
+        rows = dict(re.findall(r"^\s+([a-z][a-z0-9-]*)\s+#\s*(.*)$", out, re.MULTILINE))
+        assert rows.get("lint", "").startswith("lint project code"), rows.get("lint")
+        assert rows.get("setup", "").startswith("install/sync dev dependencies"), rows.get("setup")
+        # The old bug surfaced these fragments as the description.
+        assert "merged green" not in rows.get("lint", "")
+        assert "lockfile" not in rows.get("audit", "")
