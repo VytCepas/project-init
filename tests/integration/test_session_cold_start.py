@@ -21,9 +21,7 @@ _STAMP = ".agents/.session_setup_stamp"
 def _scaffold_python(target: Path) -> Path:
     scaffold(target, fallback_preset(), fallback_variables(), strict=True)
     # A scaffolded *user* project has its own dependency manifest.
-    (target / "pyproject.toml").write_text(
-        '[project]\nname = "fixture"\nversion = "0"\n'
-    )
+    (target / "pyproject.toml").write_text('[project]\nname = "fixture"\nversion = "0"\n')
     return target
 
 
@@ -84,9 +82,7 @@ class TestColdAndWarmStart:
         bin_dir = _make_shim_bin(tmp_path, target)
         assert _run_hook(target, bin_dir).returncode == 0
 
-        (target / "pyproject.toml").write_text(
-            '[project]\nname = "fixture"\nversion = "1"\n'
-        )
+        (target / "pyproject.toml").write_text('[project]\nname = "fixture"\nversion = "1"\n')
         assert _run_hook(target, bin_dir).returncode == 0
         calls = (tmp_path / "just-calls.log").read_text().splitlines()
         assert calls == ["setup", "setup"], "changed manifest must re-bootstrap"
@@ -112,8 +108,12 @@ class TestColdAndWarmStart:
             target,
             fallback_preset(),
             fallback_variables(
-                language="none", python="", justfile="",
-                lint_command="", format_command="", test_command="",
+                language="none",
+                python="",
+                justfile="",
+                lint_command="",
+                format_command="",
+                test_command="",
             ),
             strict=True,
         )
@@ -129,9 +129,7 @@ class TestColdAndWarmStart:
         target = _scaffold_python(tmp_path / "p")
         bin_dir = _make_shim_bin(tmp_path, target)
         (bin_dir / "just").write_text(
-            "#!/bin/bash\n"
-            'if [ "$1" = "--show" ]; then exit 0; fi\n'
-            "exit 1\n"
+            '#!/bin/bash\nif [ "$1" = "--show" ]; then exit 0; fi\nexit 1\n'
         )
 
         result = _run_hook(target, bin_dir)

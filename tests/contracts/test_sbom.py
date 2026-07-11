@@ -22,7 +22,9 @@ def _scaffold(target: Path, **overrides: str) -> Path:
 
 def _library(target: Path, language: str) -> Path:
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
-    return _scaffold(target, delivery="library", delivery_library="true", language=language, **flags)
+    return _scaffold(
+        target, delivery="library", delivery_library="true", language=language, **flags
+    )
 
 
 def _release(target: Path) -> str:
@@ -77,8 +79,12 @@ class TestSbomRecipe:
         ],
     )
     def test_sbom_recipe_present(self, tmp_path: Path, language: str, needle: str):
-        flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
-        justfile = (_scaffold(tmp_path / language, language=language, **flags) / "justfile").read_text()
+        flags = {
+            lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")
+        }
+        justfile = (
+            _scaffold(tmp_path / language, language=language, **flags) / "justfile"
+        ).read_text()
         assert "sbom:" in justfile
         assert needle in justfile
 
@@ -94,7 +100,9 @@ class TestSbomDocumented:
         [("python", "python.md"), ("node", "node.md"), ("go", "go.md"), ("rust", "rust.md")],
     )
     def test_rules_mention_sbom(self, tmp_path: Path, language: str, rules_file: str):
-        flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
+        flags = {
+            lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")
+        }
         target = _scaffold(tmp_path / language, language=language, **flags)
         rules = (target / ".agents" / "rules" / rules_file).read_text()
         assert "sbom" in rules.lower() or "cyclonedx" in rules.lower()

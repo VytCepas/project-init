@@ -31,9 +31,15 @@ def test_render_presets_plain_lists_every_preset(capsys) -> None:
     """Off a TTY the table degrades to a plain numbered list of all presets."""
     presets = [
         {"name": "core", "description": "no memory", "vars": {"memory_stack": "none"}},
-        {"name": "obsidian-only", "description": "vault only", "vars": {"memory_stack": "obsidian-only"}},
+        {
+            "name": "obsidian-only",
+            "description": "vault only",
+            "vars": {"memory_stack": "obsidian-only"},
+        },
     ]
-    pc.render_presets(presets, default_idx=2, memory_by_name={"core": "none", "obsidian-only": "obsidian-only"})
+    pc.render_presets(
+        presets, default_idx=2, memory_by_name={"core": "none", "obsidian-only": "obsidian-only"}
+    )
     out = capsys.readouterr().out
     assert "Available presets" in out
     assert "core" in out and "obsidian-only" in out
@@ -70,7 +76,9 @@ def test_render_presets_shows_resolved_inherited_memory(monkeypatch, capsys) -> 
 
 def test_render_presets_handles_missing_memory(capsys) -> None:
     """A preset absent from the resolved map shows a dash, not a KeyError."""
-    pc.render_presets([{"name": "x", "description": "d", "vars": {}}], default_idx=1, memory_by_name={})
+    pc.render_presets(
+        [{"name": "x", "description": "d", "vars": {}}], default_idx=1, memory_by_name={}
+    )
     assert "x" in capsys.readouterr().out
 
 

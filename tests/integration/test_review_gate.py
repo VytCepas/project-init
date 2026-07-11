@@ -145,9 +145,7 @@ def test_unresolved_comments_open_a_review_cycle_instead_of_merging(
     assert "Merged" not in result.stdout
 
 
-def test_reviewed_with_no_open_comments_merges_without_override(
-    tmp_target: Path, tmp_path: Path
-):
+def test_reviewed_with_no_open_comments_merges_without_override(tmp_target: Path, tmp_path: Path):
     result = _run_monitor(tmp_target, tmp_path, reviews="1", unresolved="0")
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Merged PR #1" in result.stdout

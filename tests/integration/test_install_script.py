@@ -16,9 +16,7 @@ _INSTALL_SH = _REPO_ROOT / "install.sh"
 
 
 def test_install_sh_syntax_is_valid():
-    result = subprocess.run(
-        ["bash", "-n", str(_INSTALL_SH)], capture_output=True, text=True
-    )
+    result = subprocess.run(["bash", "-n", str(_INSTALL_SH)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
 
@@ -35,9 +33,7 @@ def test_install_sh_writes_slash_command_with_stubs(tmp_path: Path):
     (bindir / "uv").chmod(0o755)
     git_stub = bindir / "git"
     git_stub.write_text(
-        "#!/usr/bin/env bash\n"
-        'if [ "$1" = clone ]; then mkdir -p "${@: -1}/.git"; fi\n'
-        "exit 0\n"
+        '#!/usr/bin/env bash\nif [ "$1" = clone ]; then mkdir -p "${@: -1}/.git"; fi\nexit 0\n'
     )
     git_stub.chmod(0o755)
 
@@ -47,9 +43,7 @@ def test_install_sh_writes_slash_command_with_stubs(tmp_path: Path):
         "PROJECT_INIT_REF": "main",  # short-circuits the network ref resolution
         "PROJECT_INIT_HOME": str(tmp_path / "install"),
     }
-    result = subprocess.run(
-        ["bash", str(_INSTALL_SH)], capture_output=True, text=True, env=env
-    )
+    result = subprocess.run(["bash", str(_INSTALL_SH)], capture_output=True, text=True, env=env)
     assert result.returncode == 0, result.stdout + result.stderr
     # The clone branch must have run (not the "update existing clone" path).
     assert (tmp_path / "install" / ".git").is_dir(), "install.sh must clone into INSTALL_DIR"

@@ -74,9 +74,11 @@ class TestTemplateIdentifiers:
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
         preset = fallback_preset()
-        scaffold(tmp_target, preset, fallback_variables(
-            project_init_url="https://github.com/example/project-init"
-        ))
+        scaffold(
+            tmp_target,
+            preset,
+            fallback_variables(project_init_url="https://github.com/example/project-init"),
+        )
 
     def test_claude_md_redirects_to_agents(self):
         """PI-136: AGENTS.md is canonical; CLAUDE.md is the redirect."""
@@ -157,9 +159,7 @@ class TestScaffoldGitHubFiles:
         # error-suppression substring anywhere in the file (brittle to harmless
         # whitespace/formatting changes): locate the multi-line `gh api graphql`
         # command substitution and capture it through the line that closes it.
-        starts = [
-            i for i, line in enumerate(lines) if line.lstrip().startswith("PROJECT_DATA=")
-        ]
+        starts = [i for i, line in enumerate(lines) if line.lstrip().startswith("PROJECT_DATA=")]
         assert starts, "board-automation.yml must assign PROJECT_DATA from a gh query"
         start = starts[0]
         ends = [i for i, line in enumerate(lines[start:], start) if "|| true" in line]
@@ -438,9 +438,7 @@ class TestPythonMatrixResolution:
         """Pull the heredoc'd Python between `<<'PY'` and its `PY` terminator."""
         lines = ci_yaml.splitlines()
         start = next(i for i, ln in enumerate(lines) if ln.rstrip().endswith("<<'PY'"))
-        end = next(
-            i for i, ln in enumerate(lines[start + 1 :], start + 1) if ln.strip() == "PY"
-        )
+        end = next(i for i, ln in enumerate(lines[start + 1 :], start + 1) if ln.strip() == "PY")
         return textwrap.dedent("\n".join(lines[start + 1 : end]))
 
     def _resolve(self, requires_python, tmp_path, monkeypatch) -> list[str]:
@@ -457,9 +455,7 @@ class TestPythonMatrixResolution:
         monkeypatch.chdir(proj)
         monkeypatch.setenv("GITHUB_OUTPUT", str(out))
         exec(compile(self.resolver, "<ci-resolver>", "exec"), {})  # noqa: S102
-        line = next(
-            ln for ln in out.read_text().splitlines() if ln.startswith("versions=")
-        )
+        line = next(ln for ln in out.read_text().splitlines() if ln.startswith("versions="))
         return json.loads(line.split("=", 1)[1])
 
     def test_floor_excludes_lower_versions(self, tmp_path, monkeypatch):

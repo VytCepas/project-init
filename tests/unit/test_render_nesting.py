@@ -58,9 +58,7 @@ class TestNestedConditionals:
 
         fake_dir = tmp_path / "mismatch-layer"
         (fake_dir / "dot_agents").mkdir(parents=True)
-        (fake_dir / "dot_agents" / "typo.md.tmpl").write_text(
-            "{{#if python}}body{{/if node}}\n"
-        )
+        (fake_dir / "dot_agents" / "typo.md.tmpl").write_text("{{#if python}}body{{/if node}}\n")
         original = sm._TEMPLATES_DIR
         sm._TEMPLATES_DIR = fake_dir.parent
         try:

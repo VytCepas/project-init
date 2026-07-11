@@ -139,7 +139,9 @@ class TestOldRecordUpgrade:
         assert m
         recorded = json.loads(m.group(2))
         recorded.pop("memory", None)
-        text = text[: m.start()] + m.group(1) + json.dumps(recorded, sort_keys=True) + text[m.end() :]
+        text = (
+            text[: m.start()] + m.group(1) + json.dumps(recorded, sort_keys=True) + text[m.end() :]
+        )
         config.write_text(text)
 
         capsys.readouterr()

@@ -39,9 +39,7 @@ class TestScaffoldGraphify:
         assert "setup_graphify.sh" in rule
 
     def test_guide_documents_workflow(self):
-        guide = (
-            self.target / ".agents" / "docs" / "guides" / "using-graphify.md"
-        ).read_text()
+        guide = (self.target / ".agents" / "docs" / "guides" / "using-graphify.md").read_text()
         assert "--obsidian" in guide
         assert "setup_graphify.sh" in guide
 

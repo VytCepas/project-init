@@ -200,9 +200,7 @@ def test_wizard_drops_python_version_when_the_language_is_not_python(monkeypatch
     assert "--python-version 3.13 ignored" in capsys.readouterr().out
 
 
-def test_wizard_does_not_ask_when_pyproject_already_declares_a_floor(
-    monkeypatch, tmp_path: Path
-):
+def test_wizard_does_not_ask_when_pyproject_already_declares_a_floor(monkeypatch, tmp_path: Path):
     """requires-python is the source of truth; asking would invite a contradiction."""
     (tmp_path / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.12"\n')
     inputs, seen = _wizard(monkeypatch, ["proj", "desc", "python", "", "none"], target=tmp_path)

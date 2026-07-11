@@ -11,9 +11,7 @@ from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_SETUP_GITHUB = (
-    _REPO_ROOT / "templates/lifecycle/dot_agents/scripts/setup_github.sh"
-)
+_SETUP_GITHUB = _REPO_ROOT / "templates/lifecycle/dot_agents/scripts/setup_github.sh"
 
 
 def _scaffold(target: Path, **overrides: str) -> Path:
@@ -41,9 +39,7 @@ class TestGovernanceFiles:
         content = (target / ".github" / "CODEOWNERS").read_text()
         assert "@your-org/backend" in content  # commented examples survive
         # No uncommented ownership line without an owner.
-        active = [
-            ln for ln in content.splitlines() if ln.strip() and not ln.startswith("#")
-        ]
+        active = [ln for ln in content.splitlines() if ln.strip() and not ln.startswith("#")]
         assert active == []
 
     def test_contributing_references_command_surface(self, tmp_path: Path):
@@ -56,8 +52,13 @@ class TestGovernanceFiles:
 
     def test_contributing_language_none_has_no_just(self, tmp_path: Path):
         target = _scaffold(
-            tmp_path / "p", language="none", python="", justfile="",
-            lint_command="", format_command="", test_command="",
+            tmp_path / "p",
+            language="none",
+            python="",
+            justfile="",
+            lint_command="",
+            format_command="",
+            test_command="",
         )
         content = (target / "CONTRIBUTING.md").read_text()
         assert "just --list" not in content

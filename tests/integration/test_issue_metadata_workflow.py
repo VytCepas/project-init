@@ -20,9 +20,7 @@ class TestIssueMetadataScaffold:
         scaffold(tmp_target, preset, fallback_variables())
 
     def test_issue_template_config_disables_blank_issues(self):
-        content = (
-            self.target / ".github" / "ISSUE_TEMPLATE" / "config.yml"
-        ).read_text()
+        content = (self.target / ".github" / "ISSUE_TEMPLATE" / "config.yml").read_text()
         assert "blank_issues_enabled: false" in content
 
     def test_issue_forms_have_shared_metadata_fields(self):
@@ -53,15 +51,13 @@ class TestIssueMetadataScaffold:
         assert "labeled, unlabeled" in content
         assert "Agent ready" in content
         assert "Confidence" in content
-        assert "gh label create \"status:needs-info\"" in content
+        assert 'gh label create "status:needs-info"' in content
 
     def test_issue_validation_auto_ensures_type_label_from_body(self):
         """A missing type label is derived from the body '- Type:' (or '### Type'),
         created if absent, and applied — so MCP/API-created issues (which can't set
         Project fields or create labels) still get a valid type label."""
-        content = (
-            self.target / ".github" / "workflows" / "issue-validation.yml"
-        ).read_text()
+        content = (self.target / ".github" / "workflows" / "issue-validation.yml").read_text()
         assert "map_type_label" in content
         assert "parse_type_from_body" in content
         # Derives from either body shape.
@@ -75,9 +71,7 @@ class TestIssueMetadataScaffold:
         assert '--add-label "$label"' in content
 
     def test_board_automation_syncs_metadata_fields(self):
-        content = (
-            self.target / ".github" / "workflows" / "board-automation.yml"
-        ).read_text()
+        content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
         assert "PROJECT_TOKEN" in content
         assert "addProjectV2ItemById" in content
         assert "updateProjectV2ItemFieldValue" in content
@@ -97,9 +91,7 @@ class TestIssueMetadataScaffold:
         """Board fields populate whether the body uses issue-form '### Heading'
         blocks or create_issue.sh / MCP-API '- Field: value' bullets. A single
         dual-format parse_body_field handles all fields (incl. Area)."""
-        content = (
-            self.target / ".github" / "workflows" / "board-automation.yml"
-        ).read_text()
+        content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
         # Bullet form: "- Field: value" (case-insensitive sed).
         assert "-[[:space:]]*${heading}:" in content
         # Heading form: "### Field".
@@ -268,9 +260,7 @@ class TestCreateIssueSkill:
         assert "create_issue" in content
 
     def test_start_task_delegates_issue_creation_to_skill(self):
-        content = (
-            self.target / ".agents" / "skills" / "start_task" / "SKILL.md"
-        ).read_text()
+        content = (self.target / ".agents" / "skills" / "start_task" / "SKILL.md").read_text()
         assert "`create_issue` skill" in content, "must delegate to the create_issue skill"
 
     def test_nojira_pr_script_scaffolded(self):
@@ -376,9 +366,7 @@ class TestGitHubWorkflowHooks:
     def test_settings_wire_workflow_hooks(self):
         data = json.loads((self.target / ".agents" / "settings.json").read_text())
         pre_commands = [
-            hook["command"]
-            for group in data["hooks"]["PreToolUse"]
-            for hook in group["hooks"]
+            hook["command"] for group in data["hooks"]["PreToolUse"] for hook in group["hooks"]
         ]
         assert any("github_command_guard.sh" in command for command in pre_commands)
         assert "UserPromptSubmit" in data["hooks"]
@@ -395,9 +383,7 @@ class TestGitHubWorkflowHooks:
         assert "--no-review" in content
 
     def test_github_workflow_skill_documents_nonzero_monitor_exit(self):
-        content = (
-            self.target / ".agents" / "skills" / "github_workflow" / "SKILL.md"
-        ).read_text()
+        content = (self.target / ".agents" / "skills" / "github_workflow" / "SKILL.md").read_text()
         assert "exits **1** for CI or merge failures" in content
         assert "Do not report a PR as merged unless the script exits 0" in content
 

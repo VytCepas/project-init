@@ -38,9 +38,7 @@ esac
 class TestLocalCiSkill:
     def test_present_with_the_method(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        content = (
-            tmp_target / ".agents" / "skills" / "local_ci" / "SKILL.md"
-        ).read_text()
+        content = (tmp_target / ".agents" / "skills" / "local_ci" / "SKILL.md").read_text()
         assert "name: local_ci" in content
         assert "user-invocable: true" in content
         # Diagnosis before action.

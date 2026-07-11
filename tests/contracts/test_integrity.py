@@ -26,6 +26,7 @@ class TestScaffoldIntegrity:
         """{{var}} or {{#if var}} surviving means a template wasn't named .tmpl
         or a variable wasn't wired up in __main__.py."""
         import re
+
         # Match {{...}} but not ${{...}} (GitHub Actions expression syntax)
         placeholder_re = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
         offenders: list[str] = []
@@ -45,9 +46,8 @@ class TestScaffoldIntegrity:
                     continue
                 for match in placeholder_re.finditer(text):
                     offenders.append(f"{f.relative_to(target)}: {match.group()}")
-        assert not offenders, (
-            "Unrendered placeholders survived scaffolding:\n  "
-            + "\n  ".join(offenders)
+        assert not offenders, "Unrendered placeholders survived scaffolding:\n  " + "\n  ".join(
+            offenders
         )
 
 
@@ -57,6 +57,7 @@ class TestStrictMode:
     def test_strict_raises_on_missing_variable(self, tmp_path: Path):
         """If a variable is missing from the dict, strict mode must raise."""
         from project_init.scaffold import TemplateRenderError
+
         target = tmp_path / "p"
         variables = make_variables()
         # Inject a stale variable into a template by hand: write a fake .tmpl
@@ -64,11 +65,10 @@ class TestStrictMode:
         # We achieve this via a custom template layer.
         fake_dir = tmp_path / "fake-layer"
         (fake_dir / "dot_agents").mkdir(parents=True)
-        (fake_dir / "dot_agents" / "stale.md.tmpl").write_text(
-            "value: {{undefined_variable_xyz}}"
-        )
+        (fake_dir / "dot_agents" / "stale.md.tmpl").write_text("value: {{undefined_variable_xyz}}")
         # Patch the templates dir for this test only.
         import project_init.scaffold as sm
+
         original = sm._TEMPLATES_DIR
         sm._TEMPLATES_DIR = fake_dir.parent
         try:
@@ -86,10 +86,9 @@ class TestStrictMode:
         target = tmp_path / "p"
         fake_dir = tmp_path / "data-layer"
         (fake_dir / "dot_agents").mkdir(parents=True)
-        (fake_dir / "dot_agents" / "about.md.tmpl").write_text(
-            "desc: {{description}}\n"
-        )
+        (fake_dir / "dot_agents" / "about.md.tmpl").write_text("desc: {{description}}\n")
         import project_init.scaffold as sm
+
         original = sm._TEMPLATES_DIR
         sm._TEMPLATES_DIR = fake_dir.parent
         try:
@@ -103,15 +102,15 @@ class TestStrictMode:
     def test_strict_target_untouched_on_validation_error(self, tmp_path: Path):
         """PI-21: strict mode must leave target untouched on validation error."""
         from project_init.scaffold import TemplateRenderError
+
         target = tmp_path / "p"
         variables = make_variables()
         # Create a broken layer that will fail strict validation.
         fake_dir = tmp_path / "broken-layer"
         (fake_dir / "dot_agents").mkdir(parents=True)
-        (fake_dir / "dot_agents" / "bad.md.tmpl").write_text(
-            "# Config\nvalue: {{undefined_var}}"
-        )
+        (fake_dir / "dot_agents" / "bad.md.tmpl").write_text("# Config\nvalue: {{undefined_var}}")
         import project_init.scaffold as sm
+
         original = sm._TEMPLATES_DIR
         sm._TEMPLATES_DIR = fake_dir.parent
         try:
@@ -164,22 +163,28 @@ class TestStrictMode:
         # Shipped templates pass strict mode (verified by other test), so just
         # assert the happy path: --strict succeeds on a known-good preset.
         from project_init.__main__ import main
+
         target = tmp_path / "p"
-        rc = main([
-            str(target), "--non-interactive",
-            "--preset", "obsidian-only",
-            "--name", "strict-test",
-            "--description", "test",
-            "--language", "python",
-            "--strict",
-        ])
+        rc = main(
+            [
+                str(target),
+                "--non-interactive",
+                "--preset",
+                "obsidian-only",
+                "--name",
+                "strict-test",
+                "--description",
+                "test",
+                "--language",
+                "python",
+                "--strict",
+            ]
+        )
         assert rc == 0
 
     def test_strict_mode_docs_describe_validated_merge(self):
         readme = Path("README.md").read_text(encoding="utf-8")
-        template_system = Path("docs/development/template-system.md").read_text(
-            encoding="utf-8"
-        )
+        template_system = Path("docs/development/template-system.md").read_text(encoding="utf-8")
 
         assert "validated scaffold files are merged into the target" in readme
         assert "strict mode is not a whole-directory replacement" in readme.lower()

@@ -82,7 +82,9 @@ def aggregate(records: list[RunRecord]) -> dict[str, Summary]:
             wall_clock_p99=lat["p99"],
             pass_rate=_rate(scored),  # _rate returns None on empty
             first_try_rate=_rate(first_tries),
-            mean_rework=_mean([float(r.rework_cycles) for r in recs if r.rework_cycles is not None]),
+            mean_rework=_mean(
+                [float(r.rework_cycles) for r in recs if r.rework_cycles is not None]
+            ),
             mean_tool_calls=_mean([float(r.tool_calls) for r in recs]),
         )
     return out
@@ -188,10 +190,14 @@ def fixed_overhead(target_dir: Path) -> list[tuple[str, int]]:
     for name in _OVERHEAD_CANDIDATES:
         path = target_dir / name
         if path.is_file():
-            rows.append((name, len(path.read_text(encoding="utf-8", errors="replace")) // _CHARS_PER_TOKEN))
+            rows.append(
+                (name, len(path.read_text(encoding="utf-8", errors="replace")) // _CHARS_PER_TOKEN)
+            )
     for skill in sorted((target_dir / ".agents" / "skills").glob("*/SKILL.md")):
         rel = skill.relative_to(target_dir)
-        rows.append((str(rel), len(skill.read_text(encoding="utf-8", errors="replace")) // _CHARS_PER_TOKEN))
+        rows.append(
+            (str(rel), len(skill.read_text(encoding="utf-8", errors="replace")) // _CHARS_PER_TOKEN)
+        )
     rows.sort(key=lambda r: -r[1])
     return rows
 
@@ -207,7 +213,18 @@ def _render_comparison(console, order: list[Summary], efficient: set[str]) -> No
     from rich.table import Table
 
     table = Table(title="Cost–benefit: bare vs scaffolded")
-    for col in ("Target", "n", "$", "Tokens", "P50 s", "Pass%", "First-try%", "Rework", "Tools", ""):
+    for col in (
+        "Target",
+        "n",
+        "$",
+        "Tokens",
+        "P50 s",
+        "Pass%",
+        "First-try%",
+        "Rework",
+        "Tools",
+        "",
+    ):
         table.add_column(col)
     for s in order:
         table.add_row(

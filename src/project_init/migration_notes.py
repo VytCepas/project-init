@@ -78,7 +78,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "no longer resets a hand-set `memory.rag_endpoint`, preset control "
             "vars (governance/lifecycle/memory_stack) no longer leak into the "
             "template gates (so `remove governance` on a governed-preset project "
-            "now converges, and a preset's `lifecycle = \"none\"` renders "
+            'now converges, and a preset\'s `lifecycle = "none"` renders '
             "correctly), and the wizard honors `--agents`, re-prompts on a "
             "mistyped language/license instead of silently coercing to `none`, "
             "and still offers the browser concern when `--mcps` is passed. "

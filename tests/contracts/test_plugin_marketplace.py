@@ -37,9 +37,7 @@ class TestMarketplaceManifest:
 
 class TestPluginManifest:
     def test_plugin_json_valid(self):
-        manifest = json.loads(
-            (_PLUGIN_ROOT / ".agents-plugin" / "plugin.json").read_text()
-        )
+        manifest = json.loads((_PLUGIN_ROOT / ".agents-plugin" / "plugin.json").read_text())
         assert manifest["name"] == "project-init-workflow"
         assert re.match(r"^\d+\.\d+\.\d+$", manifest["version"])
         assert manifest["hooks"] == "./hooks/hooks.json"
@@ -68,9 +66,7 @@ class TestPluginManifest:
         lifecycle plugin supplies PreToolUse(guard) + UserPromptSubmit)."""
         plugin_events = set(
             json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())["hooks"]
-        ) | set(
-            json.loads((_LIFECYCLE_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())["hooks"]
-        )
+        ) | set(json.loads((_LIFECYCLE_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())["hooks"])
         template_settings = (_TEMPLATE_CLAUDE / "settings.json.tmpl").read_text()
         template_events = set(
             re.findall(

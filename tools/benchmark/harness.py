@@ -115,7 +115,10 @@ _AUTH_ENV_VARS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")
 
 def auth_available(config_dir: Path) -> bool:
     """True if the run can authenticate: an API key / OAuth token in env, or seeded creds."""
-    return any(os.environ.get(v) for v in _AUTH_ENV_VARS) or (config_dir / ".credentials.json").is_file()
+    return (
+        any(os.environ.get(v) for v in _AUTH_ENV_VARS)
+        or (config_dir / ".credentials.json").is_file()
+    )
 
 
 # --- target setup (testable — no agent) -----------------------------------
@@ -440,9 +443,13 @@ def main(argv: list[str] | None = None) -> int:
         help="scaffolded preset to compare against bare (repeatable)",
     )
     run.add_argument("--model", default=_DEFAULT_MODEL)
-    run.add_argument("--repeats", type=int, default=5, help="repeats per (task,target) for variance")
+    run.add_argument(
+        "--repeats", type=int, default=5, help="repeats per (task,target) for variance"
+    )
     run.add_argument("--out", help="output JSONL (default: tools/benchmark/results/records.jsonl)")
-    run.add_argument("--prices", help="price table JSON (default: tools/benchmark/model_prices.json)")
+    run.add_argument(
+        "--prices", help="price table JSON (default: tools/benchmark/model_prices.json)"
+    )
     run.set_defaults(func=_cmd_run)
 
     rec = sub.add_parser("record-from", help="normalize an existing transcript (no agent)")
@@ -454,7 +461,9 @@ def main(argv: list[str] | None = None) -> int:
     rec.add_argument("--model", default="", help="override; default = transcript's model")
     rec.add_argument("--run-index", type=int, default=0, dest="run_index")
     rec.add_argument("--out", help="output JSONL (default: tools/benchmark/results/records.jsonl)")
-    rec.add_argument("--prices", help="price table JSON (default: tools/benchmark/model_prices.json)")
+    rec.add_argument(
+        "--prices", help="price table JSON (default: tools/benchmark/model_prices.json)"
+    )
     rec.set_defaults(func=_cmd_record_from)
 
     args = parser.parse_args(argv)

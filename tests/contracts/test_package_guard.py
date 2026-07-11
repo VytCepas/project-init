@@ -215,9 +215,7 @@ class TestWiring:
         scaffold(tmp_target, fallback_preset(), fallback_variables(), strict=True)
         settings = json.loads((tmp_target / ".agents" / "settings.json").read_text())
         commands = [
-            h["command"]
-            for entry in settings["hooks"]["PreToolUse"]
-            for h in entry["hooks"]
+            h["command"] for entry in settings["hooks"]["PreToolUse"] for h in entry["hooks"]
         ]
         assert any("package_guard.py" in c for c in commands)
         assert (tmp_target / ".agents" / "hooks" / "package_guard.py").is_file()
@@ -227,9 +225,7 @@ class TestWiring:
             (_REPO_ROOT / "plugins/project-init-workflow/hooks/hooks.json").read_text()
         )
         commands = [
-            h["command"]
-            for entry in plugin_hooks["hooks"]["PreToolUse"]
-            for h in entry["hooks"]
+            h["command"] for entry in plugin_hooks["hooks"]["PreToolUse"] for h in entry["hooks"]
         ]
         assert any("package_guard.py" in c for c in commands)
         assert (_REPO_ROOT / "plugins/project-init-workflow/hooks/package_guard.py").is_file()

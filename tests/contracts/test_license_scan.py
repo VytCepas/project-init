@@ -20,7 +20,10 @@ from tests.workflow import job, load_workflow, needs, run_commands, steps
 def _scaffold(target: Path, language: str = "python", **overrides: str) -> Path:
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
     scaffold(
-        target, load_preset("obsidian-only"), make_variables(language=language, **flags, **overrides), strict=True
+        target,
+        load_preset("obsidian-only"),
+        make_variables(language=language, **flags, **overrides),
+        strict=True,
     )
     return target
 
@@ -41,7 +44,9 @@ class TestLicenseScanJob:
 
     def test_non_blocking_not_in_ci_gate_needs(self, tmp_path: Path):
         wf = load_workflow(_scaffold(tmp_path / "p", "python"))
-        assert "license-scan" not in needs(wf, "ci-gate"), "license-scan must stay non-blocking initially"
+        assert "license-scan" not in needs(wf, "ci-gate"), (
+            "license-scan must stay non-blocking initially"
+        )
 
     @pytest.mark.parametrize(
         "language,tool",
@@ -98,7 +103,9 @@ class TestLicenseDocumented:
         [("python", "python.md"), ("node", "node.md"), ("go", "go.md"), ("rust", "rust.md")],
     )
     def test_rules_mention_license(self, tmp_path: Path, language: str, rules_file: str):
-        rules = (_scaffold(tmp_path / language, language) / ".agents" / "rules" / rules_file).read_text()
+        rules = (
+            _scaffold(tmp_path / language, language) / ".agents" / "rules" / rules_file
+        ).read_text()
         assert "license" in rules.lower()
 
 

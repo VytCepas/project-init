@@ -61,9 +61,7 @@ class TestRepoRenovateConfig:
         unpinned ref at author time.
         """
         config = json.loads((_REPO_ROOT / "renovate.json").read_text())
-        regex_managers = [
-            m for m in config["customManagers"] if m["customType"] == "regex"
-        ]
+        regex_managers = [m for m in config["customManagers"] if m["customType"] == "regex"]
         assert regex_managers, "regex custom manager for workflow templates missing"
         manager = regex_managers[0]
         assert manager["datasourceTemplate"] == "github-tags"

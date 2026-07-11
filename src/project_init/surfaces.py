@@ -38,9 +38,10 @@ def _guard_command(surface: str) -> str:
     then ``exec``s the guard so stdin (the tool-call JSON) is inherited.
     """
     return (
-        "sh -c 'cd \"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\" && "
+        'sh -c \'cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" && '
         f"exec .agents/hooks/_py.sh .agents/hooks/agent_guard_adapter.py {surface}'"
     )
+
 
 # --- canonical MCP rendering -------------------------------------------------
 
@@ -58,7 +59,9 @@ def mcp_server_specs(selected: list[dict[str, Any]]) -> dict[str, dict[str, Any]
     return out
 
 
-def render_mcp_json(servers: dict[str, dict[str, Any]], *, key: str, drop_type: bool = False) -> str:
+def render_mcp_json(
+    servers: dict[str, dict[str, Any]], *, key: str, drop_type: bool = False
+) -> str:
     """MCP config as JSON.
 
     ``key`` is the top-level wrapper: ``mcpServers`` (Claude root .mcp.json,
@@ -68,8 +71,7 @@ def render_mcp_json(servers: dict[str, dict[str, Any]], *, key: str, drop_type: 
     """
     if drop_type:
         servers = {
-            name: {k: v for k, v in spec.items() if k != "type"}
-            for name, spec in servers.items()
+            name: {k: v for k, v in spec.items() if k != "type"} for name, spec in servers.items()
         }
     return json.dumps({key: servers}, indent=2, sort_keys=True) + "\n"
 
@@ -139,9 +141,7 @@ def render_cursor_hooks() -> str:
     config = {
         "version": 1,
         "hooks": {
-            "beforeShellExecution": [
-                {"command": _guard_command("cursor"), "type": "command"}
-            ],
+            "beforeShellExecution": [{"command": _guard_command("cursor"), "type": "command"}],
         },
     }
     return json.dumps(config, indent=2, sort_keys=True) + "\n"
@@ -221,6 +221,7 @@ SURFACES: dict[str, dict[str, Any]] = {
         "mcp_render": ("json", "mcpServers", True),
     },
 }
+
 
 def render_mcp_for(kind_key: tuple[Any, ...], servers: dict[str, dict[str, Any]]) -> str:
     """Render MCP config for a ``(format, key[, drop_type])`` spec."""

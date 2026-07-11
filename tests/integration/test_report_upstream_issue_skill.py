@@ -20,13 +20,7 @@ class TestReportUpstreamIssueSkill:
         """--no-plugin copies the skill in as a real .agents/skills file, on by
         default (no opt-in flag), with the required frontmatter."""
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        skill = (
-            tmp_target
-            / ".agents"
-            / "skills"
-            / "report_upstream_issue"
-            / "SKILL.md"
-        )
+        skill = tmp_target / ".agents" / "skills" / "report_upstream_issue" / "SKILL.md"
         content = skill.read_text()
         assert "name: report_upstream_issue" in content
         assert "when_to_use:" in content
@@ -56,11 +50,7 @@ class TestReportUpstreamIssueSkill:
     def test_body_classifies_and_routes_upstream(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         content = (
-            tmp_target
-            / ".agents"
-            / "skills"
-            / "report_upstream_issue"
-            / "SKILL.md"
+            tmp_target / ".agents" / "skills" / "report_upstream_issue" / "SKILL.md"
         ).read_text()
         # Classification: project-level vs tooling/scaffolding.
         assert "Classify" in content

@@ -829,6 +829,7 @@ class TestTypecheckParity:
         assert 'find . -name "*.go"' in recipe
         assert "nothing to type-check" in recipe
 
+
 class TestTypeScriptSecurityGate:
     """PI-729: TS had no blocking security lint; semgrep was its only SAST, non-blocking.
 

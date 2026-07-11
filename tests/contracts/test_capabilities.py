@@ -40,9 +40,7 @@ def test_inventory_is_generated(tmp_path: Path):
 
 
 def test_options_reflect_choices(tmp_path: Path):
-    t = _scaffold(
-        tmp_path / "p", agents="claude,codex,cursor", installed_mcps="context7"
-    )
+    t = _scaffold(tmp_path / "p", agents="claude,codex,cursor", installed_mcps="context7")
     text = (t / _REL).read_text()
     assert "claude,codex,cursor" in text
     assert "| MCP servers | context7 |" in text
@@ -102,8 +100,12 @@ def test_mcp_section_empty_when_none(tmp_path: Path):
 def test_inventory_matches_canonical_render_no_drift(tmp_path: Path):
     """The written file equals render(variables) — single source of truth."""
     variables = make_variables(
-        plugin_mode="true", no_plugin="", codex="true", multi_agent="true",
-        agents="claude,codex", installed_mcps="context7",
+        plugin_mode="true",
+        no_plugin="",
+        codex="true",
+        multi_agent="true",
+        agents="claude,codex",
+        installed_mcps="context7",
     )
     t = _scaffold(tmp_path / "p", agents="claude,codex", installed_mcps="context7")
     assert (t / _REL).read_text() == capabilities.render(variables)

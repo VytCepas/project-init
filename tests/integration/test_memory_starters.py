@@ -298,9 +298,20 @@ class TestLintMemoryScript:
             ["git", "-C", str(self.target), "add", "-A"], capture_output=True, check=True
         )
         subprocess.run(
-            ["git", "-C", str(self.target), "-c", "user.email=t@t", "-c", "user.name=t",
-             "commit", "-qm", "seed"],
-            capture_output=True, check=True,
+            [
+                "git",
+                "-C",
+                str(self.target),
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "user.name=t",
+                "commit",
+                "-qm",
+                "seed",
+            ],
+            capture_output=True,
+            check=True,
         )
         script = self.target / ".agents" / "scripts" / "lint_memory.sh"
         result = subprocess.run(

@@ -78,9 +78,9 @@ class TestGeneratorOutput:
         src.mkdir()
         (src / "widget.py").write_text(
             '"""Widget module — does widget things."""\n\n'
-            "def public_fn():\n    \"\"\"Do a public thing.\"\"\"\n\n"
-            "def _private():\n    \"\"\"Hidden.\"\"\"\n\n"
-            "class Gadget:\n    \"\"\"A gadget.\"\"\"\n",
+            'def public_fn():\n    """Do a public thing."""\n\n'
+            'def _private():\n    """Hidden."""\n\n'
+            'class Gadget:\n    """A gadget."""\n',
             encoding="utf-8",
         )
         out = self._run(target, src)

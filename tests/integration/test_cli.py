@@ -334,7 +334,7 @@ class TestCLI:
             ]
         )
         assert rc == 0
-        assert 'Vy\'s tool' in (target / ".agents" / "config.yaml").read_text()
+        assert "Vy's tool" in (target / ".agents" / "config.yaml").read_text()
 
     def test_target_mkdir_oserror_reported_cleanly(self, tmp_path: Path, monkeypatch):
         """A mkdir OSError (e.g. PermissionError on a read-only parent) must surface

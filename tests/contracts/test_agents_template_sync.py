@@ -54,8 +54,11 @@ def test_committed_code_map_is_fresh(tmp_path: Path):
     committed = REPO_ROOT / ".agents" / "docs" / "CODE_MAP.md"
     assert committed.exists(), "run `just code-map` and commit .agents/docs/CODE_MAP.md"
     subprocess.run(
-        [sys.executable, str(REPO_ROOT / ".agents" / "scripts" / "gen_code_map.py"),
-         str(REPO_ROOT / "src")],
+        [
+            sys.executable,
+            str(REPO_ROOT / ".agents" / "scripts" / "gen_code_map.py"),
+            str(REPO_ROOT / "src"),
+        ],
         cwd=tmp_path,
         check=True,
         capture_output=True,

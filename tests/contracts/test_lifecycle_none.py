@@ -72,9 +72,12 @@ class TestLifecycleLayerDerivation:
 
     def test_lifecycle_precedes_agents(self):
         # base → fallback → lifecycle → lifecycle_fallback → agents.
-        assert overlay_layers(
-            "claude,codex", no_plugin=True, lifecycle=True
-        ) == ["fallback", "lifecycle", "lifecycle_fallback", "codex"]
+        assert overlay_layers("claude,codex", no_plugin=True, lifecycle=True) == [
+            "fallback",
+            "lifecycle",
+            "lifecycle_fallback",
+            "codex",
+        ]
 
 
 class TestVariableContract:
@@ -225,20 +228,36 @@ class TestLifecycleNoneScaffold:
         lifecycle-free scaffold didn't ship (Codex review, #482). Catches inline
         `code` references, not just markdown links."""
         names = [
-            "create_issue.sh", "start_issue.sh", "create_nojira_pr.sh", "promote_review.sh",
-            "monitor_pr.sh", "finish_pr.sh", "push_branch.sh", "setup_github.sh", "push_wiki.sh",
-            "dag_workflow.py", "board-automation", "issue-validation", "review-status",
-            "validate-pr", "project-init-upgrade",
-            "skills/create_issue", "skills/start_task", "skills/github_workflow",
-            "skills/request_review", "skills/audit",
+            "create_issue.sh",
+            "start_issue.sh",
+            "create_nojira_pr.sh",
+            "promote_review.sh",
+            "monitor_pr.sh",
+            "finish_pr.sh",
+            "push_branch.sh",
+            "setup_github.sh",
+            "push_wiki.sh",
+            "dag_workflow.py",
+            "board-automation",
+            "issue-validation",
+            "review-status",
+            "validate-pr",
+            "project-init-upgrade",
+            "skills/create_issue",
+            "skills/start_task",
+            "skills/github_workflow",
+            "skills/request_review",
+            "skills/audit",
         ]
         pat = re.compile("|".join(re.escape(n) for n in names))
         # The guard hooks and gh_host carry internal design comments that mention
         # dag_workflow.py / start_issue.sh as examples — not user-facing paths and
         # not present as wired hooks in a lifecycle-off scaffold. Allowed.
         allowed = {
-            ".agents/hooks/_usage_log.sh", ".agents/scripts/gh_host.sh",
-            ".claude/hooks/_usage_log.sh", ".claude/scripts/gh_host.sh",
+            ".agents/hooks/_usage_log.sh",
+            ".agents/scripts/gh_host.sh",
+            ".claude/hooks/_usage_log.sh",
+            ".claude/scripts/gh_host.sh",
         }
         offenders = {}
         for p in self.target.rglob("*"):
@@ -254,7 +273,9 @@ class TestLifecycleNoneScaffold:
             hits = sorted(set(pat.findall(text)))
             if hits:
                 offenders[rel] = hits
-        assert not offenders, f"dangling lifecycle references in lifecycle-free scaffold: {offenders}"
+        assert not offenders, (
+            f"dangling lifecycle references in lifecycle-free scaffold: {offenders}"
+        )
 
     def test_base_layer_intact(self):
         assert (self.target / "AGENTS.md").is_file()
@@ -268,7 +289,9 @@ class TestPluginSplit:
     def _settings(self, tmp_path: Path, lifecycle: str) -> dict:
         target = tmp_path / lifecycle
         preset = load_preset("obsidian-only")
-        extra = overlay_layers([], no_plugin=False, memory_stack="obsidian-only", lifecycle=lifecycle == "github")
+        extra = overlay_layers(
+            [], no_plugin=False, memory_stack="obsidian-only", lifecycle=lifecycle == "github"
+        )
         preset = {**preset, "layers": [*preset["layers"], *extra]}
         scaffold(target, preset, make_variables(lifecycle_tier=lifecycle), strict=True)
         return json.loads((target / ".agents" / "settings.json").read_text())

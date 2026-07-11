@@ -81,7 +81,9 @@ def needs(workflow: dict, name: str) -> list[str]:
     review).
     """
     raw = job(workflow, name).get("needs") or []
-    assert isinstance(raw, (str, list)), f"`needs:` on `{name}` is neither str nor list: {type(raw).__name__}"
+    assert isinstance(raw, (str, list)), (
+        f"`needs:` on `{name}` is neither str nor list: {type(raw).__name__}"
+    )
     return [raw] if isinstance(raw, str) else list(raw)
 
 

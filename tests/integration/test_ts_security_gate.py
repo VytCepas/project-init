@@ -51,6 +51,7 @@ def _require_bun() -> None:
         )
     pytest.skip(f"{message} — install bun to run the TS toolchain gate locally")
 
+
 _INSECURE = """/** Runs user code. */
 export function run(userInput: string): unknown {
   return eval(userInput);
@@ -92,7 +93,9 @@ def test_dev_deps_match_the_scaffolded_setup_recipe(tmp_path: Path):
     from project_init.scaffold import scaffold as _scaffold
 
     target = tmp_path / "n"
-    _scaffold(target, fallback_preset(), fallback_variables(language="node", node="true", python=""))
+    _scaffold(
+        target, fallback_preset(), fallback_variables(language="node", node="true", python="")
+    )
     setup = (target / "justfile").read_text(encoding="utf-8").split("\nsetup:", 1)[1]
     setup = setup.split("\n\n", 1)[0]
     command = " ".join(

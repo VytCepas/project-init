@@ -41,7 +41,9 @@ def _require_tool(name: str) -> None:
     if shutil.which(name):
         return
     if os.environ.get("CI"):
-        pytest.fail(f"{name} is not on PATH — CI must install it (ci.yml) or this gate tests nothing (#737).")
+        pytest.fail(
+            f"{name} is not on PATH — CI must install it (ci.yml) or this gate tests nothing (#737)."
+        )
     pytest.skip(f"{name} not available — install it to run this gate locally")
 
 
@@ -111,9 +113,7 @@ def test_pre_commit_gate_autofixes_staged_shell(tmp_path: Path):
     subprocess.run(["git", "add", "messy.sh"], cwd=target, check=True)
 
     payload = json.dumps({"tool_input": {"command": "git commit -m x"}})
-    subprocess.run(
-        ["bash", str(hook)], input=payload, cwd=target, capture_output=True, text=True
-    )
+    subprocess.run(["bash", str(hook)], input=payload, cwd=target, capture_output=True, text=True)
 
     # The working-tree file was reformatted in place …
     assert bad.read_text() != original, "pre_commit_gate did not shfmt the staged shell file"
@@ -160,7 +160,7 @@ def test_git_pre_commit_lints_the_index_not_the_worktree(tmp_path: Path):
     hook = target / ".github" / "hooks" / "pre-commit"
     # Replace the scaffolded justfile with a sentinel lint recipe.
     (target / "justfile").write_text(
-        'lint:\n    #!/usr/bin/env bash\n    if grep -q BAD x.txt; then exit 1; fi\n'
+        "lint:\n    #!/usr/bin/env bash\n    if grep -q BAD x.txt; then exit 1; fi\n"
     )
 
     subprocess.run(["git", "init", "-q"], cwd=target, check=True)
@@ -178,7 +178,9 @@ def test_git_pre_commit_lints_the_index_not_the_worktree(tmp_path: Path):
     result = subprocess.run(["bash", str(hook)], cwd=target, capture_output=True, text=True)
 
     # The staged (index) content is BAD, so the hook must block the commit …
-    assert result.returncode != 0, "pre-commit passed on a staged lint error hidden by an unstaged fix"
+    assert result.returncode != 0, (
+        "pre-commit passed on a staged lint error hidden by an unstaged fix"
+    )
     # … and the developer's unstaged fix must be restored intact afterward.
     assert (target / "x.txt").read_text() == "GOOD\n", "unstaged changes were not restored"
 
@@ -190,7 +192,7 @@ def test_git_pre_commit_ignores_unstaged_mess_on_a_clean_index(tmp_path: Path):
     scaffold(target, load_preset("obsidian-only"), make_variables(language="python", python="true"))
     hook = target / ".github" / "hooks" / "pre-commit"
     (target / "justfile").write_text(
-        'lint:\n    #!/usr/bin/env bash\n    if grep -q BAD x.txt; then exit 1; fi\n'
+        "lint:\n    #!/usr/bin/env bash\n    if grep -q BAD x.txt; then exit 1; fi\n"
     )
     subprocess.run(["git", "init", "-q"], cwd=target, check=True)
     subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=target, check=True)

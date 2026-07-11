@@ -20,7 +20,12 @@ from tests.workflow import job, load_workflow, needs, schedule_crons
 
 def _scaffold_language(target: Path, language: str) -> Path:
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
-    scaffold(target, load_preset("obsidian-only"), make_variables(language=language, **flags), strict=True)
+    scaffold(
+        target,
+        load_preset("obsidian-only"),
+        make_variables(language=language, **flags),
+        strict=True,
+    )
     return target
 
 

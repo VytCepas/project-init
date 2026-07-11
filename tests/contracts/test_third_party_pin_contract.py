@@ -103,4 +103,4 @@ def test_every_manifest_tool_declares_where_its_pin_lives():
             assert path.is_file(), f"{tool_id}: used_in path does not exist: {rel}"
             assert f'{tool["version_var"]}="{tool["pinned"]}"' in path.read_text(
                 encoding="utf-8"
-            ), f"{tool_id}: {rel} does not carry {tool['version_var']}=\"{tool['pinned']}\""
+            ), f'{tool_id}: {rel} does not carry {tool["version_var"]}="{tool["pinned"]}"'

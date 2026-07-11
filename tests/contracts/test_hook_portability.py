@@ -129,13 +129,7 @@ def test_lint_hooks_do_not_leak_ruff_stdout():
     diagnostics there, which would leak before the JSON and break consumers."""
     from pathlib import Path
 
-    root = (
-        Path(__file__).resolve().parents[2]
-        / "templates"
-        / "fallback"
-        / "dot_agents"
-        / "hooks"
-    )
+    root = Path(__file__).resolve().parents[2] / "templates" / "fallback" / "dot_agents" / "hooks"
     for name in ("pre_commit_gate.sh", "post_edit_lint.sh"):
         for line in (root / name).read_text().splitlines():
             s = line.strip()

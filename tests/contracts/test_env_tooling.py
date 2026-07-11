@@ -103,9 +103,7 @@ class TestVscodeOverlay:
         assert "anthropic.agents-code" in extensions["recommendations"]
 
     def test_go_recommends_go_extension(self, tmp_path: Path):
-        target = _scaffold_vscode(
-            tmp_path / "go", language="go", python="", go="true"
-        )
+        target = _scaffold_vscode(tmp_path / "go", language="go", python="", go="true")
         extensions = json.loads((target / ".vscode" / "extensions.json").read_text())
         assert "golang.go" in extensions["recommendations"]
         assert "charliermarsh.ruff" not in extensions["recommendations"]

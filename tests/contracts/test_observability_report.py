@@ -60,18 +60,45 @@ def _write_transcript(path: Path) -> None:
                     "cache_read_input_tokens": 8000,
                 },
                 "content": [
-                    {"type": "tool_use", "id": "t1", "name": "Skill", "input": {"skill": "github_workflow"}},
-                    {"type": "tool_use", "id": "t2", "name": "Task", "input": {"subagent_type": "Explore"}},
-                    {"type": "tool_use", "id": "t3", "name": "Bash", "input": {"command": _LEAK_COMMAND}},
+                    {
+                        "type": "tool_use",
+                        "id": "t1",
+                        "name": "Skill",
+                        "input": {"skill": "github_workflow"},
+                    },
+                    {
+                        "type": "tool_use",
+                        "id": "t2",
+                        "name": "Task",
+                        "input": {"subagent_type": "Explore"},
+                    },
+                    {
+                        "type": "tool_use",
+                        "id": "t3",
+                        "name": "Bash",
+                        "input": {"command": _LEAK_COMMAND},
+                    },
                     {"type": "tool_use", "id": "t4", "name": "mcp__ctx__query", "input": {}},
-                    {"type": "tool_use", "id": "t5", "name": "Write",
-                     "input": {"content": f"{_LEAK_FILE}\nline2\nline3"}},
-                    {"type": "tool_use", "id": "t6", "name": "Edit",
-                     "input": {"new_string": "a\nb"}},
+                    {
+                        "type": "tool_use",
+                        "id": "t5",
+                        "name": "Write",
+                        "input": {"content": f"{_LEAK_FILE}\nline2\nline3"},
+                    },
+                    {
+                        "type": "tool_use",
+                        "id": "t6",
+                        "name": "Edit",
+                        "input": {"new_string": "a\nb"},
+                    },
                     # Task with no subagent_type — its free-text description must
                     # NOT leak into the report (bucketed as "unknown").
-                    {"type": "tool_use", "id": "t7", "name": "Task",
-                     "input": {"description": _LEAK_PROMPT}},
+                    {
+                        "type": "tool_use",
+                        "id": "t7",
+                        "name": "Task",
+                        "input": {"description": _LEAK_PROMPT},
+                    },
                 ],
             },
         },
@@ -82,10 +109,18 @@ def _write_transcript(path: Path) -> None:
                     # List-form content (typed blocks) — exercises the block path
                     # of the context-volume counter (PI-655). The malformed
                     # non-string "text" block must count 0, not crash the report.
-                    {"type": "tool_result", "tool_use_id": "t1", "is_error": False,
-                     "content": [{"type": "text", "text": "ok"},
-                                 {"type": "text", "text": 123}]},
-                    {"type": "tool_result", "tool_use_id": "t3", "is_error": True, "content": "boom"},
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "t1",
+                        "is_error": False,
+                        "content": [{"type": "text", "text": "ok"}, {"type": "text", "text": 123}],
+                    },
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "t3",
+                        "is_error": True,
+                        "content": "boom",
+                    },
                 ]
             },
         },
@@ -154,9 +189,7 @@ class TestBuckets:
         mod = _load_report(_scaffold(tmp_path / "p"))
         tx = tmp_path / "t.jsonl"
         _write_transcript(tx)
-        found = mod.discover_transcript(
-            transcript=str(tx), session_id=None, project_dir=tmp_path
-        )
+        found = mod.discover_transcript(transcript=str(tx), session_id=None, project_dir=tmp_path)
         assert found == tx
 
     def test_non_numeric_token_field_does_not_crash(self, tmp_path: Path):
@@ -178,9 +211,7 @@ class TestBuckets:
             },
         }
         tx.write_text(json.dumps(entry) + "\n", encoding="utf-8")
-        report = mod.analyze(
-            mod.parse_transcript(tx), {}, {"commits": None, "merge_commits": None}
-        )
+        report = mod.analyze(mod.parse_transcript(tx), {}, {"commits": None, "merge_commits": None})
         model = report["cost"]["models"][0]
         assert model["input"] == 0  # bad value coerced, not raised
         assert model["cache_read"] == 8000  # good siblings still counted
@@ -190,9 +221,7 @@ class TestBuckets:
 
         mod = _load_report(_scaffold(tmp_path / "p"))
         with pytest.raises(FileNotFoundError, match="no transcript found|not found"):
-            mod.discover_transcript(
-                transcript=None, session_id=None, project_dir=tmp_path / "nope"
-            )
+            mod.discover_transcript(transcript=None, session_id=None, project_dir=tmp_path / "nope")
 
 
 class TestHtmlReport:
@@ -219,9 +248,7 @@ class TestHtmlReport:
         mod = _load_report(target)
         tx = tmp_path / "t.jsonl"
         _write_transcript(tx)
-        report = mod.analyze(
-            mod.parse_transcript(tx), {}, {"commits": 7, "merge_commits": 0}
-        )
+        report = mod.analyze(mod.parse_transcript(tx), {}, {"commits": 7, "merge_commits": 0})
         html = mod.render_html(report, tx)
         # Document is complete, not cut off mid-tag.
         assert html.rstrip().endswith("</html>")
@@ -263,7 +290,14 @@ class TestInvariants:
             elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
                 roots.add(node.module.split(".")[0])
         stdlib = {
-            "argparse", "json", "shutil", "subprocess", "sys", "html", "pathlib", "__future__",
+            "argparse",
+            "json",
+            "shutil",
+            "subprocess",
+            "sys",
+            "html",
+            "pathlib",
+            "__future__",
         }
         assert roots <= stdlib, f"non-stdlib imports: {roots - stdlib}"
 

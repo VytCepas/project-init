@@ -27,9 +27,7 @@ class TestSkillIndex:
                 continue
             if skill_dir.name not in index_text:
                 missing.append(skill_dir.name)
-        assert not missing, (
-            "Skill directories not referenced in INDEX.md: " + ", ".join(missing)
-        )
+        assert not missing, "Skill directories not referenced in INDEX.md: " + ", ".join(missing)
 
     def test_this_repos_own_index_covers_every_skill_dir(self):
         """PI-686: the template INDEX was guarded; this repo's own INDEX was not.

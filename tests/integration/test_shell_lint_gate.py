@@ -93,9 +93,7 @@ def test_emitted_claude_scripts_are_shfmt_clean(tmp_target: Path):
 
     dirty = []
     for p in scripts:
-        result = subprocess.run(
-            [shfmt, "-d", "-i", "2", str(p)], capture_output=True, text=True
-        )
+        result = subprocess.run([shfmt, "-d", "-i", "2", str(p)], capture_output=True, text=True)
         if result.stdout.strip() or result.returncode != 0:
             dirty.append(f"{p.relative_to(tmp_target)}:\n{result.stdout}{result.stderr}")
     assert not dirty, "emitted .agents scripts fail `shfmt -d -i 2`:\n" + "\n".join(dirty)

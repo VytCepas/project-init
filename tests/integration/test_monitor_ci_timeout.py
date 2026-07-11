@@ -53,9 +53,7 @@ def test_pi_ci_timeout_override_respected(tmp_target: Path, tmp_path: Path):
     assert "within 900s" not in result.stdout
 
 
-def test_invalid_pi_ci_timeout_fails_closed_with_clear_message(
-    tmp_target: Path, tmp_path: Path
-):
+def test_invalid_pi_ci_timeout_fails_closed_with_clear_message(tmp_target: Path, tmp_path: Path):
     scaffold(tmp_target, fallback_preset(), fallback_variables())
     script = tmp_target / ".agents" / "scripts" / "monitor_pr.sh"
     env = os.environ.copy()

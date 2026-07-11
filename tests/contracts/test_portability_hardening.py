@@ -92,9 +92,21 @@ def test_audit_stat_guidance_is_portable():
         # copies (codex/antigravity) still carry it via the sync, now gated as
         # SKILL.md.tmpl ({{#if lifecycle}}, PI-537 #5) — the wrapped body keeps
         # the portable stat guidance.
-        _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents" / "skills" / "audit" / "SKILL.md",
+        _REPO_ROOT
+        / "templates"
+        / "lifecycle_fallback"
+        / "dot_agents"
+        / "skills"
+        / "audit"
+        / "SKILL.md",
         _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills" / "audit" / "SKILL.md.tmpl",
-        _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills" / "audit" / "SKILL.md.tmpl",
+        _REPO_ROOT
+        / "templates"
+        / "antigravity"
+        / "dot_agents"
+        / "skills"
+        / "audit"
+        / "SKILL.md.tmpl",
     ):
         text = mirror.read_text()
         assert "stat -f '%Lp'" in text, f"{mirror}: missing BSD/macOS stat fallback"

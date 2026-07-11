@@ -216,9 +216,7 @@ class TestGuardSteering:
         (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
         subdir = tmp_path / "src" / "pkg"
         subdir.mkdir(parents=True)
-        out = _run_guard_hook(
-            hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=subdir
-        )
+        out = _run_guard_hook(hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=subdir)
         assert _denied(out)
         assert "monitor_pr.sh" in _deny_reason(out)
 
@@ -437,9 +435,7 @@ class TestPrereqWalk:
     def test_blocks_when_review_pending(self, dag, monkeypatch):
         for node in dag.GRAPH:
             monkeypatch.setitem(dag.CHECKS, node, lambda: (True, "ok"))
-        monkeypatch.setitem(
-            dag.CHECKS, "review.approved", lambda: (False, "review pending")
-        )
+        monkeypatch.setitem(dag.CHECKS, "review.approved", lambda: (False, "review pending"))
         ok, reason = dag.prereqs_satisfied("pr.merged")
         assert not ok
         assert "review.approved" in reason
@@ -454,9 +450,7 @@ class TestPrereqWalk:
             monkeypatch.setitem(dag.CHECKS, node, lambda: (True, "ok"))
         # branch.pushed fails — pr.opened should fail because of it,
         # and pr.merged should report the branch.pushed failure transitively.
-        monkeypatch.setitem(
-            dag.CHECKS, "branch.pushed", lambda: (False, "no remote branch")
-        )
+        monkeypatch.setitem(dag.CHECKS, "branch.pushed", lambda: (False, "no remote branch"))
         ok, reason = dag.prereqs_satisfied("pr.merged")
         assert not ok
         assert "branch.pushed" in reason
@@ -570,8 +564,11 @@ class TestSubcommands:
     def test_create_pr_nojira_rejects_bad_branch(self, tmp_path: Path):
         # Use a branch arg that doesn't match the type/* convention.
         proc = self._run(
-            "create-pr-nojira", "feat", "Some title",
-            "--branch", "no-prefix-here",
+            "create-pr-nojira",
+            "feat",
+            "Some title",
+            "--branch",
+            "no-prefix-here",
             cwd=tmp_path,
         )
         assert proc.returncode == 1
@@ -595,7 +592,9 @@ class TestSlugify:
 class TestScriptShims:
     """The bash lifecycle scripts are now thin shims around dag_workflow.py."""
 
-    @pytest.mark.parametrize("name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"])
+    @pytest.mark.parametrize(
+        "name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"]
+    )
     def test_source_script_is_shim(self, name: str):
         # Since PI-685 the repo's shims are synced verbatim from
         # templates/lifecycle, so they carry the PI-361 _py.sh resolver form.
@@ -607,7 +606,9 @@ class TestScriptShims:
         # Each shim should be tiny.
         assert len(text.splitlines()) <= 6
 
-    @pytest.mark.parametrize("name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"])
+    @pytest.mark.parametrize(
+        "name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"]
+    )
     def test_template_script_is_shim(self, name: str):
         path = REPO_ROOT / "templates" / "lifecycle" / "dot_agents" / "scripts" / name
         assert path.is_file()
@@ -683,7 +684,9 @@ class TestPushForceWithLease:
 
         proc = subprocess.run(
             [sys.executable, str(SOURCE_HOOK), "push", "feat/x", "0"],
-            cwd=work, capture_output=True, text=True,
+            cwd=work,
+            capture_output=True,
+            text=True,
         )
         assert proc.returncode == 0, proc.stderr
 
@@ -691,14 +694,18 @@ class TestPushForceWithLease:
         subprocess.run([*env_git, "commit", "-q", "--amend", "-m", "feat: one v2"], check=True)
         proc = subprocess.run(
             [sys.executable, str(SOURCE_HOOK), "push", "feat/x", "0"],
-            cwd=work, capture_output=True, text=True,
+            cwd=work,
+            capture_output=True,
+            text=True,
         )
         assert proc.returncode == 1
 
         # ...and --force-with-lease must succeed.
         proc = subprocess.run(
             [sys.executable, str(SOURCE_HOOK), "push", "feat/x", "0", "--force-with-lease"],
-            cwd=work, capture_output=True, text=True,
+            cwd=work,
+            capture_output=True,
+            text=True,
         )
         assert proc.returncode == 0, proc.stderr
 
@@ -713,7 +720,8 @@ class TestFinishBranchGuard:
         # PR #99's head is feat/PI-99-x, but a different branch is checked out.
         monkeypatch.setattr(mod, "_current_branch", lambda: "chore/PI-50-other")
         monkeypatch.setattr(
-            mod, "_gh",
+            mod,
+            "_gh",
             lambda args: (0, "feat/PI-99-x\n") if "headRefName" in args else (0, ""),
         )
         pushed: list = []
@@ -729,7 +737,8 @@ class TestFinishBranchGuard:
         mod = _load_module(SOURCE_HOOK)
         monkeypatch.setattr(mod, "_current_branch", lambda: None)
         monkeypatch.setattr(
-            mod, "_gh",
+            mod,
+            "_gh",
             lambda args: (0, "feat/PI-99-x\n") if "headRefName" in args else (0, ""),
         )
         pushed: list = []
@@ -744,7 +753,8 @@ class TestFinishBranchGuard:
         mod = _load_module(SOURCE_HOOK)
         monkeypatch.setattr(mod, "_current_branch", lambda: "feat/PI-99-x")
         monkeypatch.setattr(
-            mod, "_gh",
+            mod,
+            "_gh",
             lambda args: (0, "feat/PI-99-x\n") if "headRefName" in args else (0, ""),
         )
         pushed: list = []
@@ -770,7 +780,8 @@ class TestCiGreenStatusContext:
     @staticmethod
     def _rollup(dag, monkeypatch, entries):
         monkeypatch.setattr(
-            dag, "_gh",
+            dag,
+            "_gh",
             lambda args: (0, json.dumps({"number": 7, "statusCheckRollup": entries})),
         )
 
@@ -794,7 +805,8 @@ class TestCiGreenStatusContext:
 
     def test_mixed_green_checkrun_and_status_context(self, dag, monkeypatch):
         self._rollup(
-            dag, monkeypatch,
+            dag,
+            monkeypatch,
             [
                 {"name": "test", "status": "COMPLETED", "conclusion": "SUCCESS"},
                 {"context": "vercel", "state": "SUCCESS"},

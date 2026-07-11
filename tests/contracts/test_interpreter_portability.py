@@ -36,6 +36,7 @@ _MULTI_MODEL = (
     _REPO_ROOT / "templates" / "multi_model" / "dot_agents" / "scripts" / "setup_models.sh"
 )
 
+
 # Every shell script the scaffold ships that may invoke Python, except the
 # resolver itself (which legitimately names python3/python/uv).
 def _shell_scripts() -> list[Path]:

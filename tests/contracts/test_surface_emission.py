@@ -55,17 +55,13 @@ def test_emitted_content_matches_canonical_source(tmp_path: Path):
     would render — so editing a renderer without regenerating can't pass."""
     agents = ["claude", "codex", "cursor", "antigravity", "vscode"]
     servers = servers_for_ids(["context7"])
-    t = _scaffold(
-        tmp_path / "p", agents=",".join(agents), installed_mcps="context7"
-    )
+    t = _scaffold(tmp_path / "p", agents=",".join(agents), installed_mcps="context7")
     for rel, content in surfaces.planned_files(agents, servers).items():
         assert (t / rel).read_text() == content, f"{rel} drifted from canonical source"
 
 
 def test_mcp_schemas_per_surface(tmp_path: Path):
-    t = _scaffold(
-        tmp_path / "p", agents="claude,cursor,vscode", installed_mcps="context7"
-    )
+    t = _scaffold(tmp_path / "p", agents="claude,cursor,vscode", installed_mcps="context7")
     assert "mcpServers" in json.loads((t / ".mcp.json").read_text())
     assert "mcpServers" in json.loads((t / ".cursor/mcp.json").read_text())
     assert "servers" in json.loads((t / ".vscode/mcp.json").read_text())

@@ -15,11 +15,27 @@ from tools.benchmark.record import RunRecord, write_records
 def _rec(target: str, **over) -> RunRecord:
     """Build a RunRecord with sane defaults; `over` uses dataclass field names."""
     base = dict(
-        task="feat", target=target, run_index=0, model="claude-opus-4-8",
-        agents_version="v", session_id="", transcript_path="/t",
-        input_tokens=0, output_tokens=0, cache_read_tokens=0, cache_creation_tokens=0,
-        total_tokens=0, tool_calls=0, turns=1, wall_clock_s=None, first_ts=None, last_ts=None,
-        cost_usd=None, success=None, first_try=None, rework_cycles=None,
+        task="feat",
+        target=target,
+        run_index=0,
+        model="claude-opus-4-8",
+        agents_version="v",
+        session_id="",
+        transcript_path="/t",
+        input_tokens=0,
+        output_tokens=0,
+        cache_read_tokens=0,
+        cache_creation_tokens=0,
+        total_tokens=0,
+        tool_calls=0,
+        turns=1,
+        wall_clock_s=None,
+        first_ts=None,
+        last_ts=None,
+        cost_usd=None,
+        success=None,
+        first_try=None,
+        rework_cycles=None,
     )
     base.update(over)
     return RunRecord(**base)
@@ -28,20 +44,68 @@ def _rec(target: str, **over) -> RunRecord:
 def _sample() -> list[RunRecord]:
     return [
         # bare: cheap, often wrong (1 of 2 passes, never first-try)
-        _rec("bare", run_index=0, cost_usd=0.10, total_tokens=1000, wall_clock_s=10.0,
-             success=False, first_try=False, rework_cycles=2),
-        _rec("bare", run_index=1, cost_usd=0.10, total_tokens=1000, wall_clock_s=12.0,
-             success=True, first_try=False, rework_cycles=1),
+        _rec(
+            "bare",
+            run_index=0,
+            cost_usd=0.10,
+            total_tokens=1000,
+            wall_clock_s=10.0,
+            success=False,
+            first_try=False,
+            rework_cycles=2,
+        ),
+        _rec(
+            "bare",
+            run_index=1,
+            cost_usd=0.10,
+            total_tokens=1000,
+            wall_clock_s=12.0,
+            success=True,
+            first_try=False,
+            rework_cycles=1,
+        ),
         # obsidian-only: pricier, more accurate (both pass first-try)
-        _rec("obsidian-only", run_index=0, cost_usd=0.15, total_tokens=1500, wall_clock_s=11.0,
-             success=True, first_try=True, rework_cycles=0),
-        _rec("obsidian-only", run_index=1, cost_usd=0.15, total_tokens=1500, wall_clock_s=13.0,
-             success=True, first_try=True, rework_cycles=0),
+        _rec(
+            "obsidian-only",
+            run_index=0,
+            cost_usd=0.15,
+            total_tokens=1500,
+            wall_clock_s=11.0,
+            success=True,
+            first_try=True,
+            rework_cycles=0,
+        ),
+        _rec(
+            "obsidian-only",
+            run_index=1,
+            cost_usd=0.15,
+            total_tokens=1500,
+            wall_clock_s=13.0,
+            success=True,
+            first_try=True,
+            rework_cycles=0,
+        ),
         # obsidian-graphify: priciest, no better accuracy → dominated
-        _rec("obsidian-graphify", run_index=0, cost_usd=0.20, total_tokens=2000, wall_clock_s=14.0,
-             success=True, first_try=True, rework_cycles=0),
-        _rec("obsidian-graphify", run_index=1, cost_usd=0.20, total_tokens=2000, wall_clock_s=15.0,
-             success=True, first_try=True, rework_cycles=0),
+        _rec(
+            "obsidian-graphify",
+            run_index=0,
+            cost_usd=0.20,
+            total_tokens=2000,
+            wall_clock_s=14.0,
+            success=True,
+            first_try=True,
+            rework_cycles=0,
+        ),
+        _rec(
+            "obsidian-graphify",
+            run_index=1,
+            cost_usd=0.20,
+            total_tokens=2000,
+            wall_clock_s=15.0,
+            success=True,
+            first_try=True,
+            rework_cycles=0,
+        ),
     ]
 
 
@@ -62,7 +126,9 @@ class TestAggregate:
         assert summ["bare"].first_try_rate == 0.0
 
     def test_noop_success_none_excluded_from_pass_rate(self):
-        recs = [_rec("bare", cost_usd=0.1, total_tokens=1, wall_clock_s=1.0)]  # success defaults None
+        recs = [
+            _rec("bare", cost_usd=0.1, total_tokens=1, wall_clock_s=1.0)
+        ]  # success defaults None
         assert report.aggregate(recs)["bare"].pass_rate is None
 
 
@@ -89,10 +155,12 @@ class TestParetoTiesAndIncomparable:
 
     def test_unpriced_target_is_incomparable_not_dominated(self):
         """A target missing a Pareto axis must not be labelled 'dominated' (Codex review)."""
-        summ = report.aggregate([
-            _rec("bare", cost_usd=0.10, total_tokens=100, success=True, first_try=True),
-            _rec("mystery", cost_usd=None, total_tokens=100, success=True, first_try=True),
-        ])
+        summ = report.aggregate(
+            [
+                _rec("bare", cost_usd=0.10, total_tokens=100, success=True, first_try=True),
+                _rec("mystery", cost_usd=None, total_tokens=100, success=True, first_try=True),
+            ]
+        )
         eff = report.pareto_efficient(summ)
         line = report.verdict(summ["bare"], summ["mystery"], eff)
         assert "incomparable" in line and "dominated" not in line

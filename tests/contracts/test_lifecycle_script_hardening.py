@@ -43,9 +43,7 @@ class TestStartIssueErrorPath:
 class TestCreateIssueTempFile:
     def test_could_not_add_early_return_removes_temp_file(self):
         s = (_LIFECYCLE_SCRIPTS / "create_issue.sh").read_text()
-        block = re.search(
-            r"\n(.*\n)?\s*echo \"Warning: could not add", s
-        )
+        block = re.search(r"\n(.*\n)?\s*echo \"Warning: could not add", s)
         assert block, "could-not-add warning not found"
         assert 'rm -f "$pdata_file"' in block.group(0), (
             "the could-not-add early return must clean up the mktemp file "
@@ -241,9 +239,7 @@ class TestStartIssueWorktreeKey:
         srv = tmp_path / "srv"
         srv.mkdir()
         bare = srv / "widget.git"
-        subprocess.run(
-            ["git", "clone", "-q", "--bare", str(seed), str(bare)], check=True
-        )
+        subprocess.run(["git", "clone", "-q", "--bare", str(seed), str(bare)], check=True)
         wt = tmp_path / "widget-15-fix"
         subprocess.run(
             ["git", "--git-dir", str(bare), "worktree", "add", "-q", str(wt)],
@@ -280,7 +276,7 @@ class TestStartIssueSeedCommit:
         ):
             s = path.read_text()
             assert "_seed_base" in s, f"{path}: remote-base resolver missing"
-            assert 'refs/remotes/origin/$BASE_BRANCH' in s, (
+            assert "refs/remotes/origin/$BASE_BRANCH" in s, (
                 f"{path}: the seed decision must prefer the remote-tracking "
                 "base ref — the local base can lag behind what GitHub compares"
             )
@@ -308,9 +304,7 @@ class TestStartIssueSeedCommit:
         local-base comparison says 'has commits' (skip seed); the remote-base
         comparison correctly says 'level' (seed)."""
         s = (_LIFECYCLE_SCRIPTS / "start_issue.sh").read_text()
-        m = re.search(
-            r"^_seed_base\(\) \{\n.*?\n\}$", s, re.MULTILINE | re.DOTALL
-        )
+        m = re.search(r"^_seed_base\(\) \{\n.*?\n\}$", s, re.MULTILINE | re.DOTALL)
         assert m, "_seed_base not found"
         helper = m.group(0)
 
@@ -395,9 +389,7 @@ class TestMonitorPrMergeRetry:
                 and "--auto" not in ln
                 and not ln.lstrip().startswith("#")
             ]
-            assert not outside, (
-                f"{path}: single-shot merge outside _merge_with_retry: {outside}"
-            )
+            assert not outside, f"{path}: single-shot merge outside _merge_with_retry: {outside}"
 
     def _extract(self, script: Path, *names: str) -> str:
         s = script.read_text()
@@ -412,7 +404,9 @@ class TestMonitorPrMergeRetry:
             parts.append(m.group(0))
         return "\n".join(parts)
 
-    def _run_with_stub(self, tmp_path: Path, stub: str, script_tail: str) -> subprocess.CompletedProcess:
+    def _run_with_stub(
+        self, tmp_path: Path, stub: str, script_tail: str
+    ) -> subprocess.CompletedProcess:
         helpers = self._extract(
             _LIFECYCLE_SCRIPTS / "monitor_pr.sh",
             "_run_gh",
@@ -539,9 +533,7 @@ class TestMonitorPrLocalBranchCleanup:
         s = (_LIFECYCLE_SCRIPTS / "monitor_pr.sh").read_text()
         parts = []
         for name in ("_pr_is_merged", "_cleanup_local_branch"):
-            m = re.search(
-                rf"^{name}\(\) \{{\n.*?\n\}}$", s, re.MULTILINE | re.DOTALL
-            )
+            m = re.search(rf"^{name}\(\) \{{\n.*?\n\}}$", s, re.MULTILINE | re.DOTALL)
             assert m, f"{name} not found"
             parts.append(m.group(0))
         bin_dir = tmp_path / "bin"

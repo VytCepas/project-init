@@ -20,7 +20,9 @@ from project_init.upgrade import _backfill_variables, _migrate_semantic_config
 from tests.helpers import make_variables, memory_preset
 
 
-def _inputs(*, want_docs: bool = True, renovate: bool = True, language: str = "python") -> ScaffoldInputs:
+def _inputs(
+    *, want_docs: bool = True, renovate: bool = True, language: str = "python"
+) -> ScaffoldInputs:
     return ScaffoldInputs(
         project_name="p",
         project_description="d",
@@ -77,12 +79,18 @@ class TestGating:
         assert _render_file("base/mkdocs.yml.tmpl", python="true", want_docs="true").strip()
         assert _render_file("base/mkdocs.yml.tmpl", python="true", want_docs="").strip() == ""
         # never forced on a non-python language, even with want_docs on.
-        assert _render_file("base/mkdocs.yml.tmpl", python="", node="true", want_docs="true").strip() == ""
+        assert (
+            _render_file("base/mkdocs.yml.tmpl", python="", node="true", want_docs="true").strip()
+            == ""
+        )
 
     def test_typedoc_node_plus_want_docs(self):
         assert _render_file("base/typedoc.json.tmpl", node="true", want_docs="true").strip()
         assert _render_file("base/typedoc.json.tmpl", node="true", want_docs="").strip() == ""
-        assert _render_file("base/typedoc.json.tmpl", node="", python="true", want_docs="true").strip() == ""
+        assert (
+            _render_file("base/typedoc.json.tmpl", node="", python="true", want_docs="true").strip()
+            == ""
+        )
 
     def test_renovate_gates_on_renovate(self):
         assert _render_file("base/renovate.json.tmpl", renovate="true").strip()
@@ -116,7 +124,9 @@ class TestGating:
 class TestScaffoldGating:
     def test_python_no_docs_omits_mkdocs(self, tmp_path: Path):
         target = tmp_path / "p"
-        scaffold(target, memory_preset("core"), make_variables(python="true", want_docs=""), strict=True)
+        scaffold(
+            target, memory_preset("core"), make_variables(python="true", want_docs=""), strict=True
+        )
         assert not (target / "mkdocs.yml").exists()
 
     def test_python_default_ships_mkdocs(self, tmp_path: Path):
@@ -131,7 +141,9 @@ class TestScaffoldGating:
 
     def test_no_docs_omits_docs_tree(self, tmp_path: Path):
         target = tmp_path / "p"
-        scaffold(target, memory_preset("core"), make_variables(python="true", want_docs=""), strict=True)
+        scaffold(
+            target, memory_preset("core"), make_variables(python="true", want_docs=""), strict=True
+        )
         assert not (target / "docs").exists()
 
     def test_default_ships_docs_tree(self, tmp_path: Path):
@@ -143,8 +155,19 @@ class TestScaffoldGating:
 
 def _scaffold_cli(target: Path, *extra: str) -> None:
     rc = main(
-        [str(target), "--non-interactive", "--preset", "core", "--name", "fx",
-         "--description", "d", "--language", "python", *extra]
+        [
+            str(target),
+            "--non-interactive",
+            "--preset",
+            "core",
+            "--name",
+            "fx",
+            "--description",
+            "d",
+            "--language",
+            "python",
+            *extra,
+        ]
     )
     assert rc == 0
 
