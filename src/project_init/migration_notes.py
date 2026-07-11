@@ -167,7 +167,9 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
 }
 
 
-def notes_for_span(prev: str | None, current: str | None) -> list[tuple[str, dict]]:
+def notes_for_span(
+    prev: str | None, current: str | None
+) -> list[tuple[str, dict[str, str | None]]]:
     """Return ``[(version, entry)]`` for the span, newest version first.
 
     Selects versions ``v`` with ``prev < v <= current``. When *prev* is missing
@@ -187,5 +189,8 @@ def notes_for_span(prev: str | None, current: str | None) -> list[tuple[str, dic
     ]
     if p is None:
         selected = [(version, entry) for version, entry in selected if _parse(version) == c]
-    selected.sort(key=lambda item: _parse(item[0]), reverse=True)
+    # Every selected version parsed cleanly above; the ``or`` fallback is inert
+    # (an unparseable version was already filtered out) and only tells the type
+    # checker the sort key is never None.
+    selected.sort(key=lambda item: _parse(item[0]) or (0, 0, 0), reverse=True)
     return selected

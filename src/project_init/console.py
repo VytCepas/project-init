@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
 from rich.console import Console
 from rich.theme import Theme
@@ -69,7 +70,7 @@ def option_line(index: int, name: str, description: str, *, recommended: bool = 
 
 
 def render_presets(
-    presets: list[dict], default_idx: int, memory_by_name: dict[str, str]
+    presets: list[dict[str, Any]], default_idx: int, memory_by_name: dict[str, str]
 ) -> None:
     """Print the preset options as an aligned table (plain list off-TTY).
 

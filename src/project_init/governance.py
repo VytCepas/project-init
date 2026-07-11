@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from project_init.mcps import MCP_CATALOG, PLAYWRIGHT_MCP, servers_for_ids
 
@@ -37,7 +38,7 @@ def _mcp_ids(variables: dict[str, str]) -> list[str]:
     return [s.strip() for s in raw.split(",") if s.strip()]
 
 
-def _server_transport(spec: dict) -> str:
+def _server_transport(spec: dict[str, Any]) -> str:
     """One-line transport description for an MCP server spec."""
     if spec.get("type") == "http" or spec.get("url"):
         return f"http: {spec.get('url', '')}".strip()
@@ -46,7 +47,7 @@ def _server_transport(spec: dict) -> str:
     return f"stdio: {cmd} {args}".strip()
 
 
-def extract_ccr_routes(config_path: Path) -> dict[str, list]:
+def extract_ccr_routes(config_path: Path) -> dict[str, list[Any]]:
     """Parse a claude-code-router ``config.json`` into detected routes.
 
     Returns ``{"routes": [(role, provider, model), ...], "providers": [name]}``.

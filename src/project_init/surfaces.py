@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 
 # The shared, fail-open guard adapter (reused across surfaces); the scaffolder
@@ -44,12 +45,12 @@ def _guard_command(surface: str) -> str:
 # --- canonical MCP rendering -------------------------------------------------
 
 
-def mcp_server_specs(selected: list[dict]) -> dict[str, dict]:
+def mcp_server_specs(selected: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Canonical {name: {command,args}|{url}} from selected catalog entries.
 
     Entries without a structured ``server`` spec (none today) are skipped.
     """
-    out: dict[str, dict] = {}
+    out: dict[str, dict[str, Any]] = {}
     for m in selected:
         spec = m.get("server")
         if spec:
@@ -57,7 +58,7 @@ def mcp_server_specs(selected: list[dict]) -> dict[str, dict]:
     return out
 
 
-def render_mcp_json(servers: dict[str, dict], *, key: str, drop_type: bool = False) -> str:
+def render_mcp_json(servers: dict[str, dict[str, Any]], *, key: str, drop_type: bool = False) -> str:
     """MCP config as JSON.
 
     ``key`` is the top-level wrapper: ``mcpServers`` (Claude root .mcp.json,
@@ -73,7 +74,7 @@ def render_mcp_json(servers: dict[str, dict], *, key: str, drop_type: bool = Fal
     return json.dumps({key: servers}, indent=2, sort_keys=True) + "\n"
 
 
-def render_antigravity_mcp(servers: dict[str, dict]) -> str:
+def render_antigravity_mcp(servers: dict[str, dict[str, Any]]) -> str:
     """MCP config for Antigravity's ``.agents/mcp_config.json``.
 
     Antigravity (Windsurf/Codeium + Gemini lineage) keys HTTP/streamable servers
@@ -81,7 +82,7 @@ def render_antigravity_mcp(servers: dict[str, dict]) -> str:
     ``type``+``url`` (an HTTP entry written as ``{"type":"http","url":...}`` fails
     to load). Stdio servers (``command``/``args``) are emitted unchanged (#431).
     """
-    mapped: dict[str, dict] = {}
+    mapped: dict[str, dict[str, Any]] = {}
     for name, spec in servers.items():
         if "url" in spec:
             rest = {k: v for k, v in spec.items() if k not in ("type", "url")}
@@ -91,7 +92,7 @@ def render_antigravity_mcp(servers: dict[str, dict]) -> str:
     return json.dumps({"mcpServers": mapped}, indent=2, sort_keys=True) + "\n"
 
 
-def render_mcp_toml(servers: dict[str, dict]) -> str:
+def render_mcp_toml(servers: dict[str, dict[str, Any]]) -> str:
     """MCP config as Codex ``config.toml`` ``[mcp_servers.<name>]`` tables.
 
     Stdlib only (no toml writer): every string is emitted via ``json.dumps`` —
@@ -175,7 +176,7 @@ def render_antigravity_hooks() -> str:
 # Each entry declares what files to write; the scaffold engine consumes this.
 # (ADR-017 §2.)
 
-SURFACES: dict[str, dict] = {
+SURFACES: dict[str, dict[str, Any]] = {
     "cursor": {
         "label": "Cursor",
         "experimental": False,
@@ -221,7 +222,7 @@ SURFACES: dict[str, dict] = {
     },
 }
 
-def render_mcp_for(kind_key: tuple, servers: dict[str, dict]) -> str:
+def render_mcp_for(kind_key: tuple[Any, ...], servers: dict[str, dict[str, Any]]) -> str:
     """Render MCP config for a ``(format, key[, drop_type])`` spec."""
     fmt, key, *rest = kind_key
     if fmt == "json":
@@ -233,7 +234,7 @@ def render_mcp_for(kind_key: tuple, servers: dict[str, dict]) -> str:
     raise ValueError(f"unknown MCP format: {fmt}")
 
 
-def surface_files(surface: str, servers: dict[str, dict]) -> dict[str, str]:
+def surface_files(surface: str, servers: dict[str, dict[str, Any]]) -> dict[str, str]:
     """All files to write for a selected *surface*: {relpath: content}.
 
     *servers* is the canonical MCP spec (may be empty → no MCP file).
@@ -247,7 +248,7 @@ def surface_files(surface: str, servers: dict[str, dict]) -> dict[str, str]:
     return files
 
 
-def planned_files(agents: list[str], servers: dict[str, dict]) -> dict[str, str]:
+def planned_files(agents: list[str], servers: dict[str, dict[str, Any]]) -> dict[str, str]:
     """Map a selection to ``{relpath: content}``.
 
     The single place that maps selected *agents* + canonical *servers* to files,
@@ -273,7 +274,7 @@ def emit(
     target: Path,
     *,
     agents: list[str],
-    servers: dict[str, dict],
+    servers: dict[str, dict[str, Any]],
     conflicts: list[tuple[Path, Path]] | None = None,
 ) -> list[Path]:
     """Write the per-surface config files into *target*.

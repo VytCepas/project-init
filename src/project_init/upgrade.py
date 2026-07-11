@@ -43,6 +43,10 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from rich.console import Console
 
 from project_init.scaffold import (
     _ALWAYS_OVERWRITE,
@@ -449,7 +453,9 @@ def _scalar(line: str) -> str:
     return value.strip("\"'")
 
 
-def _record_fields(lines: list[str]) -> tuple[str | None, dict | None, dict | None]:
+def _record_fields(
+    lines: list[str],
+) -> tuple[str | None, dict[str, str] | None, dict[str, str] | None]:
     """Extract preset/variables/manifest from the lines after the marker."""
     preset = variables = manifest = None
     in_block = False
@@ -471,7 +477,7 @@ def _record_fields(lines: list[str]) -> tuple[str | None, dict | None, dict | No
     return preset, variables, manifest
 
 
-def _parse_record_block(text: str) -> tuple[str, dict, dict] | None:
+def _parse_record_block(text: str) -> tuple[str, dict[str, str], dict[str, str]] | None:
     """Parse the scaffold record block; None when no record marker exists.
 
     Only lines after the record marker are considered, so an unrelated
@@ -504,7 +510,7 @@ def _parse_record_block(text: str) -> tuple[str, dict, dict] | None:
     raise UpgradeError(msg)
 
 
-def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
+def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict[str, str], dict[str, str]]:
     """Reconstruct upgrade inputs from a pre-record config.yaml.
 
     Older scaffolds recorded only the semantic fields. Everything needed for
@@ -605,7 +611,7 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict, dict]:
     return preset_name, variables, {}
 
 
-def _memory_stack_from_flags(v: dict) -> str:
+def _memory_stack_from_flags(v: dict[str, str]) -> str:
     """Reconstruct the memory stack from recorded gate flags.
 
     A record written before the ``memory_stack`` variable existed (pre-#466)
@@ -630,7 +636,7 @@ def _memory_stack_from_flags(v: dict) -> str:
     return "obsidian-only"
 
 
-def _backfill_variables(variables: dict) -> dict:
+def _backfill_variables(variables: dict[str, str]) -> dict[str, str]:
     """Fill variables introduced after *variables* were recorded.
 
     A record written by an older scaffolder version lacks any template
@@ -727,12 +733,12 @@ def _backfill_variables(variables: dict) -> dict:
     return v
 
 
-def _recorded_agents(variables: dict) -> list[str]:
+def _recorded_agents(variables: dict[str, str]) -> list[str]:
     """The recorded agents list as names (backfill helper; default claude-only)."""
     return [a.strip() for a in variables.get("agents", "claude").split(",") if a.strip()]
 
 
-def _migrate_agents(variables: dict) -> dict:
+def _migrate_agents(variables: dict[str, str]) -> dict[str, str]:
     """Migrate a recorded agents list for removed/renamed surfaces (PI-386).
 
     Gemini CLI was removed; map a recorded ``gemini`` agent to ``antigravity``
@@ -754,7 +760,7 @@ def _migrate_agents(variables: dict) -> dict:
     return out
 
 
-def read_scaffold_record(target: Path) -> tuple[str, dict, dict, bool]:
+def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, str], bool]:
     """Return (preset_name, variables, manifest, migrated) for *target*."""
     config_path = target / _CONFIG_REL
     if not config_path.exists():
@@ -846,7 +852,7 @@ def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:
 
 
 def _render_staging(
-    preset_name: str, variables: dict, staging: Path, detect_root: Path | None = None
+    preset_name: str, variables: dict[str, str], staging: Path, detect_root: Path | None = None
 ) -> list[Path]:
     preset = load_preset(preset_name)
     # Agent overlays (PI-137) are layers appended at scaffold time, not part of
@@ -875,7 +881,7 @@ def _render_staging(
 
 
 def _classify_conflict(
-    report: DriftReport, rel: Path, base: dict, current: bytes, new_bytes: bytes
+    report: DriftReport, rel: Path, base: dict[str, str], current: bytes, new_bytes: bytes
 ) -> None:
     """A user-edited file that upstream also changed: 3-way merge or conflict (#240).
 
@@ -899,8 +905,8 @@ def compute_drift(
     target: Path,
     staging: Path,
     rendered: list[Path],
-    manifest: dict,
-    base: dict | None = None,
+    manifest: dict[str, str],
+    base: dict[str, str] | None = None,
 ) -> DriftReport:
     """Compare the staged re-render against the project tree."""
     report = DriftReport(rendered=list(rendered))
@@ -1054,7 +1060,7 @@ def _sync_memory_block(text: str, staging: Path) -> str:
     return re.sub(r"(?m)^mcps:", lambda _m: new_mem + "mcps:", text, count=1)
 
 
-def _ensure_visible_project_fields(text: str, variables: dict) -> str:
+def _ensure_visible_project_fields(text: str, variables: dict[str, str]) -> str:
     """Surface recorded `project:` fields in the hand-editable config (#259, #498).
 
     Idempotent. Operates on the human section only (above the scaffold-record
@@ -1082,7 +1088,7 @@ def apply_drift(
     staging: Path,
     report: DriftReport,
     preset_name: str,
-    variables: dict,
+    variables: dict[str, str],
 ) -> None:
     """Apply changes; 3-way-merge user edits (#240); conflicts become ``.new``.
 
@@ -1150,13 +1156,13 @@ def apply_drift(
     for rel in [*applied, *report.merged]:
         if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
             continue
-        text = _decode((staging / rel).read_bytes())
-        if text is not None:
-            base[rel.as_posix()] = text
+        decoded = _decode((staging / rel).read_bytes())
+        if decoded is not None:
+            base[rel.as_posix()] = decoded
     write_base(target, base)
 
 
-def _print_clean_or_all_skipped(console, report: DriftReport) -> None:
+def _print_clean_or_all_skipped(console: Console, report: DriftReport) -> None:
     """Report the no-drift case, distinguishing two outcomes.
 
     A truly clean tree prints "No drift"; an interactive run that skipped every
@@ -1194,7 +1200,9 @@ def _print_migration_notes(prev: str | None, current: str | None) -> None:
     # (missing/unparseable prev). Format from the parsed tuple so a recorded "v"
     # prefix or "-rc" suffix can't leak as "vv1.2.3" (Copilot review) — notes is
     # non-empty, so current is guaranteed parseable here.
-    parsed = _parse_version(current)
+    # notes is non-empty, so current is guaranteed parseable; the ``or`` fallback
+    # is inert and only narrows the type away from None for the checker.
+    parsed = _parse_version(current) or (0, 0, 0)
     span = _describe_version_span(prev, current) or f"v{'.'.join(map(str, parsed))}"
     console.print(f"\n[bold]Upgrade notes[/bold] — {span}:")
     for version, entry in notes:
@@ -1286,9 +1294,9 @@ def _classify_addition(rel: Path) -> tuple[str, str]:
     return "misc", "Miscellaneous new files"
 
 
-def _addition_groups(new_paths: list[Path], staging: Path) -> dict[str, dict]:
+def _addition_groups(new_paths: list[Path], staging: Path) -> dict[str, dict[str, Any]]:
     """Bucket new files into addition groups, each with a content hash."""
-    groups: dict[str, dict] = {}
+    groups: dict[str, dict[str, Any]] = {}
     for rel in sorted(new_paths):
         gid, rationale = _classify_addition(rel)
         groups.setdefault(gid, {"paths": [], "rationale": rationale})["paths"].append(rel)
@@ -1342,8 +1350,11 @@ def _write_declined(target: Path, declined: dict[str, str]) -> None:
 
 
 def _resolve_addition_consent(
-    target: Path, groups: dict, accept_new: list[str], decline_new: list[str]
-) -> dict:
+    target: Path,
+    groups: dict[str, dict[str, Any]],
+    accept_new: list[str],
+    decline_new: list[str],
+) -> dict[str, Any]:
     """Classify each addition group as accepted / declined / undecided.
 
     A previously-declined group stays declined only while its content hash is
@@ -1376,7 +1387,7 @@ def _resolve_addition_consent(
     }
 
 
-def _print_addition_gate(groups: dict, undecided: set) -> None:
+def _print_addition_gate(groups: dict[str, dict[str, Any]], undecided: set[str]) -> None:
     """Print the consent gate that blocks --apply until new groups are decided."""
     from rich.console import Console
 
@@ -1414,7 +1425,9 @@ def _describe_version_span(prev: str | None, current: str | None) -> str:
     return f"v{pv} → v{cv} ({level} update)"
 
 
-def _print_addition_summary(groups: dict, gate: dict, span: str = "") -> None:
+def _print_addition_summary(
+    groups: dict[str, dict[str, Any]], gate: dict[str, Any], span: str = ""
+) -> None:
     """Frame addition groups as opt-in recommendations (#249/#250).
 
     Pull-and-recommend: new additions are surfaced with the version span they
@@ -1630,7 +1643,7 @@ def _interactive_select(report: DriftReport) -> None:
         paths[:] = kept
 
 
-def _show_interactive_diff(console, report: DriftReport, rel: Path) -> None:
+def _show_interactive_diff(console: Console, report: DriftReport, rel: Path) -> None:
     """Print the drift (and any merge result) for one file during the walk."""
     diff = report.diffs.get(rel)
     if diff:

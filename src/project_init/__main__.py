@@ -8,6 +8,10 @@ import sys
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from rich.tree import Tree
 
 from project_init import __plugin_version__, __repo_url__, __version__
 from project_init.console import (
@@ -48,7 +52,7 @@ class ScaffoldInputs:
     project_name: str
     project_description: str
     language: str
-    selected_mcps: list[dict]
+    selected_mcps: list[dict[str, Any]]
     owner: str
     license_choice: str
     devcontainer: bool
@@ -150,7 +154,7 @@ def _python_floor_from_pyproject(target: Path | None) -> str | None:
 
 
 def _validate_review_cycles(
-    args, parser: argparse.ArgumentParser, effective_lifecycle: str | None
+    args: argparse.Namespace, parser: argparse.ArgumentParser, effective_lifecycle: str | None
 ) -> None:
     """Reject an unusable --review-cycles before the target dir or any prompt.
 
@@ -179,7 +183,7 @@ def _validate_review_cycles(
         )
 
 
-def _resolve_review_cycles(args, effective_lifecycle: str) -> int:
+def _resolve_review_cycles(args: argparse.Namespace, effective_lifecycle: str) -> int:
     """The non-interactive count (#714). _validate_review_cycles has already run."""
     if effective_lifecycle == "none":
         return 0
@@ -583,7 +587,7 @@ def _prompt_validated(label: str, *, default: str, flag: str, allow_empty: bool 
         console.print(f"[red]{err}[/red]")
 
 
-def _default_preset_index(presets: list[dict]) -> int:
+def _default_preset_index(presets: list[dict[str, Any]]) -> int:
     """1-based index of the preset to default to at the interactive prompt.
 
     Presets are listed sorted by filename, so an opt-in overlay preset like
@@ -602,7 +606,7 @@ def _default_preset_index(presets: list[dict]) -> int:
     return 1
 
 
-def _choose_preset_interactive(presets: list[dict]) -> dict:
+def _choose_preset_interactive(presets: list[dict[str, Any]]) -> dict[str, Any]:
     from rich.panel import Panel
 
     # Value framing (#472, ADR-023): say what a preset *is* and that it's only a
@@ -631,7 +635,7 @@ def _choose_preset_interactive(presets: list[dict]) -> dict:
     return presets[choice - 1]
 
 
-def _choose_mcps_interactive(catalog: list[dict]) -> list[dict]:
+def _choose_mcps_interactive(catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
     from rich.prompt import Prompt
 
     console.print(
@@ -716,13 +720,13 @@ def _choose_profile_interactive() -> str:
 def _resolve_mcps_non_interactive(
     mcps_arg: str,
     browser_arg: bool,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Parse non-interactive MCP flags into a flat list of selected MCPs.
 
     Raises ValueError on unknown MCP IDs — silently ignoring them hides typos.
     """
     catalog_by_id = {m["id"]: m for m in MCP_CATALOG}
-    selected: list[dict] = []
+    selected: list[dict[str, Any]] = []
     seen: set[str] = set()
     unknown: list[str] = []
 
@@ -768,7 +772,7 @@ _MEMORY_NEXT_STEPS = {
 }
 
 
-def _presets_payload(presets: list[dict]) -> list[dict]:
+def _presets_payload(presets: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Machine-readable preset list for an orchestrator (#510).
 
     Name, description, and the default memory stack each preset scaffolds — enough
@@ -777,7 +781,7 @@ def _presets_payload(presets: list[dict]) -> list[dict]:
     is applied (e.g. ``governed`` inherits ``obsidian-only``'s ``memory_stack``);
     reading the raw TOML would otherwise advertise the wrong stack (#511 review).
     """
-    payload = []
+    payload: list[dict[str, Any]] = []
     for p in presets:
         name = p.get("name", "")
         try:
@@ -796,7 +800,7 @@ def _presets_payload(presets: list[dict]) -> list[dict]:
 
 def _scaffold_result_payload(
     target: Path, created: list[Path], preset_name: str, variables: dict[str, str]
-) -> dict:
+) -> dict[str, Any]:
     """Machine-readable scaffold result for an orchestrator (#510).
 
     Carries the resolved memory descriptor (the same fields a root layer reads
@@ -828,7 +832,13 @@ def _scaffold_result_payload(
 
 
 def _emit_scaffold_output(  # noqa: PLR0913 — one arg per piece of the result
-    args, target: Path, created: list[Path], preset: dict, variables: dict, inputs, conflicts
+    args: argparse.Namespace,
+    target: Path,
+    created: list[Path],
+    preset: dict[str, Any],
+    variables: dict[str, str],
+    inputs: ScaffoldInputs,
+    conflicts: list[tuple[Path, Path]],
 ) -> None:
     """Emit the post-scaffold result.
 
@@ -855,7 +865,7 @@ def _emit_scaffold_output(  # noqa: PLR0913 — one arg per piece of the result
     _print_mcp_commands(inputs.selected_mcps)
 
 
-def _emit_preset_list(presets: list[dict], *, as_json: bool) -> None:
+def _emit_preset_list(presets: list[dict[str, Any]], *, as_json: bool) -> None:
     """Print the preset list for `--list-presets` (#510): JSON array or a human line each."""
     if as_json:
         print(json.dumps(_presets_payload(presets)))
@@ -897,7 +907,7 @@ def _print_summary(
     facts.add_row("Files", f"[success]{files_count}[/success] created/updated")
     facts.add_row("Target", str(target.resolve()))
 
-    rows: list = [facts, Rule(style="muted"), _directory_tree(dirs)]
+    rows: list[Any] = [facts, Rule(style="muted"), _directory_tree(dirs)]
     if next_step:
         rows.append(f"[heading]Next[/heading]  {next_step}")
     if git_missing:
@@ -963,12 +973,12 @@ def _print_summary_plain(  # noqa: PLR0913 — one arg per rendered summary fiel
     print()
 
 
-def _directory_tree(dirs: list[str], *, limit: int = 24):
+def _directory_tree(dirs: list[str], *, limit: int = 24) -> Tree:
     """A nested rich Tree of the created directories (flat list was fragile)."""
     from rich.tree import Tree
 
     root = Tree("[heading].[/heading]", guide_style="muted")
-    nodes: dict[str, object] = {"": root}
+    nodes: dict[str, Tree] = {"": root}
     for d in dirs[:limit]:
         path = ""
         parent = root
@@ -1404,7 +1414,7 @@ def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
     console.print()
 
 
-def _print_mcp_commands(selected: list[dict]) -> None:
+def _print_mcp_commands(selected: list[dict[str, Any]]) -> None:
     """Print the bare claude mcp add commands for the chosen MCPs."""
     if not selected:
         return
@@ -1449,8 +1459,8 @@ def _require_non_interactive_args(
 
 
 def _select_preset(
-    args: argparse.Namespace, parser: argparse.ArgumentParser, presets: list[dict]
-) -> dict:
+    args: argparse.Namespace, parser: argparse.ArgumentParser, presets: list[dict[str, Any]]
+) -> dict[str, Any]:
     """Resolve the preset from flags or interactive choice (exits on bad --preset)."""
     if args.preset:
         try:
@@ -1516,7 +1526,7 @@ def _resolve_overlays_interactive(
     return resolved_delivery, resolved_deploy, resolved_iac
 
 
-def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict]:
+def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict[str, Any]]:
     """Resolve MCPs for the wizard: honor --mcps/--browser, else prompt (PI review).
 
     A bad ``--mcps`` id warns and falls back to the catalog rather than crashing
@@ -2277,7 +2287,7 @@ def _concern_main(argv: list[str], *, enable: bool) -> int:
 
 
 def _build_variables(
-    preset: dict, inputs: ScaffoldInputs, target: Path | None = None
+    preset: dict[str, Any], inputs: ScaffoldInputs, target: Path | None = None
 ) -> dict[str, str]:
     """Assemble the template render context from the resolved inputs."""
     project_name = inputs.project_name
@@ -2478,8 +2488,8 @@ def _build_variables(
 
 
 def _resolve_inputs(
-    args,
-    parser,
+    args: argparse.Namespace,
+    parser: argparse.ArgumentParser,
     target: Path,
     preset_memory: str = "obsidian-only",
     preset_lifecycle: str = "github",
@@ -2686,7 +2696,7 @@ def main(argv: list[str] | None = None) -> int:
         return 130
 
 
-def _resolve_preset_memory(preset: dict, parser: argparse.ArgumentParser) -> str:
+def _resolve_preset_memory(preset: dict[str, Any], parser: argparse.ArgumentParser) -> str:
     """Normalize + validate a preset's ``memory_stack`` (#466).
 
     Normalizes the friendly ``obsidian`` alias and rejects a typo'd stack up
@@ -2704,7 +2714,7 @@ def _resolve_preset_memory(preset: dict, parser: argparse.ArgumentParser) -> str
     return resolved
 
 
-def _resolve_preset_lifecycle(preset: dict, parser: argparse.ArgumentParser) -> str:
+def _resolve_preset_lifecycle(preset: dict[str, Any], parser: argparse.ArgumentParser) -> str:
     """Validate a preset's ``lifecycle`` tier (#476).
 
     Only the exact string ``"none"`` disables the lifecycle downstream
@@ -2719,7 +2729,9 @@ def _resolve_preset_lifecycle(preset: dict, parser: argparse.ArgumentParser) -> 
             f"preset {preset['name']!r} declares an invalid lifecycle "
             f"{raw!r}; valid: {', '.join(_LIFECYCLE_TIERS)}"
         )
-    return raw
+    # raw matched a tier in _LIFECYCLE_TIERS (all str), so str() is a no-op that
+    # only narrows the JSON/TOML-sourced Any back to str for the checker.
+    return str(raw)
 
 
 # Subcommand names, single-sourced for _cli dispatch AND the bare-target
@@ -2727,7 +2739,9 @@ def _resolve_preset_lifecycle(preset: dict, parser: argparse.ArgumentParser) -> 
 _SUBCOMMANDS = ("upgrade", "add", "remove", "preset")
 
 
-def _record_scaffold(target: Path, preset: dict, variables: dict, created: list[Path]) -> None:
+def _record_scaffold(
+    target: Path, preset: dict[str, Any], variables: dict[str, str], created: list[Path]
+) -> None:
     """Write the scaffold record and keep the created-list honest.
 
     The record lets a later `project-init upgrade` re-render faithfully and

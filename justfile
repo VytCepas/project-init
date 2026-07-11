@@ -17,6 +17,12 @@ lint:
 format:
     uv run ruff format .
 
+# static type-check src/ under mypy --strict (config in mypy.ini; #639). mypy is
+# pulled in ephemerally via `uv run --with`, mirroring the scaffolded
+# justfile.tmpl — no dev-dependency to forget. ruff lints; it does not type-check.
+typecheck:
+    uv run --with "mypy>=1.10" --with pip mypy --install-types --non-interactive src/
+
 # run the test suite
 test:
     uv run pytest --tb=short -q
@@ -51,7 +57,7 @@ audit:
     uv run --all-extras --with pip-audit pip-audit
 
 # what CI runs
-ci: lint test audit
+ci: lint typecheck test audit
 
 # sync the plugin payload from templates (PI-129)
 sync-plugin:
