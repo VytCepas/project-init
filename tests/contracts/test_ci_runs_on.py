@@ -70,6 +70,13 @@ class TestCiRunsOnEscapeHatch:
         # (which would cancel scheduled fuzz/mutation/scorecard runs) fails.
         assert cip is not True, "cancel-in-progress must be pull_request-gated, not a bare true"
         assert cip == "${{ github.event_name == 'pull_request' }}"
+        # The group must include github.event_name so push/schedule/PR runs get
+        # distinct groups — otherwise a long nightly on the base branch and a
+        # base-branch push would share a group and serialize. Lock it in.
+        assert "github.event_name" in str(concurrency.get("group", "")), (
+            "concurrency.group must include github.event_name to avoid "
+            "push/schedule runs serializing behind each other"
+        )
 
     def test_scorecard_stays_pinned_but_gate_follows(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
