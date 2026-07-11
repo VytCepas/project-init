@@ -14,6 +14,7 @@ from pathlib import Path
 
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
+from tests.workflow import load_workflow
 
 _EXPR = "${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}"
 
@@ -59,10 +60,15 @@ class TestCiRunsOnEscapeHatch:
         runs, so the gate on `github.event_name == 'pull_request'` is load-bearing.
         """
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        text = (tmp_target / ".github" / "workflows" / "ci.yml").read_text()
-        assert "concurrency:" in text
-        assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in text
-        assert "cancel-in-progress: true" not in text
+        concurrency = load_workflow(tmp_target).get("concurrency")
+        assert isinstance(concurrency, dict), "ci.yml has no concurrency block"
+        cip = concurrency["cancel-in-progress"]
+        # yaml parses a bare `true` to the boolean True; the gated expression
+        # parses to its string. Assert structurally so a comment mentioning
+        # "cancel-in-progress: true" can't fool the check, and a real bare-true
+        # (which would cancel scheduled fuzz/mutation/scorecard runs) fails.
+        assert cip is not True, "cancel-in-progress must be pull_request-gated, not a bare true"
+        assert cip == "${{ github.event_name == 'pull_request' }}"
 
     def test_scorecard_stays_pinned_but_gate_follows(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())

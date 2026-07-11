@@ -63,6 +63,14 @@ render separately) and it widens the permission scope (board/review jobs need
 `projects`/`statuses` write), entangles triggers, and enlarges the blast radius
 of a single YAML error (#719).
 
+**Supersedes the original #589 proposal.** #589 first suggested regrouping jobs
+into ~3 workflow files to get GitHub checks-UI headings. That's the "merge the
+workflow files" move above — investigating it showed it doesn't reduce the visible
+rows and costs permission scope + trigger clarity, so we deliberately *don't* do
+it. Closing #589 with this policy is the reasoned resolution, not a dropped
+requirement: the cognitive-load goal is met by the one-required-gate model plus
+the drift guard, without the file reshuffle.
+
 **Adopted low-risk wins (both surfaces):** `concurrency: cancel-in-progress` on
 `ci.yml` — a new PR push cancels the superseded run, saving runner-minutes on
 review-cycle churn. Gated to `pull_request` events (`cancel-in-progress: ${{
