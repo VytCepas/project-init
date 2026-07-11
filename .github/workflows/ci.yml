@@ -75,6 +75,14 @@ jobs:
         # a dip is visible in the log and never blocks an unrelated PR.
         run: uv run pytest --tb=short -q --cov --cov-report=term-missing
 
+      # Dependency vulnerability scan (#637). gitleaks (secret-scan job) catches
+      # committed secrets; nothing else here catches a correctly-spelled dep
+      # already in uv.lock with a known CVE. pip-audit is pulled in ephemerally
+      # via `uv run --with`, the same pattern the scaffolded ci.yml.tmpl uses —
+      # no dev-dependency to forget. Mirrors the template's `just audit` step.
+      - name: Dependency vulnerability scan (pip-audit)
+        run: just audit
+
   wheel-smoke:
     name: Wheel smoke test
     runs-on: ubuntu-24.04
