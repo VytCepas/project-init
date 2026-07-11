@@ -40,9 +40,17 @@ Only meaningful where a mutation runner is wired for the language:
 | Rust | `cargo-mutants` | not scaffolded yet — fall back to §5 |
 | Go | `gremlins` / `go-mutesting` | not scaffolded yet — fall back to §5 |
 
-For Python: scope `[tool.mutmut] source_paths` in `pyproject.toml` to the target
-module, then `just test-mutation`. It reports **surviving mutants** — code
-changes the tests did NOT catch. Each survivor is a hole in the suite.
+For Python, target the run **without committing a narrower config**. The
+nightly CI `mutation-tests` job reads `[tool.mutmut] source_paths` from
+`pyproject.toml`, so committing a scoped-down `source_paths` silently shrinks
+CI's mutation coverage to your one module. Instead:
+
+- run mutmut with a per-run path filter — `uv run --with mutmut mutmut run <path/to/module>` — leaving the committed config alone, **or**
+- temporarily narrow `source_paths` and **restore it before committing**.
+
+`just test-mutation` runs the full configured scope (what CI runs). Either way,
+mutmut reports **surviving mutants** — code changes the tests did NOT catch.
+Each survivor is a hole in the suite.
 
 If the language has no wired mutation tool, say so plainly and drop to §5 (the
 manual loop) — do not pretend a score exists.
