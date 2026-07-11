@@ -25,6 +25,9 @@ def test_shared_skill_template_sources_exist():
     """A named source that doesn't exist means the tool compares nothing and
     still prints a green-looking summary — the exact blind spot it guards.
     """
+    # Non-empty first: an emptied SHARED_SKILLS makes this loop (and the tool)
+    # a silent no-op that still reports green (Copilot review).
+    assert skill_drift.SHARED_SKILLS, "SHARED_SKILLS is empty — the tool checks nothing"
     for name, rel in skill_drift.SHARED_SKILLS.items():
         assert (_ROOT / rel).is_file(), f"SHARED_SKILLS[{name!r}] -> missing {rel}"
 
