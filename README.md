@@ -321,6 +321,26 @@ changelog fetch).
 number) — only its `project_init_version` and the scaffold record are
 refreshed.
 
+### Health-checking a scaffolded project
+
+`.claude/` wiring can break silently — a hook loses its executable bit,
+`settings.json` gets hand-edited into invalid JSON, a referenced script is
+deleted, or the git hooks were never installed. `doctor` runs a fixed checklist
+and prints `PASS`/`WARN`/`FAIL` with a fix hint per line, exiting non-zero on
+any `FAIL`:
+
+```bash
+project-init doctor                       # check the current directory
+project-init doctor /path/to/my-project   # or a specific project
+```
+
+It checks that `.agents/config.yaml` carries a scaffold record, that
+`.claude/settings.json` is valid JSON referencing only scripts that exist and
+are executable, that the project-init plugin(s) are enabled (plugin mode) or the
+fallback hooks are present (`--no-plugin`), that the git hooks are installed
+(a warning, not a failure, before `git init`), and that a Python interpreter is
+resolvable for the hooks. Deterministic — no LLM, no network.
+
 How it works: scaffolding records the preset, template variables, and a
 content-hash manifest in a `scaffold:` block at the end of
 `.agents/config.yaml`, plus the rendered text of each managed (UTF-8) file in a
