@@ -73,6 +73,7 @@ SYNCED: dict[str, str | tuple[str, object]] = {
     "scripts/create_issue.sh": "lifecycle/dot_agents/scripts/create_issue.sh",
     "scripts/start_issue.sh": "lifecycle/dot_agents/scripts/start_issue.sh",
     "scripts/setup_github.sh": "lifecycle/dot_agents/scripts/setup_github.sh",
+    "scripts/backfill_board_done.sh": "lifecycle/dot_agents/scripts/backfill_board_done.sh",
     # reconciled from DIVERGED (#708): the template's extras (gh hard-require,
     # gh_host.sh sourcing incl. the org-profile admin guard, _py.sh interpreter
     # resolution) strictly supersede the repo copy's wording tweaks; both
