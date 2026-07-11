@@ -89,7 +89,7 @@ ci: setup lint typecheck test-cov audit
 
 # fast local gate for the pre-push hook: lint + parallel tests (CI is the full
 # backstop, so pre-push stays fast and doesn't re-run typecheck/coverage/audit)
-fast-check: lint test
+fast-ci: lint test
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
@@ -192,7 +192,7 @@ ci: setup lint typecheck test audit
 
 # fast local gate for the pre-push hook: lint + parallel tests (CI is the full
 # backstop, so pre-push stays fast and doesn't re-run typecheck/audit)
-fast-check: lint test
+fast-ci: lint test
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
@@ -289,7 +289,7 @@ ci: lint typecheck test-cov audit
 
 # fast local gate for the pre-push hook: lint + parallel tests (CI is the full
 # backstop, so pre-push stays fast and doesn't re-run typecheck/coverage/audit)
-fast-check: lint test
+fast-ci: lint test
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
@@ -400,7 +400,7 @@ ci: lint typecheck test-cov audit
 
 # fast local gate for the pre-push hook: lint + parallel tests (CI is the full
 # backstop, so pre-push stays fast and doesn't re-run typecheck/coverage/audit)
-fast-check: lint test
+fast-ci: lint test
 
 # route CI to a self-hosted runner when Actions minutes run out (PI-666);
 # requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md

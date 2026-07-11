@@ -3,7 +3,7 @@
 # in the tools and their configs, never in this file.
 
 # install/sync dev dependencies + enable the local pre-push gate (dogfood).
-# core.hooksPath points git at .githooks/, so `just fast-check` runs before every push.
+# core.hooksPath points git at .githooks/, so `just fast-ci` runs before every push.
 setup:
     uv sync --group dev
     git config core.hooksPath .githooks
@@ -68,7 +68,7 @@ ci: lint typecheck test audit
 # backstop, so we don't re-run the whole gate before every push (PI-759). Keeps
 # the push→CI loop fast while still catching the common break (a failing test).
 # fast local gate for the pre-push hook: lint + parallel tests
-fast-check: lint test
+fast-ci: lint test
 
 # sync the plugin payload from templates (PI-129)
 sync-plugin:

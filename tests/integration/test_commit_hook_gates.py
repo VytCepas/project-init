@@ -5,7 +5,7 @@ Three layers, each closing a gap the others leave:
 - **git `pre-commit`** now runs `just lint` (not only gitleaks), so a *human*
   committing from a terminal/IDE is held to the same static gate as CI — the
   Claude `pre_commit_gate.sh` only fires for agent-driven commits.
-- **git `pre-push`** runs the fast `just fast-check` (lint + parallel tests), so
+- **git `pre-push`** runs the fast `just fast-ci` (lint + parallel tests), so
   the common break is caught locally without re-running the full `just ci` (CI's
   job) before every push (PI-759).
 - **`pre_commit_gate.sh`** (the agent commit gate) gained a per-file shell block
@@ -68,13 +68,13 @@ def test_git_pre_commit_runs_lint_and_keeps_secret_scan(tmp_target: Path):
     assert "gitleaks" in pre_commit
 
 
-def test_git_pre_push_runs_fast_check(tmp_target: Path):
+def test_git_pre_push_runs_fast_ci(tmp_target: Path):
     _, pre_push = _git_hooks(tmp_target)
-    # The gate command is the lighter `just fast-check` (lint + parallel tests),
+    # The gate command is the lighter `just fast-ci` (lint + parallel tests),
     # not the full `just ci` — CI is the full backstop (PI-759). Assert the actual
     # invocation, not a substring that also appears in the explanatory comment.
-    assert "just fast-check" in pre_push
-    assert "just --show fast-check" in pre_push
+    assert "just fast-ci" in pre_push
+    assert "just --show fast-ci" in pre_push
     # Only for a real branch push, and still bypassable in an emergency.
     assert "PUSHING_BRANCH" in pre_push
     assert "--no-verify" in pre_push

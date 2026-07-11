@@ -96,21 +96,21 @@ class TestJustfilePerLanguage:
 
     @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
     def test_fast_check_is_lighter_than_ci(self, tmp_path: Path, language):
-        """PI-759: every language ships a `fast-check: lint test` recipe for the
+        """PI-759: every language ships a `fast-ci: lint test` recipe for the
         pre-push hook — the fast local gate. It must be strictly lighter than
         `ci` (no typecheck/audit/coverage), so pushing stays fast while CI runs
         the full gate. The pre-push hook invokes exactly this recipe.
         """
         target = _scaffold_language(tmp_path / language, language)
         text = (target / "justfile").read_text()
-        assert re.search(r"^fast-check: lint test\s*$", text, re.MULTILINE)
+        assert re.search(r"^fast-ci: lint test\s*$", text, re.MULTILINE)
         # Guard against silently promoting it back to the heavy gate — on the
         # header line...
-        assert not re.search(r"^fast-check:.*\b(typecheck|audit|test-cov)\b", text, re.MULTILINE)
-        # ...and in a body: `fast-check` must stay dependency-only, so a stray
+        assert not re.search(r"^fast-ci:.*\b(typecheck|audit|test-cov)\b", text, re.MULTILINE)
+        # ...and in a body: `fast-ci` must stay dependency-only, so a stray
         # `just typecheck`/`audit` line can't sneak the heavy gate back in
         # while the header still reads `lint test` (Copilot review, PR #760).
-        assert _recipe_body(text, "fast-check").strip() == ""
+        assert _recipe_body(text, "fast-ci").strip() == ""
 
     def test_node_ci_recipe_includes_typecheck(self, tmp_path: Path):
         target = _scaffold_language(tmp_path / "n", "node")
