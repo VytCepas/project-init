@@ -196,7 +196,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     against PyPI/npm/crates.io), wired into settings.json and documented (#564)
 #     memory-move content change
 #   • issue-validation.yml — self-populating board metadata: auto-ensures the
-#     type label from the body "- Type:" for MCP/API-created issues
+#     type label from the body "- Type:" for MCP/API-created issues, and derives
+#     area:<slug> label(s) from the body Area field (PI-777); issue-metadata.md
+#     documents that derivation
 #   • report_upstream_issue skill (SKILL.md + INDEX/README/project-init.md rows)
 #     — new default-on skill routing tooling bugs upstream to project-init
 #   • token_efficiency skill (PI-647) — new default-on skill with token-frugal
@@ -240,6 +242,7 @@ _ADDED_SINCE_BASELINE = {
     ".agents/scripts/create_issue.sh",
     ".github/workflows/board-automation.yml",
     ".github/workflows/issue-validation.yml",
+    ".agents/docs/guides/issue-metadata.md",
     # #629: workflow actions pinned to commit SHAs so a fresh scaffold no longer
     # trips its own Semgrep mutable-action-tag gate. ci.yml/board-automation.yml
     # already excluded above; project-init-upgrade.yml is the remaining drift.

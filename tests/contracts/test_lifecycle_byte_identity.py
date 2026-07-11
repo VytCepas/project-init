@@ -208,7 +208,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #   • board-automation.yml / issue-validation.yml — self-populating board
 #     metadata: dual-format ("### Heading" + "- Field: value") body parsing so
 #     issues created outside the web form still populate all board fields, plus
-#     auto-ensuring the type label from the body "- Type:" for MCP/API issues
+#     auto-ensuring the type label from the body "- Type:" for MCP/API issues,
+#     and (PI-777 area labels) deriving area:<slug> label(s) from the body Area
+#     field for click-to-filter; issue-metadata.md documents the derivation
 #   • skills/report_upstream_issue/SKILL.md + skills/INDEX.md — new default-on
 #     skill that routes tooling/scaffolding bugs upstream to project-init; only
 #     the --no-plugin combos copy the skill in (plugin mode ships it via the
@@ -260,6 +262,7 @@ _ADDED_SINCE_BASELINE = {
     ".agents/scripts/create_issue.sh",
     ".github/workflows/board-automation.yml",
     ".github/workflows/issue-validation.yml",
+    ".agents/docs/guides/issue-metadata.md",
     ".agents/config.yaml",
     ".agents/hooks/session_setup.sh",
     "mypy.ini",

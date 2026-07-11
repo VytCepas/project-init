@@ -70,6 +70,54 @@ class TestIssueMetadataScaffold:
         assert 'gh label create "$label"' in content
         assert '--add-label "$label"' in content
 
+    def test_issue_validation_derives_area_labels(self):
+        """The free-text Area value is turned into facetable area:<slug> label(s)
+        for click-to-filter, comma-separated areas each get one, and it is
+        best-effort (never blocks — the Area value itself is already required)."""
+        content = (self.target / ".github" / "workflows" / "issue-validation.yml").read_text()
+        assert "apply_area_labels" in content
+        assert "apply_area_labels\n" in content  # actually called, not just defined
+        assert 'parse_body_field "Area"' in content
+        assert 'gh label create "area:$slug"' in content
+        assert '--add-label "area:$slug"' in content
+        # Comma-split so "ci, templates" becomes two labels.
+        assert 'tr "," ' in content or "tr ',' " in content
+
+    def test_area_label_slugification_executes(self, tmp_path: Path):
+        """Run the *shipped* parse_body_field/apply_area_labels against sample
+        bodies with a mocked gh — proves the slug logic, comma-split, and
+        unset/empty skips actually work, not just that the text is present."""
+        import re
+        import textwrap
+
+        bash = shutil.which("bash")
+        if bash is None:
+            pytest.skip("bash not available")
+        wf = (self.target / ".github" / "workflows" / "issue-validation.yml").read_text()
+        # Extract the two real functions (contiguous block) from the shipped file,
+        # so this exercises the shipped code — not a copy that could drift green.
+        start = wf.index("# Dual-format body field reader")
+        end = wf.index('has_body_value "Priority"')
+        block = textwrap.dedent(wf[start:end])
+
+        # The shipped code sends gh output to /dev/null and echoes
+        # "Applied area label 'area:<slug>'." on a successful add — so mock gh to
+        # just succeed and parse that real output line.
+        harness = (
+            "set -euo pipefail\n"
+            "ISSUE_NUMBER=1\n"
+            "gh() { return 0; }\n" + block + "\n"
+            'ISSUE_BODY="- Area: CI, Scaffold Engine"; apply_area_labels\n'
+            'ISSUE_BODY="### Area\n\nlifecycle\n"; apply_area_labels\n'
+            'ISSUE_BODY="- Area: unset"; apply_area_labels\n'
+            'ISSUE_BODY="- Priority: high"; apply_area_labels\n'
+        )
+        out = subprocess.run(
+            [bash, "-c", harness], capture_output=True, text=True, check=True
+        ).stdout
+        labels = re.findall(r"Applied area label '(area:[a-z0-9-]+)'", out)
+        assert labels == ["area:ci", "area:scaffold-engine", "area:lifecycle"], labels
+
     def test_board_automation_syncs_metadata_fields(self):
         content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
         assert "PROJECT_TOKEN" in content
@@ -114,6 +162,11 @@ class TestIssueMetadataScaffold:
         content = doc.read_text()
         assert "GitHub labels" in content
         assert "markdown body" in content
+        # The area-label auto-derivation is documented so agents set the Area
+        # field rather than hand-crafting labels (excluded from byte-identity, so
+        # this is the content guard for that doc line).
+        assert "area:<slug>" in content
+        assert "click-to-filter" in content
 
     def test_setup_github_script_created(self):
         script = self.target / ".agents" / "scripts" / "setup_github.sh"
