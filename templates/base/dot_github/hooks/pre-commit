@@ -32,12 +32,13 @@ if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
   # touched" — treating it as such destroyed uncommitted work on every commit.
   # Three independent guards, outermost first:
   #
-  #   1. Refuse to isolate at all when the diff touches a symlink or a gitlink
-  #      (raw mode 120000/160000). This is the guard that actually catches the
-  #      reported case — a symlink replaced by a directory. Note `git apply -R
-  #      --check` returns 0 on that diff and the real apply then wrecks the tree,
-  #      so the dry run CANNOT be relied on here; and git reports it as a plain
-  #      delete, so `--diff-filter=T` does not see it either. Mode-sniffing does.
+  #   1. Refuse to isolate at all when the diff cannot survive an apply (see
+  #      _isolable). This is the guard that actually catches the reported cases;
+  #      the two obvious alternatives do NOT, and both were tried:
+  #        - `git apply -R --check` returns 0 on these diffs, and the real apply
+  #          then wrecks the tree. The dry run cannot be relied on.
+  #        - git reports the replacement as a plain delete, not a type change,
+  #          so `--diff-filter=T` comes back empty.
   #   2. Dry-run anyway (`--check` writes nothing) for the classes it does catch.
   #   3. Install the restore trap BEFORE the real apply, never after — a partial
   #      revert with no trap has nothing to undo it.
@@ -45,7 +46,19 @@ if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
   # And never delete the patch on a failure path: it is the only copy of the
   # user's unstaged work.
   _isolable() {
-    # Any diff line whose old/new mode is a symlink (120000) or gitlink (160000).
+    # A path in the diff that is now a DIRECTORY in the worktree: `git apply`
+    # cannot write a file where a directory stands, and it fails only *after*
+    # deleting earlier files in the patch. Covers both replacement shapes — a
+    # tracked symlink swapped for a dir (what `project-init upgrade` does to
+    # `.claude`) AND a tracked regular file swapped for a dir; the file's mode
+    # stays 100644, so mode-sniffing alone would miss the second entirely.
+    local _f
+    while IFS= read -r -d '' _f; do
+      if [ -d "$_f" ]; then
+        return 1
+      fi
+    done < <(git diff --name-only -z 2>/dev/null)
+    # Symlinks and gitlinks are fragile under apply even without a dir clash.
     ! git diff --raw 2>/dev/null | awk '{print $1, $2}' | grep -qE '120000|160000'
   }
   _patch=""
