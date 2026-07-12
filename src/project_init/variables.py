@@ -777,11 +777,15 @@ def _text_field_error(flag: str, value: str, *, allow_empty: bool = False) -> st
     if (
         '"' in value
         or "\\" in value
-        # 0x85 (NEL), 0x2028 (LINE SEPARATOR), 0x2029 (PARAGRAPH SEPARATOR) are
-        # > 0x20 so they slip past the C0 check, but Python's str.splitlines()
-        # treats them as line breaks — they'd split a single-line YAML value
-        # mid-parse on a later upgrade (PI-535).
-        or any(ord(ch) < 0x20 or ord(ch) in (0x7F, 0x85, 0x2028, 0x2029) for ch in value)
+        # DEL (0x7F) + the C1 control block (0x80-0x9F, which includes NEL 0x85)
+        # are non-printable in the YAML spec — a strict parser (the descriptor
+        # oracle + the orchestrator) rejects them even inside a double-quoted
+        # scalar (PI-806, found via property-based test). 0x2028/0x2029 are
+        # > 0x9F but Python's str.splitlines() breaks a single-line value on
+        # them (PI-535). C0 (< 0x20) covers the rest.
+        or any(
+            ord(ch) < 0x20 or 0x7F <= ord(ch) <= 0x9F or ord(ch) in (0x2028, 0x2029) for ch in value
+        )
     ):
         return (
             f"{flag} must not contain double-quotes, backslashes, newlines, or "
