@@ -142,6 +142,7 @@ Per-surface agent-config generation (ADR-017, PI-366).
 - `def scaffold_record_path` — Locate *target*'s scaffold record, tolerating the pre-PI-606 location.
 - `class UpgradeError` — Raised when the project cannot be upgraded (missing/invalid config).
 - `class DriftReport` — Outcome of comparing a fresh render against the scaffolded project.
+- `def upgrade_base_path` — Locate the merge-base sidecar, tolerating the pre-PI-606 ``.claude/`` home.
 - `def read_base` — Return the recorded ``{rel: rendered-text}`` merge base, or ``{}``.
 - `def write_base` — Persist the ``{rel: rendered-text}`` merge base sidecar (sorted, pretty).
 - `def write_scaffold_record` — Append/replace the scaffold record block in .agents/config.yaml.

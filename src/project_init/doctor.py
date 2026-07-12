@@ -56,7 +56,6 @@ def check_scaffold_record(target: Path) -> tuple[Check, dict[str, str] | None]:
     without re-reading the file.
     """
     from project_init.upgrade import (
-        _CONFIG_REL,
         UpgradeError,
         _backfill_variables,
         _migrate_agents,
@@ -65,14 +64,17 @@ def check_scaffold_record(target: Path) -> tuple[Check, dict[str, str] | None]:
     )
 
     # Tolerates the pre-PI-606 `.claude/config.yaml` location, or doctor would
-    # report a legacy scaffold as "never scaffolded" too (PI-813).
+    # report a legacy scaffold as "never scaffolded" too (PI-813). Messages below
+    # name the path actually read — printing the canonical path while reading the
+    # legacy one produced diagnostics that pointed at the wrong file.
     config = scaffold_record_path(target)
+    shown = config.relative_to(target) if config.is_relative_to(target) else config
     if not config.is_file():
         return (
             Check(
                 "FAIL",
                 "scaffold record",
-                f"{_CONFIG_REL} not found",
+                f"{shown} not found",
                 hint="this directory was not scaffolded by project-init (or the record was deleted)",
             ),
             None,
@@ -81,7 +83,7 @@ def check_scaffold_record(target: Path) -> tuple[Check, dict[str, str] | None]:
         text = config.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         return (
-            Check("FAIL", "scaffold record", f"cannot read {_CONFIG_REL}: {exc}"),
+            Check("FAIL", "scaffold record", f"cannot read {shown}: {exc}"),
             None,
         )
     try:
@@ -101,7 +103,7 @@ def check_scaffold_record(target: Path) -> tuple[Check, dict[str, str] | None]:
             Check(
                 "WARN",
                 "scaffold record",
-                f"{_CONFIG_REL} has no scaffold-record marker (pre-record or hand-edited)",
+                f"{shown} has no scaffold-record marker (pre-record or hand-edited)",
                 hint="run `project-init upgrade` to reconcile, or restore from git",
             ),
             None,
@@ -113,7 +115,7 @@ def check_scaffold_record(target: Path) -> tuple[Check, dict[str, str] | None]:
     # and false-FAIL a valid copied-hooks project (Codex review). The backfill
     # defaults such records to no_plugin, which is what pre-plugin scaffolds were.
     variables = _migrate_agents(_backfill_variables(variables))
-    return Check("PASS", "scaffold record", f"{_CONFIG_REL} records preset {_preset!r}"), variables
+    return Check("PASS", "scaffold record", f"{shown} records preset {_preset!r}"), variables
 
 
 def check_settings_json(target: Path) -> tuple[Check, dict[str, Any] | None]:

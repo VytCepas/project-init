@@ -83,24 +83,38 @@ def _is_sibling(rel: Path) -> bool:
     return bool(_SIBLING_RE.search(rel.name))
 
 
-def _relocate_legacy_record(target: Path) -> bool:
-    """Move a pre-PI-606 ``.claude/config.yaml`` record to ``.agents/`` (PI-813).
+def _relocate_legacy_state(target: Path) -> list[str]:
+    """Move a pre-PI-606 project's scaffold state into ``.agents/`` (PI-813).
 
-    ``config.yaml`` is deliberately excluded from the managed drift set — it is the
-    hand-editable record the scaffolder owns — so the re-render never recreates it
-    at the new path on its own. Without an explicit move a legacy project would
-    upgrade every file *except* the record that identifies it, leave the record
-    behind in ``.claude/``, and come back legacy on the next run.
+    Both files are excluded from the managed drift set — the record because it is
+    the hand-editable file the scaffolder owns, the sidecar because it is internal
+    — so a re-render never recreates either at the new path. Without an explicit
+    move a legacy project would upgrade every file *except* the two that describe
+    it, and come back legacy on the next run.
 
-    Returns True when a record was moved.
+    The sidecar matters as much as the record: ``read_base`` treats a missing
+    sidecar as "no base recorded", so leaving it in ``.claude/`` degrades every
+    3-way merge into a conflict without a word of warning.
+
+    Returns the relative paths moved (empty when there is nothing to migrate).
     """
-    canonical = target / _CONFIG_REL
-    legacy = target / _LEGACY_CONFIG_REL
-    if canonical.exists() or not legacy.exists():
-        return False
-    canonical.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(legacy), str(canonical))
-    return True
+    moved: list[str] = []
+    for legacy_rel, canonical_rel in (
+        (_LEGACY_CONFIG_REL, _CONFIG_REL),
+        (_LEGACY_BASE_REL, _BASE_REL),
+    ):
+        legacy, canonical = target / legacy_rel, target / canonical_rel
+        if canonical.exists() or not legacy.exists():
+            continue
+        try:
+            canonical.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(legacy), str(canonical))
+        except OSError as exc:
+            # Abort loudly rather than half-migrate and traceback mid-upgrade.
+            msg = f"cannot migrate {legacy_rel} to {canonical_rel}: {exc}"
+            raise UpgradeError(msg) from exc
+        moved.append(f"{legacy_rel} → {canonical_rel}")
+    return moved
 
 
 def scaffold_record_path(target: Path) -> Path:
@@ -112,9 +126,11 @@ def scaffold_record_path(target: Path) -> Path:
     record and declared them never scaffolded, so the one upgrade that most needed
     to run was the only one that could not (PI-813).
 
-    `--apply` re-renders the record at the canonical `.agents/` path, so a legacy
-    project migrates itself on its next upgrade. When neither exists, the canonical
-    path is returned so the error names the location a current project should have.
+    This resolver only *reads*. The record is excluded from the managed drift set,
+    so a re-render never recreates it at the new path — `--apply` migrates it with
+    an explicit move (`_relocate_legacy_state`). When neither path exists, the
+    canonical one is returned so the error names the location a current project
+    should have.
     """
     current = target / _CONFIG_REL
     if current.exists():
@@ -248,6 +264,25 @@ _hash_bytes = hash_bytes
 # (#241). Text only — files that don't decode as UTF-8 are omitted and fall back
 # to the ``.new`` sibling path on conflict.
 _BASE_REL = Path(".agents/.upgrade-base.json")
+# The sidecar's pre-PI-606 home, alongside the legacy record (PI-813).
+_LEGACY_BASE_REL = Path(".claude/.upgrade-base.json")
+
+
+def upgrade_base_path(target: Path) -> Path:
+    """Locate the merge-base sidecar, tolerating the pre-PI-606 ``.claude/`` home.
+
+    Reading only the new path made a legacy project's sidecar invisible, and
+    ``read_base`` swallows that as a plain missing file — so every 3-way merge
+    silently lost its base and every user edit degraded into a conflict. The
+    failure is invisible precisely because the sidecar is optional (PI-813).
+    """
+    current = target / _BASE_REL
+    if current.exists():
+        return current
+    legacy = target / _LEGACY_BASE_REL
+    if legacy.exists():
+        return legacy
+    return current
 
 
 def read_base(target: Path) -> dict[str, str]:
@@ -257,7 +292,7 @@ def read_base(target: Path) -> dict[str, str]:
     out — a corrupted entry must not later reach the merge engine as a non-text
     base and crash the upgrade (#240 review).
     """
-    path = target / _BASE_REL
+    path = upgrade_base_path(target)
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -838,6 +873,11 @@ def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, s
         # A non-UTF-8 config.yaml would otherwise surface as a raw traceback,
         # since run_upgrade only catches UpgradeError (2026-07 review).
         msg = f"{config_path} is not valid UTF-8 — cannot read the scaffold record ({exc})."
+        raise UpgradeError(msg) from exc
+    except OSError as exc:
+        # Unreadable for any other reason (permissions, a directory at the path):
+        # same treatment, or it escapes run_upgrade's handler as a raw traceback.
+        msg = f"{config_path} cannot be read — cannot load the scaffold record ({exc})."
         raise UpgradeError(msg) from exc
     parsed = _parse_record_block(text)
     if parsed is not None:
@@ -1821,16 +1861,16 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
         # Run apply even with zero file drift: the config version line and the
         # scaffold record must still refresh to the current tool version.
         if apply:
-            # Before apply_drift rewrites the record: a legacy project's record is
-            # still in .claude/, and apply_drift only updates it at the canonical
-            # path (PI-813).
-            if _relocate_legacy_record(target):
+            # Migrate a legacy project's record + merge-base sidecar into .agents/
+            # before apply_drift writes through them (PI-813). Deliberately inside
+            # the apply branch and after the addition gate: a gated run applies
+            # nothing, so it must not move the user's files either. Once consent is
+            # given the run reaches here and migrates. read_base() above already
+            # resolves the legacy sidecar, so the merge base is correct either way.
+            for moved in _relocate_legacy_state(target):
                 from rich.console import Console
 
-                Console().print(
-                    "[green]migrated scaffold record[/green] "
-                    ".claude/config.yaml → .agents/config.yaml"
-                )
+                Console().print(f"[green]migrated[/green] {moved}")
             suppressed = {p for gid in gate["declined_now"] for p in groups[gid]["paths"]}
             report.new = [rel for rel in report.new if rel not in suppressed]
             # Per-file interactive walk (#245): drop the files the user skips so
