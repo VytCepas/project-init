@@ -13,13 +13,6 @@ project-init — scaffolder for agentic-development infrastructure.
 
 CLI entry point for `project-init` and `uvx project-init`.
 
-- `class ScaffoldInputs` — The resolved wizard inputs as one named record (PI-190).
-- `def resolve_delivery` — Normalize a delivery value; default 'prototype'.
-- `def resolve_deploy` — Normalize a deploy target; default 'none'.
-- `def resolve_iac` — Normalize an --iac value; default 'none'. Raises ValueError on an unknown tool.
-- `def resolve_agents` — Parse/validate an --agents value; claude is always included first.
-- `def agent_layers` — Template layers contributed by the selected agents (no fallback).
-- `def render_run_command` — Fill ``{project_slug}`` in a language ``run_command``.
 - `def main` — Run the scaffolding CLI; return the process exit code.
 
 ### `project_init/capabilities.py`
@@ -31,6 +24,16 @@ Deterministic capabilities inventory (PI-374, ADR-017).
 - `def surface_hooks` — (hook file, events) for the GUI surfaces selected via --agents (#366).
 - `def render` — The CAPABILITIES.md content for a scaffold described by *variables*.
 - `def emit` — Write .agents/CAPABILITIES.md.
+
+### `project_init/cli_output.py`
+
+project-init CLI output — result payloads, summary panels, and tree rendering.
+
+
+### `project_init/cli_parser.py`
+
+project-init CLI argument parser and pre-scaffold input validators.
+
 
 ### `project_init/concerns.py`
 
@@ -112,6 +115,11 @@ Stable access to the machine-readable descriptor contract schemas (#786).
 - `def load_descriptor_schema` — Parsed descriptor JSON Schema — validate an emitted ``config.yaml`` against it.
 - `def load_usage_event_schema` — Parsed usage-event JSON Schema — validate one ``usage.jsonl`` line against it.
 
+### `project_init/subcommands.py`
+
+project-init subcommands: upgrade / add / remove / preset / doctor.
+
+
 ### `project_init/surfaces.py`
 
 Per-surface agent-config generation (ADR-017, PI-366).
@@ -141,3 +149,19 @@ Per-surface agent-config generation (ADR-017, PI-366).
 - `def compute_drift` — Compare the staged re-render against the project tree.
 - `def apply_drift` — Apply changes; 3-way-merge user edits (#240); conflicts become ``.new``.
 - `def run_upgrade` — Entry point for the upgrade subcommand; returns a process exit code.
+
+### `project_init/variables.py`
+
+project-init variable resolution: flag→prompt→preset precedence + template context.
+
+- `class ScaffoldInputs` — The resolved wizard inputs as one named record (PI-190).
+- `def resolve_delivery` — Normalize a delivery value; default 'prototype'.
+- `def resolve_deploy` — Normalize a deploy target; default 'none'.
+- `def resolve_iac` — Normalize an --iac value; default 'none'. Raises ValueError on an unknown tool.
+- `def resolve_agents` — Parse/validate an --agents value; claude is always included first.
+- `def agent_layers` — Template layers contributed by the selected agents (no fallback).
+- `def render_run_command` — Fill ``{project_slug}`` in a language ``run_command``.
+
+### `project_init/wizard_prompts.py`
+
+project-init interactive wizard — prompt primitives and per-concern choosers.

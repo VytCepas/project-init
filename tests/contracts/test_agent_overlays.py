@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import project_init.wizard_prompts as _wiz
 from project_init.__main__ import agent_layers, resolve_agents
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables
@@ -107,16 +108,16 @@ class TestAgentSelection:
         # "3.11" answers the target-Python prompt a python scaffold now asks (#628).
         prompt_answers = iter(["proj", "desc", "python", "3.11", "@owner", "none"])
         ask_answers = iter(["4,10", "4"])
-        monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(prompt_answers))
+        monkeypatch.setattr(_wiz, "_prompt", lambda *a, **k: next(prompt_answers))
         monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: next(ask_answers))
-        monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
-        monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
-        monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
-        monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
-        monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
-        monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
+        monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
+        monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
+        monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
+        monkeypatch.setattr(_wiz, "_choose_iac_interactive", lambda: "none")
+        monkeypatch.setattr(_wiz, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
+        monkeypatch.setattr(_wiz, "_choose_lifecycle_interactive", lambda *a, **k: "github")
         # PI-714: a lifecycle-on wizard now asks for review cycles.
-        monkeypatch.setattr(cli, "_choose_review_cycles_interactive", lambda *a, **k: 2)
+        monkeypatch.setattr(_wiz, "_choose_review_cycles_interactive", lambda *a, **k: 2)
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 
         result = cli._gather_inputs_interactive(
