@@ -61,9 +61,12 @@ def check_scaffold_record(target: Path) -> tuple[Check, dict[str, str] | None]:
         _backfill_variables,
         _migrate_agents,
         _parse_record_block,
+        scaffold_record_path,
     )
 
-    config = target / _CONFIG_REL
+    # Tolerates the pre-PI-606 `.claude/config.yaml` location, or doctor would
+    # report a legacy scaffold as "never scaffolded" too (PI-813).
+    config = scaffold_record_path(target)
     if not config.is_file():
         return (
             Check(

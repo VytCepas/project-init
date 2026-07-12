@@ -70,6 +70,9 @@ from project_init.scaffold import (
 )
 
 _CONFIG_REL = Path(".agents/config.yaml")
+# Where the record lived before the `.claude/` -> `.agents/` rename (PI-606),
+# which shipped in v1.0.1. Scaffolds from v1.0.0 and earlier still keep it there.
+_LEGACY_CONFIG_REL = Path(".claude/config.yaml")
 _VERSION_LINE_RE = re.compile(r"^(\s*project_init_version:\s*).*$", re.MULTILINE)
 # A never-clobber sibling: `<file>.new` or `<file>.new.N` (see scaffold._new_sibling).
 _SIBLING_RE = re.compile(r"\.new(\.\d+)?$")
@@ -78,6 +81,48 @@ _SIBLING_RE = re.compile(r"\.new(\.\d+)?$")
 def _is_sibling(rel: Path) -> bool:
     """True if *rel* is a `.new`/`.new.N` overwrite-protection sibling (PI-535)."""
     return bool(_SIBLING_RE.search(rel.name))
+
+
+def _relocate_legacy_record(target: Path) -> bool:
+    """Move a pre-PI-606 ``.claude/config.yaml`` record to ``.agents/`` (PI-813).
+
+    ``config.yaml`` is deliberately excluded from the managed drift set — it is the
+    hand-editable record the scaffolder owns — so the re-render never recreates it
+    at the new path on its own. Without an explicit move a legacy project would
+    upgrade every file *except* the record that identifies it, leave the record
+    behind in ``.claude/``, and come back legacy on the next run.
+
+    Returns True when a record was moved.
+    """
+    canonical = target / _CONFIG_REL
+    legacy = target / _LEGACY_CONFIG_REL
+    if canonical.exists() or not legacy.exists():
+        return False
+    canonical.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(legacy), str(canonical))
+    return True
+
+
+def scaffold_record_path(target: Path) -> Path:
+    """Locate *target*'s scaffold record, tolerating the pre-PI-606 location.
+
+    The `.claude/` -> `.agents/` rename shipped in v1.0.1, moving the record from
+    `.claude/config.yaml` to `.agents/config.yaml`. Reading only the new path
+    stranded every scaffold from v1.0.0 and earlier: `upgrade` could not find their
+    record and declared them never scaffolded, so the one upgrade that most needed
+    to run was the only one that could not (PI-813).
+
+    `--apply` re-renders the record at the canonical `.agents/` path, so a legacy
+    project migrates itself on its next upgrade. When neither exists, the canonical
+    path is returned so the error names the location a current project should have.
+    """
+    current = target / _CONFIG_REL
+    if current.exists():
+        return current
+    legacy = target / _LEGACY_CONFIG_REL
+    if legacy.exists():
+        return legacy
+    return current
 
 
 # Variables that pre-record config files cannot recover; filled with the
@@ -224,7 +269,7 @@ def read_base(target: Path) -> dict[str, str]:
 
 def write_base(target: Path, base: dict[str, str]) -> None:
     """Persist the ``{rel: rendered-text}`` merge base sidecar (sorted, pretty)."""
-    if not (target / _CONFIG_REL).exists():
+    if not scaffold_record_path(target).exists():
         return  # not a scaffolded project — nothing to anchor the base to
     path = target / _BASE_REL
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -780,7 +825,7 @@ def _migrate_agents(variables: dict[str, str]) -> dict[str, str]:
 
 def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, str], bool]:
     """Return (preset_name, variables, manifest, migrated) for *target*."""
-    config_path = target / _CONFIG_REL
+    config_path = scaffold_record_path(target)
     if not config_path.exists():
         msg = (
             f"{config_path} not found — this directory was not scaffolded by "
@@ -1776,6 +1821,16 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
         # Run apply even with zero file drift: the config version line and the
         # scaffold record must still refresh to the current tool version.
         if apply:
+            # Before apply_drift rewrites the record: a legacy project's record is
+            # still in .claude/, and apply_drift only updates it at the canonical
+            # path (PI-813).
+            if _relocate_legacy_record(target):
+                from rich.console import Console
+
+                Console().print(
+                    "[green]migrated scaffold record[/green] "
+                    ".claude/config.yaml → .agents/config.yaml"
+                )
             suppressed = {p for gid in gate["declined_now"] for p in groups[gid]["paths"]}
             report.new = [rel for rel in report.new if rel not in suppressed]
             # Per-file interactive walk (#245): drop the files the user skips so
