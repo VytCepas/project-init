@@ -27,6 +27,8 @@ _LIFECYCLE_HOOK_NAMES = {"github_command_guard.sh", "workflow_state_reminder.sh"
 _HELPER = _FALLBACK_HOOKS / "_usage_log.sh"
 _PROD_GUARD = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "prod_guard.py"
 _PACKAGE_GUARD = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "package_guard.py"
+_DAG_GUARD = _REPO_ROOT / "templates" / "lifecycle" / "dot_agents" / "hooks" / "dag_workflow.py"
+_USAGE_EVENT_SCHEMA = _REPO_ROOT / "schemas" / "usage-event.schema.json"
 
 
 def _source_dir(hook: str) -> Path:
@@ -37,12 +39,13 @@ def _plugin_dir(hook: str) -> Path:
     return _LIFECYCLE_PLUGIN_HOOKS if hook in _LIFECYCLE_HOOK_NAMES else _PLUGIN_HOOKS
 
 
-# The five always-on shell hooks that must self-log, with the (hook, event) each
-# should record.
+# The always-on shell hooks that self-log via _usage_log.sh, with the
+# (hook, event) each records. github_command_guard.sh is deliberately absent: it
+# `exec`s the guard, so it can't see the outcome — dag_workflow.py records the
+# event itself with the decision + command (see TestDagGuardSelfLog).
 _WIRED_HOOKS = {
     "session_setup.sh": ("session_setup", "SessionStart"),
     "pre_commit_gate.sh": ("pre_commit_gate", "PreToolUse"),
-    "github_command_guard.sh": ("github_command_guard", "PreToolUse"),
     "post_edit_lint.sh": ("post_edit_lint", "PostToolUse"),
     "workflow_state_reminder.sh": ("workflow_state_reminder", "UserPromptSubmit"),
 }
@@ -70,14 +73,14 @@ class TestHelperGating:
 
     def test_writes_valid_json_with_marker(self, tmp_path: Path):
         (tmp_path / ".agents" / "observability").mkdir(parents=True)
-        _call_helper(tmp_path, "github_command_guard", "PreToolUse")
+        _call_helper(tmp_path, "session_setup", "SessionStart")
         log = tmp_path / ".agents" / "observability" / "usage.jsonl"
         assert log.is_file()
         rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
         assert len(rows) == 1
         row = rows[0]
-        assert row["hook"] == "github_command_guard"
-        assert row["event"] == "PreToolUse"
+        assert row["hook"] == "session_setup"
+        assert row["event"] == "SessionStart"
         assert row["project"] == str(tmp_path)
         assert "ts" in row
         # No session env set → the optional field is omitted.
@@ -291,3 +294,68 @@ class TestPackageGuardSelfLog:
         verdict, log = _run_package_guard(payload, tmp_path)
         assert verdict is None  # safe command → no verdict
         assert log.is_file()  # but the firing is still recorded
+
+
+def _run_dag_guard(payload: dict, root: Path) -> tuple[dict | None, Path]:
+    result = subprocess.run(
+        ["python3", str(_DAG_GUARD), "guard"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin", "CLAUDE_PROJECT_DIR": str(root)},
+        cwd=str(root),
+        timeout=30,
+    )
+    assert result.returncode == 0, "guard must always exit 0 (fail-open)"
+    verdict = json.loads(result.stdout) if result.stdout.strip() else None
+    return verdict, root / ".agents" / "observability" / "usage.jsonl"
+
+
+class TestDagGuardSelfLog:
+    """WS3: the DAG command guard records its decision + redacted command, so a
+    root orchestrator's governance signal isn't `action=unknown`. The shim
+    `exec`s the guard, so dag_workflow.py logs the event itself."""
+
+    _BLOCK = "git push origin main"
+    _SECRET = "git push https://u:s3cr3t@h/r main"
+
+    def test_blocks_and_logs_decision_and_command(self, tmp_path: Path):
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
+        payload = {"tool_input": {"command": self._BLOCK}, "session_id": "sess-dag"}
+        verdict, log = _run_dag_guard(payload, tmp_path)
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"  # still blocks
+        rows = [json.loads(x) for x in log.read_text().splitlines() if x.strip()]
+        assert len(rows) == 1
+        assert rows[0]["hook"] == "github_command_guard"
+        assert rows[0]["decision"] == "block"
+        assert rows[0]["command"] == self._BLOCK
+        assert rows[0]["session"] == "sess-dag"
+
+    def test_allowed_command_logs_allow(self, tmp_path: Path):
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
+        verdict, log = _run_dag_guard({"tool_input": {"command": "ls -la"}}, tmp_path)
+        assert verdict is None
+        row = json.loads(log.read_text().splitlines()[0])
+        assert row["decision"] == "allow"
+
+    def test_command_is_redacted(self, tmp_path: Path):
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
+        _, log = _run_dag_guard({"tool_input": {"command": self._SECRET}}, tmp_path)
+        raw = log.read_text()
+        assert "s3cr3t" not in raw
+        assert "://***@" in raw
+
+    def test_dormant_without_marker(self, tmp_path: Path):
+        _, log = _run_dag_guard({"tool_input": {"command": self._BLOCK}}, tmp_path)
+        assert not log.exists()
+
+    def test_emitted_line_validates_against_usage_event_schema(self, tmp_path: Path):
+        import jsonschema
+
+        (tmp_path / ".agents" / "observability").mkdir(parents=True)
+        _run_dag_guard({"tool_input": {"command": self._BLOCK}, "session_id": "s"}, tmp_path)
+        _, log2 = _run_dag_guard({"tool_input": {"command": "ls"}}, tmp_path)
+        schema = json.loads(_USAGE_EVENT_SCHEMA.read_text())
+        for line in log2.read_text().splitlines():
+            if line.strip():
+                jsonschema.validate(json.loads(line), schema)

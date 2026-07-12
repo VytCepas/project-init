@@ -8,11 +8,9 @@
 
 set -euo pipefail
 
-# Self-log this firing (dormant unless the observability overlay is installed).
-# Reads no stdin (</dev/null), so the payload still reaches dag_workflow.py via
-# the exec below; runs before exec because exec replaces this process.
-# shellcheck source=/dev/null
-. "$(dirname "$0")/_usage_log.sh" 2>/dev/null &&
-  usage_log github_command_guard PreToolUse </dev/null || true
+# No self-log here: this shim `exec`s the guard, so it can't see the outcome.
+# dag_workflow.py's guard records the observability event itself (decision +
+# redacted command), which is what a root orchestrator's governance signal reads
+# — a decision-less firing here would just be `action=unknown` noise (WS3).
 
 exec "$(dirname "$0")/_py.sh" "$(dirname "$0")/dag_workflow.py" guard
