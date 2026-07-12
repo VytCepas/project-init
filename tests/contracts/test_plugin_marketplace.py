@@ -22,7 +22,7 @@ _LIFECYCLE_CLAUDE = _REPO_ROOT / "templates" / "lifecycle" / "dot_agents"
 
 class TestMarketplaceManifest:
     def test_valid_and_lists_plugins_with_existing_sources(self):
-        config = json.loads(_MARKETPLACE.read_text())
+        config = json.loads(_MARKETPLACE.read_text(encoding="utf-8"))
         assert config["name"] == "project-init"
         assert config["owner"]["name"]
         # The lifecycle decomposition (#476) split the single plugin into a core
@@ -40,7 +40,9 @@ class TestPluginManifest:
         # Both shipped plugins, not just the core one: the lifecycle manifest can
         # regress (missing name, non-semver version) just as easily.
         for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
-            manifest = json.loads((root / ".claude-plugin" / "plugin.json").read_text())
+            manifest = json.loads(
+                (root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
+            )
             assert manifest["name"] == root.name
             assert re.match(r"^\d+\.\d+\.\d+$", manifest["version"]), root.name
 
@@ -49,12 +51,14 @@ class TestPluginManifest:
         # makes the client reject it as a duplicate and load *no* hooks at all
         # ("Duplicate hooks file detected"). The key is for *additional* hook files.
         for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
-            manifest = json.loads((root / ".claude-plugin" / "plugin.json").read_text())
+            manifest = json.loads(
+                (root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
+            )
             assert "hooks" not in manifest, root.name
             assert (root / "hooks" / "hooks.json").is_file(), root.name
 
     def test_hooks_json_references_only_existing_scripts(self):
-        config = json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())
+        config = json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
         commands = [
             h["command"]
             for entries in config["hooks"].values()
@@ -76,8 +80,12 @@ class TestPluginManifest:
         wire, so the documented cutover (ADR-010) is a drop-in swap (#476: the
         lifecycle plugin supplies PreToolUse(guard) + UserPromptSubmit)."""
         plugin_events = set(
-            json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())["hooks"]
-        ) | set(json.loads((_LIFECYCLE_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())["hooks"])
+            json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))["hooks"]
+        ) | set(
+            json.loads(
+                (_LIFECYCLE_PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8")
+            )["hooks"]
+        )
         template_settings = (_TEMPLATE_CLAUDE / "settings.json.tmpl").read_text()
         template_events = set(
             re.findall(
@@ -144,7 +152,7 @@ class TestScaffoldedSettingsWiring:
         # memory_preset appends the lifecycle overlay (#476) so dag_workflow.py
         # (scaffolded in both modes) is present, as a real default scaffold is.
         scaffold(target, memory_preset("obsidian-only"), make_variables(), strict=True)
-        settings = json.loads((target / ".agents" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text(encoding="utf-8"))
         assert (
             settings["extraKnownMarketplaces"]["project-init"]["source"]["repo"]
             == "example/project-init"
@@ -164,7 +172,7 @@ class TestScaffoldedSettingsWiring:
 
         target = tmp_path / "p"
         scaffold(target, fallback_preset(), fallback_variables(), strict=True)
-        settings = json.loads((target / ".agents" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text(encoding="utf-8"))
         assert "project-init-workflow@project-init" not in settings["enabledPlugins"]
         commands = [
             h["command"]
