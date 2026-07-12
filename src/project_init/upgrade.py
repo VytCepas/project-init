@@ -814,28 +814,14 @@ def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, s
         variables = _migrate_agents(_backfill_variables(variables))
         migrated = True
 
-    if (target / "pyproject.toml").exists():
-        try:
-            import tomllib
+    # Single source of truth for the requires-python floor (PI-799): the same
+    # extractor the CLI uses for its --python-version conflict check, so the two
+    # can never drift. A declared requires-python overrides the recorded floor.
+    from project_init.variables import _python_floor_from_pyproject
 
-            with (target / "pyproject.toml").open("rb") as f:
-                data = tomllib.load(f)
-                req = data.get("project", {}).get("requires-python", "")
-                if not req:
-                    req = (
-                        data.get("tool", {})
-                        .get("poetry", {})
-                        .get("dependencies", {})
-                        .get("python", "")
-                    )
-                if req:
-                    import re
-
-                    m = re.search(r"(?:>=?|==|~=?|\^|^\s*)\s*(\d+\.\d+)", req)
-                    if m and m.group(1):
-                        variables["python_floor"] = m.group(1)
-        except Exception:
-            pass
+    floor = _python_floor_from_pyproject(target)
+    if floor:
+        variables["python_floor"] = floor
 
     return preset_name, variables, manifest, migrated
 
