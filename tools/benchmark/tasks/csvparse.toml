@@ -1,0 +1,75 @@
+# Benchmark task: fix a CSV line parser that splits on every comma.
+# SWE-bench-style FAIL_TO_PASS / PASS_TO_PASS, edge-case-dense (PI-804): the
+# naive split handles simple rows but breaks quoted commas and escaped quotes,
+# so a first attempt that forgets an RFC-4180 rule reworks. Deterministic,
+# pytest-scored in both bare and scaffolded targets.
+#
+# Seed contents use TOML *literal* (''') strings so the CSV double-quotes pass
+# through verbatim — a basic (""") block would see `""hi""` + a closing quote as
+# a premature triple-quote terminator.
+id = "csvparse"
+description = "Fix a CSV line parser to handle quoted fields and escaped quotes"
+prompt = """
+`parse_line(line)` in `csvparse.py` splits one CSV record into a list of field
+strings, but it splits on every comma. Fix it to follow RFC 4180 quoting for a
+single line:
+  - a field may be wrapped in double quotes; a comma INSIDE quotes is part of
+    the field, not a separator,
+  - inside a quoted field, a doubled quote `""` is a literal single `"`,
+  - the surrounding quotes are removed from the returned field value,
+  - unquoted empty fields stay as empty strings.
+Make the failing tests in `test_csvparse.py` pass without breaking the passing
+ones. Assume a single line with no embedded newlines.
+"""
+
+# Seeded baseline: naive comma split. test_simple / test_empty_fields pass;
+# test_quoted_comma and test_escaped_quote fail — the FAIL_TO_PASS to fix.
+[[seed_files]]
+path = "csvparse.py"
+content = '''
+def parse_line(line):
+    """Parse one CSV record into a list of field strings."""
+    return line.split(",")
+'''
+
+[[seed_files]]
+path = "test_csvparse.py"
+content = '''
+from csvparse import parse_line
+
+
+def test_simple():
+    assert parse_line("a,b,c") == ["a", "b", "c"]
+
+
+def test_empty_fields():
+    assert parse_line("a,,c") == ["a", "", "c"]
+
+
+def test_quoted_comma():
+    assert parse_line('a,"b,c",d') == ["a", "b,c", "d"]
+
+
+def test_escaped_quote():
+    assert parse_line('x,"he said ""hi""",y') == ["x", 'he said "hi"', "y"]
+
+
+def test_quoted_then_empty():
+    assert parse_line('"a,b",,"c"') == ["a,b", "", "c"]
+'''
+
+# Consumed by accuracy scoring (#273). FAIL_TO_PASS must flip green while
+# PASS_TO_PASS stays green.
+[check]
+type = "pytest"
+command = "uv run pytest -q test_csvparse.py"
+expect_exit = 0
+fail_to_pass = [
+    "test_csvparse.py::test_quoted_comma",
+    "test_csvparse.py::test_escaped_quote",
+    "test_csvparse.py::test_quoted_then_empty",
+]
+pass_to_pass = [
+    "test_csvparse.py::test_simple",
+    "test_csvparse.py::test_empty_fields",
+]

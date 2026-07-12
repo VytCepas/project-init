@@ -1,0 +1,92 @@
+# Benchmark task: fix a semver comparator that ignores pre-release precedence.
+# SWE-bench-style FAIL_TO_PASS / PASS_TO_PASS, but edge-case-dense (PI-804): the
+# naive core-only comparison passes basic ordering yet gets every pre-release
+# rule wrong, so a rushed fix reworks. Deterministic, pytest-scored in both
+# bare and scaffolded targets.
+id = "semver"
+description = "Fix a semver comparator to honor pre-release precedence"
+prompt = """
+`compare(a, b)` in `semver.py` returns -1/0/1 ordering two semantic-version
+strings, but it only compares the numeric core (major.minor.patch) and ignores
+the pre-release suffix entirely. Fix it to follow the Semantic Versioning 2.0.0
+precedence rules for pre-release identifiers:
+  - a version WITH a pre-release has LOWER precedence than the same version
+    without one (1.0.0-alpha < 1.0.0),
+  - pre-release identifiers are compared left to right; numeric identifiers
+    compare numerically, alphanumeric ones compare lexically in ASCII order, and
+    a numeric identifier always has lower precedence than an alphanumeric one,
+  - a larger set of pre-release fields has higher precedence when all preceding
+    identifiers are equal (1.0.0-alpha < 1.0.0-alpha.1),
+  - build metadata (a `+...` suffix) is IGNORED for precedence.
+Make the failing tests in `test_semver.py` pass without breaking the passing
+ones. Do not change the -1/0/1 return contract.
+"""
+
+# Seeded baseline: core-only comparison. test_basic_ordering passes; every
+# pre-release test fails (suffix is dropped, so 1.0.0-alpha compares equal to
+# 1.0.0) — the FAIL_TO_PASS the agent must fix.
+[[seed_files]]
+path = "semver.py"
+content = """
+def compare(a, b):
+    \"\"\"Return -1, 0, or 1 comparing two semver strings a and b.\"\"\"
+    def core(v):
+        base = v.split("+", 1)[0].split("-", 1)[0]
+        return [int(x) for x in base.split(".")]
+
+    ca, cb = core(a), core(b)
+    if ca < cb:
+        return -1
+    if ca > cb:
+        return 1
+    return 0
+"""
+
+[[seed_files]]
+path = "test_semver.py"
+content = """
+from semver import compare
+
+
+def test_basic_ordering():
+    assert compare("1.0.0", "2.0.0") == -1
+    assert compare("1.2.0", "1.1.0") == 1
+    assert compare("1.0.0", "1.0.0") == 0
+
+
+def test_build_metadata_ignored():
+    assert compare("1.0.0+build.9", "1.0.0+build.1") == 0
+
+
+def test_prerelease_less_than_release():
+    assert compare("1.0.0-alpha", "1.0.0") == -1
+    assert compare("1.0.0", "1.0.0-alpha") == 1
+
+
+def test_prerelease_field_ordering():
+    assert compare("1.0.0-alpha", "1.0.0-beta") == -1
+    assert compare("1.0.0-alpha.1", "1.0.0-alpha.2") == -1
+    assert compare("1.0.0-alpha", "1.0.0-alpha.1") == -1
+
+
+def test_numeric_vs_alphanumeric_identifier():
+    # A numeric identifier has lower precedence than an alphanumeric one.
+    assert compare("1.0.0-1", "1.0.0-alpha") == -1
+    assert compare("1.0.0-2", "1.0.0-11") == -1  # numeric fields compare numerically
+"""
+
+# Consumed by accuracy scoring (#273). FAIL_TO_PASS must flip green while
+# PASS_TO_PASS stays green.
+[check]
+type = "pytest"
+command = "uv run pytest -q test_semver.py"
+expect_exit = 0
+fail_to_pass = [
+    "test_semver.py::test_prerelease_less_than_release",
+    "test_semver.py::test_prerelease_field_ordering",
+    "test_semver.py::test_numeric_vs_alphanumeric_identifier",
+]
+pass_to_pass = [
+    "test_semver.py::test_basic_ordering",
+    "test_semver.py::test_build_metadata_ignored",
+]
