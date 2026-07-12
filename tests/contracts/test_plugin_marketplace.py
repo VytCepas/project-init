@@ -11,7 +11,7 @@ from project_init.scaffold import scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_MARKETPLACE = _REPO_ROOT / ".agents-plugin" / "marketplace.json"
+_MARKETPLACE = _REPO_ROOT / ".claude-plugin" / "marketplace.json"
 _PLUGIN_ROOT = _REPO_ROOT / "plugins" / "project-init-workflow"
 _LIFECYCLE_PLUGIN_ROOT = _REPO_ROOT / "plugins" / "project-init-lifecycle"
 _TEMPLATE_CLAUDE = _REPO_ROOT / "templates" / "base" / "dot_agents"
@@ -37,7 +37,7 @@ class TestMarketplaceManifest:
 
 class TestPluginManifest:
     def test_plugin_json_valid(self):
-        manifest = json.loads((_PLUGIN_ROOT / ".agents-plugin" / "plugin.json").read_text())
+        manifest = json.loads((_PLUGIN_ROOT / ".claude-plugin" / "plugin.json").read_text())
         assert manifest["name"] == "project-init-workflow"
         assert re.match(r"^\d+\.\d+\.\d+$", manifest["version"])
         assert manifest["hooks"] == "./hooks/hooks.json"
@@ -206,3 +206,25 @@ class TestSyncTool:
         assert (fake_plugin / "hooks" / "hooks.json").exists()
         assert (fake_lifecycle_plugin / "hooks" / "hooks.json").exists()
         assert (fake_plugin / "hooks" / "hooks.json").exists()
+
+
+class TestManifestDiscoveryPath:
+    """The manifest location is a consumer's discovery contract, not our convention.
+
+    Claude Code reads manifests *only* from `.claude-plugin/`. PI-606 renamed the
+    directory to `.agents-plugin/` alongside the `.claude/` -> `.agents/` migration
+    and silently un-shipped both plugins; every assertion above kept passing because
+    they resolve through module constants, which followed the rename. These pin the
+    literal path instead, so the same mistake fails loudly.
+    """
+
+    def test_marketplace_manifest_is_at_the_spec_path(self):
+        assert (_REPO_ROOT / ".claude-plugin" / "marketplace.json").is_file()
+
+    def test_every_plugin_manifest_is_at_the_spec_path(self):
+        for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
+            assert (root / ".claude-plugin" / "plugin.json").is_file(), root.name
+
+    def test_no_manifest_survives_outside_the_spec_path(self):
+        strays = [*_REPO_ROOT.glob(".agents-plugin"), *_REPO_ROOT.glob("plugins/*/.agents-plugin")]
+        assert strays == []

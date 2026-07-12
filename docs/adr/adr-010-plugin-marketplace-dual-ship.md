@@ -71,3 +71,24 @@ window closed the same day it opened. Scaffolds are now **plugin-first**:
   invert because the source stayed in `templates/`.
 - Upgrade backfills `no_plugin=true` for pre-cutover records, so existing
   dual-ship projects re-render faithfully with their copies intact.
+
+## Addendum (2026-07-12): the manifest path is protocol, not branding
+
+PI-606 (#620) renamed `.claude-plugin/` → `.agents-plugin/` while migrating
+`.claude/` → `.agents/`. That swept up a path it should not have, and
+silently un-shipped both plugins: Claude Code discovers manifests *only* at
+`.claude-plugin/marketplace.json`, so `claude plugin marketplace add` failed
+outright and every plugin-first scaffold — which since PI-165 wires its hooks
+through the plugin and nowhere else — ran with no hooks at all.
+
+The manifests are back at `.claude-plugin/`. The rule that missed:
+
+- `.agents/` is **our** convention, and renaming it is ours to do.
+- `.claude-plugin/` is a **consumer's discovery contract**. There is no
+  agent-agnostic plugin-manifest standard to migrate to, so the rename had no
+  destination — it just moved the file somewhere nothing reads.
+
+The three contract tests guarding these manifests followed the rename and
+stayed green throughout, because each asserted the manifests were internally
+consistent, never that they sat where the client looks. `test_plugin_marketplace.py`
+now pins the literal spec path so this cannot regress silently again.

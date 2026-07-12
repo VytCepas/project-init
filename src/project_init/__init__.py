@@ -2,7 +2,7 @@
 
 __version__ = "1.1.1"
 # Plugin version is independent of the scaffolder (ADR-010). Kept in sync with
-# plugins/project-init-workflow/.agents-plugin/plugin.json by a contract test;
+# plugins/project-init-workflow/.claude-plugin/plugin.json by a contract test;
 # a constant here because plugins/ is not packaged into the installed wheel.
 __plugin_version__ = "0.7.0"
 __repo_url__ = "https://github.com/VytCepas/project-init"

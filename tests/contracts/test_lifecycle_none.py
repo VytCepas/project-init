@@ -307,7 +307,7 @@ class TestPluginSplit:
         assert "project-init-lifecycle@project-init" not in plugins
 
     def test_both_plugins_registered_in_marketplace(self):
-        mp = json.loads((_REPO_ROOT / ".agents-plugin" / "marketplace.json").read_text())
+        mp = json.loads((_REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text())
         names = {p["name"] for p in mp["plugins"]}
         assert {"project-init-workflow", "project-init-lifecycle"} <= names
         for entry in mp["plugins"]:

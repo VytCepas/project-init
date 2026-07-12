@@ -67,7 +67,7 @@ class TestSettingsRendersHostAwareSource:
 class TestPluginVersionInSync:
     def test_constant_matches_plugin_json(self):
         plugin_json = json.loads(
-            (_REPO_ROOT / "plugins/project-init-workflow/.agents-plugin/plugin.json").read_text()
+            (_REPO_ROOT / "plugins/project-init-workflow/.claude-plugin/plugin.json").read_text()
         )
         assert __plugin_version__ == plugin_json["version"], (
             "__plugin_version__ must match the plugin manifest"
