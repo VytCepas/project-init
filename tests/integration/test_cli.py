@@ -188,6 +188,8 @@ class TestCLI:
             "C:\\projects\\foo",
             "line\nbreak",
             "del\x7fchar",
+            "c1\x80here",
+            "c1\x9fhere",
             "nel\x85here",
             "lsep\u2028here",
             "psep\u2029here",
@@ -197,6 +199,8 @@ class TestCLI:
             "backslash",
             "newline",
             "del-0x7f",
+            "c1-0x80",
+            "c1-0x9f",
             "nel-0x85",
             "line-sep-2028",
             "para-sep-2029",
@@ -335,6 +339,37 @@ class TestCLI:
         )
         assert rc == 0
         assert "Vy's tool" in (target / ".agents" / "config.yaml").read_text()
+
+    def test_valid_unicode_name_yields_strict_yaml_parseable_config(self, tmp_path: Path):
+        """The positive half of the YAML-safety contract (PI-806): an accepted
+        name with ordinary non-ASCII (accents, CJK, emoji) must produce a
+        config.yaml that a STRICT YAML parser reads back — the same oracle the
+        descriptor contract + orchestrator use. Guards against over-rejecting
+        while the C1-control fix (0x80-0x9F) tightens the gate."""
+        import yaml
+
+        from project_init.__main__ import main
+
+        target = tmp_path / "p"
+        rc = main(
+            [
+                str(target),
+                "--non-interactive",
+                "--name",
+                "café-世界-🎉",
+                "--description",
+                "a café tool",
+                "--language",
+                "python",
+                "--preset",
+                "core",
+            ]
+        )
+        assert rc == 0
+        loaded = yaml.safe_load((target / ".agents" / "config.yaml").read_text(encoding="utf-8"))
+        assert isinstance(loaded, dict)
+        assert loaded["project"]["name"] == "café-世界-🎉"
+        assert loaded["project"]["description"] == "a café tool"
 
     def test_target_mkdir_oserror_reported_cleanly(self, tmp_path: Path, monkeypatch):
         """A mkdir OSError (e.g. PermissionError on a read-only parent) must surface
