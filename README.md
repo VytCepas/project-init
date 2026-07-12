@@ -449,9 +449,11 @@ four-category comparison and the moat, see
 - **Distributing `.agents/` components**: the official
   [Claude Code plugin marketplace](https://code.agents.com/docs/en/discover-plugins)
   is the standard channel for hooks/skills/agents. This repo doubles as a
-  marketplace (`.agents-plugin/marketplace.json`) shipping the
-  `project-init-workflow` plugin — the project-agnostic skills and guard
-  hooks, auto-update included. Scaffolds are **plugin-first** (ADR-010
+  marketplace (`.claude-plugin/marketplace.json`) shipping two plugins:
+  `project-init-workflow` — the project-agnostic skills and guard hooks —
+  and `project-init-lifecycle`, the GitHub issue→branch→PR→review→merge
+  automation (#476), enabled only when the lifecycle tier is on. Both
+  auto-update. Scaffolds are **plugin-first** (ADR-010
   cutover): `settings.json` enables the plugin, and a hook or skill fix
   shipped in the plugin reaches every project without re-scaffolding. The
   `--no-plugin` flag restores file copies + local wiring for offline or

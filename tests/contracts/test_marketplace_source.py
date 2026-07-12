@@ -47,7 +47,7 @@ class TestSettingsRendersHostAwareSource:
     def test_github_emits_github_source(self, tmp_path: Path):
         target = tmp_path / "g"
         scaffold(target, memory_preset("obsidian-only"), make_variables(), strict=True)
-        data = json.loads((target / ".agents" / "settings.json").read_text())
+        data = json.loads((target / ".agents" / "settings.json").read_text(encoding="utf-8"))
         src = data["extraKnownMarketplaces"]["project-init"]["source"]
         assert src == {"source": "github", "repo": "example/project-init"}
 
@@ -59,7 +59,7 @@ class TestSettingsRendersHostAwareSource:
             project_init_repo_url="https://ghes.example.com/org/repo.git",
         )
         scaffold(target, memory_preset("obsidian-only"), v, strict=True)
-        data = json.loads((target / ".agents" / "settings.json").read_text())
+        data = json.loads((target / ".agents" / "settings.json").read_text(encoding="utf-8"))
         src = data["extraKnownMarketplaces"]["project-init"]["source"]
         assert src == {"source": "git", "url": "https://ghes.example.com/org/repo.git"}
 
@@ -67,7 +67,7 @@ class TestSettingsRendersHostAwareSource:
 class TestPluginVersionInSync:
     def test_constant_matches_plugin_json(self):
         plugin_json = json.loads(
-            (_REPO_ROOT / "plugins/project-init-workflow/.agents-plugin/plugin.json").read_text()
+            (_REPO_ROOT / "plugins/project-init-workflow/.claude-plugin/plugin.json").read_text()
         )
         assert __plugin_version__ == plugin_json["version"], (
             "__plugin_version__ must match the plugin manifest"

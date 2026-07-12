@@ -11,7 +11,7 @@ from project_init.scaffold import scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_MARKETPLACE = _REPO_ROOT / ".agents-plugin" / "marketplace.json"
+_MARKETPLACE = _REPO_ROOT / ".claude-plugin" / "marketplace.json"
 _PLUGIN_ROOT = _REPO_ROOT / "plugins" / "project-init-workflow"
 _LIFECYCLE_PLUGIN_ROOT = _REPO_ROOT / "plugins" / "project-init-lifecycle"
 _TEMPLATE_CLAUDE = _REPO_ROOT / "templates" / "base" / "dot_agents"
@@ -22,7 +22,7 @@ _LIFECYCLE_CLAUDE = _REPO_ROOT / "templates" / "lifecycle" / "dot_agents"
 
 class TestMarketplaceManifest:
     def test_valid_and_lists_plugins_with_existing_sources(self):
-        config = json.loads(_MARKETPLACE.read_text())
+        config = json.loads(_MARKETPLACE.read_text(encoding="utf-8"))
         assert config["name"] == "project-init"
         assert config["owner"]["name"]
         # The lifecycle decomposition (#476) split the single plugin into a core
@@ -37,13 +37,28 @@ class TestMarketplaceManifest:
 
 class TestPluginManifest:
     def test_plugin_json_valid(self):
-        manifest = json.loads((_PLUGIN_ROOT / ".agents-plugin" / "plugin.json").read_text())
-        assert manifest["name"] == "project-init-workflow"
-        assert re.match(r"^\d+\.\d+\.\d+$", manifest["version"])
-        assert manifest["hooks"] == "./hooks/hooks.json"
+        # Both shipped plugins, not just the core one: the lifecycle manifest can
+        # regress (missing name, non-semver version) just as easily.
+        for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
+            manifest = json.loads(
+                (root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
+            )
+            assert manifest["name"] == root.name
+            assert re.match(r"^\d+\.\d+\.\d+$", manifest["version"]), root.name
+
+    def test_plugin_json_does_not_redeclare_the_standard_hooks_file(self):
+        # `hooks/hooks.json` is loaded automatically; naming it in the manifest too
+        # makes the client reject it as a duplicate and load *no* hooks at all
+        # ("Duplicate hooks file detected"). The key is for *additional* hook files.
+        for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
+            manifest = json.loads(
+                (root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8")
+            )
+            assert "hooks" not in manifest, root.name
+            assert (root / "hooks" / "hooks.json").is_file(), root.name
 
     def test_hooks_json_references_only_existing_scripts(self):
-        config = json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())
+        config = json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
         commands = [
             h["command"]
             for entries in config["hooks"].values()
@@ -65,8 +80,12 @@ class TestPluginManifest:
         wire, so the documented cutover (ADR-010) is a drop-in swap (#476: the
         lifecycle plugin supplies PreToolUse(guard) + UserPromptSubmit)."""
         plugin_events = set(
-            json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())["hooks"]
-        ) | set(json.loads((_LIFECYCLE_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())["hooks"])
+            json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))["hooks"]
+        ) | set(
+            json.loads(
+                (_LIFECYCLE_PLUGIN_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8")
+            )["hooks"]
+        )
         template_settings = (_TEMPLATE_CLAUDE / "settings.json.tmpl").read_text()
         template_events = set(
             re.findall(
@@ -133,7 +152,7 @@ class TestScaffoldedSettingsWiring:
         # memory_preset appends the lifecycle overlay (#476) so dag_workflow.py
         # (scaffolded in both modes) is present, as a real default scaffold is.
         scaffold(target, memory_preset("obsidian-only"), make_variables(), strict=True)
-        settings = json.loads((target / ".agents" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text(encoding="utf-8"))
         assert (
             settings["extraKnownMarketplaces"]["project-init"]["source"]["repo"]
             == "example/project-init"
@@ -153,7 +172,7 @@ class TestScaffoldedSettingsWiring:
 
         target = tmp_path / "p"
         scaffold(target, fallback_preset(), fallback_variables(), strict=True)
-        settings = json.loads((target / ".agents" / "settings.json").read_text())
+        settings = json.loads((target / ".agents" / "settings.json").read_text(encoding="utf-8"))
         assert "project-init-workflow@project-init" not in settings["enabledPlugins"]
         commands = [
             h["command"]
@@ -206,3 +225,25 @@ class TestSyncTool:
         assert (fake_plugin / "hooks" / "hooks.json").exists()
         assert (fake_lifecycle_plugin / "hooks" / "hooks.json").exists()
         assert (fake_plugin / "hooks" / "hooks.json").exists()
+
+
+class TestManifestDiscoveryPath:
+    """The manifest location is a consumer's discovery contract, not our convention.
+
+    Claude Code reads manifests *only* from `.claude-plugin/`. PI-606 renamed the
+    directory to `.agents-plugin/` alongside the `.claude/` -> `.agents/` migration
+    and silently un-shipped both plugins; every assertion above kept passing because
+    they resolve through module constants, which followed the rename. These pin the
+    literal path instead, so the same mistake fails loudly.
+    """
+
+    def test_marketplace_manifest_is_at_the_spec_path(self):
+        assert (_REPO_ROOT / ".claude-plugin" / "marketplace.json").is_file()
+
+    def test_every_plugin_manifest_is_at_the_spec_path(self):
+        for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
+            assert (root / ".claude-plugin" / "plugin.json").is_file(), root.name
+
+    def test_no_manifest_survives_outside_the_spec_path(self):
+        strays = [*_REPO_ROOT.glob(".agents-plugin"), *_REPO_ROOT.glob("plugins/*/.agents-plugin")]
+        assert strays == []

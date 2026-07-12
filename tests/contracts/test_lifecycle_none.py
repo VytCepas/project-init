@@ -181,7 +181,9 @@ class TestLifecycleNoneScaffold:
         assert (skills / "plan" / "SKILL.md").is_file()
 
     def test_settings_valid_and_no_lifecycle_hooks(self):
-        settings = json.loads((self.target / ".agents" / "settings.json").read_text())
+        settings = json.loads(
+            (self.target / ".agents" / "settings.json").read_text(encoding="utf-8")
+        )
         commands = [
             h["command"]
             for entries in settings["hooks"].values()
@@ -294,7 +296,7 @@ class TestPluginSplit:
         )
         preset = {**preset, "layers": [*preset["layers"], *extra]}
         scaffold(target, preset, make_variables(lifecycle_tier=lifecycle), strict=True)
-        return json.loads((target / ".agents" / "settings.json").read_text())
+        return json.loads((target / ".agents" / "settings.json").read_text(encoding="utf-8"))
 
     def test_lifecycle_plugin_enabled_when_on(self, tmp_path: Path):
         plugins = self._settings(tmp_path, "github")["enabledPlugins"]
@@ -307,7 +309,9 @@ class TestPluginSplit:
         assert "project-init-lifecycle@project-init" not in plugins
 
     def test_both_plugins_registered_in_marketplace(self):
-        mp = json.loads((_REPO_ROOT / ".agents-plugin" / "marketplace.json").read_text())
+        mp = json.loads(
+            (_REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8")
+        )
         names = {p["name"] for p in mp["plugins"]}
         assert {"project-init-workflow", "project-init-lifecycle"} <= names
         for entry in mp["plugins"]:
@@ -315,7 +319,9 @@ class TestPluginSplit:
 
     def test_lifecycle_plugin_carries_lifecycle_hooks_and_skills(self):
         root = _REPO_ROOT / "plugins" / "project-init-lifecycle"
-        events = set(json.loads((root / "hooks" / "hooks.json").read_text())["hooks"])
+        events = set(
+            json.loads((root / "hooks" / "hooks.json").read_text(encoding="utf-8"))["hooks"]
+        )
         assert events == {"PreToolUse", "UserPromptSubmit"}
         for sk in ("create_issue", "start_task", "github_workflow", "request_review", "audit"):
             assert (root / "skills" / sk / "SKILL.md").is_file()
@@ -324,7 +330,9 @@ class TestPluginSplit:
 
     def test_core_plugin_has_no_lifecycle_hooks(self):
         root = _REPO_ROOT / "plugins" / "project-init-workflow"
-        events = set(json.loads((root / "hooks" / "hooks.json").read_text())["hooks"])
+        events = set(
+            json.loads((root / "hooks" / "hooks.json").read_text(encoding="utf-8"))["hooks"]
+        )
         assert "UserPromptSubmit" not in events
         assert not (root / "hooks" / "github_command_guard.sh").exists()
         assert not (root / "skills" / "create_issue").exists()
