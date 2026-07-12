@@ -31,7 +31,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "were DELETED. Recover them from the commit BEFORE the upgrade; do not "
             "restore from HEAD, which may already contain the deletion:\n"
             "  1. Find the deleting commit (search all history, not just the last "
-            "one): `git log --diff-filter=D --name-only -- '.claude/*'`\n"
+            "one): `git log --diff-filter=D --name-only -- .claude/`\n"
             "  2. Restore from its parent: `git checkout <sha>^ -- .claude/`\n"
             "  3. Move each recovered file to the matching `.agents/` path, then "
             "delete the leftover `.claude/` copies (`.claude/` is now a generated "
