@@ -493,6 +493,50 @@ def cmd_check(node: str) -> int:
     return 2
 
 
+def _redact_command(command: str) -> str:
+    """Truncate to 500 chars and redact common secret patterns (mirrors prod_guard)."""
+    cmd = command[:500]
+    cmd = re.sub(r"(?i)(token|key|secret|password|auth|api_key)=[\w-]+", r"\1=***", cmd)
+    return re.sub(r"://[^@]+@", r"://***@", cmd)
+
+
+def _usage_log(payload: dict, decision: str) -> None:
+    """Append one schema-pinned guard event to .agents/observability/usage.jsonl.
+
+    Records the guard's ``decision`` (``allow``/``deny``) and the redacted
+    ``command`` so a root orchestrator's governance signal isn't
+    ``action=unknown`` (WS3). Dormant unless the observability overlay is
+    installed (marker dir), and fully fail-open — logging must never break the
+    guard. The event shape is pinned by schemas/usage-event.schema.json.
+    """
+    try:
+        root_env = os.environ.get("CLAUDE_PROJECT_DIR")
+        if root_env:
+            root = Path(root_env)
+        else:
+            code, out = _git(["rev-parse", "--show-toplevel"])
+            root = Path(out.strip()) if code == 0 and out.strip() else Path.cwd()
+        obs = root / ".agents" / "observability"
+        if not obs.is_dir():
+            return
+        command = ((payload.get("tool_input") or {}).get("command") or "").strip()
+        line = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "hook": "github_command_guard",
+            "event": "PreToolUse",
+            "project": str(root),
+            "decision": decision,
+            "command": _redact_command(command),
+        }
+        session = payload.get("session_id") or os.environ.get("CLAUDE_SESSION_ID")
+        if session:
+            line["session"] = str(session)
+        with (obs / "usage.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(line) + "\n")
+    except Exception:  # noqa: BLE001 — logging must never break the guard
+        return
+
+
 def cmd_guard() -> int:
     raw = sys.stdin.read()
     if not raw:
@@ -502,6 +546,8 @@ def cmd_guard() -> int:
     except json.JSONDecodeError:
         return 0
     result = guard(payload)
+    # "block"/"allow" matches the prod_guard/package_guard decision vocabulary.
+    _usage_log(payload, "block" if result is not None else "allow")
     if result is not None:
         sys.stdout.write(json.dumps(result))
     return 0
