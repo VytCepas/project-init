@@ -15,6 +15,33 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.1.3": {
+        "summary": (
+            "Fixes a data-loss bug in the 1.1.2 `.claude/` -> `.agents/` migration "
+            "(#816). That migration re-rendered the files the templates own and "
+            "DELETED everything else: project-authored ADRs and the entire `memory/` "
+            "tier were removed and never recreated — silently, with the upgrade "
+            "reporting success. The migration now moves the whole `.claude/` tree "
+            "into `.agents/` before computing drift, so your own files survive and "
+            "your edits to managed files 3-way merge instead of being overwritten."
+        ),
+        "action_required": (
+            "If you already upgraded to 1.1.2 from a pre-v1.0.1 (`.claude/`) layout, "
+            "your project-authored files under `.claude/` — ADRs, the `memory/` tier — "
+            "were DELETED. Recover them from the commit BEFORE the upgrade; do not "
+            "restore from HEAD, which may already contain the deletion:\n"
+            "  1. Find the deleting commit (search all history, not just the last "
+            "one): `git log --diff-filter=D --name-only -- .claude/`\n"
+            "  2. Restore from its parent: `git checkout <sha>^ -- .claude/`\n"
+            "  3. Move each recovered file to the matching `.agents/` path, then "
+            "delete the leftover `.claude/` copies (`.claude/` is now a generated "
+            "mirror).\n"
+            "If the upgrade was never committed, `git checkout -- .claude/` is enough. "
+            "If the tree was NOT clean at upgrade time, uncommitted content is gone. "
+            "Upgrading straight from 1.0.x to 1.1.3 is unaffected — it never loses the "
+            "files in the first place."
+        ),
+    },
     "1.1.2": {
         "summary": (
             "Three fixes, all of which failed silently in 1.1.x. (1) Both plugins "
