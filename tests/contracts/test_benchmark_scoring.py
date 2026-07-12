@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from tools.benchmark import scoring
 from tools.benchmark.harness import load_task
 
@@ -202,3 +204,30 @@ class TestScoreOrchestrator:
         tx.write_text(json.dumps({"type": "assistant", "message": {"model": "m"}}) + "\n")
         s = scoring.score(load_task("feat"), target_dir=None, transcript_path=tx)
         assert s.success is None and s.first_try is None and s.rework_cycles == 0
+
+
+class TestFailToPassTasksAreNonVacuous:
+    """The seeded baseline of a FAIL_TO_PASS task must actually be broken (PI-804).
+
+    A task whose seed already passes its own FAIL_TO_PASS nodes gives the agent
+    nothing to fix — it scores 100% for free and measures nothing. Guard the
+    edge-case-dense tasks by materializing their seed (no agent) and asserting
+    the split: PASS_TO_PASS green, FAIL_TO_PASS red. Break it by seeding a
+    correct module and this fails.
+    """
+
+    @pytest.mark.parametrize("task_id", ["fix", "semver", "csvparse"])
+    def test_seed_baseline_has_the_intended_gap(self, task_id: str, tmp_path: Path):
+        task = load_task(task_id)
+        _seed_passing_pytest(tmp_path)
+        for spec in task["seed_files"]:
+            (tmp_path / spec["path"]).write_text(spec["content"], encoding="utf-8")
+        check = task["check"]
+        # PASS_TO_PASS nodes must already be green on the untouched seed.
+        assert scoring._run_pytest_check({**check, "fail_to_pass": []}, tmp_path) is True, (
+            f"{task_id}: PASS_TO_PASS nodes should pass on the seeded baseline"
+        )
+        # FAIL_TO_PASS nodes must be red — the bug the agent is scored on fixing.
+        assert scoring._run_pytest_check({**check, "pass_to_pass": []}, tmp_path) is False, (
+            f"{task_id}: FAIL_TO_PASS nodes should fail on the seeded baseline"
+        )
