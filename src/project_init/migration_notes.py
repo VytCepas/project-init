@@ -15,6 +15,32 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.1.2": {
+        "summary": (
+            "Three fixes, all of which failed silently in 1.1.x. (1) Both plugins "
+            "were uninstallable and loaded ZERO hooks: the marketplace manifests "
+            "sat at `.agents-plugin/`, which Claude Code never reads, and each "
+            "plugin.json redeclared the standard hooks file so the client rejected "
+            "it as a duplicate. Plugin-first scaffolds take their hooks only from "
+            "the plugin, so they ran with no commit gate, no lint-on-edit and no "
+            "prod guard — while `.agents/rules/hooks.md` said the hooks were firing "
+            "(#810). (2) The git `pre-commit` hook DESTROYED UNSTAGED WORK: "
+            "`git apply` is not atomic, and the hook read its non-zero exit as "
+            "'nothing was touched', so a single commit could delete uncommitted "
+            "files and still exit 0 (#812). (3) `upgrade` refused to run on any "
+            "pre-v1.0.1 scaffold, reporting it as never scaffolded (#814)."
+        ),
+        "action_required": (
+            "Run `.agents/scripts/install_hooks.sh` after upgrading. The git hooks "
+            "are COPIED into `.git/hooks/` at install time, so upgrading the "
+            "template does NOT replace the copy you are running — without this "
+            "step you keep the pre-commit hook that destroys unstaged work, while "
+            "believing 1.1.2 fixed it. Also re-add the plugin marketplace "
+            "(`claude plugin marketplace add <your project-init repo>`) if you "
+            "tried before 1.1.2 and it failed: every install attempt against the "
+            "old manifests errored out."
+        ),
+    },
     "1.0.2": {
         "summary": (
             "TypeScript projects gain a BLOCKING security lint "
