@@ -27,13 +27,19 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
         ),
         "action_required": (
             "If you already upgraded to 1.1.2 from a pre-v1.0.1 (`.claude/`) layout, "
-            "CHECK YOUR GIT HISTORY NOW: `git status` and `git log --diff-filter=D "
-            "--name-only -1`. Any project-authored file under `.claude/` — ADRs, the "
-            "memory/ tier — was deleted from the working tree. If the tree was clean "
-            "at upgrade time it is all recoverable (`git checkout HEAD -- .claude/`, "
-            "then move the files to the matching `.agents/` path). If it was NOT "
-            "clean, uncommitted content is gone. Upgrading straight from 1.0.x to "
-            "1.1.3 is unaffected — it never loses the files in the first place."
+            "your project-authored files under `.claude/` — ADRs, the memory/ tier — "
+            "were DELETED. Recover them from the commit BEFORE the upgrade; do not "
+            "restore from HEAD, which may already contain the deletion:\n"
+            "  1. Find the deleting commit (search all history, not just the last "
+            "one): `git log --diff-filter=D --name-only -- '.claude/*'`\n"
+            "  2. Restore from its parent: `git checkout <sha>^ -- .claude/`\n"
+            "  3. Move each recovered file to the matching `.agents/` path, then "
+            "delete the leftover `.claude/` copies (`.claude/` is now a generated "
+            "mirror).\n"
+            "If the upgrade was never committed, `git checkout -- .claude/` is enough. "
+            "If the tree was NOT clean at upgrade time, uncommitted content is gone. "
+            "Upgrading straight from 1.0.x to 1.1.3 is unaffected — it never loses the "
+            "files in the first place."
         ),
     },
     "1.1.2": {
