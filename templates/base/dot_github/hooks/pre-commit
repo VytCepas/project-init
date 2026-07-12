@@ -45,6 +45,12 @@ if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
   #
   # And never delete the patch on a failure path: it is the only copy of the
   # user's unstaged work.
+  #
+  # Every git call below is anchored with `-C "$REPO_ROOT"`, and paths from
+  # `git diff` are resolved against it. `git diff` emits root-relative paths and
+  # `git apply` interprets them relative to CWD — git itself runs hooks from the
+  # worktree root, but nothing here should depend on that, and the directory
+  # probe in _isolable would silently stop detecting anything if it did.
   _isolable() {
     # A path in the diff that is now a DIRECTORY in the worktree: `git apply`
     # cannot write a file where a directory stands, and it fails only *after*
@@ -54,17 +60,18 @@ if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
     # stays 100644, so mode-sniffing alone would miss the second entirely.
     local _f
     while IFS= read -r -d '' _f; do
-      if [ -d "$_f" ]; then
+      if [ -d "$REPO_ROOT/$_f" ]; then
         return 1
       fi
-    done < <(git diff --name-only -z 2>/dev/null)
+    done < <(git -C "$REPO_ROOT" diff --name-only -z 2>/dev/null)
     # Symlinks and gitlinks are fragile under apply even without a dir clash.
-    ! git diff --raw 2>/dev/null | awk '{print $1, $2}' | grep -qE '120000|160000'
+    ! git -C "$REPO_ROOT" diff --raw 2>/dev/null | awk '{print $1, $2}' |
+      grep -qE '120000|160000'
   }
   _patch=""
   _restore() {
     [ -n "$_patch" ] || return 0
-    if git apply --whitespace=nowarn "$_patch" >/dev/null 2>&1; then
+    if git -C "$REPO_ROOT" apply --whitespace=nowarn "$_patch" >/dev/null 2>&1; then
       rm -f "$_patch"
       _patch=""
       return 0
@@ -78,17 +85,18 @@ if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
     echo "" >&2
     echo "     $_patch" >&2
     echo "" >&2
-    echo "   Recover with:  git apply --whitespace=nowarn '$_patch'" >&2
+    echo "   Recover with (the patch has repo-root-relative paths, so -C matters):" >&2
+    echo "     git -C '$REPO_ROOT' apply --whitespace=nowarn '$_patch'" >&2
     _patch=""
     exit 1
   }
-  if ! git diff --quiet 2>/dev/null; then
+  if ! git -C "$REPO_ROOT" diff --quiet 2>/dev/null; then
     _p="$(mktemp)"
-    if _isolable && git diff --binary --no-color >"$_p" 2>/dev/null &&
-      git apply -R --check --whitespace=nowarn "$_p" >/dev/null 2>&1; then
+    if _isolable && git -C "$REPO_ROOT" diff --binary --no-color >"$_p" 2>/dev/null &&
+      git -C "$REPO_ROOT" apply -R --check --whitespace=nowarn "$_p" >/dev/null 2>&1; then
       _patch="$_p"
       trap _restore EXIT
-      if ! git apply -R --whitespace=nowarn "$_p" >/dev/null 2>&1; then
+      if ! git -C "$REPO_ROOT" apply -R --whitespace=nowarn "$_p" >/dev/null 2>&1; then
         # --check passed but the apply still broke partway: the tree may be
         # half-reverted. _restore puts it back, and shouts if it cannot.
         _restore
