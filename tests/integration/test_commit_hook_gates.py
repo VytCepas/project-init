@@ -212,3 +212,48 @@ def test_git_pre_commit_ignores_unstaged_mess_on_a_clean_index(tmp_path: Path):
     assert result.returncode == 0, f"pre-commit blocked a clean staged commit:\n{result.stderr}"
     # … and the unstaged mess restored untouched (no conflict markers).
     assert (target / "x.txt").read_text() == "BAD\n", "unstaged changes were not restored"
+
+
+def test_git_pre_commit_never_destroys_unstaged_work_it_cannot_isolate(tmp_path: Path):
+    """A diff `git apply` mishandles must not cost the user their unstaged work (PI-811).
+
+    `git apply` is not atomic: on a fatal error it can delete files and *then* exit
+    non-zero. The hook used to read that non-zero exit as "nothing was touched",
+    discard the only copy of the patch, and install no restore trap — so a single
+    `git commit` silently destroyed uncommitted work.
+
+    The trigger here is the reported one: a tracked symlink replaced by a real
+    directory (what `project-init upgrade` does to `.claude`). Note the two guards
+    that do NOT catch it — `git apply -R --check` exits 0 on this diff, and git
+    reports it as a plain delete so `--diff-filter=T` is empty — which is why the
+    hook sniffs raw file modes instead.
+    """
+    _require_tool("just")
+    target = tmp_path / "proj"
+    scaffold(target, load_preset("obsidian-only"), make_variables(language="python", python="true"))
+    hook = target / ".github" / "hooks" / "pre-commit"
+    (target / "justfile").write_text("lint:\n    @echo LINT_OK\n")
+
+    subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+    subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=target, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=target, check=True)
+    (target / "a.txt").write_text("ORIG\n")
+    (target / "link").symlink_to("a.txt")
+    subprocess.run(["git", "add", "a.txt", "link", "justfile"], cwd=target, check=True)
+    subprocess.run(["git", "commit", "-qm", "init"], cwd=target, check=True)
+
+    # Unstaged: precious WIP, plus the symlink -> directory type change that makes
+    # `git apply -R` blow up partway through.
+    (target / "a.txt").write_text("PRECIOUS_WIP\n")
+    (target / "link").unlink()
+    (target / "link").mkdir()
+    (target / "link" / "inside.txt").write_text("x\n")
+    # …and something actually staged, so a commit is genuinely in flight.
+    (target / "staged.txt").write_text("s\n")
+    subprocess.run(["git", "add", "staged.txt"], cwd=target, check=True)
+
+    subprocess.run(["bash", str(hook)], cwd=target, capture_output=True, text=True)
+
+    assert (target / "a.txt").read_text() == "PRECIOUS_WIP\n", (
+        "pre-commit destroyed unstaged work while trying to isolate the index"
+    )

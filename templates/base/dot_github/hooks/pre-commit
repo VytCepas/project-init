@@ -26,22 +26,70 @@ if command -v just >/dev/null 2>&1 && [ -f "$REPO_ROOT/justfile" ] &&
   # be isolated safely (e.g. binary diffs, apply failure), fall back to linting
   # the worktree rather than risk touching it. No unstaged changes → the worktree
   # already equals the index, so skip the dance entirely.
+  #
+  # `git apply` is NOT atomic (PI-811): on a fatal error it can modify and delete
+  # files and *then* exit non-zero. So a non-zero exit does NOT mean "nothing was
+  # touched" — treating it as such destroyed uncommitted work on every commit.
+  # Three independent guards, outermost first:
+  #
+  #   1. Refuse to isolate at all when the diff touches a symlink or a gitlink
+  #      (raw mode 120000/160000). This is the guard that actually catches the
+  #      reported case — a symlink replaced by a directory. Note `git apply -R
+  #      --check` returns 0 on that diff and the real apply then wrecks the tree,
+  #      so the dry run CANNOT be relied on here; and git reports it as a plain
+  #      delete, so `--diff-filter=T` does not see it either. Mode-sniffing does.
+  #   2. Dry-run anyway (`--check` writes nothing) for the classes it does catch.
+  #   3. Install the restore trap BEFORE the real apply, never after — a partial
+  #      revert with no trap has nothing to undo it.
+  #
+  # And never delete the patch on a failure path: it is the only copy of the
+  # user's unstaged work.
+  _isolable() {
+    # Any diff line whose old/new mode is a symlink (120000) or gitlink (160000).
+    ! git diff --raw 2>/dev/null | awk '{print $1, $2}' | grep -qE '120000|160000'
+  }
   _patch=""
   _restore() {
-    if [ -n "$_patch" ]; then
-      git apply --whitespace=nowarn "$_patch" >/dev/null 2>&1 || true
+    [ -n "$_patch" ] || return 0
+    if git apply --whitespace=nowarn "$_patch" >/dev/null 2>&1; then
       rm -f "$_patch"
       _patch=""
+      return 0
     fi
+    # Restore failed — the worktree may be missing unstaged work. Never swallow
+    # this, and never `rm` the patch: it is the only way back.
+    echo "" >&2
+    echo "❌ pre-commit: could NOT restore your unstaged changes." >&2
+    echo "   Your working tree may be missing uncommitted work. The patch that" >&2
+    echo "   restores it has been kept:" >&2
+    echo "" >&2
+    echo "     $_patch" >&2
+    echo "" >&2
+    echo "   Recover with:  git apply --whitespace=nowarn '$_patch'" >&2
+    _patch=""
+    exit 1
   }
   if ! git diff --quiet 2>/dev/null; then
     _p="$(mktemp)"
-    if git diff --binary --no-color >"$_p" 2>/dev/null &&
-      git apply -R --whitespace=nowarn "$_p" >/dev/null 2>&1; then
+    if _isolable && git diff --binary --no-color >"$_p" 2>/dev/null &&
+      git apply -R --check --whitespace=nowarn "$_p" >/dev/null 2>&1; then
       _patch="$_p"
       trap _restore EXIT
+      if ! git apply -R --whitespace=nowarn "$_p" >/dev/null 2>&1; then
+        # --check passed but the apply still broke partway: the tree may be
+        # half-reverted. _restore puts it back, and shouts if it cannot.
+        _restore
+        trap - EXIT
+        echo "❌ pre-commit: could not isolate the staged snapshot; nothing was committed." >&2
+        exit 1
+      fi
     else
+      # The tree cannot be isolated (nothing has been touched — `--check` is a
+      # dry run). Fall back to linting the worktree, and say so: unstaged changes
+      # are now in scope, which is exactly what the isolation exists to prevent.
       rm -f "$_p"
+      echo "pre-commit: unstaged changes can't be set aside safely (type change or" >&2
+      echo "  binary diff), so linting the WORKING TREE, not the staged snapshot." >&2
     fi
   fi
   if ! (cd "$REPO_ROOT" && just lint); then
