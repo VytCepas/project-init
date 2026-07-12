@@ -18,12 +18,12 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
     "1.1.2": {
         "summary": (
             "Three fixes, all of which failed silently in 1.1.x. (1) Both plugins "
-            "were un-installable and loaded ZERO hooks: the marketplace manifests "
+            "were uninstallable and loaded ZERO hooks: the marketplace manifests "
             "sat at `.agents-plugin/`, which Claude Code never reads, and each "
             "plugin.json redeclared the standard hooks file so the client rejected "
             "it as a duplicate. Plugin-first scaffolds take their hooks only from "
             "the plugin, so they ran with no commit gate, no lint-on-edit and no "
-            "prod guard — while `rules/hooks.md` said the hooks were firing "
+            "prod guard — while `.agents/rules/hooks.md` said the hooks were firing "
             "(#810). (2) The git `pre-commit` hook DESTROYED UNSTAGED WORK: "
             "`git apply` is not atomic, and the hook read its non-zero exit as "
             "'nothing was touched', so a single commit could delete uncommitted "
