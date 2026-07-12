@@ -92,3 +92,13 @@ The three contract tests guarding these manifests followed the rename and
 stayed green throughout, because each asserted the manifests were internally
 consistent, never that they sat where the client looks. `test_plugin_marketplace.py`
 now pins the literal spec path so this cannot regress silently again.
+
+Two clarifications on the Decision Outcome above, which is a 2026-06-12 record
+and is left standing as one:
+
+- It says the marketplace lists `project-init-workflow`. That was true when
+  written; the lifecycle decomposition (#476) later split the payload, and the
+  marketplace now lists `project-init-lifecycle` alongside it. The single-plugin
+  wording is history, not current state — see README.md for what ships today.
+- Its `.claude-plugin/` path was briefly rewritten to `.agents-plugin/` by
+  PI-606's blanket rename and has been restored. The decision never changed.
