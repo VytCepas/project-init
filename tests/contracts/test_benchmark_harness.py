@@ -290,7 +290,25 @@ class TestAuth:
         monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cfg"))
         assert harness.default_config_dir() == tmp_path / "cfg"
         monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
-        assert harness.default_config_dir() == Path.home() / ".agents"
+        # PI-802: the default is Claude Code's real config dir (~/.claude), where
+        # the subscription/OAuth credentials live — NOT ~/.agents.
+        assert harness.default_config_dir() == Path.home() / ".claude"
+
+    def test_default_config_dir_finds_existing_login(self, tmp_path: Path, monkeypatch):
+        """With no env override, the resolver points at a real ~/.claude login.
+
+        Regression guard for PI-802: the harness must locate credentials Claude
+        Code actually wrote, so `run` authenticates off a Pro/Max login instead
+        of falsely reporting "not authenticated".
+        """
+        fake_home = tmp_path / "home"
+        (fake_home / ".claude").mkdir(parents=True)
+        (fake_home / ".claude" / ".credentials.json").write_text("{}", encoding="utf-8")
+        monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: fake_home))
+        resolved = harness.default_config_dir()
+        assert (resolved / ".credentials.json").is_file()
+        assert resolved == fake_home / ".claude"
 
     def test_seed_credentials_copies_subscription_token(self, tmp_path: Path):
         source = tmp_path / "real"

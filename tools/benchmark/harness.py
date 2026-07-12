@@ -82,10 +82,13 @@ def transcript_path_for(config_dir: Path, target_dir: Path, session_id: str) -> 
 def default_config_dir() -> Path:
     """The user's real Claude config dir — where OAuth/subscription creds live.
 
-    Honors ``CLAUDE_CONFIG_DIR`` (matching Claude Code), else ``~/.agents``.
+    Honors ``CLAUDE_CONFIG_DIR`` (matching Claude Code), else ``~/.claude`` —
+    Claude Code's real default config dir, where the subscription/OAuth
+    ``.credentials.json`` is written (NOT ``~/.agents``, which is a project's
+    scaffolded tree, not the user's Claude config; PI-802).
     """
     env = os.environ.get("CLAUDE_CONFIG_DIR")
-    return Path(env) if env else Path.home() / ".agents"
+    return Path(env) if env else Path.home() / ".claude"
 
 
 def seed_credentials(config_dir: Path, source: Path | None = None) -> bool:
@@ -109,7 +112,7 @@ def seed_credentials(config_dir: Path, source: Path | None = None) -> bool:
 
 
 # Env vars Claude Code honors for non-interactive auth — both take precedence
-# over stored credentials, so either is sufficient (https://code.agents.com/docs/en/env-vars).
+# over stored credentials, so either is sufficient (https://code.claude.com/docs/en/env-vars).
 _AUTH_ENV_VARS = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")
 
 
