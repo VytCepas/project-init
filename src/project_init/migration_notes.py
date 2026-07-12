@@ -19,7 +19,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
         "summary": (
             "Fixes a data-loss bug in the 1.1.2 `.claude/` -> `.agents/` migration "
             "(#816). That migration re-rendered the files the templates own and "
-            "DELETED everything else: project-authored ADRs and the entire memory/ "
+            "DELETED everything else: project-authored ADRs and the entire `memory/` "
             "tier were removed and never recreated — silently, with the upgrade "
             "reporting success. The migration now moves the whole `.claude/` tree "
             "into `.agents/` before computing drift, so your own files survive and "
@@ -27,7 +27,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
         ),
         "action_required": (
             "If you already upgraded to 1.1.2 from a pre-v1.0.1 (`.claude/`) layout, "
-            "your project-authored files under `.claude/` — ADRs, the memory/ tier — "
+            "your project-authored files under `.claude/` — ADRs, the `memory/` tier — "
             "were DELETED. Recover them from the commit BEFORE the upgrade; do not "
             "restore from HEAD, which may already contain the deletion:\n"
             "  1. Find the deleting commit (search all history, not just the last "
