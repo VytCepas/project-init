@@ -40,7 +40,15 @@ class TestPluginManifest:
         manifest = json.loads((_PLUGIN_ROOT / ".claude-plugin" / "plugin.json").read_text())
         assert manifest["name"] == "project-init-workflow"
         assert re.match(r"^\d+\.\d+\.\d+$", manifest["version"])
-        assert manifest["hooks"] == "./hooks/hooks.json"
+
+    def test_plugin_json_does_not_redeclare_the_standard_hooks_file(self):
+        # `hooks/hooks.json` is loaded automatically; naming it in the manifest too
+        # makes the client reject it as a duplicate and load *no* hooks at all
+        # ("Duplicate hooks file detected"). The key is for *additional* hook files.
+        for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
+            manifest = json.loads((root / ".claude-plugin" / "plugin.json").read_text())
+            assert "hooks" not in manifest, root.name
+            assert (root / "hooks" / "hooks.json").is_file(), root.name
 
     def test_hooks_json_references_only_existing_scripts(self):
         config = json.loads((_PLUGIN_ROOT / "hooks" / "hooks.json").read_text())
