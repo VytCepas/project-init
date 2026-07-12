@@ -197,6 +197,11 @@ class TestLegacyUnmanagedContentIsCarried:
         # The scaffold already writes a .claude/ mirror, so drop it before the move.
         shutil.rmtree(target / ".claude", ignore_errors=True)
         (target / ".agents").rename(target / ".claude")
+        # A real v1.0.0 record lists `.claude/` paths in its manifest — which is why
+        # every file reads as a genuinely-new addition and the consent gate fires.
+        # Without this the fixture is a current scaffold wearing a legacy hat.
+        cfg = target / ".claude" / "config.yaml"
+        cfg.write_text(cfg.read_text().replace(".agents/", ".claude/"))
         # …plus files the scaffolder does not own and never renders.
         adr = target / ".claude" / "docs" / "adr" / "adr-003-our-own.md"
         adr.parent.mkdir(parents=True, exist_ok=True)
@@ -232,3 +237,24 @@ class TestLegacyUnmanagedContentIsCarried:
         )
         after = sorted(p.relative_to(target).as_posix() for p in (target / ".agents").rglob("*"))
         assert before == after or set(before) <= set(after)
+
+    def test_a_gated_run_moves_nothing(self, tmp_path: Path):
+        """A run that stops at the addition-consent gate must not mutate the tree.
+
+        The migration has to happen BEFORE apply_drift (or the fresh render clobbers
+        the user's files) and AFTER the consent gate (or a run that applies nothing
+        still moves the user's files). Getting only the first edge right silently
+        half-migrated a project that then exited 2 having applied nothing (PI-816
+        review — Codex and Copilot both caught it).
+        """
+        target = self._legacy_with_own_content(tmp_path)
+        before = sorted(p.relative_to(target).as_posix() for p in (target / ".claude").rglob("*"))
+
+        # No --accept-new: a legacy project's whole tree is a new addition group, so
+        # this stops at the gate and applies nothing.
+        rc = run_upgrade(target, apply=True)
+
+        assert rc == 2, "expected the addition-consent gate to stop this run"
+        after = sorted(p.relative_to(target).as_posix() for p in (target / ".claude").rglob("*"))
+        assert after == before, "a gated run moved the user's files out of .claude/"
+        assert not (target / ".agents").exists(), "a gated run migrated the tree anyway"

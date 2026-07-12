@@ -86,10 +86,10 @@ def _is_sibling(rel: Path) -> bool:
 def is_legacy_layout(target: Path) -> bool:
     """True when *target*'s record still lives at the pre-PI-606 ``.claude/`` path.
 
-    Must be read BEFORE anything is relocated, and it is the gate on
-    :func:`_carry_unmanaged_legacy_content`: in a *current* project ``.claude/`` is
-    a generated mirror of ``.agents/``, so carrying it across would collide with
-    every canonical file it already duplicates.
+    Must be read BEFORE anything is migrated, and it is the gate on
+    :func:`_migrate_legacy_tree`: in a *current* project ``.claude/`` is a generated
+    mirror of ``.agents/``, so migrating it across would collide with every
+    canonical file it already duplicates.
     """
     return (target / _LEGACY_CONFIG_REL).is_file() and not (target / _CONFIG_REL).is_file()
 
@@ -145,7 +145,7 @@ def scaffold_record_path(target: Path) -> Path:
 
     This resolver only *reads*. The record is excluded from the managed drift set,
     so a re-render never recreates it at the new path — `--apply` migrates it with
-    an explicit move (`_relocate_legacy_state`). When neither path exists, the
+    an explicit move (`_migrate_legacy_tree`). When neither path exists, the
     canonical one is returned so the error names the location a current project
     should have.
     """
@@ -1816,9 +1816,9 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
     """
     import sys
 
-    # Read BEFORE anything relocates — the relocation is what makes it stop being
-    # true, and _carry_unmanaged_legacy_content must not run on a current project
-    # (there .claude/ is a generated mirror of .agents/, not user content).
+    # Read BEFORE anything moves — the migration is what makes it stop being true,
+    # and _migrate_legacy_tree must not run on a current project (there .claude/ is
+    # a generated mirror of .agents/, not user content).
     legacy_layout = is_legacy_layout(target)
     try:
         preset_name, variables, manifest, migrated = read_scaffold_record(target)
@@ -1851,18 +1851,6 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
     # project fields on --apply (2026-07 review).
     variables["project_init_plugin_version"] = __plugin_version__
 
-    # Migrate the legacy tree BEFORE rendering and computing drift (PI-813/PI-816).
-    # Order is the whole fix. Migrate afterwards and every legacy file looks like a
-    # brand-new render: the drift engine has nothing at the canonical path to compare
-    # against, so it writes the fresh template over the user's copy. That is how the
-    # memory tier was lost — `memory/MEMORY.md` IS a template output, so "carry only
-    # the unmanaged files" still clobbered it. Move everything first and the project
-    # simply looks normal: managed files 3-way merge against their base, and
-    # unmanaged files (ADRs, memory the templates don't own) are in neither the
-    # manifest nor the render, so nothing touches them.
-    if apply and legacy_layout:
-        _migrate_legacy_tree(target)
-
     staging_root = Path(tempfile.mkdtemp(prefix="project-init-upgrade-"))
     staging = staging_root / "render"
     try:
@@ -1894,12 +1882,23 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
         # Run apply even with zero file drift: the config version line and the
         # scaffold record must still refresh to the current tool version.
         if apply:
-            # Migrate a legacy project's record + merge-base sidecar into .agents/
-            # before apply_drift writes through them (PI-813). Deliberately inside
-            # the apply branch and after the addition gate: a gated run applies
-            # nothing, so it must not move the user's files either. Once consent is
-            # given the run reaches here and migrates. read_base() above already
-            # resolves the legacy sidecar, so the merge base is correct either way.
+            if legacy_layout:
+                # Migrate here — past the consent gate, before apply_drift (PI-813,
+                # PI-816). Both edges are load-bearing and pull in opposite directions:
+                #   - AFTER the gate, because a gated run returns 2 having applied
+                #     nothing, and a run that applies nothing must not move the user's
+                #     files either.
+                #   - BEFORE apply_drift, or every legacy file looks like a brand-new
+                #     render and the fresh template is written over the user's copy —
+                #     which is how the memory tier was lost (memory/MEMORY.md IS a
+                #     template output, so "carry only unmanaged files" still clobbered it).
+                # Hence the recompute below rather than migrating up at the render:
+                # drift was measured against the pre-migration tree, where the managed
+                # files did not exist yet. Re-measuring against the migrated tree turns
+                # them from "new" (overwrite) into "changed/merged" (3-way merge against
+                # the recorded base), which is what preserves user edits.
+                _migrate_legacy_tree(target)
+                report = compute_drift(target, staging, rendered, manifest, read_base(target))
             suppressed = {p for gid in gate["declined_now"] for p in groups[gid]["paths"]}
             report.new = [rel for rel in report.new if rel not in suppressed]
             # Per-file interactive walk (#245): drop the files the user skips so
