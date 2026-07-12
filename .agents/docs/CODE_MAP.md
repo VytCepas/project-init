@@ -139,6 +139,7 @@ Per-surface agent-config generation (ADR-017, PI-366).
 
 `project-init upgrade` — re-render from recorded config with a drift report.
 
+- `def is_legacy_layout` — True when *target*'s record still lives at the pre-PI-606 ``.claude/`` path.
 - `def scaffold_record_path` — Locate *target*'s scaffold record, tolerating the pre-PI-606 location.
 - `class UpgradeError` — Raised when the project cannot be upgraded (missing/invalid config).
 - `class DriftReport` — Outcome of comparing a fresh render against the scaffolded project.

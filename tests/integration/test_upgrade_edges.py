@@ -4,6 +4,7 @@ file/dir type collisions, and CRLF preservation through the 3-way merge.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -177,3 +178,57 @@ class TestLegacyClaudeRecordLocation:
 
         run_upgrade(target, apply=True)
         assert canonical_base.is_file(), "upgrade --apply must migrate the merge-base sidecar"
+
+
+class TestLegacyUnmanagedContentIsCarried:
+    """The migration must not delete the project's OWN files (PI-816).
+
+    `.claude/` -> `.agents/` re-renders the *managed* files and rebuilds `.claude/`
+    as a projection. A project-authored file is in neither set — not in the manifest,
+    so the drift engine never reports it; not a template output, so nothing recreates
+    it. It was silently deleted. Real loss, on a real upgrade: two project ADRs and
+    the entire memory/ tier.
+    """
+
+    def _legacy_with_own_content(self, tmp_path: Path) -> Path:
+        target = tmp_path / "proj"
+        _scaffold(target)
+        # Recreate a true v1.0.0 layout: everything under .claude/, no .agents/.
+        # The scaffold already writes a .claude/ mirror, so drop it before the move.
+        shutil.rmtree(target / ".claude", ignore_errors=True)
+        (target / ".agents").rename(target / ".claude")
+        # …plus files the scaffolder does not own and never renders.
+        adr = target / ".claude" / "docs" / "adr" / "adr-003-our-own.md"
+        adr.parent.mkdir(parents=True, exist_ok=True)
+        adr.write_text("# ADR-003: a decision WE wrote\n")
+        mem = target / ".claude" / "memory" / "MEMORY.md"
+        mem.parent.mkdir(parents=True, exist_ok=True)
+        mem.write_text("our project memory\n")
+        return target
+
+    def test_project_authored_files_survive_the_migration(self, tmp_path: Path):
+        target = self._legacy_with_own_content(tmp_path)
+
+        run_upgrade(target, apply=True, accept_new=["all"])
+
+        adr = target / ".agents" / "docs" / "adr" / "adr-003-our-own.md"
+        mem = target / ".agents" / "memory" / "MEMORY.md"
+        assert adr.is_file(), "the upgrade deleted a project-authored ADR"
+        assert mem.is_file(), "the upgrade deleted the project's memory tier"
+        assert adr.read_text() == "# ADR-003: a decision WE wrote\n", "content mangled"
+        assert mem.read_text() == "our project memory\n", "content mangled"
+
+    def test_a_current_project_is_untouched(self, tmp_path: Path):
+        """The carry must NOT fire on a normal project, where .claude/ is a
+        generated mirror — carrying it would collide with every canonical file."""
+        target = tmp_path / "proj"
+        _scaffold(target)
+        before = sorted(p.relative_to(target).as_posix() for p in (target / ".agents").rglob("*"))
+
+        run_upgrade(target, apply=True, accept_new=["all"])
+
+        assert not list((target / ".agents").rglob("*.new")), (
+            "carry fired on a current project and collided with the .claude/ mirror"
+        )
+        after = sorted(p.relative_to(target).as_posix() for p in (target / ".agents").rglob("*"))
+        assert before == after or set(before) <= set(after)
