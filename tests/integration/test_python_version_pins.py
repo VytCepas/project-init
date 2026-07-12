@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+import project_init.wizard_prompts as _wiz
+
 _BASE = (
     "--non-interactive",
     "--preset",
@@ -153,15 +155,15 @@ def _wizard(
         seen.append(str(label))
         return next(answer_iter)
 
-    monkeypatch.setattr(cli, "_prompt", fake_prompt)
-    monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
-    monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
-    monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
-    monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
-    monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
-    monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
-    monkeypatch.setattr(cli, "_choose_review_cycles_interactive", lambda *a, **k: 2)
-    monkeypatch.setattr(cli, "_choose_agents_interactive", lambda: ["claude"])
+    monkeypatch.setattr(_wiz, "_prompt", fake_prompt)
+    monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
+    monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
+    monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
+    monkeypatch.setattr(_wiz, "_choose_iac_interactive", lambda: "none")
+    monkeypatch.setattr(_wiz, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
+    monkeypatch.setattr(_wiz, "_choose_lifecycle_interactive", lambda *a, **k: "github")
+    monkeypatch.setattr(_wiz, "_choose_review_cycles_interactive", lambda *a, **k: 2)
+    monkeypatch.setattr(_wiz, "_choose_agents_interactive", lambda: ["claude"])
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 
     inputs = cli._gather_inputs_interactive(

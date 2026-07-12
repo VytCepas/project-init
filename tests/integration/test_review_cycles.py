@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+import project_init.wizard_prompts as _wiz
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
 
@@ -135,14 +136,14 @@ def test_wizard_skips_the_prompt_when_lifecycle_is_declined(monkeypatch):
         seen.append(str(label))
         return next(answers)
 
-    monkeypatch.setattr(cli, "_prompt", fake_prompt)
-    monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
-    monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
-    monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
-    monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
-    monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
-    monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "none")
-    monkeypatch.setattr(cli, "_choose_agents_interactive", lambda: ["claude"])
+    monkeypatch.setattr(_wiz, "_prompt", fake_prompt)
+    monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
+    monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
+    monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
+    monkeypatch.setattr(_wiz, "_choose_iac_interactive", lambda: "none")
+    monkeypatch.setattr(_wiz, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
+    monkeypatch.setattr(_wiz, "_choose_lifecycle_interactive", lambda *a, **k: "none")
+    monkeypatch.setattr(_wiz, "_choose_agents_interactive", lambda: ["claude"])
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 
     inputs = cli._gather_inputs_interactive(
@@ -156,15 +157,15 @@ def _wizard_with_flag(monkeypatch, *, lifecycle: str, cli_cycles: int | None):
     import project_init.__main__ as cli
 
     answers = iter(["proj", "desc", "go", "", "none"])
-    monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
-    monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
-    monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
-    monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
-    monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
-    monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
-    monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: lifecycle)
-    monkeypatch.setattr(cli, "_choose_review_cycles_interactive", lambda *a, **k: 2)
-    monkeypatch.setattr(cli, "_choose_agents_interactive", lambda: ["claude"])
+    monkeypatch.setattr(_wiz, "_prompt", lambda *a, **k: next(answers))
+    monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
+    monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
+    monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
+    monkeypatch.setattr(_wiz, "_choose_iac_interactive", lambda: "none")
+    monkeypatch.setattr(_wiz, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
+    monkeypatch.setattr(_wiz, "_choose_lifecycle_interactive", lambda *a, **k: lifecycle)
+    monkeypatch.setattr(_wiz, "_choose_review_cycles_interactive", lambda *a, **k: 2)
+    monkeypatch.setattr(_wiz, "_choose_agents_interactive", lambda: ["claude"])
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
     return cli._gather_inputs_interactive(
         default_name="proj",
@@ -276,7 +277,7 @@ def test_interactive_defers_when_only_the_preset_says_none():
 def test_review_cycles_explainer_states_its_value(capsys, monkeypatch):
     import project_init.__main__ as cli
 
-    monkeypatch.setattr(cli, "_prompt", lambda *a, **k: "2")
+    monkeypatch.setattr(_wiz, "_prompt", lambda *a, **k: "2")
     assert cli._choose_review_cycles_interactive() == 2
     out = capsys.readouterr().out
     assert "no review control" in out

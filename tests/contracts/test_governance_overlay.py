@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import project_init.wizard_prompts as _wiz
 from project_init.__main__ import main
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from project_init.upgrade import read_scaffold_record
@@ -191,16 +192,18 @@ class TestInteractiveResolution:
 
         # "3.11" answers the target-Python prompt a python scaffold now asks (#628).
         answers = iter(["proj", "desc", "python", "3.11", "@owner", "none", "claude"])
-        monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
-        monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
-        monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
-        monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
-        monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
-        monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
-        monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
+        monkeypatch.setattr(_wiz, "_prompt", lambda *a, **k: next(answers))
+        monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
+        monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
+        monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
+        monkeypatch.setattr(_wiz, "_choose_iac_interactive", lambda: "none")
+        monkeypatch.setattr(_wiz, "_choose_memory_interactive", lambda *a, **k: "obsidian-only")
+        monkeypatch.setattr(_wiz, "_choose_lifecycle_interactive", lambda *a, **k: "github")
         # PI-714: a lifecycle-on wizard now asks for review cycles.
-        monkeypatch.setattr(cli, "_choose_review_cycles_interactive", lambda *a, **k: 2)
-        monkeypatch.setattr(cli, "_choose_agents_interactive", lambda *a, **k: ["claude", "vscode"])
+        monkeypatch.setattr(_wiz, "_choose_review_cycles_interactive", lambda *a, **k: 2)
+        monkeypatch.setattr(
+            _wiz, "_choose_agents_interactive", lambda *a, **k: ["claude", "vscode"]
+        )
         # Every Confirm.ask (devcontainer/mise/vscode/multi-model/governance) → decline.
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
         return cli

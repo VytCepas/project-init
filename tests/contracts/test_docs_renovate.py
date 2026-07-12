@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+import project_init.wizard_prompts as _wiz
 from project_init.__main__ import ScaffoldInputs, _build_variables, main
 from project_init.scaffold import _TEMPLATES_DIR, _render, load_preset, scaffold
 from project_init.upgrade import _backfill_variables, _migrate_semantic_config
@@ -214,16 +215,18 @@ class TestInteractiveFlags:
 
         # "3.11" answers the target-Python prompt a python scaffold now asks (#628).
         answers = iter(["proj", "desc", "python", "3.11", "@owner", "none", "claude"])
-        monkeypatch.setattr(cli, "_prompt", lambda *a, **k: next(answers))
-        monkeypatch.setattr(cli, "_choose_mcps_interactive", lambda catalog: [])
-        monkeypatch.setattr(cli, "_choose_browser_interactive", lambda: False)
-        monkeypatch.setattr(cli, "_choose_delivery_interactive", lambda language: "prototype")
-        monkeypatch.setattr(cli, "_choose_iac_interactive", lambda: "none")
-        monkeypatch.setattr(cli, "_choose_memory_interactive", lambda *a, **k: "none")
-        monkeypatch.setattr(cli, "_choose_lifecycle_interactive", lambda *a, **k: "github")
+        monkeypatch.setattr(_wiz, "_prompt", lambda *a, **k: next(answers))
+        monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
+        monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
+        monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
+        monkeypatch.setattr(_wiz, "_choose_iac_interactive", lambda: "none")
+        monkeypatch.setattr(_wiz, "_choose_memory_interactive", lambda *a, **k: "none")
+        monkeypatch.setattr(_wiz, "_choose_lifecycle_interactive", lambda *a, **k: "github")
         # PI-714: a lifecycle-on wizard now asks for review cycles.
-        monkeypatch.setattr(cli, "_choose_review_cycles_interactive", lambda *a, **k: 2)
-        monkeypatch.setattr(cli, "_choose_agents_interactive", lambda *a, **k: ["claude", "vscode"])
+        monkeypatch.setattr(_wiz, "_choose_review_cycles_interactive", lambda *a, **k: 2)
+        monkeypatch.setattr(
+            _wiz, "_choose_agents_interactive", lambda *a, **k: ["claude", "vscode"]
+        )
         # Confirm.ask → True: docs/renovate would land ON if the flags were ignored.
         monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: True)
         return cli

@@ -172,7 +172,7 @@ class TestWizardHonorsMcpsFlag:
         # vscode still prompt in the same run (2026-07 review).
         offered = []
         monkeypatch.setattr(
-            "project_init.__main__._choose_browser_interactive",
+            "project_init.wizard_prompts._choose_browser_interactive",
             lambda: offered.append(True) or False,
         )
         selected = _gather_mcps_interactive("context7", False)
@@ -180,7 +180,7 @@ class TestWizardHonorsMcpsFlag:
         assert offered, "browser concern must still be offered (ADR-023)"
 
     def test_cli_mcps_browser_prompt_accept_adds_playwright(self, monkeypatch):
-        monkeypatch.setattr("project_init.__main__._choose_browser_interactive", lambda: True)
+        monkeypatch.setattr("project_init.wizard_prompts._choose_browser_interactive", lambda: True)
         selected = _gather_mcps_interactive("context7", False)
         assert [m["id"] for m in selected] == ["context7", "playwright"]
 

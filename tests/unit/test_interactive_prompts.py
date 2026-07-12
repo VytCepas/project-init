@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+import project_init.wizard_prompts as _wiz
 from project_init import __main__
 from project_init.mcps import MCP_CATALOG
 
@@ -55,7 +56,7 @@ def test_choose_mcps_interactive_empty_skips(monkeypatch):
 def test_gather_inputs_interactive_enter_defaults_uses_description_default(monkeypatch):
     """A full interactive accept-defaults flow must not loop forever on an empty
     required description; it derives a valid default from the accepted name."""
-    monkeypatch.setattr(__main__, "_prompt", lambda _label, default="": default)
+    monkeypatch.setattr(_wiz, "_prompt", lambda _label, default="": default)
     monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: k.get("default", ""))
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: k.get("default", False))
 
@@ -80,14 +81,14 @@ def test_gather_inputs_interactive_honors_explicit_agents_claude(monkeypatch):
     """`--agents claude` (interactive) must yield a claude-only project, not open
     the surface chooser — the chooser can never return claude-only, so an absent
     flag and an explicit `claude` had been conflated (default was "claude")."""
-    monkeypatch.setattr(__main__, "_prompt", lambda _label, default="": default)
+    monkeypatch.setattr(_wiz, "_prompt", lambda _label, default="": default)
     monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: k.get("default", ""))
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: k.get("default", False))
 
     def _fail_chooser():
         raise AssertionError("surface chooser must not run when --agents is explicit")
 
-    monkeypatch.setattr(__main__, "_choose_agents_interactive", _fail_chooser)
+    monkeypatch.setattr(_wiz, "_choose_agents_interactive", _fail_chooser)
 
     result = __main__._gather_inputs_interactive(
         default_name="demo",
@@ -107,13 +108,13 @@ def test_gather_inputs_interactive_honors_explicit_agents_claude(monkeypatch):
 
 def test_gather_inputs_interactive_absent_agents_opens_chooser(monkeypatch):
     """An absent --agents flag (None) still opens the surface chooser."""
-    monkeypatch.setattr(__main__, "_prompt", lambda _label, default="": default)
+    monkeypatch.setattr(_wiz, "_prompt", lambda _label, default="": default)
     monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: k.get("default", ""))
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: k.get("default", False))
 
     called = []
     monkeypatch.setattr(
-        __main__, "_choose_agents_interactive", lambda: called.append(True) or ["claude", "vscode"]
+        _wiz, "_choose_agents_interactive", lambda: called.append(True) or ["claude", "vscode"]
     )
 
     result = __main__._gather_inputs_interactive(

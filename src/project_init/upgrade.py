@@ -621,7 +621,7 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict[str, str], dic
     }
     for flag in _LANGUAGE_FLAGS:
         variables[flag] = "true" if language == flag else ""
-    from project_init.__main__ import _LANGUAGE_COMMANDS, render_run_command
+    from project_init.variables import _LANGUAGE_COMMANDS, render_run_command
 
     _, _, _, run_cmd = _LANGUAGE_COMMANDS.get(language, ("", "", "", ""))
     variables["run_command"] = render_run_command(run_cmd, variables["project_slug"])
@@ -744,7 +744,7 @@ def _backfill_variables(variables: dict[str, str]) -> dict[str, str]:
         "true" if (v.get("devcontainer") or v.get("delivery") == "service") else ""
     )
     v["not_delivery_service"] = "" if v.get("delivery") == "service" else "true"
-    from project_init.__main__ import _LANGUAGE_COMMANDS, render_run_command
+    from project_init.variables import _LANGUAGE_COMMANDS, render_run_command
 
     _, _, _, run_cmd = _LANGUAGE_COMMANDS.get(language, ("", "", "", ""))
     v.setdefault("run_command", render_run_command(run_cmd, v.get("project_slug", "")))
