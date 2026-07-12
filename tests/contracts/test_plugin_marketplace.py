@@ -37,9 +37,12 @@ class TestMarketplaceManifest:
 
 class TestPluginManifest:
     def test_plugin_json_valid(self):
-        manifest = json.loads((_PLUGIN_ROOT / ".claude-plugin" / "plugin.json").read_text())
-        assert manifest["name"] == "project-init-workflow"
-        assert re.match(r"^\d+\.\d+\.\d+$", manifest["version"])
+        # Both shipped plugins, not just the core one: the lifecycle manifest can
+        # regress (missing name, non-semver version) just as easily.
+        for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
+            manifest = json.loads((root / ".claude-plugin" / "plugin.json").read_text())
+            assert manifest["name"] == root.name
+            assert re.match(r"^\d+\.\d+\.\d+$", manifest["version"]), root.name
 
     def test_plugin_json_does_not_redeclare_the_standard_hooks_file(self):
         # `hooks/hooks.json` is loaded automatically; naming it in the manifest too

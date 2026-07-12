@@ -16,7 +16,7 @@ scaffolder stops copying files the moment the plugin exists.
 
 ## Decision Outcome
 
-**Marketplace lives in this repo.** `.agents-plugin/marketplace.json` at
+**Marketplace lives in this repo.** `.claude-plugin/marketplace.json` at
 the repo root lists `project-init-workflow` with a relative source
 (`./plugins/project-init-workflow`). No second repo to maintain; relative
 sources resolve for git-based marketplace adds, which is how scaffolded
