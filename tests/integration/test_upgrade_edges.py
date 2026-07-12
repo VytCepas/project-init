@@ -9,7 +9,13 @@ from pathlib import Path
 import pytest
 
 from project_init.__main__ import main
-from project_init.upgrade import UpgradeError, _three_way_merge, read_scaffold_record, run_upgrade
+from project_init.upgrade import (
+    UpgradeError,
+    _three_way_merge,
+    read_base,
+    read_scaffold_record,
+    run_upgrade,
+)
 
 _CONFIG = Path(".agents/config.yaml")
 
@@ -103,3 +109,71 @@ class TestCrlfPreservation:
         merged, clean = _three_way_merge(base, ours, theirs)
         assert clean
         assert "\r" not in merged
+
+
+class TestLegacyClaudeRecordLocation:
+    """A pre-v1.0.1 scaffold keeps its record at `.claude/config.yaml` (PI-813).
+
+    The `.claude/` -> `.agents/` rename (PI-606) shipped in v1.0.1 and moved the
+    scaffold record. `upgrade` read only the new path, so every project scaffolded
+    at v1.0.0 or earlier was told it "was not scaffolded by project-init" and could
+    never be upgraded — the migration the tool exists to perform was the one
+    operation it refused to do.
+    """
+
+    def _legacy_scaffold(self, tmp_path: Path) -> Path:
+        """Scaffold, then move the record back to where v1.0.0 put it."""
+        target = tmp_path / "proj"
+        _scaffold(target)
+        legacy = target / ".claude" / "config.yaml"
+        legacy.parent.mkdir(parents=True, exist_ok=True)
+        legacy.write_bytes((target / _CONFIG).read_bytes())
+        (target / _CONFIG).unlink()
+        return target
+
+    def test_record_is_found_at_the_legacy_path(self, tmp_path: Path):
+        target = self._legacy_scaffold(tmp_path)
+        preset, variables, _manifest, _migrated = read_scaffold_record(target)
+        assert preset == "obsidian-only"
+        assert variables["project_name"] == "edge"
+
+    def test_upgrade_runs_instead_of_claiming_the_project_was_never_scaffolded(
+        self, tmp_path: Path
+    ):
+        target = self._legacy_scaffold(tmp_path)
+        # The bug: this raised UpgradeError("… was not scaffolded by project-init").
+        run_upgrade(target, apply=False)
+
+    def test_apply_relocates_the_record_to_the_canonical_path(self, tmp_path: Path):
+        target = self._legacy_scaffold(tmp_path)
+        # A real v1.0.0 project has drift by definition; this synthetic one is
+        # rendered from current templates, so give it some — otherwise `--apply`
+        # correctly re-renders nothing and the record never moves.
+        (target / ".agents" / "rules" / "hooks.md").unlink()
+
+        run_upgrade(target, apply=True)
+
+        assert (target / _CONFIG).is_file(), "upgrade --apply must migrate the record to .agents/"
+        preset, _variables, _manifest, _migrated = read_scaffold_record(target)
+        assert preset == "obsidian-only", "the migrated record must survive the move intact"
+
+    def test_merge_base_sidecar_is_found_and_migrated(self, tmp_path: Path):
+        """The sidecar must migrate too, or every 3-way merge silently loses its base.
+
+        `read_base` treats a missing sidecar as "no base recorded" and returns {} —
+        so leaving it behind in `.claude/` degrades every user edit into a conflict
+        with no error at all. The failure is invisible precisely because the sidecar
+        is optional (PI-813 review, Codex).
+        """
+        target = self._legacy_scaffold(tmp_path)
+        # Move the sidecar back to its pre-PI-606 home too, as a real v1.0.0 has it.
+        legacy_base = target / ".claude" / ".upgrade-base.json"
+        canonical_base = target / ".agents" / ".upgrade-base.json"
+        legacy_base.write_bytes(canonical_base.read_bytes())
+        canonical_base.unlink()
+
+        # Read it where it actually lives — this returned {} before the fix.
+        assert read_base(target), "legacy merge base was invisible — every merge loses its base"
+
+        run_upgrade(target, apply=True)
+        assert canonical_base.is_file(), "upgrade --apply must migrate the merge-base sidecar"
