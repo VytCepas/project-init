@@ -15,6 +15,27 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.1.3": {
+        "summary": (
+            "Fixes a data-loss bug in the 1.1.2 `.claude/` -> `.agents/` migration "
+            "(#816). That migration re-rendered the files the templates own and "
+            "DELETED everything else: project-authored ADRs and the entire memory/ "
+            "tier were removed and never recreated — silently, with the upgrade "
+            "reporting success. The migration now moves the whole `.claude/` tree "
+            "into `.agents/` before computing drift, so your own files survive and "
+            "your edits to managed files 3-way merge instead of being overwritten."
+        ),
+        "action_required": (
+            "If you already upgraded to 1.1.2 from a pre-v1.0.1 (`.claude/`) layout, "
+            "CHECK YOUR GIT HISTORY NOW: `git status` and `git log --diff-filter=D "
+            "--name-only -1`. Any project-authored file under `.claude/` — ADRs, the "
+            "memory/ tier — was deleted from the working tree. If the tree was clean "
+            "at upgrade time it is all recoverable (`git checkout HEAD -- .claude/`, "
+            "then move the files to the matching `.agents/` path). If it was NOT "
+            "clean, uncommitted content is gone. Upgrading straight from 1.0.x to "
+            "1.1.3 is unaffected — it never loses the files in the first place."
+        ),
+    },
     "1.1.2": {
         "summary": (
             "Three fixes, all of which failed silently in 1.1.x. (1) Both plugins "
