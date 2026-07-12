@@ -22,6 +22,47 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 # generators emit only the canonical format, never the legacy brackets).
 _CANONICAL_TITLE_RE = re.compile(r"^(feat|fix|chore|docs|test)!?: .+")
 
+# A real ``uses:`` key (not a substring like ``statuses:``) pointing at an
+# external ``owner/repo@ref`` action. Local (``./``) and templated (``{{``)
+# refs are not pinnable and are skipped.
+_USES_REF = re.compile(r"(?:^|\s)uses:\s*(?P<ref>[^\s{./][^\s]*@[^\s]+)")
+
+
+def _pinned_oracle() -> re.Pattern[str]:
+    """The Renovate custom-manager regex doubles as the "is it SHA-pinned?"
+    oracle for the *templates*: a ``uses:`` line that matches is both
+    digest-pinned AND in the exact form the manager keeps fresh (one space
+    before the ``# vX`` comment — the manager can't parse ``.tmpl`` YAML natively).
+    """
+    config = json.loads((_REPO_ROOT / "renovate.json").read_text())
+    manager = next(m for m in config["customManagers"] if m["customType"] == "regex")
+    return re.compile(manager["matchStrings"][0].replace("(?<", "(?P<"))
+
+
+# Oracle for the repo's OWN `.github/workflows/*.yml`: Renovate's *native*
+# github-actions manager keeps these fresh regardless of comment spacing, so the
+# guard enforces the security property — a full 40-char SHA — plus a trailing
+# version comment (`# vX` or `# release/…`), tolerant of one or two spaces.
+_REPO_PIN_ORACLE = re.compile(r"@[0-9a-f]{40}\s+#\s*(?:v[\d.]+|release/)")
+
+
+def _audit_action_pins(workflow_files: list[Path], pinned: re.Pattern[str]) -> int:
+    """Assert every external action ref in *workflow_files* is SHA-pinned; return
+    the number of refs audited so a caller can prove it actually checked some."""
+    checked = 0
+    for wf in workflow_files:
+        for line in wf.read_text().splitlines():
+            if not _USES_REF.search(line):
+                continue
+            checked += 1
+            assert pinned.search(line), (
+                f"unpinned action ref in {wf.relative_to(_REPO_ROOT)}: "
+                f"{line.strip()!r} — pin to a full 40-char commit SHA with a "
+                f"trailing `# vX` comment (#629/#791) so a mutable tag can't run "
+                f"attacker-controlled code with the workflow's permissions"
+            )
+    return checked
+
 
 def _assert_renovate_contract(config: dict) -> None:
     assert "config:recommended" in config["extends"]
@@ -63,16 +104,7 @@ class TestRepoRenovateConfig:
         config = json.loads((_REPO_ROOT / "renovate.json").read_text())
         regex_managers = [m for m in config["customManagers"] if m["customType"] == "regex"]
         assert regex_managers, "regex custom manager for workflow templates missing"
-        manager = regex_managers[0]
-        assert manager["datasourceTemplate"] == "github-tags"
-
-        # The renovate custom-manager regex doubles as the "is it pinned?"
-        # oracle: a ref that matches is both SHA-pinned and kept fresh.
-        pinned = re.compile(manager["matchStrings"][0].replace("(?<", "(?P<"))
-        # A real ``uses:`` key (not a substring like ``statuses:``) pointing at
-        # an external ``owner/repo@ref`` action. Local (``./``) and templated
-        # (``{{`` ) refs are not pinnable and are skipped.
-        uses_ref = re.compile(r"(?:^|\s)uses:\s*(?P<ref>[^\s{./][^\s]*@[^\s]+)")
+        assert regex_managers[0]["datasourceTemplate"] == "github-tags"
 
         workflow_files = sorted(
             p
@@ -81,20 +113,26 @@ class TestRepoRenovateConfig:
             if "/workflows/" in p.as_posix()
         )
         assert workflow_files, "no workflow templates found to audit"
+        assert _audit_action_pins(workflow_files, _pinned_oracle()), (
+            "expected to audit at least one workflow action ref"
+        )
 
-        checked = 0
-        for wf in workflow_files:
-            for line in wf.read_text().splitlines():
-                if not uses_ref.search(line):
-                    continue
-                checked += 1
-                assert pinned.search(line), (
-                    f"unpinned action ref in {wf.relative_to(_REPO_ROOT)}: "
-                    f"{line.strip()!r} — pin to a full 40-char commit SHA with a "
-                    f"trailing `# vX` comment (#629) so a fresh scaffold passes "
-                    f"its Semgrep mutable-action-tag gate"
-                )
-        assert checked, "expected to audit at least one workflow action ref"
+    def test_repo_own_workflows_are_sha_pinned(self):
+        """PI-791: the repo's OWN `.github/workflows/*.yml` must be SHA-pinned too.
+
+        The template audit above only scans `templates/`, the scaffolded Semgrep
+        `github-actions-mutable-action-tag` gate only runs in *generated*
+        projects, and this repo's Semgrep step scans `src/` — so nothing caught a
+        tag-pinned action added to this repo's own workflows (release.yml runs
+        with `contents: write` + PyPI OIDC — the worst case). This is that guard.
+        Renovate pins new refs only on its schedule; CI must reject one at author
+        time.
+        """
+        workflow_files = sorted((_REPO_ROOT / ".github" / "workflows").glob("*.yml"))
+        assert workflow_files, "no repo workflows found to audit"
+        assert _audit_action_pins(workflow_files, _REPO_PIN_ORACLE), (
+            "expected to audit at least one repo workflow action ref"
+        )
 
 
 class TestScaffoldedRenovateConfig:
