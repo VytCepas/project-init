@@ -7,7 +7,7 @@
 
 Scaffolder for agentic-development infrastructure. One command drops a `.agents/` folder into any project so Claude Code (and other agents) have memory, docs, hooks, and curated MCPs ready to go.
 
-**Who it's for** — solo devs and small teams running Claude Code seriously across multiple repos who want consistent, *enforced* agent infrastructure (CI, a git-lifecycle DAG guard, memory, curated MCPs) — not a hand-maintained `.agents/` per project.
+**Who it's for** — solo devs and small teams running Claude Code seriously across multiple repos who want consistent agent infrastructure with a *real* boundary — git hooks and CI that bind every commit, an in-session git-lifecycle DAG guard that *steers* (advisory; ADR-007), memory, curated MCPs — not a hand-maintained `.agents/` per project.
 
 ```bash
 uvx project-init .        # scaffold into the current directory
@@ -440,7 +440,8 @@ four-category comparison and the moat, see
 - **What this scaffolder owns**: project infrastructure files (CI workflows,
   `.gitignore`, GitHub issue/PR templates and board automation),
   preset composition with deterministic, tested rendering, and the integrated
-  GitHub lifecycle (DAG-enforced issue → branch → PR → review → merge). No
+  GitHub lifecycle (issue → branch → PR → review → merge — steered in-session by
+  a DAG guard, bound by git hooks + CI). No
   community plugin or scaffolder covers these.
 - **Knowledge-graph memory**: the community has consolidated around
   [Graphify](https://github.com/safishamsi/graphify) for codebase knowledge

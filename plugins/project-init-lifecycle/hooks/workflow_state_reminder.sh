@@ -111,7 +111,7 @@ state_block = f"\nCurrent DAG nodes:\n{dag_state}\n" if dag_state else ""
 
 if first_time:
     context = (
-        "GitHub workflow rules (enforced by the dag_workflow.py guard hook):\n"
+        "GitHub workflow rules (the dag_workflow.py guard hook flags violations in-session; git hooks + CI are what bind):\n"
         "\n"
         "Lifecycle order (DAG):\n"
         "  issue.created -> branch.created -> branch.pushed -> pr.opened\n"
