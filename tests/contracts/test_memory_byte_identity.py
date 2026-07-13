@@ -204,6 +204,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #   • token_efficiency skill (PI-647) — new default-on skill with token-frugal
 #     working habits; INDEX/AGENTS.md/justfile rows already excluded above
 _ADDED_SINCE_BASELINE = {
+    # PI-819: diagnoses a REQUIRED status check that no job reports — the state
+    # that leaves every PR permanently BLOCKED with all checks green.
+    ".agents/scripts/check_branch_protection.sh",
     # PI-647: token-efficiency conventions propagated to scaffolds
     ".agents/skills/token_efficiency/SKILL.md",
     # PI-694: token-budget lint gate — new always-copied script (justfile

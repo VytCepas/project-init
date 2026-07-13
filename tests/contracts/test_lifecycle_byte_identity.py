@@ -219,6 +219,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
+    # PI-819: diagnoses a REQUIRED status check that no job reports — the state
+    # that leaves every PR permanently BLOCKED with all checks green.
+    ".agents/scripts/check_branch_protection.sh",
     # PI-647: token-efficiency conventions propagated to scaffolds
     ".agents/skills/token_efficiency/SKILL.md",
     # PI-694: token-budget lint gate — new always-copied script (justfile
