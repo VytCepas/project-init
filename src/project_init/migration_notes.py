@@ -15,6 +15,25 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.1.6": {
+        "summary": (
+            "Fixes two more holes in the branch-protection diagnostic (#825). "
+            "`setup_github.sh` enforces through TWO layers — classic branch "
+            "protection AND (org profile) a `project-init-baseline` repository "
+            "ruleset — and the check read only the first, so a PR blocked solely by "
+            "a stale RULESET check was told 'all required checks are reported'. It "
+            "now unions both layers (paginated). And `setup_github.sh` itself only "
+            "CREATED a ruleset, warning if one already existed — so re-running it, "
+            "the remedy the diagnostic prints, never fixed a stale ruleset. It now "
+            "updates an existing one."
+        ),
+        "action_required": (
+            "Org-profile repos: re-run `.agents/scripts/setup_github.sh --protect` "
+            "(note the flag — without it the script touches neither branch "
+            "protection nor the ruleset). It now re-syncs a stale ruleset instead of "
+            "warning and doing nothing."
+        ),
+    },
     "1.1.5": {
         "summary": (
             "Fixes a FALSE ALARM in the 1.1.4 branch-protection diagnostic (#822). "
