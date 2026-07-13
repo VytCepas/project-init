@@ -36,6 +36,7 @@ for ((i=0; i<$#; i++)); do
 done
 _emit() { printf '%s' "$1" | jq -r "$_filter"; }
 case "$*" in
+  *"--json number"*)        echo "${STUB_PR_NUMBER:-}" ;;
   *nameWithOwner*)          echo "o/r" ;;
   *defaultBranchRef*)       echo "main" ;;
   *required_status_checks*) _emit "$REQUIRED_JSON" ;;
@@ -147,3 +148,45 @@ def test_never_blocks_when_gh_is_unavailable(tmp_path: Path):
         check=False,
     )
     assert result.returncode == 0, f"the diagnostic blocked the workflow:\n{result.stderr}"
+
+
+def test_a_pr_only_required_check_is_never_called_a_phantom(tmp_path: Path):
+    """The killer false positive (PI-822), found by running the SHIPPED script.
+
+    `Check PR title, branch, and linked issue` runs on pull_request only — it never
+    reports on a push to the default branch. The first version fell back to the
+    branch's check-runs when given no PR, so it accused that perfectly satisfiable
+    check of being unsatisfiable and told the user to rewrite branch protection that
+    was fine. A false alarm is worse than no diagnostic.
+
+    With no PR resolvable the script must now decline to guess: exit 0, say why.
+    """
+    _require_jq()
+    script = _script(tmp_path)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    gh = bin_dir / "gh"
+    gh.write_text(_GH_STUB)
+    gh.chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+        "STUB_PR_NUMBER": "",  # no PR for this branch
+        "REQUIRED_JSON": json.dumps(
+            {"contexts": ["CI gate", "Check PR title, branch, and linked issue"]}
+        ),
+        # The branch's check-runs hold only the push-triggered job — the PR-only
+        # check is absent, which is normal and must NOT read as a phantom.
+        "CHECKRUNS_JSON": json.dumps({"check_runs": [{"name": "CI gate"}]}),
+        "STATUSES_JSON": json.dumps({"statuses": []}),
+        "ROLLUP_JSON": json.dumps({"statusCheckRollup": []}),
+    }
+    result = subprocess.run(
+        ["bash", str(script)], capture_output=True, text=True, env=env, check=False
+    )
+    assert result.returncode == 0, (
+        f"a PR-only required check was falsely called a phantom:\n{result.stderr}"
+    )
+    assert "Check PR title" not in result.stdout + result.stderr.replace(
+        "cannot distinguish a phantom", ""
+    ), "the script accused a PR-only check instead of declining to guess"
