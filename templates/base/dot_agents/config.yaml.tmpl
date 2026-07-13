@@ -56,7 +56,18 @@ tooling:
 {{#if observability}}observability:
   path: .agents/observability
 
-{{/if observability}}hooks:
+{{/if observability}}ci:
+  # Where a root orchestrator can read this project's build status when CI is
+  # NOT the forge's own (Jenkins, Buildkite, Drone, a self-hosted runner).
+  # Empty = the orchestrator falls back to `gh`/`glab`, which is what almost
+  # every project wants. Set status_url to a JSON endpoint reporting the latest
+  # build, e.g. https://jenkins.example.com/job/app/lastBuild/api/json
+  status_url: ""
+  # Optional dot-path to the status value inside that JSON (e.g. "data.outcome").
+  # Empty = auto-detect the usual keys (result, status, conclusion, state).
+  status_field: ""
+
+hooks:
   expected: [pre-commit, commit-msg, pre-push]
 
 

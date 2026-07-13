@@ -1195,6 +1195,37 @@ def _sync_memory_block(text: str, staging: Path) -> str:
     return re.sub(r"(?m)^mcps:", lambda _m: new_mem + "mcps:", text, count=1)
 
 
+_CI_BLOCK = (
+    "ci:\n"
+    "  # Where a root orchestrator can read this project's build status when CI is\n"
+    "  # NOT the forge's own (Jenkins, Buildkite, Drone, a self-hosted runner).\n"
+    "  # Empty = the orchestrator falls back to `gh`/`glab`.\n"
+    '  status_url: ""\n'
+    '  # Optional dot-path to the status value inside that JSON (e.g. "data.outcome").\n'
+    '  status_field: ""\n'
+    "\n"
+)
+
+_HOOKS_KEY_RE = re.compile(r"(?m)^hooks:")
+
+
+def _ensure_ci_block(text: str) -> str:
+    """Backfill the optional `ci:` descriptor block into a pre-#828 config (PI-828).
+
+    Idempotent, and it never rewrites an existing block: a hand-set
+    ``status_url`` is the entire point of the field, so a config that already
+    declares ``ci:`` is left exactly as its owner wrote it. config.yaml is
+    excluded from drift comparison (it holds hand-edited fields), so without
+    this splice the block would only ever reach *fresh* scaffolds and existing
+    projects could never declare a non-forge CI endpoint.
+    """
+    head, sep, tail = text.partition(_RECORD_MARKER)
+    if re.search(r"(?m)^ci:", head) or not _HOOKS_KEY_RE.search(head):
+        return text
+    head = _HOOKS_KEY_RE.sub(lambda m: _CI_BLOCK + m.group(0), head, count=1)
+    return head + sep + tail
+
+
 def _ensure_visible_project_fields(text: str, variables: dict[str, str]) -> str:
     """Surface recorded `project:` fields in the hand-editable config (#259, #498).
 
@@ -1264,6 +1295,7 @@ def apply_drift(
         text = config_path.read_text(encoding="utf-8")
         text = _VERSION_LINE_RE.sub(rf"\g<1>{variables['project_init_version']}", text, count=1)
         text = _ensure_visible_project_fields(text, variables)
+        text = _ensure_ci_block(text)
         text = _sync_memory_block(text, staging)
         config_path.write_text(text, encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)
 

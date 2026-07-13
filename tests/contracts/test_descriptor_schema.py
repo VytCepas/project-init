@@ -151,6 +151,16 @@ class TestContractVersionAndBlocks:
         assert config["hooks"]["expected"]
         assert config["observability"]["path"]
 
+    def test_emits_ci_block(self, tmp_path: Path):
+        # PI-828: the optional non-forge CI endpoint. Emitted empty — a reader
+        # feature-detects it and falls back to gh/glab when unset.
+        config = _render_full(tmp_path)
+        assert config["ci"]["status_url"] == ""
+
+    def test_emits_ci_status_field_escape_hatch(self, tmp_path: Path):
+        config = _render_full(tmp_path)
+        assert config["ci"]["status_field"] == ""
+
 
 class TestSchemaAccessor:
     """PI-786: the schemas are a consumable, versioned artifact a downstream
@@ -160,7 +170,7 @@ class TestSchemaAccessor:
         schema = load_descriptor_schema()
         props = schema["properties"]
         # The v2 contract surfaces a root orchestrator reads must be defined.
-        assert {"deploy", "observability", "hooks", "tooling", "memory"} <= set(props)
+        assert {"deploy", "observability", "hooks", "tooling", "memory", "ci"} <= set(props)
         assert "v2" in schema["title"]
 
     def test_usage_event_schema_loads(self):
