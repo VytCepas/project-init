@@ -48,7 +48,10 @@ BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/n
 # simply nothing to check.
 CLASSIC=$(gh api "repos/$REPO/branches/$BRANCH/protection/required_status_checks" \
   --jq '.contexts[]?' 2>/dev/null || true)
-RULESET=$(gh api "repos/$REPO/rules/branches/$BRANCH" \
+# --paginate: /rules/branches is paginated, and a required_status_checks rule on a
+# later page would be silently omitted — producing the same false "all healthy" this
+# whole check exists to prevent.
+RULESET=$(gh api --paginate "repos/$REPO/rules/branches/$BRANCH" \
   --jq '.[]? | select(.type == "required_status_checks")
         | .parameters.required_status_checks[]?.context' 2>/dev/null || true)
 REQUIRED=$(printf '%s\n%s\n' "$CLASSIC" "$RULESET" | sed '/^$/d' | sort -u)
@@ -105,7 +108,9 @@ fi
   echo "   up (e.g. PI-761 made the Python matrix run per-PR on the floor version"
   echo "   only, so 'Lint and test (3.12)' and friends stopped being reported)."
   echo ""
-  echo "   Fix: re-run  .agents/scripts/setup_github.sh"
+  # --protect is REQUIRED: without it setup_github.sh never touches protection
+  # or the ruleset, so the "remedy" would silently do nothing at all.
+  echo "   Fix: re-run  .agents/scripts/setup_github.sh --protect"
   echo "   It requires the single 'CI gate' job, which needs: the whole matrix and"
   echo "   the secret scan — so it stays correct across any future matrix change."
 } >&2
