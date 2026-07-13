@@ -39,6 +39,7 @@ case "$*" in
   *"--json number"*)        echo "${STUB_PR_NUMBER:-}" ;;
   *nameWithOwner*)          echo "o/r" ;;
   *defaultBranchRef*)       echo "main" ;;
+  *rules/branches*)         _emit "${RULESET_JSON:-[]}" ;;
   *required_status_checks*) _emit "$REQUIRED_JSON" ;;
   *statusCheckRollup*)      _emit "$ROLLUP_JSON" ;;
   *check-runs*)             _emit "$CHECKRUNS_JSON" ;;
@@ -62,7 +63,14 @@ def _script(tmp_path: Path) -> Path:
     return target / ".agents" / "scripts" / "check_branch_protection.sh"
 
 
-def _run(script: Path, tmp_path: Path, *, required: list[str], rollup: list[dict]):
+def _run(
+    script: Path,
+    tmp_path: Path,
+    *,
+    required: list[str],
+    rollup: list[dict],
+    ruleset: list[dict] | None = None,
+):
     _require_jq()
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
@@ -73,6 +81,7 @@ def _run(script: Path, tmp_path: Path, *, required: list[str], rollup: list[dict
         **os.environ,
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
         "REQUIRED_JSON": json.dumps({"contexts": required}),
+        "RULESET_JSON": json.dumps(ruleset or []),
         "ROLLUP_JSON": json.dumps({"statusCheckRollup": rollup}),
         "CHECKRUNS_JSON": json.dumps({"check_runs": [e for e in rollup if "name" in e]}),
         "STATUSES_JSON": json.dumps({"statuses": [e for e in rollup if "context" in e]}),
@@ -190,3 +199,33 @@ def test_a_pr_only_required_check_is_never_called_a_phantom(tmp_path: Path):
     assert "Check PR title" not in result.stdout + result.stderr.replace(
         "cannot distinguish a phantom", ""
     ), "the script accused a PR-only check instead of declining to guess"
+
+
+def test_a_phantom_that_lives_only_in_a_ruleset_is_still_found(tmp_path: Path):
+    """setup_github.sh enforces via TWO layers: classic branch protection and (org
+    profile) a `project-init-baseline` repository ruleset, each with its own
+    required_status_checks. Reading only the classic layer told a PR blocked solely
+    by a stale RULESET check that everything was fine — a false REASSURANCE, worse
+    than the false alarm this script exists to prevent, because it sends the
+    operator looking anywhere but the real cause (PI-825)."""
+    result = _run(
+        _script(tmp_path),
+        tmp_path,
+        required=["CI gate"],  # classic layer is clean…
+        ruleset=[
+            {
+                "type": "required_status_checks",
+                "parameters": {
+                    "required_status_checks": [
+                        {"context": "CI gate"},
+                        {"context": "Lint and test (3.12)"},  # …the stale one is HERE
+                    ]
+                },
+            }
+        ],
+        rollup=[{"name": "CI gate"}],
+    )
+    assert result.returncode == 1, "a ruleset-only phantom was missed — reported healthy"
+    assert "Lint and test (3.12)" in result.stderr, (
+        f"the ruleset-required check was not named:\n{result.stderr}"
+    )
