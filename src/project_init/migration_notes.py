@@ -18,10 +18,10 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
     "1.1.5": {
         "summary": (
             "Fixes a FALSE ALARM in the 1.1.4 branch-protection diagnostic (#822). "
-            "Run without a PR number, `check_branch_protection.sh` compared the "
-            "required contexts against the default branch's check-runs and reported "
-            "a PR-only check (`Check PR title, branch, and linked issue`) as "
-            "unsatisfiable — telling you to rewrite branch protection that was "
+            "Run without a PR number, `.agents/scripts/check_branch_protection.sh` "
+            "compared required contexts against the default branch's check-runs and "
+            "reported a PR-only check (`Check PR title, branch, and linked issue`) "
+            "as unsatisfiable — telling you to rewrite branch protection that was "
             "perfectly fine. A required context can legitimately be PR-only, and on "
             "the default branch a PR-only check and a real phantom look identical: "
             "absent. It now uses the PR's own check rollup — the exact set GitHub "
