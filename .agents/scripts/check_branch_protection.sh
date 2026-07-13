@@ -12,8 +12,7 @@
 # phantom contexts and the fix.
 #
 # Usage: check_branch_protection.sh [PR_NUMBER]
-#   With a PR number: compares required contexts against the checks that PR reported.
-#   Without one:      compares them against the check names on the default branch.
+#   Defaults to the PR for the current branch. A PR is required: see below.
 # Exit 0 = protection is satisfiable; 1 = phantom contexts found; 0 also when the
 # state cannot be determined (no gh, not authed, no protection) — a diagnostic must
 # never itself block a workflow.
@@ -44,25 +43,34 @@ if [ -z "$REQUIRED" ]; then
   exit 0
 fi
 
-# Checks that actually reported. Two kinds satisfy a required context and BOTH must
-# be collected, or the diagnostic invents phantoms that are not there — a false
-# alarm here is worse than none, because it sends someone rewriting protection that
-# was fine:
-#   - Actions check-runs      -> .name       (e.g. "CI gate")
-#   - classic commit statuses -> .context    (e.g. Vercel, Codecov)
-# The fallback is applied PER ENTRY (`.[] | (.name // .context)`), not across the
-# whole stream: `.[]?.name // .[]?.context` only falls back when the left side
-# yields nothing at all, so a rollup holding both kinds would silently drop every
-# status and report it as unsatisfiable (PI-819 review).
-if [ -n "$PR_NUMBER" ]; then
-  REPORTED=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
-    --jq '.statusCheckRollup[]? | (.name // .context) | select(. != null)' 2>/dev/null || true)
-else
-  REPORTED=$(
-    gh api "repos/$REPO/commits/$BRANCH/check-runs" --jq '.check_runs[]?.name' 2>/dev/null || true
-    gh api "repos/$REPO/commits/$BRANCH/status" --jq '.statuses[]?.context' 2>/dev/null || true
-  )
+# Checks that actually reported, taken from the PR's rollup — the exact set GitHub
+# matches the required contexts against.
+#
+# It MUST be a PR. A required context can legitimately be PR-only (validate-pr's
+# "Check PR title, branch, and linked issue" never runs on a push to the default
+# branch), so the branch's check-runs cannot tell a phantom from a PR-only check —
+# they look identical: absent. An earlier version fell back to the branch and
+# duly accused a perfectly satisfiable check of being unsatisfiable (PI-822).
+#
+# A false alarm here is worse than no diagnostic at all: it sends someone rewriting
+# branch protection that was fine. So when there is no PR to look at, say so and
+# stop, rather than guess.
+if [ -z "$PR_NUMBER" ]; then
+  PR_NUMBER=$(gh pr view --json number -q .number 2>/dev/null || true) # PR for this branch
 fi
+if [ -z "$PR_NUMBER" ]; then
+  {
+    echo "check_branch_protection: no pull request to check against."
+    echo "  Pass a PR number: check_branch_protection.sh <PR>"
+    echo "  A required check can be PR-only, so the default branch's check-runs"
+    echo "  cannot distinguish a phantom from a check that simply never runs on a"
+    echo "  push — and guessing would raise a false alarm."
+  } >&2
+  exit 0
+fi
+
+REPORTED=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
+  --jq '.statusCheckRollup[]? | (.name // .context) | select(. != null)' 2>/dev/null || true)
 
 PHANTOM=$(comm -23 <(printf '%s\n' "$REQUIRED" | sort -u) <(printf '%s\n' "$REPORTED" | sort -u))
 
