@@ -15,6 +15,28 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.1.7": {
+        "summary": (
+            "Adds an optional `ci:` block to the descriptor (#828): `status_url` "
+            "(a JSON endpoint reporting the latest build) and `status_field` (an "
+            "optional dot-path for odd response shapes). It lets a root "
+            "orchestrator read the CI state of a project whose CI is NOT its "
+            "forge's — Jenkins, Buildkite, Drone, a self-hosted runner — which "
+            "`gh`/`glab` can only ever report as `unknown`. The contract version "
+            "stays 2: this is an additive optional field, and a consumer "
+            "feature-detects it. `upgrade` splices the block into an existing "
+            "config (config.yaml is excluded from drift, so it would otherwise "
+            "only ever reach fresh scaffolds); the splice is idempotent and never "
+            "overwrites a `status_url` you set by hand."
+        ),
+        "action_required": (
+            "Nothing, unless your CI is not your forge's. The block is emitted "
+            "empty, and an empty `status_url` means 'my CI is the forge's' — so "
+            "`gh`/`glab` keep probing exactly as before. To use it, set "
+            "`ci.status_url` in `.agents/config.yaml` to your build's JSON status "
+            "endpoint."
+        ),
+    },
     "1.1.6": {
         "summary": (
             "Fixes two more holes in the branch-protection diagnostic (#825). "
