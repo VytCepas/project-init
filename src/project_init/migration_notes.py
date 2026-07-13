@@ -15,6 +15,26 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.1.5": {
+        "summary": (
+            "Fixes a FALSE ALARM in the 1.1.4 branch-protection diagnostic (#822). "
+            "Run without a PR number, `.agents/scripts/check_branch_protection.sh` "
+            "compared required contexts against the default branch's check-runs and "
+            "reported a PR-only check (`Check PR title, branch, and linked issue`) "
+            "as unsatisfiable — telling you to rewrite branch protection that was "
+            "perfectly fine. A required context can legitimately be PR-only, and on "
+            "the default branch a PR-only check and a real phantom look identical: "
+            "absent. It now uses the PR's own check rollup — the exact set GitHub "
+            "matches against — and declines to guess when there is no PR."
+        ),
+        "action_required": (
+            "If 1.1.4's diagnostic told you a required check was unsatisfiable, "
+            "re-check with a PR number before changing anything: "
+            "`.agents/scripts/check_branch_protection.sh <PR>`. If it now reports "
+            "all checks satisfied, your branch protection was always correct and "
+            "needs no change."
+        ),
+    },
     "1.1.4": {
         "summary": (
             "Diagnoses the silent forever-block (#819). Branch protection is written "
