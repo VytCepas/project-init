@@ -15,6 +15,29 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.1.4": {
+        "summary": (
+            "Diagnoses the silent forever-block (#819). Branch protection is written "
+            "once, at scaffold time; the workflows keep changing. A REQUIRED status "
+            "check that no job reports is never satisfied, so the branch sits "
+            "`BLOCKED` with every check green and no error anywhere — and EVERY pull "
+            "request in the repo becomes unmergeable. Projects scaffolded before "
+            "PI-555 require the per-version matrix contexts (`Lint and test (3.12)` "
+            "…), and PI-761 stopped producing those on a PR, so they are stranded. "
+            "The new `.agents/scripts/check_branch_protection.sh` names the "
+            "unsatisfiable checks, and `monitor_pr.sh` runs it whenever a PR is "
+            "BLOCKED instead of leaving the cause to be guessed."
+        ),
+        "action_required": (
+            "If your PRs are stuck 'BLOCKED' while every check passes, run "
+            "`.agents/scripts/check_branch_protection.sh` — it names the required "
+            "checks nothing reports. The fix is to re-run "
+            "`.agents/scripts/setup_github.sh`, which re-syncs protection to require "
+            "the single `CI gate` job (it `needs:` the whole matrix and the secret "
+            "scan, so it survives any future matrix change). Scaffolds created after "
+            "PI-555 already require `CI gate` and need nothing."
+        ),
+    },
     "1.1.3": {
         "summary": (
             "Fixes a data-loss bug in the 1.1.2 `.claude/` -> `.agents/` migration "

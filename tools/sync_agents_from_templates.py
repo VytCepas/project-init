@@ -79,6 +79,9 @@ SYNCED: dict[str, str | tuple[str, object]] = {
     # resolution) strictly supersede the repo copy's wording tweaks; both
     # dependencies (scripts/gh_host.sh, hooks/_py.sh) are in the shared set
     "scripts/monitor_pr.sh": "lifecycle/dot_agents/scripts/monitor_pr.sh",
+    # monitor_pr.sh execs this from its own directory when a PR is BLOCKED; without
+    # it in the shared set the repo's own copy has nothing to exec (PI-819 review).
+    "scripts/check_branch_protection.sh": "lifecycle/dot_agents/scripts/check_branch_protection.sh",
     # reconciled from DIVERGED (#710): the repo copy's --prune flag, bash-3.2
     # empty-array guard, and bot-identity commit fallback were upstreamed into
     # the template, which keeps its host-aware gh_web_base clone URL
