@@ -430,8 +430,12 @@ class TestAgentGuardAdapter:
         scaffold. This checks the rendered output, not the template source.
         """
         target = _scaffold_agents(tmp_path / "p", "codex")
+        # Run from the scaffold root, exactly as `just lint` does, so ruff's
+        # config discovery finds the *scaffolded* ruff.toml — not this repo's
+        # config or ruff's built-in defaults (Copilot review on PR #834).
         result = subprocess.run(
-            [sys.executable, "-m", "ruff", "format", "--check", str(target / ".agents")],
+            [sys.executable, "-m", "ruff", "format", "--check", "."],
+            cwd=target,
             capture_output=True,
             text=True,
             check=False,
