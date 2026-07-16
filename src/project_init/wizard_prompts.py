@@ -122,12 +122,14 @@ def _choose_preset_interactive(presets: list[dict[str, Any]]) -> dict[str, Any]:
     # starting point, so the choice is informed rather than blind.
     console.print(
         Panel(
-            "A [bold]preset[/bold] is your starting bundle — it sets the default "
-            "overlays (memory, lifecycle, toolchain).\n\n"
-            "[cyan]Helps:[/cyan] pick the closest fit, then the prompts below let "
-            "you still decline or add individual pieces.\n"
+            "A [bold]preset[/bold] is your starting bundle — it sets sensible "
+            "defaults for the overlays (lifecycle, memory, toolchain) that the "
+            "prompts below then let you confirm or change one at a time.\n\n"
+            "[cyan]Helps:[/cyan] pick the closest fit; nothing here is locked in "
+            "— each overlay gets its own prompt, so you can still decline or add "
+            "individual pieces.\n"
             '[dim]Default: the recommended obsidian-only preset. "core" is the '
-            "leanest (no memory backend).[/dim]",
+            "leanest.[/dim]",
             title="Preset",
             border_style="cyan",
         )
@@ -345,6 +347,8 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
 
     default_idx = _MEMORY_STACKS.index(default) + 1 if default in _MEMORY_STACKS else 3
     body = (
+        "[dim]Confirm or change the memory backend your preset set up front — "
+        "the default below is that preset's stack, not a fresh choice.[/dim]\n\n"
         "A [bold]memory backend[/bold] gives your agents a place to persist "
         "decisions, conventions, and session notes [bold]across conversations[/bold] "
         "— so context survives beyond a single chat. Everything stays on disk. "

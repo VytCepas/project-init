@@ -96,7 +96,9 @@ def render_presets(
     table = Table(box=box.SIMPLE_HEAD, pad_edge=False, show_edge=False, expand=True)
     table.add_column("#", style="key", width=2, justify="right")
     table.add_column("Preset", style="heading", no_wrap=True)
-    table.add_column("Memory", style="accent", no_wrap=True)
+    # "(default)" signals the stack is a starting point the later memory prompt
+    # refines — not a decision locked in at preset choice (#833).
+    table.add_column("Memory (default)", style="accent", no_wrap=True)
     table.add_column("What you get", style="muted", ratio=1)
     for i, preset in enumerate(presets, 1):
         rec = "  [recommend]✔ recommended[/recommend]" if i == default_idx else ""
