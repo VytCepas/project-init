@@ -417,6 +417,29 @@ class TestAgentGuardAdapter:
         assert proc.returncode == 0
         assert proc.stdout.strip() == ""
 
+    def test_rendered_adapter_is_format_clean(self, tmp_path: Path):
+        """PI-832: the RENDERED `.py.tmpl` must pass the `just lint` gate it ships.
+
+        `test_shipped_python_templates_are_format_clean` runs `ruff format
+        --check` over raw `templates/`, but ruff skips `.tmpl` files (wrong
+        extension) — so a `.py.tmpl` that renders to malformed Python slips
+        through. `agent_guard_adapter.py.tmpl` did exactly that: its standalone
+        closing `{{/if multi_agent}}` carried a trailing newline the working
+        sibling `gen_code_map.py.tmpl` omits, so the rendered hook ended in a
+        blank line and failed `ruff format --check` on a fresh multi-agent
+        scaffold. This checks the rendered output, not the template source.
+        """
+        target = _scaffold_agents(tmp_path / "p", "codex")
+        result = subprocess.run(
+            [sys.executable, "-m", "ruff", "format", "--check", str(target / ".agents")],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"ruff format --check exited {result.returncode}\n{result.stdout}{result.stderr}"
+        )
+
     @pytest.mark.parametrize(
         ("dialect", "decision_key", "reason_key"),
         [
