@@ -101,6 +101,8 @@ Expose it to agents over MCP (see .agents/rules/rag.md):
 
 Record the endpoint so a root orchestrator can discover it (#498):
   in .agents/config.yaml set  memory.rag_endpoint: "ccc mcp"   (or the index path)
+  then re-run `project-init upgrade --apply` — that expands .agents/rules/rag.md
+  from the not-wired-yet stub into the full RAG guidance (#849)
 
 The .cocoindex_code/ index is a derived cache — gitignored, never hand-edited.
 Re-run this script any time to rebuild after large code changes.

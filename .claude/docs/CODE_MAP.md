@@ -159,6 +159,7 @@ Per-surface agent-config generation (ADR-017, PI-366).
 project-init variable resolution: flag→prompt→preset precedence + template context.
 
 - `class ScaffoldInputs` — The resolved wizard inputs as one named record (PI-190).
+- `def rag_gate_variables` — The rag_wired/rag_unwired template gates (#849).
 - `def resolve_delivery` — Normalize a delivery value; default 'prototype'.
 - `def resolve_deploy` — Normalize a deploy target; default 'none'.
 - `def resolve_iac` — Normalize an --iac value; default 'none'. Raises ValueError on an unknown tool.
