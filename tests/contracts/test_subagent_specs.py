@@ -56,9 +56,9 @@ def test_delegation_guidance_carries_the_orientation_contract(tmp_path: Path):
     # The skill file lands in .agents/skills only on --no-plugin scaffolds;
     # plugin mode ships the same payload via sync_plugin (byte-identity tested).
     scaffold(target, fallback_preset(), fallback_variables(), strict=True)
-    body = (
-        target / ".agents" / "skills" / "token_efficiency" / "SKILL.md"
-    ).read_text(encoding="utf-8")
+    body = (target / ".agents" / "skills" / "token_efficiency" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
 
     flat = " ".join(body.split())  # phrase asserts must survive line wrapping
     for artifact in (
