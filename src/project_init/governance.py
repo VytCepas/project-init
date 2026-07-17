@@ -19,7 +19,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from project_init.mcps import MCP_CATALOG, PLAYWRIGHT_MCP, servers_for_ids
+from project_init.mcps import MCP_CATALOG, PLAYWRIGHT_MCP, resolve_js_runner, servers_for_ids
 
 _OUTPUT_REL = Path(".agents/governance/ai-bom.generated.md")
 _CCR_CONFIG_REL = Path(".agents/multi-model/config.json")
@@ -85,7 +85,7 @@ def render_aibom(detect_root: Path, variables: dict[str, str]) -> str:
     """
     by_id = {m["id"]: m for m in MCP_CATALOG}
     by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
-    servers = servers_for_ids(_mcp_ids(variables))
+    servers = servers_for_ids(_mcp_ids(variables), js_runner=resolve_js_runner(variables))
 
     lines: list[str] = [
         _GENERATED_HEADER,

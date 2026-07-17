@@ -130,7 +130,7 @@ def _emit_scaffold_output(  # noqa: PLR0913 — one arg per piece of the result
     _print_summary(target, created, preset["name"], variables.get("memory_stack", "none"))
     if conflicts:
         _print_conflicts(conflicts)
-    _print_mcp_commands(inputs.selected_mcps)
+    _print_mcp_commands(inputs.selected_mcps, js_runner="bunx" if variables.get("node") else "npx")
 
 
 def _emit_preset_list(presets: list[dict[str, Any]], *, as_json: bool) -> None:
@@ -302,14 +302,18 @@ def _print_conflicts(conflicts: list[tuple[Path, Path]]) -> None:
     console.print()
 
 
-def _print_mcp_commands(selected: list[dict[str, Any]]) -> None:
-    """Print the bare claude mcp add commands for the chosen MCPs."""
+def _print_mcp_commands(selected: list[dict[str, Any]], js_runner: str = "bunx") -> None:
+    """Print the bare claude mcp add commands for the chosen MCPs.
+
+    #842: the catalog is written with bunx; swap in the runner the scaffolded
+    toolchain actually has so the printed command works as pasted.
+    """
     if not selected:
         return
 
     from rich.panel import Panel
 
-    body = "\n".join(m["command"] for m in selected)
+    body = "\n".join(m["command"].replace(" bunx ", f" {js_runner} ") for m in selected)
     console.print(
         Panel(
             body,

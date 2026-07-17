@@ -54,7 +54,8 @@ def test_emitted_content_matches_canonical_source(tmp_path: Path):
     """Drift guard: every generated file equals what surfaces.planned_files
     would render — so editing a renderer without regenerating can't pass."""
     agents = ["claude", "codex", "cursor", "antigravity", "vscode"]
-    servers = servers_for_ids(["context7"])
+    # PI-842: the fixture scaffold is language=python — npx, not bunx.
+    servers = servers_for_ids(["context7"], js_runner="npx")
     t = _scaffold(tmp_path / "p", agents=",".join(agents), installed_mcps="context7")
     for rel, content in surfaces.planned_files(agents, servers).items():
         assert (t / rel).read_text() == content, f"{rel} drifted from canonical source"
