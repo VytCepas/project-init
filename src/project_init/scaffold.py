@@ -1082,7 +1082,12 @@ def _emit_generated_files(
             detect_root=detect_root,
         )
 
-    _generate_claude_projection(target, first_scaffold=first_scaffold, conflicts=conflicts)
+    _generate_claude_projection(
+        target,
+        first_scaffold=first_scaffold,
+        conflicts=conflicts,
+        plugin_mode=bool(variables.get("plugin_mode")),
+    )
     return created
 
 
@@ -1101,6 +1106,37 @@ _PROJECTION_EXCLUDE = frozenset(
 # Runtime state that must never enter the projection, at any depth.
 _PROJECTION_JUNK = frozenset({"__pycache__", "logs", ".local", ".cache"})
 
+# Skills the two project-init plugins provide (ADR-010). In plugin mode Claude
+# Code loads these from the enabled plugins, so projecting the on-disk
+# `.agents/skills/` twins into `.claude/skills/` registered every one of them
+# TWICE per session (~2.4k wasted tokens + doubled picker entries, #843). The
+# on-disk copies stay — surfaces that cannot read Claude plugins (Codex,
+# Antigravity, Amp, Junie) consume `.agents/skills/` directly via their
+# overlays; only the Claude projection skips them. A contract test pins this
+# list to the actual plugins/*/skills payloads.
+PLUGIN_PROVIDED_SKILLS = frozenset(
+    {
+        "add_adr",
+        "add_command",
+        "add_hook",
+        "audit",
+        "checkpoint",
+        "create_issue",
+        "diagram",
+        "github_workflow",
+        "local_ci",
+        "report_upstream_issue",
+        "request_review",
+        "review",
+        "save_memory",
+        "session_summary",
+        "start_task",
+        "status",
+        "token_efficiency",
+        "verify-test-strength",
+    }
+)
+
 
 def _unique_backup_dir(claude_dir: Path) -> Path:
     """A non-colliding ``.claude.pre-project-init`` sibling to park adopted config."""
@@ -1118,6 +1154,7 @@ def _generate_claude_projection(
     *,
     first_scaffold: bool = True,
     conflicts: list[tuple[Path, Path]] | None = None,
+    plugin_mode: bool = False,
 ) -> None:
     """Project the Claude-read subset of `.agents/` into `.claude/` (PI-627).
 
@@ -1192,6 +1229,10 @@ def _generate_claude_projection(
         # nested dir that happens to share a name is unaffected.
         if Path(dirpath).resolve() == agents_resolved:
             skip |= {n for n in names if n in _PROJECTION_EXCLUDE}
+        # #843: in plugin mode the enabled plugins already provide these skills
+        # to Claude — projecting the on-disk twins double-registers every one.
+        if plugin_mode and Path(dirpath).resolve() == agents_resolved / "skills":
+            skip |= {n for n in names if n in PLUGIN_PROVIDED_SKILLS}
         return skip
 
     shutil.copytree(agents_dir, claude_dir, ignore=_ignore)

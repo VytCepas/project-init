@@ -1977,7 +1977,11 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
             # the derived .claude/ projection — without this an upgraded project
             # keeps a stale (or absent) .claude/ and Claude Code loads old config.
             # first_scaffold=False: the target's .claude/ is our own projection.
-            _generate_claude_projection(target, first_scaffold=False)
+            _generate_claude_projection(
+                target,
+                first_scaffold=False,
+                plugin_mode=bool(variables.get("plugin_mode")),
+            )
             _write_declined(target, gate["declined_map"])
         _print_report(report, applied=apply)
         if groups:
