@@ -696,6 +696,11 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict[str, str], dic
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "rag": "true" if "rag" in stack else "",
+        # #849: pre-record/legacy paths carry no target to probe — emit the
+        # conservative unwired gate; read_scaffold_record recomputes from the
+        # live rag_endpoint right after.
+        "rag_wired": "",
+        "rag_unwired": "true" if "rag" in stack else "",
         "memory": "" if stack == "none" else "true",
         "memory_tier": memory_tier(stack),
         # Lifecycle (#476): a pre-record config ALWAYS shipped the GitHub
@@ -792,6 +797,11 @@ def _backfill_variables(variables: dict[str, str]) -> dict[str, str]:
         "graphify": "true" if "graphify" in stack else "",
         "obsidian": "true" if "obsidian" in stack else "",
         "rag": "true" if "rag" in stack else "",
+        # #849: pre-record/legacy paths carry no target to probe — emit the
+        # conservative unwired gate; read_scaffold_record recomputes from the
+        # live rag_endpoint right after.
+        "rag_wired": "",
+        "rag_unwired": "true" if "rag" in stack else "",
         # Memory gate (#466): "" only for the vault-free `none` stack. The
         # obsidian/graphify substring checks already yield "" for none.
         "memory": "" if stack == "none" else "true",
@@ -940,6 +950,11 @@ def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, s
         if variables.get("python") and (owns_pin or no_pin)
         else ""
     )
+    # #849: the rag.md rule gates on the live rag_endpoint value — recompute so
+    # wiring RAG (or a legacy record with no gate variables) re-renders right.
+    from project_init.variables import rag_gate_variables
+
+    variables.update(rag_gate_variables(variables.get("memory_stack", ""), target))
 
     return preset_name, variables, manifest, migrated
 

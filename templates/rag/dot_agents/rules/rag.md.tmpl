@@ -1,4 +1,4 @@
----
+{{#if rag_wired}}---
 description: RAG memory (tier 3) — a semantic recall surface, authoritative for nothing
 globs: [".agents/scripts/setup_rag.sh", ".agents/config.yaml"]
 alwaysApply: false
@@ -30,3 +30,14 @@ sqlite-vec cache in `.cocoindex_code/`.
 - **The index is a derived, gitignored cache** — never a source of truth, never
   committed, never hand-edited. Rebuild it from the corpus (`ccc index`), don't
   curate it.
+{{/if rag_wired}}{{#if rag_unwired}}---
+description: RAG memory (tier 3) — selected but not wired yet
+globs: [".agents/scripts/setup_rag.sh", ".agents/config.yaml"]
+alwaysApply: false
+---
+
+RAG (tier 3) is selected but **not set up**: run `.agents/scripts/setup_rag.sh`,
+then set `memory.rag_endpoint` in `.agents/config.yaml` and re-run
+`project-init upgrade --apply` to expand this rule into the full guidance.
+Until then use the graph + grep; details: `.agents/docs/guides/using-rag.md`.
+{{/if rag_unwired}}

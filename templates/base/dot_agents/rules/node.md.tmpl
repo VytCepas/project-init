@@ -1,4 +1,4 @@
----
+{{#if node}}---
 description: Node.js / Bun environment and tooling
 globs: ["**/*.ts", "**/*.tsx", "**/*.js", "package.json", "bun.lockb"]
 alwaysApply: false
@@ -42,3 +42,4 @@ Pattern/tooling, **not** a blocking gate — property tests live alongside unit 
 **When it runs:** the CI `fuzz` job is schedule-only (nightly) and non-blocking —
 never on a PR (#727). fast-check draws fresh seeds each run, so nightly explores
 inputs a per-PR run would only repeat. Run `just fuzz` locally at will.
+{{/if node}}

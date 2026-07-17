@@ -57,7 +57,8 @@ def test_skills_and_hooks_and_mcp_listed(tmp_path: Path):
     assert "| SessionStart | session_setup.sh |" in text
     assert "| UserPromptSubmit | workflow_state_reminder.sh |" in text
     # The selected MCP server + its invocation.
-    assert "| context7 | bunx @upstash/context7-mcp |" in text
+    # PI-842: a python-language scaffold's toolchain has no bun — npx.
+    assert "| context7 | npx @upstash/context7-mcp |" in text
 
 
 def test_base_skill_plan_is_listed(tmp_path: Path):

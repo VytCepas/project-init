@@ -1050,7 +1050,7 @@ def _emit_generated_files(
     scaffold/upgrade so they cannot drift.
     """
     from project_init import capabilities, surfaces
-    from project_init.mcps import servers_for_ids
+    from project_init.mcps import resolve_js_runner, servers_for_ids
 
     agents = [a.strip() for a in variables.get("agents", "").split(",") if a.strip()]
     mcp_raw = variables.get("installed_mcps", "none")
@@ -1061,7 +1061,7 @@ def _emit_generated_files(
     created = surfaces.emit(
         target,
         agents=agents,
-        servers=servers_for_ids(mcp_ids),
+        servers=servers_for_ids(mcp_ids, js_runner=resolve_js_runner(variables)),
         conflicts=conflicts,
     )
     # Surface-independent capabilities inventory (PI-374).

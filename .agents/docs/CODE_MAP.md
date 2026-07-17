@@ -78,6 +78,7 @@ Deterministic AIBOM generation for the governance overlay (ADR-018, #412).
 
 MCP catalog and emit helpers for the project-init wizard.
 
+- `def resolve_js_runner` — The JS package runner the scaffolded toolchain actually has (#842).
 - `def servers_for_ids` — Canonical MCP server specs for the given catalog ids.
 - `def format_installed_mcps` — Human-readable comma-separated list for template substitution.
 - `def format_installed_mcps_yaml` — Inline YAML list string for config.yaml template.
@@ -158,6 +159,7 @@ Per-surface agent-config generation (ADR-017, PI-366).
 project-init variable resolution: flag→prompt→preset precedence + template context.
 
 - `class ScaffoldInputs` — The resolved wizard inputs as one named record (PI-190).
+- `def rag_gate_variables` — The rag_wired/rag_unwired template gates (#849).
 - `def resolve_delivery` — Normalize a delivery value; default 'prototype'.
 - `def resolve_deploy` — Normalize a deploy target; default 'none'.
 - `def resolve_iac` — Normalize an --iac value; default 'none'. Raises ValueError on an unknown tool.
