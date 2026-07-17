@@ -105,3 +105,34 @@ class TestMonitorLockoutHint:
         assert "local_ci" not in out
         # The pre-existing timeout guidance is intact.
         assert "did not settle" in out
+
+
+class TestRunnerGuideHostPrereqs:
+    """PI-840: the guide names every host binary a scaffolded workflow assumes.
+
+    A fresh runner box missing `jq` failed validate-pr/board-sync steps with
+    exit 127 — which read as a PR-metadata failure, not an environment problem.
+    """
+
+    _GUIDE = Path(".agents") / "docs" / "guides" / "self-hosted-ci-runner.md"
+
+    def test_guide_names_the_assumed_binaries(self, tmp_target: Path):
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
+        content = (tmp_target / self._GUIDE).read_text()
+        assert "## Host prerequisites" in content
+        for binary in ("`git`", "`curl`", "`jq`", "`shellcheck`", "`gh`", "`docker`"):
+            assert binary in content, f"guide must name {binary}"
+        # The observed failure signature, so the symptom is searchable.
+        assert "exit 127" in content
+        # A copy-pasteable preflight one-liner.
+        assert 'command -v "$b"' in content
+
+    def test_lifecycle_free_guide_omits_lifecycle_workflow_rows(self, tmp_target: Path):
+        scaffold(tmp_target, fallback_preset(), fallback_variables(lifecycle_tier="none"))
+        content = (tmp_target / self._GUIDE).read_text()
+        assert "## Host prerequisites" in content
+        # The lifecycle-workflow table rows are conditional; their names would
+        # be dangling references here (test_lifecycle_none.py scans for them).
+        assert "validate-pr" not in content
+        assert "board-automation" not in content
+        assert "lifecycle workflows" not in content
