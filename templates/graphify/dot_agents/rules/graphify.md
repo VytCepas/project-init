@@ -8,6 +8,11 @@ alwaysApply: false
 
 - Context lookup order: `graphify-out/graph.json` → vault notes → raw code.
   Query the graph before grepping the codebase; it is rebuilt per commit.
+- Query forms: `graphify query "<question>"` returns a scoped subgraph —
+  usually far smaller than raw grep output; `graphify path "<A>" "<B>"` for
+  relationships; `graphify explain "<concept>"` for a focused concept. Use
+  `graphify-out/wiki/index.md` (if present) for broad navigation, and read
+  `graphify-out/GRAPH_REPORT.md` only for whole-architecture review.
 - Rebuild manually after large uncommitted changes: `/graphify .` (skill)
   or `graphify update .` (CLI).
 - Export to the vault: `graphify . --obsidian` writes graph notes
