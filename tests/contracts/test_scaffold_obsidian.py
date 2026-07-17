@@ -288,11 +288,13 @@ class TestScaffoldObsidianOnly:
         assert "uv sync" in content
         assert "globs" in content
 
-    def test_all_language_rule_files_present(self):
+    def test_only_selected_language_rules_present(self):
+        # PI-844: this scaffold is language=python — the other languages' rules
+        # must not ship (they'd load ~4.3k unused tokens every session).
         rules = self.target / ".agents" / "rules"
         assert (rules / "python.md").exists()
-        assert (rules / "node.md").exists()
-        assert (rules / "go.md").exists()
+        assert not (rules / "node.md").exists()
+        assert not (rules / "go.md").exists()
         assert (rules / "hooks.md").exists()
 
     def test_add_hook_skill_exists(self):
