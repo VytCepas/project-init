@@ -1,4 +1,4 @@
----
+{{#if go}}---
 description: Go environment and tooling
 globs: ["**/*.go", "go.mod", "go.sum"]
 alwaysApply: false
@@ -41,3 +41,4 @@ fuzz target.
 reports vulnerabilities actually reachable from your code, not every
 advisory touching a transitive dependency — a lower false-positive rate than
 a plain dependency-list scan.
+{{/if go}}

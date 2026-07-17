@@ -1,4 +1,4 @@
----
+{{#if python}}---
 description: Python environment, tooling, and test conventions
 globs: ["**/*.py", "pyproject.toml", "uv.lock"]
 alwaysApply: false
@@ -67,3 +67,4 @@ coverage floor (which checks how much is exercised).
 never on a PR (#727), the same placement mutation testing already uses.
 Hypothesis draws fresh seeds each run, so nightly explores inputs a per-PR run
 would only repeat. Run `just fuzz` locally at will.
+{{/if python}}
