@@ -57,10 +57,11 @@ def _reject_conflicting_python_version(
     if declared and declared != flag:
         parser.error(
             f"--python-version {flag} conflicts with the Python floor "
-            f"({declared}) declared by pyproject.toml/.python-version. CI derives "
-            f"its matrix from requires-python, so mise.toml and mypy.ini would pin "
-            f"{flag} while CI tested {declared}. Align the declaration with {flag}, "
-            f"or drop --python-version to adopt the declared {declared}."
+            f"({declared}) declared by pyproject.toml/.python-version. The CI "
+            f"matrix follows the declared floor (requires-python when present, "
+            f"else the recorded floor), so mise.toml and mypy.ini would pin "
+            f"{flag} while CI tested {declared}. Align the declaration with "
+            f"{flag}, or drop --python-version to adopt the declared {declared}."
         )
 
 

@@ -285,3 +285,44 @@ def test_unparsable_pin_surfaces_a_new_sibling_conflict(tmp_path: Path):
     assert result.returncode == 0, result.stderr
     assert (tmp_path / ".python-version").read_text().strip() == "system"
     assert (tmp_path / ".python-version.new").read_text().strip() == "3.13"
+
+
+def test_upgrade_proposes_the_pin_to_a_legacy_python_scaffold(tmp_path: Path):
+    """PR #860 review: a pre-847 record never managed .python-version — when no
+    pin exists there is no contention, so upgrade may add the file."""
+    from project_init.__main__ import main as upgrade_main
+    from project_init.scaffold import scaffold
+    from project_init.upgrade import write_scaffold_record
+    from tests.helpers import fallback_preset, fallback_variables
+
+    target = tmp_path / "p"
+    # helpers set python_version_pin="" — like a pre-847 scaffold, no pin emitted.
+    created = scaffold(target, fallback_preset(), fallback_variables(python_floor="3.12"))
+    assert not (target / ".python-version").exists()
+    variables = fallback_variables(python_floor="3.12")
+    variables.pop("python_version_pin")
+    write_scaffold_record(target, "obsidian-only", variables, created)
+    # The new file rides the addition-consent flow (#249): proposed, not imposed.
+    assert upgrade_main(["upgrade", str(target), "--apply"]) == 2
+    rc = upgrade_main(["upgrade", str(target), "--apply", "--accept-new", "all"])
+    assert rc == 0
+    assert (target / ".python-version").read_text().strip() == "3.12"
+
+
+def test_upgrade_never_contends_for_an_unmanaged_pin(tmp_path: Path):
+    from project_init.__main__ import main as upgrade_main
+    from project_init.scaffold import scaffold
+    from project_init.upgrade import write_scaffold_record
+    from tests.helpers import fallback_preset, fallback_variables
+
+    target = tmp_path / "p"
+    created = scaffold(target, fallback_preset(), fallback_variables())
+    variables = fallback_variables()
+    variables.pop("python_version_pin")
+    write_scaffold_record(target, "obsidian-only", variables, created)
+    # The project pins its own interpreter after the fact (uv/pyenv).
+    (target / ".python-version").write_text("3.12\n")
+    rc = upgrade_main(["upgrade", str(target), "--apply"])
+    assert rc == 0
+    assert (target / ".python-version").read_text().strip() == "3.12"
+    assert not (target / ".python-version.new").exists()

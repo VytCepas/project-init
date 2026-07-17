@@ -87,6 +87,7 @@ class TestVersionSpanOnUpgrade:
         v = make_variables(project_init_version="0.0.1")
         created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
+        (target / ".python-version").write_text("3.11\n")  # park the #847 pin proposal
         assert run_upgrade(target, apply=True) == 0
         _, recorded, _, _ = read_scaffold_record(target)
         assert recorded["project_init_version"] == __version__

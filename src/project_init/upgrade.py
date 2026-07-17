@@ -928,11 +928,17 @@ def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, s
     floor = _declared_python_floor(target)
     if floor:
         variables["python_floor"] = floor
-    # #847: the emitted .python-version pin tracks the floor exactly when this
-    # tool owns the file (it's in the recorded manifest); otherwise stay empty
-    # so an upgrade never creates or contends for a pin the project owns itself.
+    # #847: the emitted .python-version pin tracks the floor when this tool
+    # owns the file (recorded manifest) — and, on a Python project, when no pin
+    # exists at all, so an upgrade can propose the new file to older scaffolds
+    # (PR #860 review). An existing UNMANAGED pin stays untouched: empty here
+    # means "never contend for a file the project owns itself".
+    owns_pin = ".python-version" in manifest
+    no_pin = target is not None and not (target / ".python-version").exists()
     variables["python_version_pin"] = (
-        variables.get("python_floor", "") if ".python-version" in manifest else ""
+        variables.get("python_floor", "")
+        if variables.get("python") and (owns_pin or no_pin)
+        else ""
     )
 
     return preset_name, variables, manifest, migrated
@@ -1461,6 +1467,7 @@ _ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
     ((".codex",), "codex-agent", "Codex agent wiring"),
     ((".agents",), "agents-dir", "Agent skills/hooks (.agents/ — Codex, Antigravity)"),
     (("docs",), "docs", "Project documentation site"),
+    ((".python-version",), "python-pin", "Python version pin (#847: single-source floor)"),
 )
 
 

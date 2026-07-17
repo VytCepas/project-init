@@ -674,7 +674,9 @@ class TestPluginCutoverMigration:
         preset, recovered, _, _ = read_scaffold_record(target)
         assert recovered["no_plugin"] == "true"
         assert recovered["plugin_mode"] == ""
-        rc = main(["upgrade", str(target), "--apply"])
+        # --accept-new: the #847 .python-version pin is proposed to unpinned
+        # legacy scaffolds via the addition-consent flow; not what's under test.
+        rc = main(["upgrade", str(target), "--apply", "--accept-new", "all"])
         assert rc == 0
         # The copied payload survives: still present, not flagged removed.
         assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()

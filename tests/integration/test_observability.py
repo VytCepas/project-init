@@ -50,6 +50,7 @@ class TestUpgradeInjectsObservability:
         v = make_variables()
         created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
+        (target / ".python-version").write_text("3.11\n")  # park the #847 pin proposal
         cfg = target / ".agents" / "config.yaml"
 
         # Simulate a pre-#259 human config: drop the visible enforcement/host lines.
@@ -76,6 +77,7 @@ class TestUpgradeInjectsObservability:
         v = make_variables()
         created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
+        (target / ".python-version").write_text("3.11\n")  # park the #847 pin proposal
         assert run_upgrade(target, apply=True) == 0
         human = _human_section((target / ".agents" / "config.yaml").read_text())
         # Fields are present exactly once (no duplicate injection on a current config).
@@ -87,6 +89,7 @@ class TestUpgradeInjectsObservability:
         v = make_variables()
         created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         write_scaffold_record(target, "obsidian-only", v, created)
+        (target / ".python-version").write_text("3.11\n")  # park the #847 pin proposal
         cfg = target / ".agents" / "config.yaml"
         # Simulate a config predating the updates section (strip the whole block).
         text = re.sub(
