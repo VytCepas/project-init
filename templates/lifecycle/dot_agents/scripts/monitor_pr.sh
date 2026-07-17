@@ -29,6 +29,21 @@
 #   Two fix cycles are required before admin-merge is allowed. This ensures
 #   review feedback (including Copilot comments) is read and addressed at
 #   least once before force-merging.
+#
+# Ignored (informational) checks — PI-837:
+#   `monitor_ignore_checks` in .agents/config.yaml (single-line JSON array of
+#   check names; per-run override: PI_MONITOR_IGNORE_CHECKS, comma-separated)
+#   names checks that are reported but never block the merge. Use it for a
+#   known-dead check: during a GitHub Actions billing lockout, GitHub-hosted
+#   jobs die permanently as zero-step startup failures while self-hosted CI
+#   stays green — without this list one dead check deadlocks every PR.
+#
+#   Gotcha: check runs attach to COMMITS, not PRs. A sibling branch created at
+#   the same head commit shares its check rollup — a failure produced by the
+#   other branch's PR events shows up here too (observed: zarija #130/#131).
+#   Remedy when it happens: give the PR a unique head, e.g.
+#     git commit --allow-empty -m "chore: refresh PR head" && push
+#   which clears the stale failure from this PR's rollup.
 
 set -euo pipefail
 
@@ -129,9 +144,32 @@ if [ "$MODE" != "--merge" ]; then
   fi
 fi
 
+# PI-837: checks treated as informational — reported, never blocking.
+# Precedence: PI_MONITOR_IGNORE_CHECKS env (comma-separated) > config.yaml
+# `monitor_ignore_checks` (single-line JSON array) > none. Normalized to a
+# JSON array once, here; a malformed config value fails loudly rather than
+# silently ignoring nothing.
+IGNORE_CHECKS=$("$PY" -c "
+import json, os, sys
+env = os.environ.get('PI_MONITOR_IGNORE_CHECKS', '')
+if env.strip():
+    names = [n.strip() for n in env.split(',') if n.strip()]
+else:
+    raw = sys.argv[1].strip() or '[]'
+    try:
+        names = json.loads(raw)
+        assert isinstance(names, list) and all(isinstance(n, str) for n in names)
+    except Exception:
+        print(f'monitor_ignore_checks in .agents/config.yaml must be a single-line'
+              f' JSON array of check names; got: {raw}', file=sys.stderr)
+        sys.exit(2)
+print(json.dumps(names))
+" "$(monitor_ignore_checks)")
+
 _count_pending() {
   echo "$1" | "$PY" -c "
 import json, sys
+ignore = set(json.loads(sys.argv[1]))
 data = json.load(sys.stdin)
 # Exclude review/decision; it is a derived commit status that only appears
 # after a review event. We detect review state directly via reviewDecision.
@@ -139,26 +177,37 @@ data = json.load(sys.stdin)
 # cancel), not a hand-rolled state allowlist: just-queued Actions report
 # state=QUEUED (and WAITING/REQUESTED for env-gated jobs), all bucket=pending.
 # An allowlist that omitted those let the CI-wait break before CI ran (#428).
-print(sum(1 for c in data if c.get('name') != 'review/decision' and c.get('bucket') == 'pending'))
-"
+# Ignored checks are excluded too: a check the operator declared informational
+# must not hang the CI wait any more than it may block the merge (PI-837).
+print(sum(1 for c in data
+          if c.get('name') != 'review/decision'
+          and c.get('name') not in ignore
+          and c.get('bucket') == 'pending'))
+" "$IGNORE_CHECKS"
 }
 
 _print_failures() {
   echo "$1" | "$PY" -c "
 import json, sys
+ignore = set(json.loads(sys.argv[1]))
 data = json.load(sys.stdin)
-bad = [
-    c for c in data
-    if c.get('name') != 'review/decision'
-    and (
+bad, informational = [], []
+for c in data:
+    if c.get('name') == 'review/decision':
+        continue
+    failing = (
         c.get('bucket') in ('fail', 'cancel')
         or c.get('state') in ('FAILURE', 'CANCELLED', 'TIMED_OUT', 'ERROR')
     )
-]
+    if not failing:
+        continue
+    (informational if c.get('name') in ignore else bad).append(c)
+for c in informational:
+    print(f\"  {c['name']}: {c.get('state') or c.get('bucket')} — informational (monitor_ignore_checks), not blocking\")
 for c in bad:
     print(f\"  {c['name']}: {c.get('state') or c.get('bucket')}\")
 sys.exit(len(bad))
-"
+" "$IGNORE_CHECKS"
 }
 
 # Print review feedback — inline comments first, falls back to full PR comments view.
