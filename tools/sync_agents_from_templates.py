@@ -87,8 +87,6 @@ SYNCED: dict[str, str | tuple[str, object]] = {
     # the template, which keeps its host-aware gh_web_base clone URL
     "scripts/push_wiki.sh": "lifecycle/dot_agents/scripts/push_wiki.sh",
     # subagent specs (Claude Code reads them from the .claude/ mirror)
-    "agents/explore.md": "base/dot_agents/agents/explore.md",
-    "agents/code-reviewer.md": "base/dot_agents/agents/code-reviewer.md",
     "agents/README.md": "base/dot_agents/agents/README.md",
     # code map generator (stored Python-gated; this repo is Python)
     "scripts/gen_code_map.py": (

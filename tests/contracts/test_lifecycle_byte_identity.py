@@ -219,6 +219,11 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
+    # PI-848: local agent specs removed — explore duplicates the built-in
+    # Explore agent; code-reviewer ships only on --no-egress scaffolds.
+    ".agents/agents/explore.md",
+    ".agents/agents/code-reviewer.md",
+    ".agents/agents/README.md",
     # PI-819: diagnoses a REQUIRED status check that no job reports — the state
     # that leaves every PR permanently BLOCKED with all checks green.
     ".agents/scripts/check_branch_protection.sh",

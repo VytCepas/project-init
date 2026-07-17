@@ -204,6 +204,11 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #   • token_efficiency skill (PI-647) — new default-on skill with token-frugal
 #     working habits; INDEX/AGENTS.md/justfile rows already excluded above
 _ADDED_SINCE_BASELINE = {
+    # PI-848: local agent specs removed — explore duplicates the built-in
+    # Explore agent; code-reviewer ships only on --no-egress scaffolds.
+    ".agents/agents/explore.md",
+    ".agents/agents/code-reviewer.md",
+    ".agents/agents/README.md",
     # PI-819: diagnoses a REQUIRED status check that no job reports — the state
     # that leaves every PR permanently BLOCKED with all checks green.
     ".agents/scripts/check_branch_protection.sh",
