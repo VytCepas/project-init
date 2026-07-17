@@ -1480,7 +1480,8 @@ _ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
     ((".agents", "docs"), "claude-docs", "In-repo docs (.agents/docs)"),
     ((".agents",), "claude-core", "Claude Code core config"),
     ((".codex",), "codex-agent", "Codex agent wiring"),
-    ((".agents",), "agents-dir", "Agent skills/hooks (.agents/ — Codex, Antigravity)"),
+    # (a second (".agents",) rule — "agents-dir" — was unreachable behind
+    # claude-core and removed; PR #860 review)
     (("docs",), "docs", "Project documentation site"),
     ((".python-version",), "python-pin", "Python version pin (#847: single-source floor)"),
 )
