@@ -32,7 +32,7 @@ class TestTokenEfficiencySkill:
         assert "test-quick" in content
         assert "tail -n 40" in content
         assert "line ranges" in content
-        assert "explore" in content
+        assert "Explore" in content
         # Subagent cost caveat — delegation saves main context, not total spend.
         assert "4×" in content
         # Output side: specific budgets, no restated code.
@@ -64,6 +64,6 @@ class TestAgentsMdTokenEfficiencyRule:
         agents_md = (tmp_target / "AGENTS.md").read_text()
         assert "**Token efficiency**" in agents_md
         assert "test-quick" in agents_md
-        assert "explore" in agents_md
+        assert "Explore" in agents_md
         # Points at the on-demand playbook rather than inlining it.
         assert "token_efficiency" in agents_md
