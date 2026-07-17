@@ -219,6 +219,8 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
+    # PI-845: the command guard gained the upstream issue-create exception.
+    ".agents/hooks/dag_workflow.py",
     # PI-846/PI-850: graphify installer tightening — new guard hook +
     # post-install fixer; the rule + setup script gained content.
     ".agents/hooks/graphify_guard.sh",
