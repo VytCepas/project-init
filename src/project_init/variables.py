@@ -114,6 +114,30 @@ class ScaffoldInputs:
 SUPPORTED_PYTHON_VERSIONS: tuple[str, ...] = ("3.11", "3.12", "3.13", "3.14")
 
 
+def rag_gate_variables(memory_stack: str, target: Path | None) -> dict[str, str]:
+    """The rag_wired/rag_unwired template gates (#849).
+
+    The full rag.md rule (~1.9KB) auto-loads every session, but until
+    `memory.rag_endpoint` is set in .agents/config.yaml the stack it describes
+    isn't wired — emit a one-line pointer instead. rag_endpoint is the durable
+    signal setup_rag.sh tells the operator to set (the index cache itself is
+    gitignored, so it can't gate re-renders on a fresh clone).
+    """
+    is_rag = memory_stack == "obsidian-graphify-rag"
+    wired = False
+    if is_rag and target:
+        cfg = target / ".agents" / "config.yaml"
+        if cfg.exists():
+            import re
+
+            m = re.search(r"(?m)^\s*rag_endpoint:([^#\n]*)", cfg.read_text(encoding="utf-8"))
+            wired = bool(m and m.group(1).strip())
+    return {
+        "rag_wired": "true" if (is_rag and wired) else "",
+        "rag_unwired": "true" if (is_rag and not wired) else "",
+    }
+
+
 def _python_floor_from_pyproject(target: Path | None) -> str | None:
     """The requires-python floor declared by an existing pyproject.toml, if any.
 
@@ -504,6 +528,7 @@ def _build_variables(
     )
 
     return {
+        **rag_gate_variables(memory_stack, target),
         "python_floor": python_floor,
         # #714: read back by gh_host.sh's review_cycles(); only rendered under
         # the {{#if lifecycle}} gate in config.yaml.tmpl.
