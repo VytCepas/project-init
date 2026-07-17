@@ -662,15 +662,27 @@ if [ -z "$REVIEW_DECISION" ] && [ "$MODE" = "--merge" ]; then
     # feedback nobody answered.
     exit 2
   fi
+  # PI-838: the reviewer-absent path must terminate, and say what it is. With
+  # no approval policy the max-cycles→admin-merge branch above (REVIEW_REQUIRED
+  # only) never applies; this branch is the terminal state for a review agent
+  # that never responds — observed live as a quota-limited bot ignoring an
+  # explicit re-request for hours. Name the condition (CI is green; this is
+  # not a CI problem), say what cycle exhaustion does, and name --no-review —
+  # don't imply a convergence that structurally cannot happen.
   if ! _has_review_activity; then
     if [ "$REVIEW_CYCLE" -lt "$MAX_REVIEW_CYCLES" ]; then
       NEXT=$((REVIEW_CYCLE + 1))
-      echo "PR #$PR_NUMBER: no review has landed after ${REVIEW_TIMEOUT}s."
-      echo "Wait for the review agents, then re-run:"
+      echo "PR #$PR_NUMBER: no review of any state has landed after ${REVIEW_TIMEOUT}s (cycle $REVIEW_CYCLE/$MAX_REVIEW_CYCLES)."
+      echo "CI is green — the review agent has not acted (a quota-limited bot, e.g. a"
+      echo "Codex daily cap, may resume later). Re-run to give it another window:"
       echo "  .agents/scripts/monitor_pr.sh $PR_NUMBER --merge --review-cycle $NEXT"
+      echo "After cycle $MAX_REVIEW_CYCLES with no review and no approval policy, the merge proceeds"
+      echo "with a REVIEWER ABSENT warning. --no-review skips the review gate entirely."
       exit 2
     fi
-    echo "PR #$PR_NUMBER: no review landed within $MAX_REVIEW_CYCLES cycles — merging on green CI."
+    echo "WARNING: REVIEWER ABSENT — no review of any state landed within $MAX_REVIEW_CYCLES cycles"
+    echo "  and this branch has no approval policy. Merging on green CI. Consider a"
+    echo "  follow-up review once the review agent recovers."
   fi
 fi
 
