@@ -28,7 +28,17 @@ _GH_STUB = """#!/bin/bash
 case "$*" in
 *"--json headRefName"*) echo "feature false" ;;
 *"--json headRefOid"*) echo "$PI_TEST_SHA" ;;
-*"pr checks"*) echo "$PI_TEST_CHECKS" ;;
+*"pr checks"*)
+  # PI-858 two-phase mode: the first poll answers PI_TEST_CHECKS, later polls
+  # answer PI_TEST_CHECKS_LATE — reproduces an ignored check registering
+  # before the real CI jobs do.
+  if [ -n "${PI_TEST_CHECKS_LATE:-}" ] && [ -f "${PI_TEST_STATE:?}" ]; then
+    echo "$PI_TEST_CHECKS_LATE"
+  else
+    [ -n "${PI_TEST_STATE:-}" ] && : >"$PI_TEST_STATE"
+    echo "$PI_TEST_CHECKS"
+  fi
+  ;;
 *"--json reviewDecision"*) echo "" ;;
 *"--json reviews"*) echo "1" ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
@@ -165,3 +175,38 @@ def test_scaffold_renders_the_key_and_gh_host_reads_it(tmp_target: Path):
         check=False,
     )
     assert result.stdout.strip() == '["board-sync", "other"]'
+
+
+def test_ignored_only_rollup_keeps_waiting_and_fails_closed(tmp_target: Path, tmp_path: Path):
+    """PI-858 (zarija #132 review, P1): an ignored check registers before real CI
+    does — the wait must NOT break on that rollup and merge with CI never run;
+    with no real check ever registering it fails closed on the CI timeout."""
+    only_ignored = '[{"name":"board-sync","state":"FAILURE","bucket":"fail"}]'
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        checks=only_ignored,
+        config_ignore='["board-sync"]',
+        extra_env={"PI_CI_TIMEOUT": "30"},
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "did not settle" in result.stdout
+    assert "Merged" not in result.stdout
+
+
+def test_real_check_registering_later_still_merges(tmp_target: Path, tmp_path: Path):
+    """Second phase of the same race: once the real check registers and passes,
+    the merge proceeds normally past the ignored failure."""
+    only_ignored = '[{"name":"board-sync","state":"FAILURE","bucket":"fail"}]'
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        checks=only_ignored,
+        config_ignore='["board-sync"]',
+        extra_env={
+            "PI_TEST_STATE": str(tmp_path / "first-poll-seen"),
+            "PI_TEST_CHECKS_LATE": _DEAD_CHECK,
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Merged PR #1" in result.stdout
