@@ -536,8 +536,12 @@ def _build_variables(
     # Empty when the pin already exists (never clobber the project's own pin —
     # it was just read as a floor source above) or on a non-Python scaffold; an
     # empty render skips the file entirely.
+    # Skip only when the existing file actually SUPPLIED a floor (PR #860
+    # review): an unparsable pin — pyenv's `system`, a virtualenv name — must
+    # still render, so the .new-sibling conflict surfaces the drift instead of
+    # the run silently pinning mise/mypy/CI to a floor the file contradicts.
     python_version_pin = ""
-    if language == "python" and not (target and (target / ".python-version").exists()):
+    if language == "python" and _python_floor_from_version_file(target) is None:
         python_version_pin = python_floor
 
     return {

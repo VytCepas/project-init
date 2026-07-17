@@ -274,3 +274,14 @@ def test_toolchain_style_pin_parses_to_major_minor(tmp_path: Path):
     (tmp_path / ".python-version").write_text("cpython@3.12.4\n")
     assert _scaffold(tmp_path).returncode == 0
     assert _pins(tmp_path)["mypy"] == "3.12"
+
+
+def test_unparsable_pin_surfaces_a_new_sibling_conflict(tmp_path: Path):
+    """PR #860 review: an existing pin the floor parse can't read (pyenv's
+    `system`, a virtualenv name) must not silently suppress the emission — the
+    .new sibling surfaces the drift between the flag-driven pins and the file."""
+    (tmp_path / ".python-version").write_text("system\n")
+    result = _scaffold(tmp_path, "--python-version", "3.13")
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / ".python-version").read_text().strip() == "system"
+    assert (tmp_path / ".python-version.new").read_text().strip() == "3.13"
