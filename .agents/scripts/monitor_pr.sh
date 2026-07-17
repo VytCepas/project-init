@@ -476,7 +476,21 @@ _wait_for_head_sync
 CI_ELAPSED=0
 while true; do
   CHECKS=$(gh pr checks "$PR_NUMBER" --json name,state,bucket 2>/dev/null) || CHECKS="[]"
-  CHECK_COUNT=$(echo "$CHECKS" | "$PY" -c "import json,sys; print(len(json.load(sys.stdin)))")
+  # PI-858: the "checks registered" guard must count only gate-relevant checks
+  # — the same filter _count_pending applies (no review/decision, no ignored
+  # names). An ignored check registers FIRST in practice (board-sync fires on
+  # PR-open while real CI jobs are still queueing), and a raw length here let
+  # the wait break on that ignored-only rollup: _print_failures then saw no
+  # blocking failure and --merge proceeded with real CI never having run.
+  # If only-ignored checks ever exist, the timeout below fails closed.
+  CHECK_COUNT=$(echo "$CHECKS" | "$PY" -c "
+import json, sys
+ignore = set(json.loads(sys.argv[1]))
+data = json.load(sys.stdin)
+print(sum(1 for c in data
+          if c.get('name') != 'review/decision'
+          and c.get('name') not in ignore))
+" "$IGNORE_CHECKS")
   if [ "$CHECK_COUNT" -gt 0 ] && [ "$(_count_pending "$CHECKS")" -eq 0 ]; then
     break
   fi
