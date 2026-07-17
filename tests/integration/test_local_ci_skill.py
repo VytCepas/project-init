@@ -136,3 +136,6 @@ class TestRunnerGuideHostPrereqs:
         assert "validate-pr" not in content
         assert "board-automation" not in content
         assert "lifecycle workflows" not in content
+        # gh stays unconditional: the base ci.yml's post-failure step runs
+        # `gh pr comment` on this runner (PR #853 review).
+        assert "`gh`" in content

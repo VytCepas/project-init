@@ -65,15 +65,15 @@ Assumed-present binaries:
 | `git` | checkout, every workflow step that touches the repo | `sudo apt install git` |
 | `curl` | download/API steps | `sudo apt install curl` |
 | `tar`, `gzip` | action tool downloads | usually present |
+| `gh` | `ci.yml`'s post-failure PR comment step runs `gh pr comment` on this runner whenever a PR job fails{{#if lifecycle}}; also the lifecycle workflows, if you route them here{{/if lifecycle}} | [cli.github.com](https://cli.github.com) |
 {{#if lifecycle}}| `jq` | JSON parsing in the lifecycle workflows (`validate-pr`, `board-automation`, `issue-validation`, `review-status`) — bites only if you route those here | `sudo apt install jq` |
-| `gh` | lifecycle workflows only — they default to GitHub-hosted, and the PAT-bearing ones must stay there | [cli.github.com](https://cli.github.com) |
 {{/if lifecycle}}| `shellcheck` | the shell-lint step (preinstalled on GitHub images — **absent on bare hosts**) | `sudo apt install shellcheck` |
 | `docker` | container image jobs, if enabled | [docs.docker.com/engine/install](https://docs.docker.com/engine/install/) |
 
 Preflight a new runner host with:
 
 ```bash
-for b in git curl tar gzip jq shellcheck; do
+for b in git curl tar gzip gh jq shellcheck; do
   command -v "$b" >/dev/null || echo "MISSING: $b"
 done
 ```
