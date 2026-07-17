@@ -204,6 +204,8 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #   • token_efficiency skill (PI-647) — new default-on skill with token-frugal
 #     working habits; INDEX/AGENTS.md/justfile rows already excluded above
 _ADDED_SINCE_BASELINE = {
+    # PI-845: the command guard gained the upstream issue-create exception.
+    ".agents/hooks/dag_workflow.py",
     # PI-846/PI-850: graphify installer tightening — new guard hook +
     # post-install fixer; the rule + setup script gained content.
     ".agents/hooks/graphify_guard.sh",
