@@ -137,11 +137,50 @@ class TestMultiModelOn:
         assert "setup_models.sh" in text
 
 
+# Everything models.sh shells out to on its tested paths. Used to build a
+# sanitized PATH so an ollama installed on the developer's machine can never
+# leak into the tests and trigger a real multi-GB `ollama pull` (PI-854).
+_HELPER_TOOLS = (
+    "bash",
+    "jq",
+    "stat",
+    "mktemp",
+    "mv",
+    "chmod",
+    "rm",
+    "cat",
+    "grep",
+    "sed",
+    "head",
+    "tail",
+    "awk",
+)
+
+
+def _sanitized_bin(tmp_path: Path, *, ollama_stub: bool = False) -> Path:
+    """A PATH with exactly the tools models.sh needs — and never a real ollama."""
+    bin_dir = tmp_path / "sanitized-bin"
+    bin_dir.mkdir(exist_ok=True)
+    for tool in _HELPER_TOOLS:
+        real = shutil.which(tool)
+        assert real is not None, f"{tool} missing from the host PATH"
+        link = bin_dir / tool
+        if not link.exists():
+            link.symlink_to(real)
+    if ollama_stub:
+        stub = bin_dir / "ollama"
+        stub.write_text('#!/bin/sh\necho "$@" >>"${OLLAMA_STUB_LOG:?}"\nexit 0\n')
+        stub.chmod(0o755)
+    return bin_dir
+
+
 @pytest.mark.skipif(shutil.which("jq") is None, reason="models.sh needs jq at runtime")
 class TestDay2HelperRuntime:
     """Exercise the day-2 helper's jq edits end-to-end (#358). Runs wherever jq is
-    available (e.g. CI); skipped otherwise. Ollama is absent in CI, so the script's
-    `have ollama` branch degrades to register-only — exactly the path we assert."""
+    available (e.g. CI); skipped otherwise. The ollama paths run under a sanitized
+    PATH (PI-854): presence/absence of ollama is controlled per-test, never
+    inherited from the host — a host with a real ollama used to make the
+    "without pull" test actually pull a multi-GB model."""
 
     @pytest.fixture(autouse=True)
     def _scaffold(self, tmp_path: Path):
@@ -153,10 +192,10 @@ class TestDay2HelperRuntime:
             encoding="utf-8",
         )
 
-    def _run(self, *args: str):
+    def _run(self, *args: str, env_overrides: dict[str, str] | None = None):
         return subprocess.run(
             ["bash", str(self.helper), *args],
-            env={**os.environ, "CCR_CONFIG": str(self.cfg)},
+            env={**os.environ, "CCR_CONFIG": str(self.cfg), **(env_overrides or {})},
             capture_output=True,
             text=True,
         )
@@ -178,9 +217,28 @@ class TestDay2HelperRuntime:
         assert r.returncode != 0
         assert "not in config" in (r.stdout + r.stderr)
 
-    def test_register_ollama_model_without_pull(self):
-        # ollama is absent in CI → registers in config without pulling.
-        assert self._run("add", "ollama", "qwen3:14b").returncode == 0
+    def test_register_ollama_model_without_pull(self, tmp_path: Path):
+        # Sanitized PATH: ollama absent by construction, not by hoping the host
+        # lacks it — `have ollama` degrades to register-only, no pull possible.
+        bin_dir = _sanitized_bin(tmp_path)
+        r = self._run("add", "ollama", "qwen3:14b", env_overrides={"PATH": str(bin_dir)})
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert "registering anyway" in (r.stdout + r.stderr)
+        assert "qwen3:14b" in self._models("ollama")
+
+    def test_add_ollama_pulls_when_present(self, tmp_path: Path):
+        # The other branch, with a recording stub — asserts the pull would
+        # happen without ever downloading anything.
+        log = tmp_path / "ollama-calls.log"
+        bin_dir = _sanitized_bin(tmp_path, ollama_stub=True)
+        r = self._run(
+            "add",
+            "ollama",
+            "qwen3:14b",
+            env_overrides={"PATH": str(bin_dir), "OLLAMA_STUB_LOG": str(log)},
+        )
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert log.read_text().strip() == "pull qwen3:14b"
         assert "qwen3:14b" in self._models("ollama")
 
 
