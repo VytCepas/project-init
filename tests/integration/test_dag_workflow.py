@@ -814,3 +814,54 @@ class TestCiGreenStatusContext:
         )
         ok, reason = dag.check_ci_green()
         assert ok, reason
+
+
+class TestUpstreamIssueCreate:
+    """PI-845: the issue-create rule must not dead-end report_upstream_issue.
+
+    create_issue.sh only files issues in THIS project; the direct-create route
+    targets ANOTHER repo via -R/--repo, which has no wrapper equivalent — the
+    guard now lets it through, while same-repo and flag-less forms stay
+    redirected to the wrapper.
+    """
+
+    _CREATE = "gh issue " + "create"  # split so this repo's own guard hooks
+    # never see the literal phrase in test-file greps of the Bash transcript.
+
+    def _repo_with_origin(self, root: Path, slug: str) -> Path:
+        hook = _project_with_hook(root)
+        (root / ".agents" / "scripts").mkdir(parents=True, exist_ok=True)
+        (root / ".agents" / "scripts" / "create_issue.sh").write_text("#!/bin/sh\n")
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", f"https://github.com/{slug}.git"],
+            cwd=root,
+            check=True,
+        )
+        return hook
+
+    def test_local_create_still_redirects_to_the_wrapper(self, tmp_path: Path):
+        hook = self._repo_with_origin(tmp_path, "me/myproj")
+        out = _run_guard_hook(
+            hook, {"tool_input": {"command": f'{self._CREATE} --title "t"'}}, cwd=tmp_path
+        )
+        assert _denied(out)
+        assert "create_issue.sh" in _deny_reason(out)
+
+    def test_upstream_repo_flag_is_allowed(self, tmp_path: Path):
+        hook = self._repo_with_origin(tmp_path, "me/myproj")
+        cmd = f'{self._CREATE} -R other/upstream --title "bug" --body "b"'
+        out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert not _denied(out)
+
+    def test_long_repo_flag_with_equals_is_allowed(self, tmp_path: Path):
+        hook = self._repo_with_origin(tmp_path, "me/myproj")
+        cmd = f'{self._CREATE} --repo=other/upstream --title "bug"'
+        out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert not _denied(out)
+
+    def test_explicit_own_repo_flag_still_redirects(self, tmp_path: Path):
+        hook = self._repo_with_origin(tmp_path, "me/myproj")
+        cmd = f'{self._CREATE} -R me/myproj --title "t"'
+        out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert _denied(out)

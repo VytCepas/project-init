@@ -27,6 +27,14 @@ echo "Registering project-scoped skill + hook..."
 # committable and teammates get it on clone; default scope is user-global.
 graphify install --project
 
+echo "Tightening the installer's hook matchers + CLAUDE.md section (PI-846/PI-850)..."
+# The installer's PreToolUse hooks fire on every Bash/Read/Glob touching ~30
+# extensions, per call, and it appends a full workflow section to CLAUDE.md
+# that duplicates .agents/rules/graphify.md. Scope the hooks to real source
+# work (once per session) and trim the section to a pointer. Fail-open.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+"$SCRIPT_DIR/../hooks/_py.sh" "$SCRIPT_DIR/../hooks/graphify_post_install.py" "$(pwd)" || true
+
 echo "Installing post-commit graph rebuild hook..."
 graphify hook install
 
