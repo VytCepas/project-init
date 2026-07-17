@@ -219,6 +219,12 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
+    # PI-846/PI-850: graphify installer tightening — new guard hook +
+    # post-install fixer; the rule + setup script gained content.
+    ".agents/hooks/graphify_guard.sh",
+    ".agents/hooks/graphify_post_install.py",
+    ".agents/rules/graphify.md",
+    ".agents/scripts/setup_graphify.sh",
     # PI-819: diagnoses a REQUIRED status check that no job reports — the state
     # that leaves every PR permanently BLOCKED with all checks green.
     ".agents/scripts/check_branch_protection.sh",
