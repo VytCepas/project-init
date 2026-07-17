@@ -44,12 +44,19 @@ case "$FILE" in
 *.py)
   # Prefer 'uv run ruff' inside a uv-managed project so the hook uses
   # the same ruff the project itself uses; fall back to a system ruff.
+  #
+  # F401 (unused import) is reported but never auto-fixed here (PI-839):
+  # agents make paired edits — edit k adds an import, edit k+1 adds its
+  # usage — and this hook fires between them, when the import is
+  # momentarily "unused". Auto-removing it turns edit k+1 into F821
+  # undefined-name churn. Genuinely dead imports still fail `just lint`
+  # and pre-commit, where the file set is settled.
   if { [ -f "$ROOT/pyproject.toml" ] || [ -f "$ROOT/uv.lock" ]; } && command -v uv &>/dev/null; then
-    uv run ruff check --fix --quiet "$FILE" >/dev/null 2>&1 || true
+    uv run ruff check --fix --unfixable F401 --quiet "$FILE" >/dev/null 2>&1 || true
     uv run ruff format --quiet "$FILE" >/dev/null 2>&1 || true
     ERRORS=$(uv run ruff check --quiet "$FILE" 2>&1 || true)
   elif command -v ruff &>/dev/null; then
-    ruff check --fix --quiet "$FILE" >/dev/null 2>&1 || true
+    ruff check --fix --unfixable F401 --quiet "$FILE" >/dev/null 2>&1 || true
     ruff format --quiet "$FILE" >/dev/null 2>&1 || true
     ERRORS=$(ruff check --quiet "$FILE" 2>&1 || true)
   fi
