@@ -77,7 +77,36 @@ parallelism.
   your machine. They cost seconds and fit the free tier once `ci.yml` moves
   off. Do not point them at `CI_RUNS_ON`.
 - The `scorecard` job stays GitHub-hosted (an OSSF requirement).
+{{#if lifecycle}}
+## Known-dead checks during the lockout (PI-837)
 
+The GitHub-hosted workflows above keep **failing permanently** while the
+billing lockout lasts — each run dies as a zero-step `startup_failure`.
+Those failures register as checks on your PRs, and `monitor_pr.sh --merge`
+blocks on any failing check, so one dead check would deadlock every PR even
+though real CI is green on your runner. Name such checks in
+`.agents/config.yaml`:
+
+```yaml
+  monitor_ignore_checks: ["board-sync"]   # reported, never blocking
+```
+
+(or per-run: `PI_MONITOR_IGNORE_CHECKS=board-sync monitor_pr.sh …`). The
+check is still printed — marked informational — and the merge proceeds.
+Remove the entry once billing recovers; the gate reverts to blocking.
+
+**Gotcha — check runs attach to commits, not PRs.** A branch created while
+pointing at the same commit as another PR's head shares that commit's check
+rollup: a failure produced by the sibling's PR events appears on *your* PR
+too, and can re-block it after you already worked around the failure. Remedy:
+give the PR a unique head commit —
+
+```bash
+git commit --allow-empty -m "chore: refresh PR head" && .agents/scripts/push_branch.sh
+```
+
+which clears the stale failure from this PR's rollup.
+{{/if lifecycle}}
 ## Alternatives
 
 Make the repo public (Actions is free), raise the spending limit, or wait for
