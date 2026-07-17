@@ -114,6 +114,35 @@ class ScaffoldInputs:
 SUPPORTED_PYTHON_VERSIONS: tuple[str, ...] = ("3.11", "3.12", "3.13", "3.14")
 
 
+def _python_floor_from_version_file(target: Path | None) -> str | None:
+    """The X.Y floor pinned by an existing .python-version file, if any (#847).
+
+    uv/pyenv write pins like ``3.13``, ``3.13.2``, or ``cpython@3.13`` — extract
+    the major.minor prefix. An unreadable or unparsable file returns None.
+    """
+    if not target or not (target / ".python-version").exists():
+        return None
+    try:
+        import re
+
+        text = (target / ".python-version").read_text(encoding="utf-8").strip()
+        m = re.search(r"(\d+\.\d+)", text.splitlines()[0] if text else "")
+        return m.group(1) if m else None
+    except Exception:
+        return None
+
+
+def _declared_python_floor(target: Path | None) -> str | None:
+    """The Python floor the project's own files declare, if any (#628, #847).
+
+    pyproject.toml's requires-python is authoritative; .python-version answers
+    when pyproject is silent — so a scaffold over an already-pinned project can
+    never record a floor that contradicts the pin (#847: config.yaml carried a
+    wizard answer while .python-version/pyproject pinned something else).
+    """
+    return _python_floor_from_pyproject(target) or _python_floor_from_version_file(target)
+
+
 def rag_gate_variables(memory_stack: str, target: Path | None) -> dict[str, str]:
     """The rag_wired/rag_unwired template gates (#849).
 
@@ -522,14 +551,27 @@ def _build_variables(
     # value when nothing declares one, and a contradicting flag was already
     # rejected by _reject_conflicting_python_version. Neither: oldest supported.
     python_floor = (
-        _python_floor_from_pyproject(target)
-        or inputs.python_version
-        or SUPPORTED_PYTHON_VERSIONS[0]
+        _declared_python_floor(target) or inputs.python_version or SUPPORTED_PYTHON_VERSIONS[0]
     )
+    # #847: on a greenfield Python scaffold, EMIT .python-version from the floor
+    # so the later `uv init` derives requires-python from the same value —
+    # previously the wizard answer lived only in config.yaml and uv pinned
+    # whatever interpreter it found, leaving the record contradicting the files.
+    # Empty when the pin already exists (never clobber the project's own pin —
+    # it was just read as a floor source above) or on a non-Python scaffold; an
+    # empty render skips the file entirely.
+    # Skip only when the existing file actually SUPPLIED a floor (PR #860
+    # review): an unparsable pin — pyenv's `system`, a virtualenv name — must
+    # still render, so the .new-sibling conflict surfaces the drift instead of
+    # the run silently pinning mise/mypy/CI to a floor the file contradicts.
+    python_version_pin = ""
+    if language == "python" and _python_floor_from_version_file(target) is None:
+        python_version_pin = python_floor
 
     return {
         **rag_gate_variables(memory_stack, target),
         "python_floor": python_floor,
+        "python_version_pin": python_version_pin,
         # #714: read back by gh_host.sh's review_cycles(); only rendered under
         # the {{#if lifecycle}} gate in config.yaml.tmpl.
         "review_cycles": str(inputs.review_cycles),

@@ -83,7 +83,7 @@ def test_flag_contradicting_requires_python_is_rejected(tmp_path: Path):
     (tmp_path / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.12"\n')
     result = _scaffold(tmp_path, "--python-version", "3.14")
     assert result.returncode != 0
-    assert "conflicts with the requires-python floor (3.12)" in result.stderr
+    assert "conflicts with the Python floor (3.12)" in result.stderr
     assert not (tmp_path / "mise.toml").exists()
 
 
@@ -208,3 +208,121 @@ def test_wizard_does_not_ask_when_pyproject_already_declares_a_floor(monkeypatch
     inputs, seen = _wizard(monkeypatch, ["proj", "desc", "python", "", "none"], target=tmp_path)
     assert not _asked_for_python(seen)
     assert inputs.python_version == ""
+
+
+# --- #847: .python-version joins the single-source floor ---------------------
+
+
+def test_greenfield_python_scaffold_emits_python_version_pin(tmp_path: Path):
+    """The wizard/flag answer must land in .python-version, so a later
+    `uv init` derives requires-python from the same value instead of pinning
+    whatever interpreter it finds (the #847 drift)."""
+    assert _scaffold(tmp_path, "--python-version", "3.13").returncode == 0
+    assert (tmp_path / ".python-version").read_text().strip() == "3.13"
+
+
+def test_existing_python_version_pin_is_read_not_clobbered(tmp_path: Path):
+    (tmp_path / ".python-version").write_text("3.12\n")
+    assert _scaffold(tmp_path).returncode == 0
+    # The pin survives untouched and drives every derived pin.
+    assert (tmp_path / ".python-version").read_text().strip() == "3.12"
+    assert _pins(tmp_path) == {"mise": "3.12", "mypy": "3.12", "ci_floor": "3.12"}
+
+
+def test_pyproject_floor_outranks_python_version_file(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.13,<3.15"\n')
+    (tmp_path / ".python-version").write_text("3.12\n")
+    assert _scaffold(tmp_path).returncode == 0
+    assert _pins(tmp_path)["mypy"] == "3.13"
+
+
+def test_flag_contradicting_python_version_file_is_rejected(tmp_path: Path):
+    (tmp_path / ".python-version").write_text("3.12\n")
+    result = _scaffold(tmp_path, "--python-version", "3.14")
+    assert result.returncode != 0
+    assert "conflicts with the Python floor" in result.stderr
+
+
+def test_non_python_scaffold_emits_no_python_version_pin(tmp_path: Path):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "project_init",
+            str(tmp_path),
+            "--non-interactive",
+            "--preset",
+            "core",
+            "--agents",
+            "claude",
+            "--name",
+            "t",
+            "--description",
+            "t",
+            "--language",
+            "go",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / ".python-version").exists()
+
+
+def test_toolchain_style_pin_parses_to_major_minor(tmp_path: Path):
+    (tmp_path / ".python-version").write_text("cpython@3.12.4\n")
+    assert _scaffold(tmp_path).returncode == 0
+    assert _pins(tmp_path)["mypy"] == "3.12"
+
+
+def test_unparsable_pin_surfaces_a_new_sibling_conflict(tmp_path: Path):
+    """PR #860 review: an existing pin the floor parse can't read (pyenv's
+    `system`, a virtualenv name) must not silently suppress the emission — the
+    .new sibling surfaces the drift between the flag-driven pins and the file."""
+    (tmp_path / ".python-version").write_text("system\n")
+    result = _scaffold(tmp_path, "--python-version", "3.13")
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / ".python-version").read_text().strip() == "system"
+    assert (tmp_path / ".python-version.new").read_text().strip() == "3.13"
+
+
+def test_upgrade_proposes_the_pin_to_a_legacy_python_scaffold(tmp_path: Path):
+    """PR #860 review: a pre-847 record never managed .python-version — when no
+    pin exists there is no contention, so upgrade may add the file."""
+    from project_init.__main__ import main as upgrade_main
+    from project_init.scaffold import scaffold
+    from project_init.upgrade import write_scaffold_record
+    from tests.helpers import fallback_preset, fallback_variables
+
+    target = tmp_path / "p"
+    # helpers set python_version_pin="" — like a pre-847 scaffold, no pin emitted.
+    created = scaffold(target, fallback_preset(), fallback_variables(python_floor="3.12"))
+    assert not (target / ".python-version").exists()
+    variables = fallback_variables(python_floor="3.12")
+    variables.pop("python_version_pin")
+    write_scaffold_record(target, "obsidian-only", variables, created)
+    # The new file rides the addition-consent flow (#249): proposed, not imposed.
+    assert upgrade_main(["upgrade", str(target), "--apply"]) == 2
+    rc = upgrade_main(["upgrade", str(target), "--apply", "--accept-new", "all"])
+    assert rc == 0
+    assert (target / ".python-version").read_text().strip() == "3.12"
+
+
+def test_upgrade_never_contends_for_an_unmanaged_pin(tmp_path: Path):
+    from project_init.__main__ import main as upgrade_main
+    from project_init.scaffold import scaffold
+    from project_init.upgrade import write_scaffold_record
+    from tests.helpers import fallback_preset, fallback_variables
+
+    target = tmp_path / "p"
+    created = scaffold(target, fallback_preset(), fallback_variables())
+    variables = fallback_variables()
+    variables.pop("python_version_pin")
+    write_scaffold_record(target, "obsidian-only", variables, created)
+    # The project pins its own interpreter after the fact (uv/pyenv).
+    (target / ".python-version").write_text("3.12\n")
+    rc = upgrade_main(["upgrade", str(target), "--apply"])
+    assert rc == 0
+    assert (target / ".python-version").read_text().strip() == "3.12"
+    assert not (target / ".python-version.new").exists()

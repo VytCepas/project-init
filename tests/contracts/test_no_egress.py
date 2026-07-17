@@ -89,6 +89,7 @@ class TestNoEgressUpgradeBackfill:
         created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
         legacy = {k: val for k, val in v.items() if k not in ("egress_ok", "no_egress")}
         write_scaffold_record(target, "obsidian-only", legacy, created)
+        (target / ".python-version").write_text("3.11\n")  # park the #847 pin proposal
 
         assert run_upgrade(target, apply=True) == 0
         data = json.loads((target / ".agents" / "settings.json").read_text())

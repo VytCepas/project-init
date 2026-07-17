@@ -33,6 +33,8 @@ def _scaffolded(tmp_path: Path) -> Path:
     v = make_variables()
     created = scaffold(target, memory_preset("obsidian-only"), v, strict=True)
     write_scaffold_record(target, "obsidian-only", v, created)
+    # An unmanaged pin parks the #847 python-pin proposal — out of scope here.
+    (target / ".python-version").write_text("3.11\n")
     return target
 
 
@@ -46,6 +48,9 @@ def _genuinely_new_docs(tmp_path: Path) -> tuple[Path, Path]:
     rel = sorted(p.relative_to(target) for p in (target / "docs").rglob("*.md"))[0]
     write_scaffold_record(target, "obsidian-only", v, [c for c in created if c != rel])
     (target / rel).unlink()
+    # An unmanaged pin parks the #847 python-pin proposal — these tests are
+    # about the docs group's consent semantics only.
+    (target / ".python-version").write_text("3.11\n")
     return target, target / rel
 
 
@@ -55,6 +60,7 @@ class TestClassify:
         assert _classify_addition(Path(".github/workflows/ci.yml"))[0] == "github-workflows"
         assert _classify_addition(Path(".agents/skills/x/SKILL.md"))[0] == "claude-skills"
         assert _classify_addition(Path("docs/guides/x.md"))[0] == "docs"
+        assert _classify_addition(Path(".python-version"))[0] == "python-pin"
 
     def test_unknown_is_misc(self):
         assert _classify_addition(Path("random.txt"))[0] == "misc"

@@ -41,6 +41,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "project_init_plugin_version": "0.1.0",
         "project_init_version_prev": "",
         "python_floor": "3.11",
+        "python_version_pin": "",
         "review_cycles": "2",
         "language": "python",
         "delivery": "prototype",

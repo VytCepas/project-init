@@ -232,6 +232,9 @@ def _overlay_off_defaults() -> dict[str, str]:
         "license_apache": "",
         "license_proprietary": "",
         "python_floor": "3.11",
+        # #847: pre-847 records carry no pin variable; empty means "never emit
+        # .python-version" — read_scaffold_record recomputes it from the manifest.
+        "python_version_pin": "",
         # #714: pre-714 records carry no review_cycles; re-render with the
         # default the wizard explains rather than dropping the key.
         "review_cycles": "2",
@@ -926,14 +929,27 @@ def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, s
         variables = _migrate_agents(_backfill_variables(variables))
         migrated = True
 
-    # Single source of truth for the requires-python floor (PI-799): the same
-    # extractor the CLI uses for its --python-version conflict check, so the two
-    # can never drift. A declared requires-python overrides the recorded floor.
-    from project_init.variables import _python_floor_from_pyproject
+    # Single source of truth for the requires-python floor (PI-799, #847): the
+    # same extractor the CLI uses for its --python-version conflict check, so
+    # the two can never drift. A declared requires-python — or, when pyproject
+    # is silent, an existing .python-version pin — overrides the recorded floor.
+    from project_init.variables import _declared_python_floor
 
-    floor = _python_floor_from_pyproject(target)
+    floor = _declared_python_floor(target)
     if floor:
         variables["python_floor"] = floor
+    # #847: the emitted .python-version pin tracks the floor when this tool
+    # owns the file (recorded manifest) — and, on a Python project, when no pin
+    # exists at all, so an upgrade can propose the new file to older scaffolds
+    # (PR #860 review). An existing UNMANAGED pin stays untouched: empty here
+    # means "never contend for a file the project owns itself".
+    owns_pin = ".python-version" in manifest
+    no_pin = target is not None and not (target / ".python-version").exists()
+    variables["python_version_pin"] = (
+        variables.get("python_floor", "")
+        if variables.get("python") and (owns_pin or no_pin)
+        else ""
+    )
     # #849: the rag.md rule gates on the live rag_endpoint value — recompute so
     # wiring RAG (or a legacy record with no gate variables) re-renders right.
     from project_init.variables import rag_gate_variables
@@ -1464,8 +1480,10 @@ _ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
     ((".agents", "docs"), "claude-docs", "In-repo docs (.agents/docs)"),
     ((".agents",), "claude-core", "Claude Code core config"),
     ((".codex",), "codex-agent", "Codex agent wiring"),
-    ((".agents",), "agents-dir", "Agent skills/hooks (.agents/ — Codex, Antigravity)"),
+    # (a second (".agents",) rule — "agents-dir" — was unreachable behind
+    # claude-core and removed; PR #860 review)
     (("docs",), "docs", "Project documentation site"),
+    ((".python-version",), "python-pin", "Python version pin (#847: single-source floor)"),
 )
 
 
