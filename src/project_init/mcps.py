@@ -1,7 +1,9 @@
 """MCP catalog and emit helpers for the project-init wizard.
 
-All commands use bunx (bun's npx equivalent) — no npm/npx anywhere.
-PI-15 (replace npx with bun) is satisfied by construction here.
+Catalog entries are written with bunx (bun's npx equivalent — PI-15). #842:
+bun only exists on a node scaffold's toolchain, so the emitted configs and the
+printed install commands swap in the requested JS runner (npx elsewhere —
+present wherever node is) via ``servers_for_ids``/``resolve_js_runner``.
 """
 
 from __future__ import annotations
@@ -54,11 +56,22 @@ PLAYWRIGHT_MCP: dict[str, Any] = {
 }
 
 
-def servers_for_ids(ids: list[str]) -> dict[str, dict[str, Any]]:
+def resolve_js_runner(variables: dict[str, str]) -> str:
+    """The JS package runner the scaffolded toolchain actually has (#842).
+
+    bunx on a node scaffold (bun is the project convention, PI-15); npx
+    everywhere else — a python/go/rust scaffold never installs bun, so a bunx
+    launcher fails every MCP start with ENOENT.
+    """
+    return "bunx" if variables.get("node") else "npx"
+
+
+def servers_for_ids(ids: list[str], js_runner: str = "bunx") -> dict[str, dict[str, Any]]:
     """Canonical MCP server specs for the given catalog ids.
 
     Returns ``{name: {command,args}|{url}}`` — the source the per-surface
-    generators render from (PI-366).
+    generators render from (PI-366). ``js_runner`` replaces the catalog's
+    bunx launcher for toolchains without bun (#842).
     """
     by_id: dict[str, dict[str, Any]] = {m["id"]: m for m in MCP_CATALOG}
     by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
@@ -67,7 +80,10 @@ def servers_for_ids(ids: list[str]) -> dict[str, dict[str, Any]]:
     for i in ids:
         entry = by_id.get(i)
         if entry and entry.get("server"):
-            out[i] = dict(entry["server"])
+            spec = dict(entry["server"])
+            if spec.get("command") == "bunx":
+                spec["command"] = js_runner
+            out[i] = spec
         elif i not in by_id:
             # A typo'd or renamed catalog id would otherwise vanish silently from
             # every surface's MCP config; surface it (2026-07 review).

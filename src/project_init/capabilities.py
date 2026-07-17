@@ -15,7 +15,7 @@ import re
 import sys
 from pathlib import Path
 
-from project_init.mcps import servers_for_ids
+from project_init.mcps import resolve_js_runner, servers_for_ids
 from project_init.scaffold import _TEMPLATES_DIR
 
 _NAME_RE = re.compile(r"^name:\s*(.+)$", re.MULTILINE)
@@ -202,7 +202,7 @@ def render(variables: dict[str, str]) -> str:
     """The CAPABILITIES.md content for a scaffold described by *variables*."""
     skills = canonical_skills(variables)
     hooks = canonical_hooks(variables)
-    servers = servers_for_ids(_mcp_ids(variables))
+    servers = servers_for_ids(_mcp_ids(variables), js_runner=resolve_js_runner(variables))
 
     lines = [
         "# Capabilities",
