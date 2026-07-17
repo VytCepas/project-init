@@ -232,6 +232,9 @@ def _overlay_off_defaults() -> dict[str, str]:
         "license_apache": "",
         "license_proprietary": "",
         "python_floor": "3.11",
+        # #847: pre-847 records carry no pin variable; empty means "never emit
+        # .python-version" — read_scaffold_record recomputes it from the manifest.
+        "python_version_pin": "",
         # #714: pre-714 records carry no review_cycles; re-render with the
         # default the wizard explains rather than dropping the key.
         "review_cycles": "2",
@@ -916,14 +919,21 @@ def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, s
         variables = _migrate_agents(_backfill_variables(variables))
         migrated = True
 
-    # Single source of truth for the requires-python floor (PI-799): the same
-    # extractor the CLI uses for its --python-version conflict check, so the two
-    # can never drift. A declared requires-python overrides the recorded floor.
-    from project_init.variables import _python_floor_from_pyproject
+    # Single source of truth for the requires-python floor (PI-799, #847): the
+    # same extractor the CLI uses for its --python-version conflict check, so
+    # the two can never drift. A declared requires-python — or, when pyproject
+    # is silent, an existing .python-version pin — overrides the recorded floor.
+    from project_init.variables import _declared_python_floor
 
-    floor = _python_floor_from_pyproject(target)
+    floor = _declared_python_floor(target)
     if floor:
         variables["python_floor"] = floor
+    # #847: the emitted .python-version pin tracks the floor exactly when this
+    # tool owns the file (it's in the recorded manifest); otherwise stay empty
+    # so an upgrade never creates or contends for a pin the project owns itself.
+    variables["python_version_pin"] = (
+        variables.get("python_floor", "") if ".python-version" in manifest else ""
+    )
 
     return preset_name, variables, manifest, migrated
 

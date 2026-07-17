@@ -17,7 +17,7 @@ from project_init import __version__
 from project_init.variables import (
     SUPPORTED_PYTHON_VERSIONS,
     ScaffoldInputs,
-    _python_floor_from_pyproject,
+    _declared_python_floor,
     _text_field_error,
 )
 
@@ -42,24 +42,25 @@ def _reject_python_version_without_python(
 def _reject_conflicting_python_version(
     flag: str | None, target: Path | None, parser: argparse.ArgumentParser
 ) -> None:
-    """Refuse a --python-version that contradicts a declared requires-python.
+    """Refuse a --python-version that contradicts a declared Python floor.
 
-    project-init does not own pyproject.toml, and the scaffolded CI matrix
-    derives from requires-python whenever it exists. Honoring the flag anyway
-    would pin mise.toml/mypy.ini to one version while CI tested another — mypy
-    would green-light syntax the oldest tested CPython cannot run (PR #713
-    review). One value or none: make the user reconcile the declaration.
+    project-init does not own pyproject.toml or .python-version, and the
+    scaffolded CI matrix derives from requires-python whenever it exists.
+    Honoring the flag anyway would pin mise.toml/mypy.ini to one version while
+    CI tested another — mypy would green-light syntax the oldest tested CPython
+    cannot run (PR #713 review). #847 extends the same rule to an existing
+    .python-version pin. One value or none: make the user reconcile.
     """
     if not flag:
         return
-    declared = _python_floor_from_pyproject(target)
+    declared = _declared_python_floor(target)
     if declared and declared != flag:
         parser.error(
-            f"--python-version {flag} conflicts with the requires-python floor "
-            f"({declared}) declared in pyproject.toml. CI derives its matrix from "
-            f"requires-python, so mise.toml and mypy.ini would pin {flag} while CI "
-            f"tested {declared}. Set requires-python to >={flag}, or drop "
-            f"--python-version to adopt the declared {declared}."
+            f"--python-version {flag} conflicts with the Python floor "
+            f"({declared}) declared by pyproject.toml/.python-version. CI derives "
+            f"its matrix from requires-python, so mise.toml and mypy.ini would pin "
+            f"{flag} while CI tested {declared}. Align the declaration with {flag}, "
+            f"or drop --python-version to adopt the declared {declared}."
         )
 
 

@@ -35,7 +35,7 @@ from project_init.variables import (
     SUPPORTED_PYTHON_VERSIONS,
     ScaffoldInputs,
     _profile_delivery_no_plugin,
-    _python_floor_from_pyproject,
+    _declared_python_floor,
     _resolve_mcps_non_interactive,
     _text_field_error,
     resolve_agents,
@@ -711,7 +711,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
             f"a python project (this is {language}).[/yellow]"
         )
         python_version = ""
-    if not python_version and language == "python" and not _python_floor_from_pyproject(target):
+    if not python_version and language == "python" and not _declared_python_floor(target):
         python_version = _prompt_choice(
             "Target Python (pins mise.toml, mypy.ini, and the CI matrix floor)",
             SUPPORTED_PYTHON_VERSIONS,
