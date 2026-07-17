@@ -78,6 +78,7 @@ Deterministic AIBOM generation for the governance overlay (ADR-018, #412).
 
 MCP catalog and emit helpers for the project-init wizard.
 
+- `def resolve_js_runner` — The JS package runner the scaffolded toolchain actually has (#842).
 - `def servers_for_ids` — Canonical MCP server specs for the given catalog ids.
 - `def format_installed_mcps` — Human-readable comma-separated list for template substitution.
 - `def format_installed_mcps_yaml` — Inline YAML list string for config.yaml template.
