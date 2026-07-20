@@ -32,7 +32,11 @@ MM_DIR="$(cd "$SCRIPT_DIR/../multi-model" && pwd)"
 TEMPLATE_CONFIG="$MM_DIR/config.json"
 ENV_FILE="$MM_DIR/.env"
 ENV_EXAMPLE="$MM_DIR/.env.example"
-GLOBAL_DIR="$HOME/.agents-code-router"
+# Upstream-owned path: this is claude-code-router's OWN config directory, not a
+# project-init one. It must NOT be swept along by any .claude → .agents rename
+# (that regression shipped in PI-606/#620 and silently broke config seeding for
+# every --multi-model scaffold — see PI-869).
+GLOBAL_DIR="$HOME/.claude-code-router"
 GLOBAL_CONFIG="$GLOBAL_DIR/config.json"
 
 # --- tiny output helpers ------------------------------------------------------
@@ -91,7 +95,7 @@ ensure_env() {
 }
 
 # --- 4. seed the machine-global config (merge-safe) + substitute keys ---------
-# CCR config is machine-level (~/.agents-code-router/config.json), shared across
+# CCR config is machine-level (~/.claude-code-router/config.json), shared across
 # projects. We never clobber an existing config silently — it is backed up first.
 seed_config() {
   mkdir -p "$GLOBAL_DIR"
@@ -99,7 +103,7 @@ seed_config() {
     local backup="$GLOBAL_CONFIG.bak.$(date +%Y%m%d%H%M%S)"
     cp "$GLOBAL_CONFIG" "$backup"
     warn "Existing global CCR config backed up to: $backup"
-    if ! ask "Overwrite ~/.agents-code-router/config.json with this project's template?"; then
+    if ! ask "Overwrite ~/.claude-code-router/config.json with this project's template?"; then
       info "Left the existing global config in place. Edit it by hand or run 'ccr ui'."
       return
     fi
@@ -250,7 +254,7 @@ Done. Multi-model switching is set up.
   .agents/scripts/models.sh add ollama qwen3:14b  # add/remove models after setup (needs jq)
 
 Background requests auto-route to DeepSeek (cheap) — the biggest silent saver.
-Edit providers/keys in ~/.agents-code-router/config.json (or .agents/multi-model/.env, then re-run).
+Edit providers/keys in ~/.claude-code-router/config.json (or .agents/multi-model/.env, then re-run).
 EOF
 }
 

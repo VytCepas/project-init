@@ -11,7 +11,7 @@ Those run below the model and stay identical whichever model you point at.
 - `config.json` — the [claude-code-router (CCR)](https://github.com/musistudio/claude-code-router)
   config template: providers (Claude / DeepSeek / Kimi / Gemini / Ollama) and `Router`
   cost defaults. This is the **seed** for the machine-global config at
-  `~/.agents-code-router/config.json` (CCR is machine-level, not per-project).
+  `~/.claude-code-router/config.json` (CCR is machine-level, not per-project).
 - `.env.example` — provider API-key slots. Copy to `.env` (gitignored) and fill in.
 - `../scripts/setup_models.sh` — one-time installer: installs CCR (pinned),
   seeds the global config from `config.json` + your `.env`, optionally pulls local
@@ -46,4 +46,4 @@ claude                                                          # opens as usual
   "Invalid tool parameters".
 
 Reverting is clean: stop using CCR (plain `claude` against Anthropic) or
-`rm ~/.agents-code-router/config.json` to remove it entirely.
+`rm ~/.claude-code-router/config.json` to remove it entirely.

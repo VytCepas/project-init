@@ -3,7 +3,7 @@
 # Copy this file to `.env` in the same directory and fill in the keys for the
 # providers you actually route to (see config.json -> Router). `.env` is already
 # gitignored. `setup_models.sh` reads this file to seed the global CCR config at
-# ~/.agents-code-router/config.json.
+# ~/.claude-code-router/config.json.
 #
 # You only need a key for a provider you reference in Router. The shipped
 # defaults route: default/longContext -> Claude, background/think -> DeepSeek.

@@ -43,7 +43,7 @@ mismatch*, not "Claude Code is slow" (it's a strong harness):
 **Gemini** *is* seeded (the `gemini` provider), but its tool-calling/streaming via
 translation is less battle-tested than Claude/DeepSeek, so Antigravity (`agy`) stays
 the higher-fidelity Gemini path. Add any other OpenAI/Anthropic-compatible provider by
-editing `~/.agents-code-router/config.json` (`ccr ui`, or a gateway like OpenRouter);
+editing `~/.claude-code-router/config.json` (`ccr ui`, or a gateway like OpenRouter);
 expect a quality penalty routing a first-party-harness model through CCR (no published
 CCR-vs-native benchmarks).
 
@@ -58,7 +58,7 @@ cp .agents/multi-model/.env.example .agents/multi-model/.env   # fill in provide
 
 The installer (idempotent) installs [claude-code-router](https://github.com/musistudio/claude-code-router)
 at a **pinned** version (bun-preferred, npm fallback), seeds the machine-global
-config at `~/.agents-code-router/config.json` from this project's template + your
+config at `~/.claude-code-router/config.json` from this project's template + your
 `.env`, optionally pulls local Ollama models sized to your RAM, and can wire your
 shell so plain `claude` routes through CCR.
 
@@ -144,7 +144,7 @@ the global CCR config for you, with the **<7B** guard):
 ```
 
 Reverting is clean: stop using CCR (plain `claude`) or
-`rm ~/.agents-code-router/config.json` removes it entirely.
+`rm ~/.claude-code-router/config.json` removes it entirely.
 
 ## Caveats (any non-Claude model)
 
