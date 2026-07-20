@@ -100,6 +100,38 @@ class TestObservabilityOn:
         assert "OTEL" in gtext or "OpenTelemetry" in gtext
         assert "documentation only" in gtext.lower()
 
+    def test_usage_report_reads_claude_codes_own_transcript_dir(self, tmp_path: Path):
+        """Transcripts must be read from where Claude Code writes them (PI-872).
+
+        ``~/.claude/projects`` is Claude Code's OWN directory. The ``.claude`` ->
+        ``.agents`` sweep in PI-606 (#620) renamed it to ``~/.agents/projects``,
+        which does not exist, so ``discover_transcript`` could never locate a
+        transcript and the whole overlay raised FileNotFoundError.
+
+        Note ``~/.agents/`` *is* legitimate elsewhere (user-level skills), and
+        ``project_dir / ".agents" / "observability"`` is the correct
+        project-local hook log — so this asserts on the machine-global
+        transcript root specifically, not on ``.agents`` appearing at all.
+        """
+        target = _scaffold(tmp_path / "p", observability=True)
+        report = target / ".agents" / "observability" / "usage_report.py"
+        text = report.read_text(encoding="utf-8")
+
+        assert 'Path.home() / ".claude" / "projects"' in text, (
+            "transcript root must be Claude Code's own dir; see PI-872"
+        )
+        assert 'Path.home() / ".agents"' not in text, (
+            "Claude Code's transcript dir is upstream-owned and must not be "
+            "swept by a .claude -> .agents rename (PI-606/#620, PI-872)"
+        )
+        # The project-local hook log is a different path and must survive.
+        assert 'project_dir / ".agents" / "observability"' in text
+
+        guide = (target / ".agents" / "docs" / "guides" / "using-observability.md").read_text(
+            encoding="utf-8"
+        )
+        assert "~/.agents/projects" not in guide, "guide must not name the renamed path"
+
     def test_usage_report_satisfies_scaffolded_ruff_gates(self, tmp_path: Path):
         """The generated analyzer is committed into Python projects, so it must
         satisfy the scaffold's own PERF/S/BLE ruff gates on day one."""

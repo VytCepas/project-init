@@ -49,7 +49,7 @@ def project_slug(project_dir: str) -> str:
     Claude replaces every character that is not alphanumeric or ``-`` with
     ``-`` (so ``/``, ``.``, and ``_`` all become ``-``), which for an absolute
     path yields a leading ``-``. Empirically verified against
-    ``~/.agents/projects/`` (e.g. ``/home/u/projects/project_init`` →
+    ``~/.claude/projects/`` (e.g. ``/home/u/projects/project_init`` →
     ``-home-u-projects-project-init``).
     """
     return "".join(c if (c.isalnum() or c == "-") else "-" for c in project_dir)
@@ -64,7 +64,11 @@ def _price_for(model: str) -> tuple[float, float]:
 
 
 def _projects_root() -> Path:
-    return Path.home() / ".agents" / "projects"
+    # Upstream-owned path: ``~/.claude`` is Claude Code's OWN transcript
+    # directory, not a project-init one. It must NOT be swept along by any
+    # .claude → .agents rename (that regression shipped in PI-606/#620 and left
+    # this overlay unable to find any transcript at all — see PI-872).
+    return Path.home() / ".claude" / "projects"
 
 
 def discover_transcript(
@@ -74,7 +78,7 @@ def discover_transcript(
 
     Order: explicit ``--transcript`` → ``--session-id`` under the derived slug
     → newest ``*.jsonl`` under the derived slug → newest ``*.jsonl`` anywhere
-    under ``~/.agents/projects`` whose entries' ``cwd`` matches the project dir.
+    under ``~/.claude/projects`` whose entries' ``cwd`` matches the project dir.
     """
     if transcript:
         p = Path(transcript).expanduser()
