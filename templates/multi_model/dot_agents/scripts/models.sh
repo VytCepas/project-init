@@ -4,14 +4,14 @@
 #
 # Add / switch / remove models after the initial setup_models.sh run — including
 # models you didn't pick at init, or your own Ollama models. Wraps Ollama + edits
-# to the machine-global CCR config (~/.agents-code-router/config.json) via jq.
+# to the machine-global CCR config (~/.claude-code-router/config.json) via jq.
 # Deterministic, no LLM. Switching itself is live in Claude Code: /model prov,model.
 #
 # Tip: alias it for the bare `models …` form the docs use:
 #   alias models="$PWD/.agents/scripts/models.sh"
 set -euo pipefail
 
-CONFIG="${CCR_CONFIG:-$HOME/.agents-code-router/config.json}"
+CONFIG="${CCR_CONFIG:-$HOME/.claude-code-router/config.json}"
 OLLAMA_BASE_URL="http://localhost:11434/v1/chat/completions"
 
 info() { printf '\033[0;36m›\033[0m %s\n' "$*"; }

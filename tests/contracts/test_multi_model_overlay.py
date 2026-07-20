@@ -105,6 +105,43 @@ class TestMultiModelOn:
         assert '. "$ENV_FILE"' not in content
         assert 'mv "$tmp" "$GLOBAL_CONFIG"' in content
 
+    def test_installer_seeds_ccr_upstream_config_dir(self):
+        """The seeded config must land where CCR actually reads it (PI-869).
+
+        ``~/.claude-code-router`` is claude-code-router's OWN directory, not a
+        project-init one. The ``.claude`` -> ``.agents`` sweep in PI-606 (#620)
+        renamed it to ``~/.agents-code-router``, so the installer wrote a config
+        CCR never read: setup reported success, CCR started on its own defaults,
+        and the advertised background->DeepSeek cost route silently never applied.
+
+        This guards the path in both directions — a future rename sweep that
+        catches this line again fails here.
+        """
+        content = (self.target / ".agents" / "scripts" / "setup_models.sh").read_text()
+        assert 'GLOBAL_DIR="$HOME/.claude-code-router"' in content, (
+            "installer must target CCR's real config dir; see PI-869"
+        )
+
+        # models.sh reads the same machine-global config, so it carried the
+        # identical rename and must be guarded alongside the installer.
+        helper = (self.target / ".agents" / "scripts" / "models.sh").read_text()
+        assert "$HOME/.claude-code-router/config.json" in helper, (
+            "day-2 helper must read CCR's real config dir; see PI-869"
+        )
+
+        # Sweep the whole rendered overlay: scripts, guide, READMEs and .env
+        # example all name this path, and a stale one misdirects the user even
+        # where it is only prose.
+        stale = sorted(
+            p.relative_to(self.target).as_posix()
+            for p in self.target.rglob("*")
+            if p.is_file() and ".agents-code-router" in p.read_text(errors="ignore")
+        )
+        assert not stale, (
+            "CCR's config dir is upstream-owned and must not be swept by a "
+            f".claude -> .agents rename (PI-606/#620 regression, PI-869): {stale}"
+        )
+
     def test_day2_helper_present_executable_and_documented(self):
         helper = self.target / ".agents" / "scripts" / "models.sh"
         assert helper.is_file()
