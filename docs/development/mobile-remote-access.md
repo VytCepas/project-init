@@ -15,7 +15,7 @@ paths keep this repo's hook-based enforcement live**. Verified against vendor do
 The decisive fact: **enforcement depends on *where the session executes*, not which
 device you hold.** A session on your machine applies your full local config — the
 scaffolded hooks (`github_command_guard.sh`, the DAG guard, `prod_guard.py`) plus
-anything in `~/.agents`. A cloud sandbox honors only **repo-committed** files:
+anything in `~/.claude`. A cloud sandbox honors only **repo-committed** files:
 committed hooks may run inside the VM, but your local user config, resources, and
 credentials don't — so per ADR-007 **git/CI is the guaranteed enforcement boundary**
 for cloud surfaces. See the local-vs-cloud caveat in

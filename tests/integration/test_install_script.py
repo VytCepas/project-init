@@ -48,6 +48,13 @@ def test_install_sh_writes_slash_command_with_stubs(tmp_path: Path):
     # The clone branch must have run (not the "update existing clone" path).
     assert (tmp_path / "install" / ".git").is_dir(), "install.sh must clone into INSTALL_DIR"
 
-    cmd = home / ".agents" / "commands" / "project-init.md"
+    # Claude Code's OWN config dir — NOT a project-init one. PI-606/#620 renamed
+    # both install.sh and this assertion to ~/.agents/commands, so the test kept
+    # passing while every fresh install produced a /project-init that Claude Code
+    # never loaded (PI-877). Do not "fix" a failure here by renaming the path.
+    cmd = home / ".claude" / "commands" / "project-init.md"
     assert cmd.is_file(), "install.sh must write the /project-init slash command"
     assert "project-init" in cmd.read_text()
+    assert not (home / ".agents" / "commands").exists(), (
+        "install.sh must not write commands under ~/.agents (PI-877)"
+    )

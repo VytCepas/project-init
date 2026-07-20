@@ -48,7 +48,7 @@ hence the manual, opt-in invocation.
 
 ```sh
 uv run python -m tools.benchmark.harness record-from \
-  --task feat --target bare --transcript ~/.agents/projects/<slug>/<session>.jsonl
+  --task feat --target bare --transcript ~/.claude/projects/<slug>/<session>.jsonl
 ```
 
 Useful for re-deriving records from past sessions, and the path the tests

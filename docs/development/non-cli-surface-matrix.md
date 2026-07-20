@@ -78,7 +78,7 @@ and `AGENTS.md`/`CLAUDE.md`.
 
 | Surface | Already covered by current output | Gap to close (feeds #366) |
 |---|---|---|
-| Claude Code VS Code ext | hooks, skills, CLAUDE.md (same `.agents/`) | **shared project MCP**: emit a root `.mcp.json` (`mcpServers`) when MCPs are configured — `.agents/` alone does not carry shareable MCP (bare `claude mcp add` writes a private `~/.agents.json` entry) |
+| Claude Code VS Code ext | hooks, skills, CLAUDE.md (same `.agents/`) | **shared project MCP**: emit a root `.mcp.json` (`mcpServers`) when MCPs are configured — `.agents/` alone does not carry shareable MCP (bare `claude mcp add` writes a private `~/.claude.json` entry) |
 | Copilot agent mode | CLAUDE.md, `.agents/skills`, hooks (matcher-blind), AGENTS.md | `.vscode/mcp.json` (`servers` map) if MCPs are configured; document that matchers are advisory here |
 | Cursor | `.agents/skills` (skills), AGENTS.md | `.cursor/hooks.json` (`PreToolUse(Bash)`→`beforeShellExecution`, deny via `{"permission":"deny","user_message"}`; PI-385); `.cursor/mcp.json` (≈copy of `mcpServers`) |
 | Codex (CLI/IDE) | `.codex/hooks.json` ⚠️ (schema-correct & delivered; **enforcement unverified** — codex 0.138.0 didn't fire project hooks in the 2026-06-23 live test without an enable step), `.agents/skills` ✅, AGENTS.md ✅ | MCP → `.codex/config.toml` `[mcp_servers.*]` if MCPs are configured |

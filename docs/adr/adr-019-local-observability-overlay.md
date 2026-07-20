@@ -34,7 +34,7 @@ The hard constraints:
    pinned interpreter.
 4. **Two facts about the available signals:**
    - Claude Code already writes a per-session **transcript JSONL**
-     (`~/.agents/projects/<slug>/*.jsonl`) carrying model usage, tool calls, and
+     (`~/.claude/projects/<slug>/*.jsonl`) carrying model usage, tool calls, and
      timings — always present, no setup. Its schema is **not officially stable**.
    - The one thing the transcript does *not* record cleanly is **which hooks
      fired**. Claude Code's OTEL export captures more (exact active-time,

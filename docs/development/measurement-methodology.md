@@ -86,7 +86,7 @@ Verified against Claude Code 2.1.181.
 | Tool calls / redundant reads / turns | transcript JSONL | tool-use entries |
 | Session id (→ transcript path) | `claude -p --output-format json` | `session_id` |
 
-Transcripts live at `~/.agents/projects/<project>/<session-id>.jsonl`; isolate
+Transcripts live at `~/.claude/projects/<project>/<session-id>.jsonl`; isolate
 each run by setting `CLAUDE_CONFIG_DIR` to a temp dir so runs don't pollute the
 user's history and fixed-overhead stays clean.
 

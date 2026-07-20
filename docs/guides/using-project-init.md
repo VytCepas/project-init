@@ -10,7 +10,7 @@ project-init scaffolds a `.agents/` folder into any project so that Claude Code 
 curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
 ```
 
-Installs `uv` if missing, clones the repo to `~/.local/share/project-init`, and writes a `/project-init` slash command into `~/.agents/commands/`.
+Installs `uv` if missing, clones the repo to `~/.local/share/project-init`, and writes a `/project-init` slash command into `~/.claude/commands/`.
 
 ---
 
@@ -273,7 +273,7 @@ git commit --allow-empty -m "test: verify hooks"
 
 | Problem | Fix |
 |---------|-----|
-| `/project-init` not found | Re-run install script; check `~/.agents/commands/project-init.md` exists |
+| `/project-init` not found | Re-run install script; check `~/.claude/commands/project-init.md` exists |
 | `uv: command not found` | Add `export PATH="$HOME/.local/bin:$PATH"` to shell profile |
 | `bunx: command not found` when adding MCPs | `curl -fsSL https://bun.sh/install \| bash` |
 | Hooks don't fire on commit | Check `python3 --version`; hooks need `python3` on PATH |
