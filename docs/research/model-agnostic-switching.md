@@ -267,7 +267,7 @@ Concretely:
 
 CCR is **machine-level, not project-level** (user decision: keep global, no
 per-project config): installed globally (bun-preferred/npm), config at
-`~/.agents-code-router/config.json`, runs a local proxy on `127.0.0.1:3456`.
+`~/.claude-code-router/config.json`, runs a local proxy on `127.0.0.1:3456`.
 
 **Launch default = plain `claude`.** The setup wires `eval "$(ccr activate)"`
 into the shell rc so the normal `claude` command routes through CCR — no `ccr
@@ -341,7 +341,7 @@ pattern; allowed by CLAUDE.md / ADR-001).
 
 - install CCR + Claude Code (bun-preferred, npm fallback), **pinned versions**;
 - wire `eval "$(ccr activate)"` into shell rc so plain `claude` routes;
-- seed `~/.agents-code-router/config.json` from the template (merge-safe), with
+- seed `~/.claude-code-router/config.json` from the template (merge-safe), with
   `background → cheap model` cost defaults;
 - detect OS + RAM/VRAM → recommend models that fit + suggest quant; `ollama pull`
   chosen models at chosen quant;
@@ -367,7 +367,7 @@ ccr ui                            # CCR's web editor for hand-tuning routing
 - Add **any** model (incl. unselected/custom Ollama models); `/model
   ollama,<model>` switches live.
 - **Capability guard:** `models add ollama` warns/confirms if the model is <7B.
-- Only state touched is the global `~/.agents-code-router/config.json` (jq) +
+- Only state touched is the global `~/.claude-code-router/config.json` (jq) +
   `ollama`; fully reversible.
 
 ### Update & security model (third-party supply-chain)

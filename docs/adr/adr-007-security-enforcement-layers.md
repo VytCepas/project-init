@@ -73,7 +73,7 @@ slipped past a clone without hooks.)
   per-surface hook configs generated for Cursor/Codex/Antigravity/VS Code are
   **best-effort and fail-open** — fidelity varies (e.g. VS Code Copilot ignores
   hook matchers), and cloud-sandbox surfaces (Claude web, Codex cloud, Jules)
-  honor only repo-committed config with no local `~/.agents`. So the in-editor
+  honor only repo-committed config with no local `~/.claude`. So the in-editor
   hooks are advisory; **git hooks + CI remain the only enforcement that binds
   every surface.** Surface fidelity + the local-vs-cloud split are documented in
   `docs/development/non-cli-surface-matrix.md` and the README's surface matrix.
