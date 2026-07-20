@@ -39,7 +39,7 @@ silently produces an empty report.
 Two data sources, both local:
 
 1. **The transcript JSONL** Claude Code already writes
-   (`~/.agents/projects/<slug>/*.jsonl`) — always present, no setup.
+   (`~/.claude/projects/<slug>/*.jsonl`) — always present, no setup.
 2. **The hook self-log** (`.agents/observability/usage.jsonl`) — written by the
    project's own hooks, but **only while this overlay is installed** (the
    `.agents/observability/` directory is the activation marker). It is the one
