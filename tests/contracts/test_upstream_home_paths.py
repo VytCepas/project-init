@@ -38,7 +38,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Directories worth scanning: the product, the scaffolder, the installer, docs.
 _SCAN_DIRS = ("templates", "src", "docs", "tools", ".agents")
-_SCAN_FILES = ("install.sh",)
+
+# Root-level files are scanned by GLOB, not by an enumerated list. The first cut
+# of this guard named only install.sh and therefore missed README.md, which
+# still sent users to ~/.agents/commands and shipped an uninstall command that
+# removed the wrong file (caught by Codex in review of PI-877). An explicit list
+# re-creates that blind spot every time a root doc is added; a glob cannot.
+_SCAN_ROOT_GLOBS = ("*.md", "*.sh", "*.toml", "*.cfg", "*.ini", "*.yml", "*.yaml")
 
 _SKIP_DIR_PARTS = {".git", "__pycache__", ".venv", "node_modules", ".ruff_cache"}
 _SKIP_SUFFIXES = {".pyc", ".png", ".jpg", ".gif", ".svg", ".ico", ".woff", ".woff2"}
@@ -66,10 +72,8 @@ _ALLOWED = {
 
 def _candidate_files() -> list[Path]:
     files: list[Path] = []
-    for name in _SCAN_FILES:
-        p = REPO_ROOT / name
-        if p.is_file():
-            files.append(p)
+    for pattern in _SCAN_ROOT_GLOBS:
+        files.extend(p for p in REPO_ROOT.glob(pattern) if p.is_file())
     for d in _SCAN_DIRS:
         root = REPO_ROOT / d
         if not root.is_dir():

@@ -61,7 +61,7 @@ uv tool install project-init   # or one-off: uvx project-init .
 curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh | bash
 ```
 
-This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to `~/.local/share/project-init` (override with `PROJECT_INIT_HOME=...`) **pinned to the latest tagged release**, and writes a user-level slash command at `~/.agents/commands/project-init.md`.
+This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to `~/.local/share/project-init` (override with `PROJECT_INIT_HOME=...`) **pinned to the latest tagged release**, and writes a user-level slash command at `~/.claude/commands/project-init.md`.
 
 Pin a specific version, or opt into the unreleased development head:
 
@@ -131,7 +131,7 @@ The execution model — not the surface name — decides what binds:
   run on your machine, so the enforcement layer is live (subject to the
   per-surface fidelity above — some drop hook matchers).
 - **Cloud-sandbox surfaces** (Claude web, Codex cloud, Jules): only
-  **repo-committed** config runs; user-level `~/.agents` is dropped, hooks run
+  **repo-committed** config runs; user-level `~/.claude` is dropped, hooks run
   inside the VM, and git goes through a push-restricted proxy — the local
   enforcement layer is replaced by the sandbox's.
 
@@ -404,7 +404,7 @@ directory yourself.
 # PyPI install:
 uv tool uninstall project-init
 # git install (installer path):
-rm -rf ~/.local/share/project-init ~/.agents/commands/project-init.md
+rm -rf ~/.local/share/project-init ~/.claude/commands/project-init.md
 ```
 
 ## Troubleshooting
