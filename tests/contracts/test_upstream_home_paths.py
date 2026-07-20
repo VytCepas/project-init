@@ -67,6 +67,11 @@ _ALLOWED = {
     # there — the disambiguation that fixed PI-802. Removing it would lose the
     # warning.
     "tools/benchmark/harness.py",
+    # Upgrade notes must name the OLD broken paths verbatim — their whole job is
+    # telling users which orphaned files to delete and which hand-edited CCR
+    # config to port before removing. Prose only: this module declares no path
+    # any code resolves, so exempting it cannot hide a functional regression.
+    "src/project_init/migration_notes.py",
 }
 
 
@@ -104,9 +109,15 @@ def _hits(pattern: re.Pattern[str], *, respect_allowlist: bool) -> list[str]:
 
 
 def test_no_hyphen_suffixed_agents_home_path():
-    """`~/.agents-<tool>` is always a renamed external path (PI-869)."""
-    # No allowlist here: there is no legitimate ~/.agents-<suffix> path at all.
-    hits = _hits(_HYPHEN_SUFFIXED, respect_allowlist=False)
+    """`~/.agents-<tool>` is always a renamed external path (PI-869).
+
+    This originally ignored the allowlist, on the reasoning that no legitimate
+    `~/.agents-<suffix>` path could exist anywhere. That was too strong: upgrade
+    notes must name the old broken spelling verbatim to tell users which
+    orphaned config to port and delete. The allowlist is honored here too — it
+    stays short, and every entry carries a reason.
+    """
+    hits = _hits(_HYPHEN_SUFFIXED, respect_allowlist=True)
     assert not hits, (
         "found a hyphen-suffixed ~/.agents-<tool> home path — this is an "
         "external tool's directory renamed by a .claude -> .agents sweep "

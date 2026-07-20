@@ -15,6 +15,38 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.2.1": {
+        "summary": (
+            "Fixes three paths that pointed at directories nothing reads. The "
+            "1.1.2-era `.claude/` -> `.agents/` migration (#620) also renamed "
+            "machine-global directories owned by OTHER tools, so each of these "
+            "wrote or read a file that was silently ignored. (1) The installer "
+            "wrote `/project-init` to `~/.agents/commands/`, which Claude Code "
+            "never loads — every install since then produced a slash command "
+            "that did nothing (#878). (2) The multi-model overlay seeded CCR's "
+            "config to `~/.agents-code-router/`, so the cost-saving "
+            "background->DeepSeek route never applied and provider keys never "
+            "took effect (#871). (3) The observability overlay read transcripts "
+            "from `~/.agents/projects/`, so the usage report could never find "
+            "one (#875). All three now use the upstream-owned `~/.claude*` "
+            "paths, and a contract test fails if a future rename sweeps them up "
+            "again."
+        ),
+        "action_required": (
+            "Re-run the installer to get a working `/project-init` at "
+            "`~/.claude/commands/project-init.md`, then delete the dead "
+            "`~/.agents/commands/project-init.md` if present (older README "
+            "uninstall instructions named that stale path, so it may survive an "
+            "uninstall). If you use --multi-model: re-run "
+            "`.agents/scripts/setup_models.sh` to seed "
+            "`~/.claude-code-router/config.json`. IMPORTANT — if you hand-edited "
+            "`~/.agents-code-router/config.json` (adding providers or keys), "
+            "those edits were never read by CCR but are still your only copy: "
+            "port them across BEFORE deleting that directory. Observability "
+            "needs no action; `usage_report.py` simply starts finding "
+            "transcripts."
+        ),
+    },
     "1.1.7": {
         "summary": (
             "Adds an optional `ci:` block to the descriptor (#828): `status_url` "
