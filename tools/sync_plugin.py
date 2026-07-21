@@ -33,6 +33,8 @@ from __future__ import annotations
 
 import argparse
 import filecmp
+import hashlib
+import json
 import shutil
 import sys
 import tempfile
@@ -51,6 +53,93 @@ AMP_SKILLS = REPO_ROOT / "templates" / "amp" / "dot_agents" / "skills"
 JUNIE_SKILLS = REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
 # Every payload root the sync (re)writes — snapshotted by `--check`.
 _AGENT_SKILL_DESTS = [CODEX_SKILLS, ANTIGRAVITY_SKILLS, AMP_SKILLS, JUNIE_SKILLS]
+
+# PI-881: pins each plugin's version to a hash of its shipped payload. Claude
+# Code caches a plugin by version, so a payload change that forgets to bump the
+# version silently serves the stale copy (PI-845 shipped that way for months;
+# #857 fixed it twice by hand). Lives OUTSIDE the plugin dirs so it is not part
+# of either shipped payload. update_payload_locks() refuses to relock a changed
+# payload under an unchanged version; tests/contracts/test_plugin_marketplace.py
+# fails if a lock drifts from the tree.
+_PAYLOAD_LOCKS = REPO_ROOT / "plugins" / "payload-locks.json"
+_VERSIONED_PLUGINS = (WORKFLOW_PLUGIN, LIFECYCLE_PLUGIN)
+
+
+def _payload_files(plugin_root: Path) -> list[Path]:
+    """Shipped payload files under *plugin_root* — everything but `.claude-plugin/`.
+
+    The manifest and the lock live in `.claude-plugin/`; excluding it keeps the
+    hash free of self-reference (the lock records this very hash).
+    """
+    return sorted(
+        p
+        for p in plugin_root.rglob("*")
+        if p.is_file() and ".claude-plugin" not in p.relative_to(plugin_root).parts
+    )
+
+
+def payload_sha256(plugin_root: Path) -> str:
+    """A stable content hash over a plugin's shipped payload (path + bytes)."""
+    digest = hashlib.sha256()
+    for f in _payload_files(plugin_root):
+        digest.update(f.relative_to(plugin_root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(f.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def plugin_version(plugin_root: Path) -> str:
+    """The declared ``version`` in a plugin's manifest."""
+    manifest = json.loads((plugin_root / ".claude-plugin" / "plugin.json").read_text("utf-8"))
+    return str(manifest["version"])
+
+
+def read_payload_locks() -> dict[str, dict[str, str]]:
+    """The committed {plugin: {version, sha256}} lock map, or {} if absent."""
+    if _PAYLOAD_LOCKS.exists():
+        return json.loads(_PAYLOAD_LOCKS.read_text("utf-8"))
+    return {}
+
+
+def expected_lock(plugin_root: Path) -> dict[str, str]:
+    """What *plugin_root*'s lock entry should be for the current tree."""
+    return {"version": plugin_version(plugin_root), "sha256": payload_sha256(plugin_root)}
+
+
+def payload_lock_drift() -> list[str]:
+    """Plugins whose committed lock no longer matches the tree (read-only)."""
+    locks = read_payload_locks()
+    return [p.name for p in _VERSIONED_PLUGINS if locks.get(p.name) != expected_lock(p)]
+
+
+def update_payload_locks() -> list[str]:
+    """Refresh each plugin's payload lock; refuse to relock without a version bump.
+
+    A changed payload under an unchanged version raises ``SystemExit`` — the whole
+    point (PI-881): it forces the bump that makes Claude Code re-fetch the plugin.
+    A first-seen plugin is seeded without objection.
+    """
+    locks = read_payload_locks()
+    unbumped: list[str] = []
+    changed: list[str] = []
+    for plugin in _VERSIONED_PLUGINS:
+        want = expected_lock(plugin)
+        prior = locks.get(plugin.name)
+        if prior == want:
+            continue
+        if prior and prior["sha256"] != want["sha256"] and prior["version"] == want["version"]:
+            unbumped.append(
+                f"{plugin.name}: payload changed but version is still {want['version']} — "
+                f"bump it in plugins/{plugin.name}/.claude-plugin/plugin.json, then re-run."
+            )
+            continue
+        locks[plugin.name] = want
+        changed.append(f"{plugin.name}/payload-lock -> {want['version']}")
+    if unbumped:
+        raise SystemExit("plugin payload version guard (PI-881):\n  " + "\n  ".join(unbumped))
+    _PAYLOAD_LOCKS.write_text(json.dumps(locks, indent=2, sort_keys=True) + "\n", newline="\n")
+    return changed
 
 
 def _skill_dirs(skills_root: Path) -> list[Path]:
@@ -256,6 +345,7 @@ def _check() -> int:
                 shutil.rmtree(root)
             if (snapshot / str(i)).exists():
                 shutil.copytree(snapshot / str(i), root)
+    drifted += [f"{name} (payload-lock)" for name in payload_lock_drift()]
     if drifted:
         sys.stderr.write(
             "plugin payload is out of sync — run `just sync-plugin`:\n  "
@@ -280,6 +370,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.check:
         return _check()
     for rel in sync():
+        sys.stdout.write(f"synced {rel}\n")
+    for rel in update_payload_locks():
         sys.stdout.write(f"synced {rel}\n")
     return 0
 

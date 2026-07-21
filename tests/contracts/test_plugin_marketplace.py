@@ -6,6 +6,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 import tools.sync_plugin as sync_plugin
 from project_init.scaffold import scaffold
 from tests.helpers import make_variables
@@ -140,6 +142,53 @@ class TestPluginPayloadInSync:
 
     def test_lifecycle_plugin_hooks_in_sync(self):
         self._assert_hooks(_LIFECYCLE_PLUGIN_ROOT, sync_plugin.lifecycle_hook_scripts())
+
+
+class TestPayloadVersionLock:
+    """PI-881: a plugin's version must move when its payload does.
+
+    Claude Code caches a plugin by version, so a payload change under an
+    unchanged version silently serves the stale copy (the PI-845 guard fix
+    shipped that way; #857 patched the same class twice by hand). The committed
+    `plugins/payload-locks.json` pins each version to a payload hash; these
+    tests are the tripwire, and `update_payload_locks()` refuses to relock a
+    changed payload without a bump.
+    """
+
+    def test_lock_matches_the_committed_tree(self):
+        locks = sync_plugin.read_payload_locks()
+        for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
+            assert locks.get(root.name) == sync_plugin.expected_lock(root), (
+                f"{root.name} payload lock drifted — run `just sync-plugin` "
+                "(bump the plugin version first if the payload changed)"
+            )
+
+    def test_lock_version_tracks_the_manifest(self):
+        locks = sync_plugin.read_payload_locks()
+        for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
+            assert locks[root.name]["version"] == sync_plugin.plugin_version(root), root.name
+
+    def test_guard_rejects_a_payload_change_without_a_version_bump(self, tmp_path, monkeypatch):
+        # Prove the guard can fail: a lock recording a different hash under the
+        # current version must make update_payload_locks() refuse to relock.
+        fake = tmp_path / "payload-locks.json"
+        poisoned = {
+            root.name: {"version": sync_plugin.plugin_version(root), "sha256": "0" * 64}
+            for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT)
+        }
+        fake.write_text(json.dumps(poisoned), encoding="utf-8")
+        monkeypatch.setattr(sync_plugin, "_PAYLOAD_LOCKS", fake)
+        with pytest.raises(SystemExit, match="payload changed but version is still"):
+            sync_plugin.update_payload_locks()
+
+    def test_guard_seeds_a_first_seen_plugin_without_objecting(self, tmp_path, monkeypatch):
+        fake = tmp_path / "payload-locks.json"  # absent → every plugin is first-seen
+        monkeypatch.setattr(sync_plugin, "_PAYLOAD_LOCKS", fake)
+        sync_plugin.update_payload_locks()
+        assert sync_plugin.read_payload_locks() == {
+            root.name: sync_plugin.expected_lock(root)
+            for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT)
+        }
 
 
 class TestScaffoldedSettingsWiring:
