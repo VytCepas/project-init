@@ -97,9 +97,11 @@ def _uv_init(target: Path, language: str) -> BootstrapStep:
         return BootstrapStep("uv init", _SKIPPED, f"not a python project ({language})")
     if (target / "pyproject.toml").exists():
         return BootstrapStep("uv init", _SKIPPED, "pyproject.toml already present")
-    # --no-workspace/--bare keep it minimal; uv writes pyproject.toml +
-    # .python-version, which `just setup` then syncs.
-    ok, msg = _run(["uv", "init", "--bare"], target)
+    # --bare keeps it minimal (pyproject.toml + .python-version, which `just
+    # setup` then syncs); --no-workspace stops uv from discovering a parent
+    # workspace and mutating its pyproject.toml to add this target as a member —
+    # a change outside the scaffold the bootstrap would never commit (#887 review).
+    ok, msg = _run(["uv", "init", "--bare", "--no-workspace"], target)
     return BootstrapStep("uv init", _DONE if ok else _FAILED, msg)
 
 

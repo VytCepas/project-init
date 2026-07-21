@@ -91,6 +91,18 @@ class TestToolchainSkips:
         (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
         assert bootstrap._uv_init(tmp_path, "python").outcome == "skipped"
 
+    def test_uv_init_passes_no_workspace(self, tmp_path: Path, monkeypatch):
+        # --no-workspace stops uv from mutating a parent workspace's pyproject.
+        captured: dict[str, list[str]] = {}
+
+        def fake(cmd: list[str], target: Path) -> tuple[bool, str]:
+            captured["cmd"] = cmd
+            return True, ""
+
+        monkeypatch.setattr(bootstrap, "_run", fake)
+        bootstrap._uv_init(tmp_path, "python")
+        assert "--no-workspace" in captured["cmd"]
+
     def test_install_deps_skips_without_justfile(self, tmp_path: Path):
         assert bootstrap._install_deps(tmp_path, "none").outcome == "skipped"
 
