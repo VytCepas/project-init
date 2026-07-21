@@ -44,6 +44,11 @@ jobs:
 
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4
+        with:
+          # Pin the just binary version (#891): the action's default resolves
+          # "latest" via the releases API, which intermittently returns "no
+          # release matching" under GitHub API throttling and fails the job.
+          just-version: "1.57.0"
 
       - name: Sync dev dependencies
         run: uv sync --group dev --locked
@@ -106,6 +111,11 @@ jobs:
 
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4
+        with:
+          # Pin the just binary version (#891): the action's default resolves
+          # "latest" via the releases API, which intermittently returns "no
+          # release matching" under GitHub API throttling and fails the job.
+          just-version: "1.57.0"
 
       - name: Sync dev dependencies
         run: uv sync --group dev --locked
@@ -269,6 +279,11 @@ jobs:
 
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4
+        with:
+          # Pin the just binary version (#891): the action's default resolves
+          # "latest" via the releases API, which intermittently returns "no
+          # release matching" under GitHub API throttling and fails the job.
+          just-version: "1.57.0"
 
       - name: License scan (pip-licenses)
         run: just license

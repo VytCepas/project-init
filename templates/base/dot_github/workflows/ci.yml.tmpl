@@ -169,6 +169,11 @@ jobs:
       # so the command surface is defined exactly once.
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          # Pin the just binary version (#891): the action's default resolves
+          # "latest" via the releases API, which intermittently returns "no
+          # release matching" under GitHub API throttling and fails the job.
+          just-version: "1.57.0"
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
@@ -256,6 +261,11 @@ jobs:
       # fallback below is CI-specific logic that doesn't belong in a recipe.
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          # Pin the just binary version (#891): the action's default resolves
+          # "latest" via the releases API, which intermittently returns "no
+          # release matching" under GitHub API throttling and fails the job.
+          just-version: "1.57.0"
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
       - name: Install shfmt
@@ -353,6 +363,11 @@ jobs:
       # lint stays on the action above, which installs and caches the binary.
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          # Pin the just binary version (#891): the action's default resolves
+          # "latest" via the releases API, which intermittently returns "no
+          # release matching" under GitHub API throttling and fails the job.
+          just-version: "1.57.0"
 
       # #725: `just typecheck` must mean the same thing in every language, since
       # this is the step CI and agents call. For go it is `go vet ./...`, guarded
@@ -401,6 +416,11 @@ jobs:
 
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          # Pin the just binary version (#891): the action's default resolves
+          # "latest" via the releases API, which intermittently returns "no
+          # release matching" under GitHub API throttling and fails the job.
+          just-version: "1.57.0"
 
       # Prebuilt binaries — avoids a multi-minute `cargo install` compile per
       # run for either tool.
@@ -703,6 +723,11 @@ jobs:
 
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          # Pin the just binary version (#891): the action's default resolves
+          # "latest" via the releases API, which intermittently returns "no
+          # release matching" under GitHub API throttling and fails the job.
+          just-version: "1.57.0"
 {{#if python}}
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -826,6 +851,11 @@ jobs:
 
       - name: Install just
         uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          # Pin the just binary version (#891): the action's default resolves
+          # "latest" via the releases API, which intermittently returns "no
+          # release matching" under GitHub API throttling and fails the job.
+          just-version: "1.57.0"
 
       # A fresh scaffold ships no manifest. Skip rather than fail: a nightly run
       # that is red from day one is a notification people learn to ignore. Only
