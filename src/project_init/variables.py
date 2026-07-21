@@ -115,6 +115,12 @@ class ScaffoldInputs:
     # scaffolded commit path emits it. Recorded in .agents/config.yaml so tooling
     # and future sessions can read the choice. Opt-OUT — default ON.
     coauthor: bool = True
+    # Post-scaffold bootstrap (#887): run the environment setup a fresh scaffold
+    # otherwise leaves to the user — git init, hook install, uv/deps, and an
+    # initial commit. The wizard's FINAL question or --bootstrap; strictly
+    # opt-IN (default OFF) so --non-interactive/automation never shells out
+    # without consent. Transient action, not a rendered/recorded variable.
+    bootstrap: bool = False
 
 
 SUPPORTED_PYTHON_VERSIONS: tuple[str, ...] = ("3.11", "3.12", "3.13", "3.14")
@@ -799,6 +805,7 @@ def _resolve_inputs(
         want_docs=not args.no_docs,
         renovate=not args.no_renovate,
         coauthor=not args.no_coauthor,
+        bootstrap=args.bootstrap,
     )
 
 

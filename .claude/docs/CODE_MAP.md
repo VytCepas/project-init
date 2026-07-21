@@ -15,6 +15,14 @@ CLI entry point for `project-init` and `uvx project-init`.
 
 - `def main` — Run the scaffolding CLI; return the process exit code.
 
+### `project_init/bootstrap.py`
+
+Post-scaffold bootstrap (#887): optionally initialize the environment.
+
+- `class BootstrapStep` — One bootstrap action and how it turned out.
+- `def run_bootstrap` — Initialize the scaffolded project in *target*; return per-step outcomes.
+- `def print_bootstrap_report` — Render the bootstrap outcome — one line per step, failures loud.
+
 ### `project_init/capabilities.py`
 
 Deterministic capabilities inventory (PI-374, ADR-017).

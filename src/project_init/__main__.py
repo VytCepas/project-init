@@ -221,6 +221,9 @@ from project_init.wizard_prompts import (
     _choose_agents_interactive as _choose_agents_interactive,
 )
 from project_init.wizard_prompts import (
+    _choose_bootstrap_interactive as _choose_bootstrap_interactive,
+)
+from project_init.wizard_prompts import (
     _choose_browser_interactive as _choose_browser_interactive,
 )
 from project_init.wizard_prompts import (
@@ -364,6 +367,23 @@ def _record_scaffold(
         created.append(config_rel)
 
 
+def _maybe_bootstrap(args: argparse.Namespace, inputs: ScaffoldInputs, target: Path) -> None:
+    """Run the post-scaffold bootstrap when opted in (#887).
+
+    The wizard's final question / --bootstrap. Runs before the summary so its git
+    init clears the "not a git repo" hint (computed structurally in
+    _print_summary). Side effects happen even in --json mode; the human report is
+    suppressed there to keep the sole JSON line intact.
+    """
+    if not inputs.bootstrap:
+        return
+    from project_init.bootstrap import print_bootstrap_report, run_bootstrap
+
+    steps = run_bootstrap(target, language=inputs.language, coauthor=inputs.coauthor)
+    if not args.json:
+        print_bootstrap_report(steps)
+
+
 def _reject_bare_subcommand_target(raw_target: str, parser: argparse.ArgumentParser) -> None:
     """Refuse a bare subcommand word as the scaffold target.
 
@@ -479,6 +499,7 @@ def _cli(argv: list[str]) -> int:
             no_docs=args.no_docs,
             no_renovate=args.no_renovate,
             no_coauthor=args.no_coauthor,
+            cli_bootstrap=args.bootstrap,
             # Pre-seed the basic-field prompts from the CLI so flags passed
             # without --non-interactive are honored, not dropped (PI review).
             cli_name=args.name,
@@ -543,6 +564,7 @@ def _cli(argv: list[str]) -> int:
         sys.stderr.write(f"error: scaffolding into {target} failed: {e.strerror or e}{where}\n")
         return 1
 
+    _maybe_bootstrap(args, inputs, target)
     _emit_scaffold_output(args, target, created, preset, variables, inputs, conflicts)
     return 0
 

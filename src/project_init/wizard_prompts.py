@@ -521,6 +521,22 @@ def _choose_renovate_interactive() -> bool:
     )
 
 
+def _choose_bootstrap_interactive() -> bool:
+    return _explain_and_confirm(
+        "Initialize everything now",
+        "Run the setup a fresh scaffold otherwise leaves to you:\n"
+        "  [bold]git init[/bold] → install lifecycle hooks → "
+        "[bold]uv init[/bold] + [bold]just setup[/bold] (python) → initial commit.\n\n"
+        "[cyan]Helps:[/cyan] the project is usable and committed the moment the "
+        "wizard exits — no manual bootstrap checklist.\n"
+        "[dim]Each step is idempotent (skips what is already done) and "
+        "best-effort (a failure is reported, the scaffold stays intact). "
+        "Non-interactive runs opt in with --bootstrap.[/dim]",
+        "Initialize everything now (git, hooks, deps, initial commit)?",
+        default=True,
+    )
+
+
 def _choose_coauthor_interactive() -> bool:
     return _explain_and_confirm(
         "Co-Authored-By trailer",
@@ -665,6 +681,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     no_docs: bool = False,
     no_renovate: bool = False,
     no_coauthor: bool = False,
+    cli_bootstrap: bool = False,
     cli_name: str | None = None,
     cli_description: str | None = None,
     cli_language: str | None = None,
@@ -856,6 +873,10 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         # Co-Authored-By: Claude commit trailer (#888). --no-coauthor pre-declines
         # and skips the prompt, mirroring --no-docs / --no-renovate.
         coauthor=False if no_coauthor else _choose_coauthor_interactive(),
+        # Post-scaffold bootstrap (#887) — the FINAL question (kwargs evaluate
+        # left-to-right, so this prompt follows coauthor's). --bootstrap
+        # pre-accepts and skips the prompt.
+        bootstrap=True if cli_bootstrap else _choose_bootstrap_interactive(),
     )
 
 
