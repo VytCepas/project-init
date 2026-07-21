@@ -881,3 +881,27 @@ class TestUpstreamIssueCreate:
         cmd = f'{self._CREATE} --repo=github.com/other/upstream --title "bug"'
         out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
         assert not _denied(out)
+
+    def _repo_with_origin_url(self, root: Path, url: str) -> Path:
+        hook = _project_with_hook(root)
+        (root / ".agents" / "scripts").mkdir(parents=True, exist_ok=True)
+        (root / ".agents" / "scripts" / "create_issue.sh").write_text("#!/bin/sh\n")
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+        subprocess.run(["git", "remote", "add", "origin", url], cwd=root, check=True)
+        return hook
+
+    def test_same_name_repo_on_a_different_host_is_allowed(self, tmp_path: Path):
+        # PI-882 review: a GHES project filing to github.com/OWNER/same-name is a
+        # genuinely different repo — the explicit, differing host must classify it
+        # as upstream even though owner/repo match.
+        hook = self._repo_with_origin_url(tmp_path, "https://ghe.example.com/me/myproj.git")
+        cmd = f'{self._CREATE} -R github.com/me/myproj --title "bug"'
+        out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert not _denied(out)
+
+    def test_own_repo_via_scp_style_origin_still_redirects(self, tmp_path: Path):
+        # The host parser must handle scp-like `git@host:owner/repo` origins too.
+        hook = self._repo_with_origin_url(tmp_path, "git@github.com:me/myproj.git")
+        cmd = f'{self._CREATE} -R github.com/me/myproj --title "t"'
+        out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert _denied(out)
