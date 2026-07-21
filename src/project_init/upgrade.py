@@ -1142,16 +1142,27 @@ def _mirror_mode(src: Path, dest: Path) -> None:
 # project_init_version line, in declaration order. The contract version leads so
 # a pre-field project actually advances past v0 on `upgrade --apply` (#498,
 # ADR-025) — an orchestrator reads the visible YAML, not the hidden record.
-_PROJECT_VISIBLE_FIELDS = (
-    (
-        "project_init_contract_version",
-        "descriptor-contract schema a root orchestrator reads (#498, ADR-025); absent ⇒ v0",
-    ),
-    ("project_init_plugin_version", "plugin payload version (ADR-010)"),
-    ("profile", "individual | standalone | org — distribution profile (ADR-013)"),
-    ("enforcement", "advisory | hard — see ADR-013 / #251"),
-    ("project_init_host", "upstream GitHub host — #255/#259"),
-)
+# One indented `key: …` line inside the `project:` block; multi-line values do
+# not occur there. Used to diff the user's project fields against a fresh render.
+_PROJECT_FIELD_RE = re.compile(r"^  ([A-Za-z_]\w*):")
+
+
+def _project_field_lines(head: str) -> dict[str, str]:
+    """Map each top-level `project:` field key to its full source line, in order.
+
+    *head* is a config's human section (above the scaffold-record marker); only
+    the `project:` block is scanned, so top-level keys like `language:` — and the
+    record's own JSON below — are ignored.
+    """
+    block = re.search(r"(?ms)^project:\n(.*?)(?=^\S)", head)
+    if not block:
+        return {}
+    fields: dict[str, str] = {}
+    for line in block.group(1).splitlines():
+        m = _PROJECT_FIELD_RE.match(line)
+        if m:
+            fields[m.group(1)] = line
+    return fields
 
 
 _UPDATES_BLOCK = (
@@ -1237,7 +1248,12 @@ _CI_BLOCK = (
     "\n"
 )
 
-_HOOKS_KEY_RE = re.compile(r"(?m)^hooks:")
+# The template renders `ci:` just above `hooks:`; both are unconditional in a
+# fresh scaffold. A config old enough to lack `ci:` also predates `hooks:`, so
+# anchoring on `hooks:` alone silently no-ops exactly when the splice is needed
+# (PI-880). Fall back to `updates:` (guaranteed present by the field pass that
+# runs first) so the block still lands, keeping template order (ci before both).
+_CI_ANCHOR_RE = re.compile(r"(?m)^(?:hooks|updates):")
 
 
 def _ensure_ci_block(text: str) -> str:
@@ -1251,30 +1267,43 @@ def _ensure_ci_block(text: str) -> str:
     projects could never declare a non-forge CI endpoint.
     """
     head, sep, tail = text.partition(_RECORD_MARKER)
-    if re.search(r"(?m)^ci:", head) or not _HOOKS_KEY_RE.search(head):
+    if re.search(r"(?m)^ci:", head):
         return text
-    head = _HOOKS_KEY_RE.sub(lambda m: _CI_BLOCK + m.group(0), head, count=1)
+    anchor = _CI_ANCHOR_RE.search(head)
+    if anchor:
+        head = head[: anchor.start()] + _CI_BLOCK + head[anchor.start() :]
+    else:
+        head = head.rstrip("\n") + "\n\n" + _CI_BLOCK
     return head + sep + tail
 
 
-def _ensure_visible_project_fields(text: str, variables: dict[str, str]) -> str:
-    """Surface recorded `project:` fields in the hand-editable config (#259, #498).
+def _ensure_visible_project_fields(text: str, staging: Path) -> str:
+    """Surface every `project:` field a fresh scaffold renders (#259, #498, PI-880).
 
-    Idempotent. Operates on the human section only (above the scaffold-record
-    marker) so injected lines survive ``write_scaffold_record``'s strip-and-
-    re-append. Missing ``project:`` fields are inserted together, in declaration
-    order, in a single substitution after the ``project_init_version`` line; the
-    ``updates`` consent placeholder is appended if the config predates it.
+    The source of truth is the staging render of *this project's own* variables,
+    not a hand-kept field list — so a field added upstream since the scaffold was
+    created (e.g. ``review_cycles``, ``monitor_ignore_checks``) reaches an
+    existing project too, and the upgraded config carries the same project fields
+    a fresh one would. Idempotent, and it only ever ADDS: a field the user
+    already has (possibly hand-edited) is left untouched.
+
+    Operates on the human section only (above the scaffold-record marker) so
+    injected lines survive ``write_scaffold_record``'s strip-and-re-append.
+    Missing fields are inserted together, in template order, after the
+    ``project_init_version`` line; the ``updates`` consent placeholder is
+    appended if the config predates it.
     """
     head, sep, tail = text.partition(_RECORD_MARKER)
-    missing = [
-        f"  {key}: {variables.get(key, '')}  # {comment}"
-        for key, comment in _PROJECT_VISIBLE_FIELDS
-        if not re.search(rf"(?m)^\s+{re.escape(key)}:", head)
-    ]
-    if missing:
-        block = "\n".join(missing)
-        head = _VERSION_LINE_RE.sub(lambda m: f"{m.group(0)}\n{block}", head, count=1)
+    staged_config = staging / _CONFIG_REL
+    if staged_config.is_file():
+        staged_head = staged_config.read_text(encoding="utf-8").partition(_RECORD_MARKER)[0]
+        have = set(_project_field_lines(head))
+        missing = [
+            line for key, line in _project_field_lines(staged_head).items() if key not in have
+        ]
+        if missing:
+            block = "\n".join(missing)
+            head = _VERSION_LINE_RE.sub(lambda m: f"{m.group(0)}\n{block}", head, count=1)
     if "declined_additions:" not in head:
         head = head.rstrip("\n") + _UPDATES_BLOCK
     return head + sep + tail
@@ -1325,7 +1354,7 @@ def apply_drift(
     if config_path.exists():
         text = config_path.read_text(encoding="utf-8")
         text = _VERSION_LINE_RE.sub(rf"\g<1>{variables['project_init_version']}", text, count=1)
-        text = _ensure_visible_project_fields(text, variables)
+        text = _ensure_visible_project_fields(text, staging)
         text = _ensure_ci_block(text)
         text = _sync_memory_block(text, staging)
         config_path.write_text(text, encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)

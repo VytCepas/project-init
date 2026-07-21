@@ -96,6 +96,49 @@ def _tree_snapshot(target: Path) -> dict[str, bytes]:
     }
 
 
+def _visible_shape(config: Path) -> tuple[set[str], set[str]]:
+    """(project-field keys, top-level keys) of a config's human section."""
+    from project_init.upgrade import _project_field_lines
+
+    head = config.read_text().partition(_RECORD_MARKER)[0]
+    return set(_project_field_lines(head)), set(re.findall(r"(?m)^([a-z][\w]*):", head))
+
+
+def test_upgrade_backfills_every_field_a_fresh_scaffold_has(tmp_path: Path):
+    """PI-880: an existing config must gain EVERY field a fresh scaffold renders.
+
+    config.yaml is drift-excluded, so additive fields only reach an existing
+    project through the upgrade's targeted splice. That splice used to miss the
+    `ci:` block (its `hooks:` anchor is absent in a config old enough to need it)
+    and every newer `project:` field (`monitor_ignore_checks`, `review_cycles`,
+    …) — so an upgraded child diverged from a fresh one. Assert the field sets
+    now match.
+    """
+    fresh = tmp_path / "fresh"
+    _scaffold(fresh)
+    want_project, want_top = _visible_shape(fresh / _CONFIG_REL)
+    assert "monitor_ignore_checks" in want_project and "ci" in want_top  # fixture sanity
+
+    old = tmp_path / "old"
+    _scaffold(old)
+    config = old / _CONFIG_REL
+    head, sep, tail = config.read_text().partition(_RECORD_MARKER)
+    # Reproduce the real pre-#828 shape: no `ci:` AND no `hooks:` key (both were
+    # added together, so the config that needs ci: has no hooks: to anchor on).
+    head = re.sub(r"(?ms)^ci:\n.*?(?=^\w)", "", head, count=1)
+    head = re.sub(r"(?ms)^hooks:\n.*?(?=^\w)", "", head, count=1)
+    head = re.sub(r"(?m)^  (?:monitor_ignore_checks|review_cycles):.*\n", "", head)
+    config.write_text(head + sep + tail)
+    gap_project, gap_top = _visible_shape(config)
+    assert "ci" not in gap_top and "hooks" not in gap_top  # gap created
+    assert "monitor_ignore_checks" not in gap_project
+
+    assert main(["upgrade", str(old), "--apply"]) == 0
+    got_project, got_top = _visible_shape(config)
+    assert got_project == want_project, got_project ^ want_project
+    assert "ci" in got_top, "ci: must be backfilled even with no hooks: anchor"
+
+
 class TestDirtyTreeGuard:
     """#242: --apply is gated on a clean git work tree, with an undo hint."""
 

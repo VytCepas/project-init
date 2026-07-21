@@ -60,6 +60,17 @@ def test_backfill_leaves_the_scaffold_record_intact() -> None:
     assert out.index("\nci:") < out.index(_RECORD_MARKER)
 
 
-def test_backfill_no_ops_on_a_config_without_hooks() -> None:
-    # Nothing to anchor against — leave the file alone rather than guess.
-    assert _ensure_ci_block("project:\n  name: app\n") == "project:\n  name: app\n"
+def test_backfill_reaches_a_config_without_a_hooks_key() -> None:
+    # PI-880: a config old enough to lack `ci:` also predates `hooks:`, so the
+    # splice must not depend on `hooks:` being there. With no `hooks:`/`updates:`
+    # anchor it appends the block rather than silently dropping it.
+    out = _ensure_ci_block("project:\n  name: app\n")
+    assert "status_url:" in out
+
+
+def test_backfill_anchors_above_updates_when_hooks_is_absent() -> None:
+    # The realistic pre-`hooks:` shape (PI-880): the field pass guarantees an
+    # `updates:` key, so `ci:` lands just above it — template order preserved.
+    pre = 'project:\n  name: "app"\n\ntooling:\n  lint_command: "x"\n\nupdates:\n  declined_additions: {}\n'
+    out = _ensure_ci_block(pre)
+    assert out.index("\nci:") < out.index("\nupdates:")
