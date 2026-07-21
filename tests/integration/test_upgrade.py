@@ -139,6 +139,34 @@ def test_upgrade_backfills_every_field_a_fresh_scaffold_has(tmp_path: Path):
     assert "ci" in got_top, "ci: must be backfilled even with no hooks: anchor"
 
 
+def test_field_backfill_handles_a_reindented_project_block(tmp_path: Path):
+    """PI-880 review: a project block a formatter reindented (not two spaces) must
+    not read every field as missing and gain duplicate, value-shadowing defaults.
+    Existing fields are detected regardless of indent, and a genuinely-missing one
+    is inserted at the block's own indent (never mixing widths)."""
+    from project_init.upgrade import _ensure_visible_project_fields
+
+    staging = tmp_path / "staging"
+    (staging / _CONFIG_REL).parent.mkdir(parents=True)
+    (staging / _CONFIG_REL).write_text(
+        'project:\n  name: "x"\n  project_init_version: 1.0.0\n'
+        "  review_cycles: 2\n  monitor_ignore_checks: []\n\nmcps: []\n"
+    )
+    # A four-space project block that already carries a hand-set
+    # monitor_ignore_checks and is missing review_cycles.
+    user = (
+        'project:\n    name: "x"\n    project_init_version: 1.0.0\n'
+        '    monitor_ignore_checks: ["board-sync"]\n\nmcps: []\n'
+    )
+    out = _ensure_visible_project_fields(user, staging)
+    assert out.count("monitor_ignore_checks:") == 1, "must not duplicate an existing field"
+    assert '["board-sync"]' in out, "the user's hand-set value must survive"
+    assert re.search(r"(?m)^    review_cycles:", out), (
+        "missing field inserted at the block's indent"
+    )
+    assert "\n  review_cycles:" not in out, "no two-space line mixed into a four-space block"
+
+
 class TestDirtyTreeGuard:
     """#242: --apply is gated on a clean git work tree, with an undo hint."""
 

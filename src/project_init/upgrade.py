@@ -1143,8 +1143,10 @@ def _mirror_mode(src: Path, dest: Path) -> None:
 # a pre-field project actually advances past v0 on `upgrade --apply` (#498,
 # ADR-025) — an orchestrator reads the visible YAML, not the hidden record.
 # One indented `key: …` line inside the `project:` block; multi-line values do
-# not occur there. Used to diff the user's project fields against a fresh render.
-_PROJECT_FIELD_RE = re.compile(r"^  ([A-Za-z_]\w*):")
+# not occur there. The indent is captured, not fixed at two spaces, so a config a
+# formatter reindented is still recognised — else every field reads as missing
+# and gets a duplicate default that can shadow the user's value (PI-880 review).
+_PROJECT_FIELD_RE = re.compile(r"^(\s+)([A-Za-z_]\w*):")
 
 
 def _project_field_lines(head: str) -> dict[str, str]:
@@ -1161,7 +1163,7 @@ def _project_field_lines(head: str) -> dict[str, str]:
     for line in block.group(1).splitlines():
         m = _PROJECT_FIELD_RE.match(line)
         if m:
-            fields[m.group(1)] = line
+            fields[m.group(2)] = line
     return fields
 
 
@@ -1297,9 +1299,15 @@ def _ensure_visible_project_fields(text: str, staging: Path) -> str:
     staged_config = staging / _CONFIG_REL
     if staged_config.is_file():
         staged_head = staged_config.read_text(encoding="utf-8").partition(_RECORD_MARKER)[0]
-        have = set(_project_field_lines(head))
+        have = _project_field_lines(head)
+        # Match the config's own project-block indent (a formatter may not use two
+        # spaces) so injected lines never mix indentation and break the YAML.
+        sample = next(iter(have.values()), "  x")
+        indent = sample[: len(sample) - len(sample.lstrip())]
         missing = [
-            line for key, line in _project_field_lines(staged_head).items() if key not in have
+            indent + line.lstrip()
+            for key, line in _project_field_lines(staged_head).items()
+            if key not in have
         ]
         if missing:
             block = "\n".join(missing)
