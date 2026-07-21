@@ -1,7 +1,7 @@
 {
   "name": "project-init-lifecycle",
   "displayName": "project-init GitHub Lifecycle",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "GitHub lifecycle automation from project-init (#476, ADR-021): the issue->branch->PR->review->merge DAG guard + workflow-state hooks and the create_issue/start_task/github_workflow/request_review/audit skills. Enabled only when the lifecycle tier is on; the forge-agnostic quality/safety hooks live in project-init-workflow.",
   "author": {
     "name": "Vytautas Čepas",

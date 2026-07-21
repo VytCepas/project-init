@@ -263,13 +263,15 @@ def prereqs_satisfied(node: str, _seen: set[str] | None = None) -> tuple[bool, s
 # allowed through (guard() checks _is_upstream_issue_create first).
 _ISSUE_CREATE_RE = re.compile(r"\bgh\s+issue\s+create\b")
 _ISSUE_REPO_FLAG_RE = re.compile(
-    r"\bgh\s+issue\s+create\b[^;&|]*?(?:-R|--repo)[= ]+['\"]?([\w.-]+/[\w.-]+)"
+    r"\bgh\s+issue\s+create\b[^;&|]*?(?:-R|--repo)[= ]+['\"]?([\w.-]+(?:/[\w.-]+)+)"
 )
-_ORIGIN_SLUG_RE = re.compile(r"[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$")
+# origin URL → (host, owner/repo): strip scheme, then any `user@`, leaving
+# `host[:port][:/]path`. Covers https, ssh://, and scp-like `git@host:owner/repo`.
+_ORIGIN_URL_RE = re.compile(r"^(?:\w+://)?(?:[^@/]+@)?([\w.-]+)(?::\d+)?[:/](.+)$")
 
 
-def _origin_slug() -> str | None:
-    """This repo's owner/repo, from the origin remote (no network)."""
+def _origin_host_slug() -> tuple[str, str] | None:
+    """This repo's (host, owner/repo) from the origin remote (no network)."""
     try:
         url = subprocess.run(
             ["git", "config", "--get", "remote.origin.url"],  # noqa: S607 — read-only config probe, fixed argv
@@ -280,8 +282,13 @@ def _origin_slug() -> str | None:
         ).stdout.strip()
     except Exception:  # noqa: BLE001 — a guard probe must never break the hook
         return None
-    m = _ORIGIN_SLUG_RE.search(url)
-    return m.group(1).lower() if m else None
+    m = _ORIGIN_URL_RE.match(url)
+    if not m:
+        return None
+    parts = m.group(2).lower().removesuffix(".git").strip("/").split("/")
+    if len(parts) < 2:
+        return None
+    return m.group(1).lower(), "/".join(parts[-2:])
 
 
 def _is_upstream_issue_create(cmd: str) -> bool:
@@ -289,11 +296,26 @@ def _is_upstream_issue_create(cmd: str) -> bool:
     m = _ISSUE_REPO_FLAG_RE.search(cmd)
     if not m:
         return False
-    target = m.group(1).lower().removesuffix(".git")
-    origin = _origin_slug()
+    # `gh --repo` accepts an optional host ([HOST/]OWNER/REPO). Compare the
+    # owner/repo, and — when the flag carries an explicit host — the host too:
+    # otherwise `-R github.com/OWNER/this-repo` parses as `github.com/OWNER` and
+    # slips past the wrapper (PI-882), while a genuinely cross-host filing to a
+    # same-named repo (e.g. a GHES project reporting to github.com/OWNER/REPO)
+    # must still be allowed through (PI-882 review).
+    parts = m.group(1).lower().removesuffix(".git").split("/")
+    flag_host = parts[-3] if len(parts) >= 3 else None
+    flag_slug = "/".join(parts[-2:])
+    origin = _origin_host_slug()
     # Unknown origin: an explicit -R is still not this project's issue tracker
     # (create_issue.sh needs origin to work at all) — allow rather than dead-end.
-    return origin is None or target != origin
+    if origin is None:
+        return True
+    origin_host, origin_slug = origin
+    if flag_slug != origin_slug:
+        return True
+    # Same owner/repo: an upstream filing only when an explicit, different host
+    # is named; a bare or matching host is this project's own tracker.
+    return flag_host is not None and flag_host != origin_host
 
 
 COMMAND_RULES: list[tuple[re.Pattern[str], str | None, str]] = [
