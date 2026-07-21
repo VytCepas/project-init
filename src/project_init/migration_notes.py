@@ -15,6 +15,35 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.2.2": {
+        "summary": (
+            "Fixes three defects in how additive changes reach existing "
+            "projects. (1) `upgrade` never spliced newer config.yaml fields into "
+            "an existing scaffold: the `ci:` backfill anchored on a `hooks:` key "
+            "that a config old enough to need `ci:` does not have, and the "
+            "visible `project:` fields came from a hand-kept list, so "
+            "`monitor_ignore_checks` (#837) and `review_cycles` never arrived. "
+            "The backfill is now derived from a fresh render of your own "
+            "variables, so an upgraded config carries the same project fields a "
+            "fresh one would (#880). (2) The GitHub-lifecycle plugin's payload "
+            "changed without a version bump, so Claude Code kept serving the "
+            "stale cached copy — the PI-845 issue-guard fix never reached "
+            "existing installs. The lifecycle plugin is bumped to 0.2.1 and a "
+            "payload-version guard now fails the sync if a plugin's payload "
+            "changes without a bump (#881). (3) The issue-create guard compared "
+            "`gh --repo` slugs host-blind, so `-R github.com/OWNER/this-repo` "
+            "bypassed the wrapper that stamps issue metadata; the compare is now "
+            "host-aware in both directions (#882)."
+        ),
+        "action_required": (
+            "Nothing required. On your next `project-init upgrade` an existing "
+            "config gains the `ci:` block plus `review_cycles` and "
+            "`monitor_ignore_checks`, all with safe defaults (an empty "
+            "`status_url` means 'my CI is the forge's', so probing is unchanged). "
+            "Claude Code re-fetches the lifecycle plugin at 0.2.1, delivering the "
+            "corrected issue-create guard and the previously-stranded PI-845 fix."
+        ),
+    },
     "1.2.1": {
         "summary": (
             "Fixes three paths that pointed at directories nothing reads. The "
