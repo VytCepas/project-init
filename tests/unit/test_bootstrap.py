@@ -34,6 +34,12 @@ class TestGitInit:
         _git(tmp_path, "init")
         assert bootstrap._git_init(tmp_path).outcome == "skipped"
 
+    def test_initial_branch_is_main(self, tmp_path: Path):
+        # Regardless of the machine's init.defaultBranch, the lifecycle targets
+        # main, so a bootstrapped repo must not land on master (#887 review).
+        bootstrap._git_init(tmp_path)
+        assert _git(tmp_path, "symbolic-ref", "--short", "HEAD").stdout.strip() == "main"
+
 
 class TestInitialCommit:
     @staticmethod
@@ -136,6 +142,23 @@ class TestOrchestration:
         monkeypatch.setattr(bootstrap, "_run", fake)
         steps = run_bootstrap(tmp_path, language="none", coauthor=False)
         assert steps[0].outcome == "failed"
+
+
+class TestReport:
+    _STEP = [bootstrap.BootstrapStep("initial commit", "failed", "boom")]
+
+    def test_json_report_goes_to_stderr(self, capsys):
+        bootstrap.print_bootstrap_report(self._STEP, stderr=True)
+        captured = capsys.readouterr()
+        assert "Bootstrap" in captured.err
+
+    def test_json_report_keeps_stdout_clean(self, capsys):
+        bootstrap.print_bootstrap_report(self._STEP, stderr=True)
+        assert capsys.readouterr().out == ""
+
+    def test_default_report_goes_to_stdout(self, capsys):
+        bootstrap.print_bootstrap_report(self._STEP)
+        assert "Bootstrap" in capsys.readouterr().out
 
 
 class TestCliWiring:

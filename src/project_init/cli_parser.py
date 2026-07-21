@@ -329,9 +329,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "After scaffolding, initialize the environment (#887): git init, "
             "install lifecycle hooks, uv init + just setup for python, and an "
-            "initial commit. Idempotent (skips what is already done). Off by "
-            "default; the wizard asks as its final question. Opt in for "
-            "--non-interactive/automation"
+            "initial commit. Idempotent (skips what is already done). Required "
+            "for --non-interactive/automation, which never bootstraps on its own; "
+            "the interactive wizard instead asks as its final question "
+            "(defaulting to Yes)"
         ),
     )
     p.add_argument(

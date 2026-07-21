@@ -372,16 +372,16 @@ def _maybe_bootstrap(args: argparse.Namespace, inputs: ScaffoldInputs, target: P
 
     The wizard's final question / --bootstrap. Runs before the summary so its git
     init clears the "not a git repo" hint (computed structurally in
-    _print_summary). Side effects happen even in --json mode; the human report is
-    suppressed there to keep the sole JSON line intact.
+    _print_summary). In --json mode the report goes to stderr so a machine caller
+    still sees best-effort failures without the sole JSON line being disturbed
+    (#887 review).
     """
     if not inputs.bootstrap:
         return
     from project_init.bootstrap import print_bootstrap_report, run_bootstrap
 
     steps = run_bootstrap(target, language=inputs.language, coauthor=inputs.coauthor)
-    if not args.json:
-        print_bootstrap_report(steps)
+    print_bootstrap_report(steps, stderr=args.json)
 
 
 def _reject_bare_subcommand_target(raw_target: str, parser: argparse.ArgumentParser) -> None:

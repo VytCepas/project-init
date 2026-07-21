@@ -18,8 +18,14 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from rich.console import Console
+
 from project_init.cli_output import _is_git_marker
-from project_init.console import console
+from project_init.console import WIZARD_THEME, console
+
+# A stderr-bound console so --json runs can surface bootstrap failures without
+# polluting the sole JSON line on stdout (#887 review).
+_err_console = Console(theme=WIZARD_THEME, stderr=True)
 
 # Conventional-commits subject so the initial commit passes a scaffolded
 # commit-msg hook; the trailer is appended only when the project opted in (#888).
@@ -65,7 +71,15 @@ def _git_init(target: Path) -> BootstrapStep:
     if _has_git(target):
         return BootstrapStep("git init", _SKIPPED, "already a git repository")
     ok, msg = _run(["git", "init", "-q"], target)
-    return BootstrapStep("git init", _DONE if ok else _FAILED, msg)
+    if not ok:
+        return BootstrapStep("git init", _FAILED, msg)
+    # Force the initial branch to `main` regardless of the user's
+    # init.defaultBranch — a fresh `git init` otherwise yields `master` on an
+    # unconfigured machine, but the rendered lifecycle targets main (base_branch,
+    # setup_github.sh's branches/main/protection). symbolic-ref repoints the
+    # unborn HEAD across all git versions (no `-b`, which needs git 2.28+).
+    _run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], target)
+    return BootstrapStep("git init", _DONE, "")
 
 
 def _install_hooks(target: Path) -> BootstrapStep:
@@ -142,15 +156,21 @@ def run_bootstrap(target: Path, *, language: str, coauthor: bool) -> list[Bootst
 _ICONS = {_DONE: "[success]✔[/success]", _SKIPPED: "[muted]–[/muted]", _FAILED: "[error]✘[/error]"}
 
 
-def print_bootstrap_report(steps: list[BootstrapStep]) -> None:
-    """Render the bootstrap outcome — one line per step, failures loud."""
-    console.print("[heading]Bootstrap[/heading]")
+def print_bootstrap_report(steps: list[BootstrapStep], *, stderr: bool = False) -> None:
+    """Render the bootstrap outcome — one line per step, failures loud.
+
+    ``stderr=True`` routes the report to stderr so a ``--json`` run still surfaces
+    failures (a best-effort step can fail while the CLI exits 0) without breaking
+    the sole JSON line on stdout (#887 review).
+    """
+    out = _err_console if stderr else console
+    out.print("[heading]Bootstrap[/heading]")
     for step in steps:
         icon = _ICONS.get(step.outcome, "")
         detail = f" [muted]— {step.detail}[/muted]" if step.detail else ""
-        console.print(f"  {icon} {step.label}{detail}")
+        out.print(f"  {icon} {step.label}{detail}")
     if any(s.outcome == _FAILED for s in steps):
-        console.print(
+        out.print(
             "[warning]⚠ Some bootstrap steps failed[/warning] — the scaffold is "
             "intact; fix the cause above and finish the remaining steps by hand."
         )
