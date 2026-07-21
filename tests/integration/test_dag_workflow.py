@@ -865,3 +865,19 @@ class TestUpstreamIssueCreate:
         cmd = f'{self._CREATE} -R me/myproj --title "t"'
         out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
         assert _denied(out)
+
+    def test_host_qualified_own_repo_flag_still_redirects(self, tmp_path: Path):
+        # PI-882: gh accepts `--repo [HOST/]OWNER/REPO`. A host-qualified
+        # same-repo flag must NOT read as an upstream filing and skip the wrapper.
+        hook = self._repo_with_origin(tmp_path, "me/myproj")
+        cmd = f'{self._CREATE} -R github.com/me/myproj --title "t"'
+        out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert _denied(out)
+        assert "create_issue.sh" in _deny_reason(out)
+
+    def test_host_qualified_upstream_repo_flag_is_allowed(self, tmp_path: Path):
+        # The host prefix must not break the cross-repo carve-out either.
+        hook = self._repo_with_origin(tmp_path, "me/myproj")
+        cmd = f'{self._CREATE} --repo=github.com/other/upstream --title "bug"'
+        out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
+        assert not _denied(out)
