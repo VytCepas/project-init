@@ -119,6 +119,12 @@ Commit messages, PR titles, and branch names follow the quick-ref in
 [AGENTS.md](../AGENTS.md) — the single source for those formats. Commit
 messages use the same format as PR titles.
 Types: `feat` · `fix` · `chore` · `docs` · `test`
+{{#if coauthor}}
+End agent-generated commit messages with a trailer (blank line, then
+`Co-Authored-By: Claude <noreply@anthropic.com>`). Recorded as `commit.coauthor:
+true` in `.agents/config.yaml`; set it to `false` (or scaffold with
+`--no-coauthor`) to stop emitting it.
+{{/if coauthor}}
 
 For minor work without an issue, use `.agents/scripts/create_nojira_pr.sh <type> "description"`.
 It creates or reuses a typed `nojira` branch, pushes through `push_branch.sh`,

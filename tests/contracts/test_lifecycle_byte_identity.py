@@ -284,6 +284,11 @@ _ADDED_SINCE_BASELINE = {
     ".github/workflows/issue-validation.yml",
     ".agents/docs/guides/issue-metadata.md",
     ".agents/config.yaml",
+    # PI-888: the commit-conventions doc gained a {{#if coauthor}} block naming
+    # the Co-Authored-By: Claude trailer (default ON). A deliberate content edit,
+    # not lifecycle-move drift — project-init.md (same trailer note) is already
+    # excluded above.
+    ".agents/docs/development/conventions.md",
     ".agents/hooks/session_setup.sh",
     "mypy.ini",
     "justfile",
