@@ -64,6 +64,7 @@ def _explainer_calls() -> dict:
         "docs": lambda: cli._choose_docs_interactive("python"),
         "renovate": cli._choose_renovate_interactive,
         "coauthor": cli._choose_coauthor_interactive,
+        "bootstrap": cli._choose_bootstrap_interactive,
         "browser": cli._choose_browser_interactive,
     }
 

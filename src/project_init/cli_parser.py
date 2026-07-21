@@ -324,6 +324,18 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--bootstrap",
+        action="store_true",
+        help=(
+            "After scaffolding, initialize the environment (#887): git init, "
+            "install lifecycle hooks, uv init + just setup for python, and an "
+            "initial commit. Idempotent (skips what is already done). Required "
+            "for --non-interactive/automation, which never bootstraps on its own; "
+            "the interactive wizard instead asks as its final question "
+            "(defaulting to Yes)"
+        ),
+    )
+    p.add_argument(
         "--no-plugin",
         action="store_true",
         help=(
@@ -396,6 +408,7 @@ WIZARD_CONCERN_FLAGS: dict[str, str] = {
     "docs": "no_docs",
     "renovate": "no_renovate",
     "coauthor": "no_coauthor",
+    "bootstrap": "bootstrap",
     "browser": "browser",
 }
 
