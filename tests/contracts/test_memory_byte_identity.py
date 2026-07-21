@@ -272,6 +272,11 @@ _ADDED_SINCE_BASELINE = {
     ".agents/skills/README.md",
     ".agents/project-init.md",
     ".agents/config.yaml",
+    # PI-888: the commit-conventions doc gained a {{#if coauthor}} block naming
+    # the Co-Authored-By: Claude trailer (default ON). A deliberate content edit,
+    # not memory-move drift — project-init.md (same trailer note) is already
+    # excluded above.
+    ".agents/docs/development/conventions.md",
     "mypy.ini",
     "justfile",
     ".agents/hooks/post_edit_lint.sh",

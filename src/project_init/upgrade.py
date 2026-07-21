@@ -238,6 +238,11 @@ def _overlay_off_defaults() -> dict[str, str]:
         # #714: pre-714 records carry no review_cycles; re-render with the
         # default the wizard explains rather than dropping the key.
         "review_cycles": "2",
+        # Co-Authored-By trailer (#888): off for records predating the question —
+        # an upgrade must not start emitting a trailer a project never had. A
+        # post-#888 record carries its own value, preserved by setdefault.
+        "coauthor": "",
+        "coauthor_off": "true",
     }
 
 

@@ -19,6 +19,13 @@ Format: `type(PROJECT-123): short description` or `type: short description` (no 
 Types: `feat`, `fix`, `test`, `docs`, `chore`
 
 Example: `feat(PI-42): Add OAuth login`
+{{#if coauthor}}
+Agent-generated commits append a trailer (blank line, then):
+
+```
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+{{/if coauthor}}
 
 ## Pull requests
 

@@ -109,6 +109,12 @@ class ScaffoldInputs:
     # Only meaningful with the GitHub lifecycle; a --lifecycle none project ships
     # no monitor_pr.sh, so the wizard doesn't ask and the key isn't rendered.
     review_cycles: int = 2
+    # Co-Authored-By: Claude commit trailer (#888). When True, the scaffolded
+    # agent commit guidance (project-init.md, conventions.md) and the optional
+    # bootstrap initial commit (#887) append the trailer; when False no
+    # scaffolded commit path emits it. Recorded in .agents/config.yaml so tooling
+    # and future sessions can read the choice. Opt-OUT — default ON.
+    coauthor: bool = True
 
 
 SUPPORTED_PYTHON_VERSIONS: tuple[str, ...] = ("3.11", "3.12", "3.13", "3.14")
@@ -636,6 +642,12 @@ def _build_variables(
         # gates AND want_docs; renovate.json gates on renovate alone.
         "want_docs": "true" if inputs.want_docs else "",
         "renovate": "true" if inputs.renovate else "",
+        # Co-Authored-By: Claude commit trailer (#888). Gates the {{#if coauthor}}
+        # blocks in the agent commit guidance + config record; coauthor_off is the
+        # inverse flag for the else-less engine (mirrors lifecycle_off), so
+        # config.yaml can record a literal true/false.
+        "coauthor": "true" if inputs.coauthor else "",
+        "coauthor_off": "" if inputs.coauthor else "true",
         # Governance (PI-145). license_holder falls back to the project name
         # so a LICENSE rendered without --owner still has a copyright line.
         # The leading "@" is required for CODEOWNERS (project_owner) but is a
@@ -786,6 +798,7 @@ def _resolve_inputs(
         lifecycle=effective_lifecycle,
         want_docs=not args.no_docs,
         renovate=not args.no_renovate,
+        coauthor=not args.no_coauthor,
     )
 
 

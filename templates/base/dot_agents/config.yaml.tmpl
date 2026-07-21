@@ -54,6 +54,13 @@ tooling:
   test_command: "{{test_command}}"
   run_command: "{{run_command}}"
 
+commit:
+  # Append a `Co-Authored-By: Claude <noreply@anthropic.com>` trailer to
+  # agent-generated commits (#888). Read by the scaffolded commit guidance and
+  # the optional bootstrap initial commit. false = no scaffolded commit path
+  # emits the trailer.
+  coauthor: {{#if coauthor}}true{{/if coauthor}}{{#if coauthor_off}}false{{/if coauthor_off}}
+
 {{#if observability}}observability:
   path: .agents/observability
 

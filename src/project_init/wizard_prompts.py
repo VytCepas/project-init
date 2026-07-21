@@ -521,6 +521,21 @@ def _choose_renovate_interactive() -> bool:
     )
 
 
+def _choose_coauthor_interactive() -> bool:
+    return _explain_and_confirm(
+        "Co-Authored-By trailer",
+        "Append a [bold]Co-Authored-By: Claude <noreply@anthropic.com>[/bold] "
+        "trailer to agent-generated commits — the scaffolded commit guidance and "
+        "the optional bootstrap commit honor this choice.\n\n"
+        "[cyan]Helps:[/cyan] commit provenance shows which work an AI agent "
+        "co-authored.\n"
+        "[dim]Decline for a clean history or an org policy that forbids AI "
+        "co-author trailers. On by default; decline with --no-coauthor.[/dim]",
+        "Add a Co-Authored-By: Claude trailer to agent commits?",
+        default=True,
+    )
+
+
 def _select_preset(
     args: argparse.Namespace, parser: argparse.ArgumentParser, presets: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -649,6 +664,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     preset_lifecycle: str = "github",
     no_docs: bool = False,
     no_renovate: bool = False,
+    no_coauthor: bool = False,
     cli_name: str | None = None,
     cli_description: str | None = None,
     cli_language: str | None = None,
@@ -837,6 +853,9 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         lifecycle=resolved_lifecycle,
         want_docs=want_docs,
         renovate=want_renovate,
+        # Co-Authored-By: Claude commit trailer (#888). --no-coauthor pre-declines
+        # and skips the prompt, mirroring --no-docs / --no-renovate.
+        coauthor=False if no_coauthor else _choose_coauthor_interactive(),
     )
 
 

@@ -224,6 +224,9 @@ from project_init.wizard_prompts import (
     _choose_browser_interactive as _choose_browser_interactive,
 )
 from project_init.wizard_prompts import (
+    _choose_coauthor_interactive as _choose_coauthor_interactive,
+)
+from project_init.wizard_prompts import (
     _choose_delivery_interactive as _choose_delivery_interactive,
 )
 from project_init.wizard_prompts import (
@@ -475,6 +478,7 @@ def _cli(argv: list[str]) -> int:
             preset_lifecycle=preset_lifecycle,
             no_docs=args.no_docs,
             no_renovate=args.no_renovate,
+            no_coauthor=args.no_coauthor,
             # Pre-seed the basic-field prompts from the CLI so flags passed
             # without --non-interactive are honored, not dropped (PI review).
             cli_name=args.name,

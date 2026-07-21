@@ -314,6 +314,16 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--no-coauthor",
+        action="store_true",
+        help=(
+            "Omit the `Co-Authored-By: Claude <noreply@anthropic.com>` trailer "
+            "from scaffolded agent commit guidance and the optional bootstrap "
+            "commit (#888). On by default — decline it for a clean history or "
+            "org policy that forbids AI co-author trailers"
+        ),
+    )
+    p.add_argument(
         "--no-plugin",
         action="store_true",
         help=(
@@ -385,6 +395,7 @@ WIZARD_CONCERN_FLAGS: dict[str, str] = {
     "vscode": "vscode",
     "docs": "no_docs",
     "renovate": "no_renovate",
+    "coauthor": "no_coauthor",
     "browser": "browser",
 }
 
