@@ -39,6 +39,10 @@ class TestInitialCommit:
     @staticmethod
     def _repo(tmp_path: Path) -> Path:
         _git(tmp_path, "init")
+        # A local identity so `git commit` works on a runner with no global git
+        # config (CI), independent of the ambient environment.
+        _git(tmp_path, "config", "user.email", "t@example.com")
+        _git(tmp_path, "config", "user.name", "t")
         (tmp_path / "f.txt").write_text("x", encoding="utf-8")
         return tmp_path
 
