@@ -9,6 +9,7 @@ by all three paths, whole-file/block `{{#if}}` conditionals, and the CLI flag
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -144,6 +145,37 @@ class TestCli:
             _TRAILER
             not in (target / ".agents" / "docs" / "development" / "conventions.md").read_text()
         )
+
+
+class TestLifecycleSeedCommit:
+    """The rendered lifecycle scripts honor commit.coauthor, so the seed commit
+    start_issue.sh creates carries the trailer only when opted in (#888 review)."""
+
+    @staticmethod
+    def _coauthor_reader(target: Path) -> str:
+        r = subprocess.run(
+            ["bash", "-c", "source .agents/scripts/gh_host.sh; coauthor"],
+            cwd=target,
+            capture_output=True,
+            text=True,
+        )
+        return r.stdout.strip()
+
+    def test_reader_true_when_opted_in(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold_cli(target)
+        assert self._coauthor_reader(target) == "true"
+
+    def test_reader_empty_when_opted_out(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold_cli(target, "--no-coauthor")
+        assert self._coauthor_reader(target) == ""
+
+    def test_seed_commit_gates_trailer_on_reader(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold_cli(target)
+        seed = (target / ".agents" / "scripts" / "start_issue.sh").read_text()
+        assert '"$(coauthor)" = "true"' in seed and _TRAILER in seed
 
 
 class TestScaffoldGating:

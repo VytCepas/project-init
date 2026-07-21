@@ -208,8 +208,15 @@ fi
 # `git commit --allow-empty` still commits whatever is currently staged, which
 # would silently fold unrelated work into the generated seed commit (#446).
 _seed_commit() {
-  SEED_COMMIT=$(git commit-tree "HEAD^{tree}" -p HEAD \
-    -m "chore(${ISSUE_REF}): start #${ISSUE_NUMBER} — ${CLEAN_TITLE}")
+  local msg="chore(${ISSUE_REF}): start #${ISSUE_NUMBER} — ${CLEAN_TITLE}"
+  # Honor the recorded commit.coauthor preference (#888) — the seed is the first
+  # commit on the branch, so an opted-in project expects the trailer here too.
+  if [ "$(coauthor)" = "true" ]; then
+    msg="${msg}
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+  fi
+  SEED_COMMIT=$(git commit-tree "HEAD^{tree}" -p HEAD -m "$msg")
   git reset --soft "$SEED_COMMIT"
 }
 
