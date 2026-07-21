@@ -190,6 +190,26 @@ class TestPayloadVersionLock:
             for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT)
         }
 
+    def test_hash_folds_in_the_executable_bit(self, tmp_path, monkeypatch):
+        # A hook losing +x is a breaking payload change even with identical bytes;
+        # the digest must move so the version bump is forced (PI-881 review).
+        (tmp_path / ".claude-plugin").mkdir()
+        (tmp_path / ".claude-plugin" / "plugin.json").write_text('{"version": "1.0.0"}')
+        hook = tmp_path / "hooks" / "h.sh"
+        hook.parent.mkdir()
+        hook.write_text("#!/bin/sh\n")
+        hook.chmod(0o755)
+        executable = sync_plugin.payload_sha256(tmp_path)
+        hook.chmod(0o644)
+        assert sync_plugin.payload_sha256(tmp_path) != executable
+
+    def test_shipped_shell_hooks_are_executable(self):
+        # hooks.json runs `.sh` files directly; a non-executable one breaks the
+        # install. The digest catches a *change*, this catches the absolute state.
+        for root in (_PLUGIN_ROOT, _LIFECYCLE_PLUGIN_ROOT):
+            for hook in (root / "hooks").glob("*.sh"):
+                assert hook.stat().st_mode & 0o111, f"{root.name}/{hook.name} is not executable"
+
 
 class TestScaffoldedSettingsWiring:
     def test_default_is_plugin_first(self, tmp_path: Path):

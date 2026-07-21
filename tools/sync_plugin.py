@@ -79,11 +79,17 @@ def _payload_files(plugin_root: Path) -> list[Path]:
 
 
 def payload_sha256(plugin_root: Path) -> str:
-    """A stable content hash over a plugin's shipped payload (path + bytes)."""
+    """A stable content hash over a plugin's shipped payload.
+
+    Folds in path, bytes, and the executable bit — hooks.json invokes `.sh`
+    files directly, so a hook that loses its +x is a breaking payload change the
+    version must reflect even though its bytes are unchanged (PI-881 review).
+    """
     digest = hashlib.sha256()
     for f in _payload_files(plugin_root):
         digest.update(f.relative_to(plugin_root).as_posix().encode("utf-8"))
         digest.update(b"\0")
+        digest.update(b"x" if f.stat().st_mode & 0o111 else b"-")
         digest.update(f.read_bytes())
         digest.update(b"\0")
     return digest.hexdigest()
