@@ -208,6 +208,11 @@ def _overlay_off_defaults() -> dict[str, str]:
         "delivery_library": "",
         "delivery_service": "",
         # Deploy overlay (ADR-015): off for records predating the deploy question.
+        # Identity fields (PI-899) default empty/static — pre-deploy records
+        # never rendered the service block, so these are never consumed there.
+        "deploy_app": "",
+        "deploy_region": "us-central1",
+        "deploy_health_url": "",
         "deploy_target": "none",
         "deploy_enabled": "",
         "deploy_container": "",
@@ -792,6 +797,12 @@ def _backfill_variables(variables: dict[str, str]) -> dict[str, str]:
     recorded_agents = _recorded_agents(v)
 
     derived: dict[str, str] = {
+        # Deploy identity (PI-899): a pre-capture record rendered app from the
+        # slug and the static us-central1/empty literals — backfill exactly
+        # those so a strict re-render reproduces the old block byte-for-byte.
+        "deploy_app": v.get("project_slug", "") or "my-app",
+        "deploy_region": "us-central1",
+        "deploy_health_url": "",
         # Descriptor contract (#498): a pre-field record backfills to current so
         # the staging strict-render succeeds; a post-field record carries its own
         # value, which the setdefault below preserves.

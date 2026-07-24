@@ -180,6 +180,7 @@ project-init variable resolution: flag→prompt→preset precedence + template c
 - `def resolve_iac` — Normalize an --iac value; default 'none'. Raises ValueError on an unknown tool.
 - `def resolve_agents` — Parse/validate an --agents value; claude is always included first.
 - `def agent_layers` — Template layers contributed by the selected agents (no fallback).
+- `def deploy_identity_error` — Schema-pattern gate for the captured deploy identity (PI-899).
 - `def render_run_command` — Fill ``{project_slug}`` in a language ``run_command``.
 
 ### `project_init/wizard_prompts.py`

@@ -479,6 +479,9 @@ def _cli(argv: list[str]) -> int:
             no_egress=args.no_egress,
             cli_python_version=args.python_version,
             cli_review_cycles=args.review_cycles,
+            cli_deploy_app=args.deploy_app,
+            cli_deploy_region=args.deploy_region,
+            cli_deploy_health_url=args.deploy_health_url,
             target=target,
             preset_name=str(preset.get("name", "")),
             # BOX-1 (harbor CONTRACTS/box-profile.md): advisory defaults from
