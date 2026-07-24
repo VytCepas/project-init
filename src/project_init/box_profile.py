@@ -80,7 +80,11 @@ def load_box_profile(path: Path | None = None) -> BoxProfile | None:
     profile_raw = data.get("profile")
     if harnesses is None or mcp_roster is None:
         return None
-    if profile_raw is not None and profile_raw not in _PROFILE_MAP:
+    # isinstance before membership: an unhashable wrong type (list/table) must
+    # hit the silent-absent path, not raise TypeError (PR #898 review).
+    if profile_raw is not None and (
+        not isinstance(profile_raw, str) or profile_raw not in _PROFILE_MAP
+    ):
         return None
     return BoxProfile(
         source=source,

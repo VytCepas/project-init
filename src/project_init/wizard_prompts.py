@@ -149,7 +149,9 @@ def _choose_preset_interactive(presets: list[dict[str, Any]]) -> dict[str, Any]:
     return presets[choice - 1]
 
 
-def _choose_mcps_interactive(catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _choose_mcps_interactive(
+    catalog: list[dict[str, Any]], default_ids: tuple[str, ...] | None = None
+) -> list[dict[str, Any]]:
     from rich.prompt import Prompt
 
     console.print(
@@ -159,14 +161,18 @@ def _choose_mcps_interactive(catalog: list[dict[str, Any]]) -> list[dict[str, An
     for i, m in enumerate(catalog, 1):
         console.print(option_line(i, m["name"], m["description"]))
     console.print()
+    # Box-profile seed (BOX-1): Enter keeps the seeded selection instead of
+    # skipping — the seed is the DEFAULT here, still fully changeable.
+    enter_selection = [m for m in catalog if m["id"] in (default_ids or ())]
+    label = "Choose MCPs (comma-separated numbers, or Enter to skip)"
+    if default_ids:
+        console.print(f"[dim]Enter keeps the box-profile default: {', '.join(default_ids)}[/dim]")
+        label = "Choose MCPs (comma-separated numbers, or Enter for the default)"
 
     while True:
-        raw = Prompt.ask(
-            "Choose MCPs (comma-separated numbers, or Enter to skip)",
-            default="",
-        )
+        raw = Prompt.ask(label, default="")
         if not raw.strip():
-            return []
+            return enter_selection
 
         selected = []
         seen: set[str] = set()
@@ -209,7 +215,7 @@ def _choose_browser_interactive() -> bool:
     )
 
 
-def _choose_profile_interactive() -> str:
+def _choose_profile_interactive(default: str | None = None) -> str:
     """Present the three distribution profiles and what each bundles (#247, ADR-023)."""
     from rich.panel import Panel
 
@@ -227,7 +233,8 @@ def _choose_profile_interactive() -> str:
     for i, name in enumerate(_PROFILES, 1):
         console.print(option_line(i, name, _PROFILE_SUMMARY[name]))
     console.print()
-    choice = _prompt_menu_index("Choose a profile", len(_PROFILES), default=1)
+    default_idx = _PROFILES.index(default) + 1 if default in _PROFILES else 1
+    choice = _prompt_menu_index("Choose a profile", len(_PROFILES), default=default_idx)
     return _PROFILES[choice - 1]
 
 
@@ -622,7 +629,9 @@ def _resolve_overlays_interactive(
     return resolved_delivery, resolved_deploy, resolved_iac
 
 
-def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict[str, Any]]:
+def _gather_mcps_interactive(
+    cli_mcps: str, cli_browser: bool, default_ids: tuple[str, ...] | None = None
+) -> list[dict[str, Any]]:
     """Resolve MCPs for the wizard: honor --mcps/--browser, else prompt (PI review).
 
     A bad ``--mcps`` id warns and falls back to the catalog rather than crashing
@@ -640,7 +649,11 @@ def _gather_mcps_interactive(cli_mcps: str, cli_browser: bool) -> list[dict[str,
             if not cli_browser and _choose_browser_interactive():
                 selected = selected + [PLAYWRIGHT_MCP]
             return selected
-    selected = _choose_mcps_interactive(MCP_CATALOG)
+    selected = (
+        _choose_mcps_interactive(MCP_CATALOG)
+        if default_ids is None
+        else _choose_mcps_interactive(MCP_CATALOG, default_ids=default_ids)
+    )
     if cli_browser or _choose_browser_interactive():
         selected = selected + [PLAYWRIGHT_MCP]
     return selected
@@ -774,6 +787,11 @@ class _GatewayState:
     coauthor: bool
     memory_from_preset: bool
     mcps: list[dict[str, Any]] = field(default_factory=list)
+    # Box-profile seeds (BOX-1): recorded so an OPENED group presents the seed
+    # as its chooser default instead of resetting to factory (PR #898 review).
+    seeded_agents: tuple[str, ...] | None = None
+    seeded_mcp_ids: tuple[str, ...] | None = None
+    seeded_profile: str | None = None
 
 
 def _resolve_review_cycles(flag: int | None, lifecycle: str, *, ask: bool) -> int:
@@ -908,17 +926,19 @@ def _apply_box_profile(
             if "claude" not in valid:
                 valid.insert(0, "claude")
             state.agents = list(dict.fromkeys(valid))
+            state.seeded_agents = tuple(state.agents)
             seeded.append(f"agents={','.join(state.agents)}")
     if box.mcp_roster and not seeds.mcps.strip() and not seeds.browser:
         by_id = {m["id"]: m for m in MCP_CATALOG}
-        by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
         valid_mcps = [by_id[i] for i in dict.fromkeys(box.mcp_roster) if i in by_id]
         ignored += [i for i in box.mcp_roster if i not in by_id]
         if valid_mcps:
             state.mcps = valid_mcps
-            seeded.append(f"mcps={','.join(m['id'] for m in valid_mcps)}")
+            state.seeded_mcp_ids = tuple(m["id"] for m in valid_mcps)
+            seeded.append(f"mcps={','.join(state.seeded_mcp_ids)}")
     if box.profile is not None and seeds.profile is None:
         state.profile = box.profile
+        state.seeded_profile = box.profile
         seeded.append(f"profile={box.profile}")
     line = f"Box profile: {box.source} — seeded: {', '.join(seeded) or 'nothing (flags pinned)'}"
     if ignored:
@@ -979,9 +999,18 @@ def _apply_integrations_group(state: _GatewayState, seeds: _CliSeeds) -> None:
     # Honor --mcps/--browser as before; --mcps still leaves the browser concern
     # independently decidable inside the group (ADR-023). An explicit --agents
     # (incl. `--agents claude`) stays pinned — flag beats prompt.
-    state.mcps = _gather_mcps_interactive(seeds.mcps, seeds.browser)
+    if state.seeded_mcp_ids is None:
+        state.mcps = _gather_mcps_interactive(seeds.mcps, seeds.browser)
+    else:
+        state.mcps = _gather_mcps_interactive(
+            seeds.mcps, seeds.browser, default_ids=state.seeded_mcp_ids
+        )
     if not state.agents_pinned:
-        state.agents = _choose_agents_interactive()
+        state.agents = (
+            _choose_agents_interactive()
+            if state.seeded_agents is None
+            else _choose_agents_interactive(default=state.seeded_agents)
+        )
 
 
 def _apply_details_group(state: _GatewayState, seeds: _CliSeeds) -> None:
@@ -1026,10 +1055,20 @@ def _apply_memory_group(state: _GatewayState, seeds: _CliSeeds) -> None:
     state.review_cycles = _resolve_review_cycles(seeds.review_cycles, state.lifecycle, ask=True)
 
 
+def _apply_profile_choice(state: _GatewayState, seeds: _CliSeeds) -> None:
+    # --profile pins; a box-profile seed becomes the chooser's menu default.
+    if seeds.profile:
+        state.profile = seeds.profile
+    elif state.seeded_profile is None:
+        state.profile = _choose_profile_interactive()
+    else:
+        state.profile = _choose_profile_interactive(default=state.seeded_profile)
+
+
 def _apply_opened_groups(state: _GatewayState, opened: set[str], seeds: _CliSeeds) -> None:
     """Run the pre-collapse choosers for each opened group, in pre-collapse order."""
     if "overlays" in opened:
-        state.profile = seeds.profile or _choose_profile_interactive()
+        _apply_profile_choice(state, seeds)
     if "delivery" in opened:
         _apply_delivery_group(state, seeds)
     if "integrations" in opened:
@@ -1441,7 +1480,7 @@ def _choose_iac_interactive() -> str:
     return _IAC_OPTIONS[choice - 1]
 
 
-def _choose_agents_interactive() -> list[str]:
+def _choose_agents_interactive(default: tuple[str, ...] | None = None) -> list[str]:
     """Present the agent/editor surfaces to scaffold for (ADR-017, #616)."""
     from rich.panel import Panel
     from rich.prompt import Prompt
@@ -1458,13 +1497,17 @@ def _choose_agents_interactive() -> list[str]:
 
     console.print(Panel(body.rstrip(), title="Agent and Editor Surfaces", border_style="cyan"))
 
+    if default is not None:
+        console.print(f"[dim]Enter keeps the box-profile default: {', '.join(default)}[/dim]")
     while True:
         raw = Prompt.ask(
             "Choose surfaces (comma-separated numbers, or Enter for default)",
-            default="1",
+            # Pre-collapse behavior when unseeded: Enter -> "1" -> the vscode
+            # surface. A box-profile seed (BOX-1) becomes the Enter default.
+            default="1" if default is None else "",
         )
         if not raw.strip():
-            return ["claude", "vscode"]
+            return list(default) if default is not None else ["claude", "vscode"]
 
         selected = ["claude"]
         invalid = []

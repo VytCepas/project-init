@@ -53,6 +53,14 @@ class TestLoader:
         f.write_text('schema_version = 1\nprofile = "enterprise"\n')
         assert load_box_profile(f) is None
 
+    def test_unhashable_profile_type_is_treated_as_absent(self, tmp_path: Path, capsys):
+        # PR #898 review: `profile = ["org"]` must hit the silent-absent path,
+        # not raise TypeError from the membership test before the wizard starts.
+        f = tmp_path / "box-profile.toml"
+        f.write_text('schema_version = 1\nprofile = ["org"]\n')
+        assert load_box_profile(f) is None
+        assert capsys.readouterr().out == ""
+
     def test_env_override_wins(self, tmp_path: Path, monkeypatch):
         f = tmp_path / "elsewhere.toml"
         f.write_text('schema_version = 1\nharnesses = ["codex"]\n')
@@ -126,6 +134,28 @@ class TestWizardSeeding:
         assert inputs.agents == ["claude", "vscode"]
         assert inputs.selected_mcps == []
         assert inputs.profile == "individual"
+
+    def test_opened_groups_keep_box_seeds_as_their_defaults(self, monkeypatch, capsys):
+        # PR #898 review: opening a seeded group must present the box seed as
+        # the chooser DEFAULT (Enter keeps it), not reset to factory defaults.
+        monkeypatch.setattr(_wiz, "_prompt", lambda _label, default="": default)
+        monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: k.get("default", ""))
+        monkeypatch.setattr("rich.prompt.IntPrompt.ask", lambda *a, **k: k.get("default", 1))
+        monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: k.get("default", False))
+        monkeypatch.setattr(
+            _wiz, "_choose_gateway_interactive", lambda pinned: {"integrations", "overlays"}
+        )
+        inputs = __main__._gather_inputs_interactive(
+            default_name="demo",
+            no_plugin=False,
+            profile=None,
+            box_profile=_box(
+                harnesses=("claude", "codex"), mcp_roster=("context7",), profile="org"
+            ),
+        )
+        assert inputs.agents == ["claude", "codex"]
+        assert [m["id"] for m in inputs.selected_mcps] == ["context7"]
+        assert inputs.profile == "org"
 
     def test_all_unknown_harnesses_do_not_seed_but_are_reported(self, monkeypatch, capsys):
         inputs = _enter_only(monkeypatch, box_profile=_box(harnesses=("emacs", "vim")))
