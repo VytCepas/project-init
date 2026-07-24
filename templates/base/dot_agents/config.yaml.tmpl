@@ -22,9 +22,9 @@ language: {{language}}            # python | node | go | none
 delivery: {{delivery}}            # library | service | prototype — how this ships (ADR-015)
 {{#if delivery_service}}deploy:
   target: {{deploy_target}}
-  app: "{{project_name}}"
-  region: us-central1
-  health_url: ""
+  app: "{{deploy_app}}"
+  region: {{deploy_region}}
+  health_url: "{{deploy_health_url}}"
 {{/if delivery_service}}{{#if not_delivery_service}}deploy: {{deploy_target}}            # none | cloud-run | fly | k8s | registry | custom — service deploy overlay (ADR-015)
 {{/if not_delivery_service}}iac: {{iac}}            # none | opentofu — infrastructure-as-code overlay (ADR-015)
 

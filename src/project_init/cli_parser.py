@@ -19,6 +19,7 @@ from project_init.variables import (
     ScaffoldInputs,
     _declared_python_floor,
     _text_field_error,
+    deploy_identity_error,
 )
 
 
@@ -132,6 +133,30 @@ def _build_parser() -> argparse.ArgumentParser:
             "Deploy overlay for a service (ADR-015, opt-in): none (default — your "
             "platform/PaaS owns deploy, or not yet), cloud-run, fly, k8s, registry "
             "(publish image only), or custom. Requires --delivery service."
+        ),
+    )
+    p.add_argument(
+        "--deploy-app",
+        default="",
+        help=(
+            "deploy identity: the app/service name for the descriptor deploy "
+            "block (default: the project slug). Schema pattern [A-Za-z0-9._-]+."
+        ),
+    )
+    p.add_argument(
+        "--deploy-region",
+        default="",
+        help=(
+            "deploy identity: the region for the descriptor deploy block "
+            "(default: us-central1). Schema pattern [A-Za-z0-9._-]+."
+        ),
+    )
+    p.add_argument(
+        "--deploy-health-url",
+        default="",
+        help=(
+            "deploy identity: HTTP health-check URL the orchestrator probes "
+            "(default: empty = no probe)."
         ),
     )
     p.add_argument(
@@ -422,6 +447,9 @@ WIZARD_MECHANICAL_FLAGS: frozenset[str] = frozenset(
         "language",
         "python_version",
         "owner",
+        "deploy_app",
+        "deploy_region",
+        "deploy_health_url",
         "license",
         "agents",
         "mcps",
@@ -480,6 +508,12 @@ def _validate_text_inputs(inputs: ScaffoldInputs, parser: argparse.ArgumentParse
         err = _text_field_error(flag, value, allow_empty=allow_empty)
         if err:
             parser.error(f"--{err}")
+    # Deploy identity (PI-899): app/region must satisfy the descriptor schema
+    # pattern or the rendered config.yaml fails contract validation downstream.
+    for field, value in (("app", inputs.deploy_app), ("region", inputs.deploy_region)):
+        id_err = deploy_identity_error(field, value)
+        if id_err:
+            parser.error(f"--{id_err}")
 
 
 def _validate_existing_config(target: Path, parser: argparse.ArgumentParser) -> None:

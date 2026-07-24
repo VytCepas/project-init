@@ -208,6 +208,11 @@ def _overlay_off_defaults() -> dict[str, str]:
         "delivery_library": "",
         "delivery_service": "",
         # Deploy overlay (ADR-015): off for records predating the deploy question.
+        # Identity fields (PI-899) default empty/static — pre-deploy records
+        # never rendered the service block, so these are never consumed there.
+        "deploy_app": "",
+        "deploy_region": "us-central1",
+        "deploy_health_url": "",
         "deploy_target": "none",
         "deploy_enabled": "",
         "deploy_container": "",
@@ -831,6 +836,14 @@ def _backfill_variables(variables: dict[str, str]) -> dict[str, str]:
         # Opt-in overlays + governance default off — they postdate the record;
         # shared with migration (PI-190).
         **_overlay_off_defaults(),
+        # Deploy identity (PI-899): AFTER the overlay-off spread, or its
+        # deploy_app="" would clobber this (PR #900 review) — a pre-capture
+        # service record rendered app from the slug and the static
+        # us-central1/empty literals; backfill exactly those so a strict
+        # re-render reproduces the old block byte-for-byte.
+        "deploy_app": v.get("project_slug", "") or "my-app",
+        "deploy_region": "us-central1",
+        "deploy_health_url": "",
         # Per-agent AGENTS.md gates (2026-07 QA) postdate older records — derive
         # from the recorded agents list, AFTER the off-defaults spread so the
         # derivation wins over the generic "" (a recorded flag still wins via

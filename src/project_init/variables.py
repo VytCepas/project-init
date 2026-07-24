@@ -11,6 +11,7 @@ subcommands.
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -74,6 +75,11 @@ class ScaffoldInputs:
     # Deploy target (epic #316, ADR-015): opt-in deploy overlay for services.
     # "none" = my platform owns deploy, or not deployed via Actions yet.
     deploy: str = "none"
+    # Deploy identity (PI-899, harbor J1): captured app/region/health URL for
+    # the descriptor deploy block. Empty = derive (slug / us-central1 / none).
+    deploy_app: str = ""
+    deploy_region: str = ""
+    deploy_health_url: str = ""
     # IaC overlay (ADR-015, opt-in): none | opentofu. Independent of delivery.
     iac: str = "none"
     # Multi-model switching overlay (ADR-016, epic #315, opt-in): scaffolds the
@@ -474,6 +480,24 @@ _PROFILE_SUMMARY = {
 }
 
 
+_DEPLOY_IDENTITY_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def deploy_identity_error(field: str, value: str) -> str | None:
+    """Schema-pattern gate for the captured deploy identity (PI-899).
+
+    ``descriptor.schema.json`` pins app/region to ``^[A-Za-z0-9._-]+$``; a
+    value violating it would render a config.yaml that fails the contract
+    validation downstream. Empty is always fine (the derivation fills it).
+    """
+    if not value or _DEPLOY_IDENTITY_RE.fullmatch(value):
+        return None
+    return (
+        f"deploy-{field} {value!r} must match [A-Za-z0-9._-]+ "
+        "(the descriptor schema pattern for the deploy block)"
+    )
+
+
 def _profile_delivery_no_plugin(profile: str, explicit_no_plugin: bool) -> bool:
     """Resolve copied-in vs plugin delivery for a profile.
 
@@ -618,6 +642,13 @@ def _build_variables(
         # templates gate on these. deploy_container = build-once-by-digest graph;
         # deploy_registry = publish-image-only; both imply deploy_enabled.
         "deploy_target": inputs.deploy,
+        # Deploy identity (PI-899): captured values with derivations preserving
+        # the pre-capture rendering (app = slug, region = us-central1,
+        # health_url = empty). The orchestrator's doctor/orphans/cloud verbs
+        # dispatch on app+region and probe health_url only when non-empty.
+        "deploy_app": inputs.deploy_app or (slugify(inputs.project_name) or "my-app"),
+        "deploy_region": inputs.deploy_region or "us-central1",
+        "deploy_health_url": inputs.deploy_health_url,
         "deploy_enabled": "true" if inputs.deploy != "none" else "",
         "deploy_container": "true" if inputs.deploy in _DEPLOY_CONTAINER else "",
         "deploy_registry": "true" if inputs.deploy == "registry" else "",
@@ -799,6 +830,9 @@ def _resolve_inputs(
         review_cycles=_resolve_review_cycles(args, effective_lifecycle),
         delivery=delivery,
         deploy=deploy,
+        deploy_app=args.deploy_app,
+        deploy_region=args.deploy_region,
+        deploy_health_url=args.deploy_health_url,
         iac=iac,
         multi_model=args.multi_model,
         governance=args.governance,

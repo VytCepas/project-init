@@ -48,6 +48,10 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "delivery_library": "",
         "delivery_service": "",
         "not_delivery_service": "true",
+        # Deploy identity (PI-899): the derivation defaults (slug/static).
+        "deploy_app": "my-project",
+        "deploy_region": "us-central1",
+        "deploy_health_url": "",
         "deploy_target": "none",
         "deploy_enabled": "",
         "deploy_container": "",

@@ -754,6 +754,9 @@ class _CliSeeds:
     vscode: bool
     review_cycles: int | None
     profile: str | None
+    deploy_app: str = ""
+    deploy_region: str = ""
+    deploy_health_url: str = ""
 
 
 @dataclass
@@ -792,6 +795,10 @@ class _GatewayState:
     seeded_agents: tuple[str, ...] | None = None
     seeded_mcp_ids: tuple[str, ...] | None = None
     seeded_profile: str | None = None
+    # Deploy identity (PI-899): empty = derive at render (slug/us-central1/none).
+    deploy_app: str = ""
+    deploy_region: str = ""
+    deploy_health_url: str = ""
 
 
 def _resolve_review_cycles(flag: int | None, lifecycle: str, *, ask: bool) -> int:
@@ -895,6 +902,9 @@ def _default_gateway_state(seeds: _CliSeeds) -> tuple[_GatewayState, set[str]]:
         multi_model=seeds.multi_model,
         governance=seeds.governance,
         observability=seeds.observability,
+        deploy_app=seeds.deploy_app,
+        deploy_region=seeds.deploy_region,
+        deploy_health_url=seeds.deploy_health_url,
         memory=seeds.memory or seeds.preset_memory,
         lifecycle=lifecycle,
         review_cycles=_resolve_review_cycles(seeds.review_cycles, lifecycle, ask=False),
@@ -953,6 +963,9 @@ def _pinned_gateway_flags(seeds: _CliSeeds) -> dict[str, list[str]]:
             ("--delivery", seeds.delivery),
             ("--deploy", seeds.deploy),
             ("--iac", seeds.iac),
+            ("--deploy-app", seeds.deploy_app),
+            ("--deploy-region", seeds.deploy_region),
+            ("--deploy-health-url", seeds.deploy_health_url),
         ),
         "integrations": (
             ("--mcps", seeds.mcps.strip()),
@@ -989,10 +1002,42 @@ def _pinned_gateway_flags(seeds: _CliSeeds) -> dict[str, list[str]]:
     }
 
 
+def _capture_deploy_identity_interactive(state: _GatewayState, seeds: _CliSeeds) -> None:
+    """Capture app/region/health URL for a deploying service (PI-899).
+
+    Runs only inside the OPENED delivery group when the resolved deploy target
+    is real — the standard path never sees these prompts (defaults derive at
+    render: slug / us-central1 / no probe). app/region re-ask until they meet
+    the descriptor schema pattern; Enter keeps the derived default.
+    """
+    from project_init.variables import deploy_identity_error
+
+    def _ask(field: str, label: str, default: str) -> str:
+        while True:
+            value = _prompt(label, default=default)
+            err = deploy_identity_error(field, value)
+            if err is None:
+                return value
+            console.print(f"[red]{err}[/red]")
+
+    state.deploy_app = _ask(
+        "app", "Deploy app name (Enter = the project slug)", seeds.deploy_app or ""
+    )
+    state.deploy_region = _ask(
+        "region", "Deploy region (Enter = us-central1)", seeds.deploy_region or ""
+    )
+    state.deploy_health_url = _prompt(
+        "Health-check URL the orchestrator probes (Enter = none)",
+        default=seeds.deploy_health_url or "",
+    )
+
+
 def _apply_delivery_group(state: _GatewayState, seeds: _CliSeeds) -> None:
     state.delivery, state.deploy, state.iac = _resolve_overlays_interactive(
         seeds.language, seeds.delivery, seeds.deploy, seeds.iac
     )
+    if state.deploy != "none":
+        _capture_deploy_identity_interactive(state, seeds)
 
 
 def _apply_integrations_group(state: _GatewayState, seeds: _CliSeeds) -> None:
@@ -1285,6 +1330,9 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     cli_agents: str | None = None,
     cli_python_version: str | None = None,
     cli_review_cycles: int | None = None,
+    cli_deploy_app: str = "",
+    cli_deploy_region: str = "",
+    cli_deploy_health_url: str = "",
     target: Path | None = None,
     preset_name: str = "",
     box_profile: BoxProfile | None = None,
@@ -1380,6 +1428,9 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         vscode=cli_vscode,
         review_cycles=cli_review_cycles,
         profile=profile,
+        deploy_app=cli_deploy_app,
+        deploy_region=cli_deploy_region,
+        deploy_health_url=cli_deploy_health_url,
     )
     # ── ADR-029: resolve every concern to its standard-path value first (each
     # the value its chooser's Enter default produced pre-collapse; flags win). ──
@@ -1407,6 +1458,9 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
             review_cycles=state.review_cycles,
             delivery=state.delivery,
             deploy=state.deploy,
+            deploy_app=state.deploy_app,
+            deploy_region=state.deploy_region,
+            deploy_health_url=state.deploy_health_url,
             iac=state.iac,
             multi_model=state.multi_model,
             governance=state.governance,
