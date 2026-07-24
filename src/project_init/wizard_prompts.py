@@ -9,6 +9,7 @@ console/mcps/scaffold/variables — never subcommands or the CLI spine.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,7 @@ from project_init.console import (
     render_presets,
 )
 from project_init.mcps import MCP_CATALOG, PLAYWRIGHT_MCP
-from project_init.scaffold import load_preset
+from project_init.scaffold import load_preset, memory_tier
 from project_init.variables import (
     _AGENT_SURFACES,
     _DELIVERY,
@@ -36,6 +37,7 @@ from project_init.variables import (
     ScaffoldInputs,
     _declared_python_floor,
     _profile_delivery_no_plugin,
+    _profile_enforcement,
     _resolve_mcps_non_interactive,
     _text_field_error,
     resolve_agents,
@@ -660,6 +662,514 @@ def _print_wizard_guidance() -> None:
     )
 
 
+# The gateway groups (ADR-029): the collapsed wizard's default path asks six
+# questions; every other concern lives in one of these groups, opened on demand.
+# Each entry: (key, title, one-line contents-with-defaults). Order is the order
+# the opened groups' choosers run, which preserves the pre-collapse sequence.
+_GATEWAY_GROUPS: tuple[tuple[str, str, str], ...] = (
+    (
+        "delivery",
+        "Delivery & deploy",
+        "library/service/prototype, deploy target, IaC — defaults: prototype, none, none",
+    ),
+    (
+        "integrations",
+        "Integrations",
+        "MCP servers, browser automation, agent surfaces — defaults: none, off, claude+vscode",
+    ),
+    (
+        "extras",
+        "Dev extras",
+        "devcontainer, mise, VS Code workspace — defaults: all off",
+    ),
+    (
+        "quality",
+        "Docs & updates",
+        "docs tooling, Renovate — defaults: both on",
+    ),
+    (
+        "overlays",
+        "Profile & overlays",
+        "distribution profile, multi-model, governance, observability — "
+        "defaults: individual, off, off, off",
+    ),
+    (
+        "memory",
+        "Memory & lifecycle",
+        "memory tier ladder (auto/obsidian/graphify/rag), GitHub lifecycle, "
+        "review cycles — defaults from the preset; rag pays off only at "
+        "multi-project scale",
+    ),
+    (
+        "details",
+        "Project details",
+        "owner/CODEOWNERS, license, Co-Authored-By trailer — defaults: none, none, on",
+    ),
+)
+
+
+@dataclass(frozen=True)
+class _CliSeeds:
+    """The CLI/preset seeds the gateway resolution consults (ADR-029).
+
+    One immutable bundle so the default-state and group-applier helpers stay
+    under the complexity gates without threading twenty parameters each.
+    """
+
+    language: str
+    delivery: str | None
+    deploy: str | None
+    iac: str | None
+    multi_model: bool
+    governance: bool
+    observability: bool
+    memory: str | None
+    preset_memory: str
+    lifecycle: str | None
+    preset_lifecycle: str
+    no_docs: bool
+    no_renovate: bool
+    no_coauthor: bool
+    mcps: str
+    browser: bool
+    agents: str | None
+    owner: str
+    license_choice: str
+    devcontainer: bool
+    mise: bool
+    vscode: bool
+    review_cycles: int | None
+    profile: str | None
+
+
+@dataclass
+class _GatewayState:
+    """The mutable concern resolution the gateway groups refine (ADR-029).
+
+    Constructed by ``_default_gateway_state`` with every concern at the value
+    its chooser's Enter default produced pre-collapse (flags winning), then
+    selectively overwritten by ``_apply_opened_groups``.
+    """
+
+    profile: str
+    delivery: str
+    deploy: str
+    iac: str
+    agents: list[str]
+    agents_pinned: bool
+    owner: str
+    license_choice: str
+    devcontainer: bool
+    mise: bool
+    vscode: bool
+    want_docs: bool
+    renovate: bool
+    multi_model: bool
+    governance: bool
+    observability: bool
+    memory: str
+    lifecycle: str
+    review_cycles: int
+    coauthor: bool
+    memory_from_preset: bool
+    mcps: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _resolve_review_cycles(flag: int | None, lifecycle: str, *, ask: bool) -> int:
+    """#714 / PR #717 semantics, shared by the default path and the opened group.
+
+    Lifecycle none forces 0 and loudly drops a flag; otherwise the flag wins;
+    else the chooser (opened group) or its Enter default (standard path).
+    """
+    if lifecycle == "none":
+        if flag is not None:
+            console.print(
+                f"[yellow]--review-cycles {flag} ignored: no merge gate is "
+                "scaffolded with lifecycle 'none'.[/yellow]"
+            )
+        return 0
+    if flag is not None:
+        return flag
+    return _choose_review_cycles_interactive() if ask else 2
+
+
+def _validated_overlay_flags(seeds: _CliSeeds) -> tuple[str, str, str, bool]:
+    """Validate --delivery/--deploy/--iac without prompting (ADR-029 default path).
+
+    Returns (delivery, deploy, iac, needs_prompt): an invalid flag warns and
+    flips ``needs_prompt`` so the delivery group re-opens interactively — the
+    same never-crash, never-silently-drop fall-through the pre-collapse flow
+    had. A --deploy on a non-service delivery is dropped loudly, as before.
+    """
+    if not (seeds.delivery or seeds.deploy or seeds.iac):
+        return "prototype", "none", "none", False
+    try:
+        delivery = (
+            resolve_delivery(seeds.delivery, seeds.language) if seeds.delivery else "prototype"
+        )
+        iac = resolve_iac(seeds.iac) if seeds.iac else "none"
+        deploy = "none"
+        if delivery == "service":
+            deploy = resolve_deploy(seeds.deploy, delivery) if seeds.deploy else "none"
+        elif seeds.deploy and seeds.deploy.strip().lower() not in ("", "none"):
+            console.print(
+                f"[yellow]--deploy {seeds.deploy} ignored: deploy targets apply only "
+                f"to delivery=service (this is {delivery}).[/yellow]"
+            )
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        return "prototype", "none", "none", True
+    return delivery, deploy, iac, False
+
+
+def _default_gateway_state(seeds: _CliSeeds) -> tuple[_GatewayState, set[str]]:
+    """Resolve every concern to its standard-path value; flags always win.
+
+    Returns the state plus the groups that MUST open anyway (an invalid flag
+    fell through to its chooser, pre-collapse behavior).
+    """
+    force_open: set[str] = set()
+    delivery, deploy, iac, overlays_need_prompt = _validated_overlay_flags(seeds)
+    if overlays_need_prompt:
+        force_open.add("delivery")
+
+    mcps: list[dict[str, Any]] = []
+    if seeds.mcps.strip():
+        try:
+            mcps = _resolve_mcps_non_interactive(seeds.mcps, seeds.browser)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red] — choose from the catalog instead.")
+            force_open.add("integrations")
+    elif seeds.browser:
+        mcps = [PLAYWRIGHT_MCP]
+
+    # The chooser's Enter default is vscode-plus-claude (its option 1 is the
+    # vscode surface; panel says "Default: vscode only (plus claude)") — NOT
+    # the non-interactive path's claude-only default. Equivalence (ADR-029)
+    # binds the standard path to the CHOOSER's default (PR #896 review).
+    agents = ["claude", "vscode"]
+    agents_pinned = False
+    if seeds.agents is not None:
+        try:
+            agents = resolve_agents(seeds.agents)
+            agents_pinned = True
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
+            force_open.add("integrations")
+
+    lifecycle = seeds.lifecycle or seeds.preset_lifecycle
+    state = _GatewayState(
+        profile=seeds.profile or "individual",
+        delivery=delivery,
+        deploy=deploy,
+        iac=iac,
+        mcps=mcps,
+        agents=agents,
+        agents_pinned=agents_pinned,
+        owner=seeds.owner or "",
+        license_choice=seeds.license_choice or "none",
+        devcontainer=seeds.devcontainer,
+        mise=seeds.mise,
+        vscode=seeds.vscode,
+        want_docs=not seeds.no_docs,
+        renovate=not seeds.no_renovate,
+        multi_model=seeds.multi_model,
+        governance=seeds.governance,
+        observability=seeds.observability,
+        memory=seeds.memory or seeds.preset_memory,
+        lifecycle=lifecycle,
+        review_cycles=_resolve_review_cycles(seeds.review_cycles, lifecycle, ask=False),
+        coauthor=not seeds.no_coauthor,
+        memory_from_preset=seeds.memory is None,
+    )
+    return state, force_open
+
+
+def _pinned_gateway_flags(seeds: _CliSeeds) -> dict[str, list[str]]:
+    """Map each gateway group to the CLI flags already pinning part of it."""
+    candidates: dict[str, tuple[tuple[str, object], ...]] = {
+        "delivery": (
+            ("--delivery", seeds.delivery),
+            ("--deploy", seeds.deploy),
+            ("--iac", seeds.iac),
+        ),
+        "integrations": (
+            ("--mcps", seeds.mcps.strip()),
+            ("--browser", seeds.browser),
+            ("--agents", seeds.agents),
+        ),
+        "extras": (
+            ("--devcontainer", seeds.devcontainer),
+            ("--mise", seeds.mise),
+            ("--vscode", seeds.vscode),
+        ),
+        "quality": (("--no-docs", seeds.no_docs), ("--no-renovate", seeds.no_renovate)),
+        "overlays": (
+            ("--profile", seeds.profile),
+            ("--multi-model", seeds.multi_model),
+            ("governance (flag/preset)", seeds.governance),
+            ("--observability", seeds.observability),
+        ),
+        "memory": (
+            ("--memory", seeds.memory),
+            ("--lifecycle", seeds.lifecycle),
+            ("--review-cycles", seeds.review_cycles is not None),
+        ),
+        "details": (
+            ("--owner", seeds.owner),
+            ("--license", seeds.license_choice not in ("", "none")),
+            ("--no-coauthor", seeds.no_coauthor),
+        ),
+    }
+    return {
+        group: [flag for flag, value in pairs if value]
+        for group, pairs in candidates.items()
+        if any(value for _, value in pairs)
+    }
+
+
+def _apply_delivery_group(state: _GatewayState, seeds: _CliSeeds) -> None:
+    state.delivery, state.deploy, state.iac = _resolve_overlays_interactive(
+        seeds.language, seeds.delivery, seeds.deploy, seeds.iac
+    )
+
+
+def _apply_integrations_group(state: _GatewayState, seeds: _CliSeeds) -> None:
+    # Honor --mcps/--browser as before; --mcps still leaves the browser concern
+    # independently decidable inside the group (ADR-023). An explicit --agents
+    # (incl. `--agents claude`) stays pinned — flag beats prompt.
+    state.mcps = _gather_mcps_interactive(seeds.mcps, seeds.browser)
+    if not state.agents_pinned:
+        state.agents = _choose_agents_interactive()
+
+
+def _apply_details_group(state: _GatewayState, seeds: _CliSeeds) -> None:
+    state.owner = _prompt_validated(
+        "Owner/team for CODEOWNERS + LICENSE (e.g. @org/team)",
+        default=seeds.owner or "",
+        flag="owner",
+        allow_empty=True,
+    )
+    state.license_choice = _prompt_choice(
+        "License (mit/apache-2.0/proprietary/none)",
+        ("mit", "apache-2.0", "proprietary", "none"),
+        default=seeds.license_choice or "none",
+    )
+    if not seeds.no_coauthor:
+        # Co-Authored-By trailer (#888). --no-coauthor pre-declines and skips.
+        state.coauthor = _choose_coauthor_interactive()
+
+
+def _apply_extras_group(state: _GatewayState, seeds: _CliSeeds) -> None:
+    # A store_true CLI flag pre-accepts the toggle and skips its prompt.
+    state.devcontainer = seeds.devcontainer or _choose_devcontainer_interactive()
+    state.mise = seeds.mise or _choose_mise_interactive()
+    state.vscode = seeds.vscode or _choose_vscode_interactive()
+
+
+def _apply_quality_group(state: _GatewayState, seeds: _CliSeeds) -> None:
+    # Docs tooling axis (#477, ADR-022): --no-docs wins; only python/node have
+    # docs config to decide; other languages keep docs ON silently.
+    if not seeds.no_docs and seeds.language in ("python", "node"):
+        state.want_docs = _choose_docs_interactive(seeds.language)
+    if not seeds.no_renovate:
+        state.renovate = _choose_renovate_interactive()
+
+
+def _apply_memory_group(state: _GatewayState, seeds: _CliSeeds) -> None:
+    state.memory = seeds.memory or _choose_memory_interactive(default=seeds.preset_memory)
+    state.memory_from_preset = seeds.memory is None and state.memory == seeds.preset_memory
+    state.lifecycle = seeds.lifecycle or _choose_lifecycle_interactive(
+        default=seeds.preset_lifecycle
+    )
+    state.review_cycles = _resolve_review_cycles(seeds.review_cycles, state.lifecycle, ask=True)
+
+
+def _apply_opened_groups(state: _GatewayState, opened: set[str], seeds: _CliSeeds) -> None:
+    """Run the pre-collapse choosers for each opened group, in pre-collapse order."""
+    if "overlays" in opened:
+        state.profile = seeds.profile or _choose_profile_interactive()
+    if "delivery" in opened:
+        _apply_delivery_group(state, seeds)
+    if "integrations" in opened:
+        _apply_integrations_group(state, seeds)
+    if "details" in opened:
+        _apply_details_group(state, seeds)
+    if "extras" in opened:
+        _apply_extras_group(state, seeds)
+    if "quality" in opened:
+        _apply_quality_group(state, seeds)
+    if "overlays" in opened:
+        # Profile already resolved above (it led the pre-collapse sequence);
+        # the overlay toggles kept their pre-collapse position after quality.
+        _apply_overlays_toggles(state, seeds)
+    if "memory" in opened:
+        _apply_memory_group(state, seeds)
+
+
+def _apply_overlays_toggles(state: _GatewayState, seeds: _CliSeeds) -> None:
+    state.multi_model = seeds.multi_model or _choose_multi_model_interactive()
+    state.governance = seeds.governance or _choose_governance_interactive()
+    state.observability = seeds.observability or _choose_observability_interactive()
+
+
+def _choose_gateway_interactive(pinned: dict[str, list[str]]) -> set[str]:
+    """Offer the concern groups once; Enter takes the standard setup (ADR-029).
+
+    ``pinned`` maps a group key to the CLI flags already pinning part of it —
+    surfaced so a flag user sees their choices are honored without opening the
+    group. Deliberately NOT built on ``_prompt`` so pre-collapse ordered answer
+    iterators in tests never feed it by accident.
+    """
+    from rich.panel import Panel
+    from rich.prompt import Prompt
+
+    console.print(
+        Panel(
+            "The standard setup is ready — press [bold]Enter[/bold] to accept "
+            "it and every remaining concern takes its default (shown per group "
+            "below, echoed before scaffolding).\n\n"
+            "[cyan]Helps:[/cyan] open only the groups you want to shape; each "
+            "concern inside still explains its value and cost before asking.\n"
+            "[dim]Default: standard setup — no further questions.[/dim]",
+            title="Customize?",
+            border_style="cyan",
+        )
+    )
+    for i, (key, title, contents) in enumerate(_GATEWAY_GROUPS, 1):
+        note = f"  [yellow](pinned: {', '.join(pinned[key])})[/yellow]" if pinned.get(key) else ""
+        console.print(option_line(i, title, contents) + note)
+    console.print()
+
+    while True:
+        raw = Prompt.ask(
+            "Customize groups (comma-separated numbers, or Enter for the standard setup)",
+            default="",
+        )
+        if not raw.strip():
+            return set()
+        opened: set[str] = set()
+        invalid: list[str] = []
+        for part in raw.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            idx = int(part) - 1 if part.isdigit() else -1
+            if 0 <= idx < len(_GATEWAY_GROUPS):
+                opened.add(_GATEWAY_GROUPS[idx][0])
+            else:
+                invalid.append(part)
+        if invalid:
+            # Same contract as the MCP picker: never silently drop part of the
+            # user's selection — re-ask instead.
+            console.print(
+                f"[red]Invalid selection(s): {', '.join(invalid)}. "
+                f"Enter numbers 1-{len(_GATEWAY_GROUPS)}.[/red]"
+            )
+            continue
+        return opened
+
+
+def _print_resolution_summary(
+    inputs: ScaffoldInputs, *, preset_name: str, memory_from_preset: bool, title: str
+) -> None:
+    """Echo every resolved concern with its why/cost (ADR-029, ADR-023).
+
+    Rendered BEFORE the Customize gateway (so accepting the standard setup is
+    an informed decision, not a silent shortcut — the ADR-023 guarantee on the
+    collapsed path) and re-rendered before bootstrap when an opened group
+    changed anything. Leads with the real security surface: enforcement,
+    egress, lifecycle gate, MCP/agent capabilities, governance. The per-row
+    notes are compressed digests of the choosers' own ADR-023 panels.
+    """
+    from rich.table import Table
+
+    tier = memory_tier(inputs.memory)
+    egress = "marketplace egress off" if inputs.no_egress else "marketplace egress on"
+    table = Table(title=title, show_header=True, header_style="bold")
+    table.add_column("Concern")
+    table.add_column("Resolved")
+    table.add_column("Why · cost", style="dim")
+    rows: tuple[tuple[str, str, str], ...] = (
+        (
+            "profile / enforcement",
+            f"{inputs.profile} / {_profile_enforcement(inputs.profile)} / {egress}",
+            "who maintains it · advisory warns, hard blocks",
+        ),
+        (
+            "lifecycle / review cycles",
+            f"{inputs.lifecycle} / {inputs.review_cycles}",
+            "issue→branch→PR gates + merge review depth · adds process",
+        ),
+        (
+            "MCP servers",
+            ", ".join(m["id"] for m in inputs.selected_mcps) or "(none)",
+            "each server = a new tool/egress capability",
+        ),
+        (
+            "agent surfaces",
+            ", ".join(inputs.agents),
+            "each surface gets scaffolded config = a trust surface",
+        ),
+        (
+            "governance / observability / multi-model",
+            f"{'on' if inputs.governance else 'off'} / "
+            f"{'on' if inputs.observability else 'off'} / "
+            f"{'on' if inputs.multi_model else 'off'}",
+            "AUP+SYSTEM_CARD gate · transcript metrics · CCR routing",
+        ),
+        ("language", inputs.language, "sets toolchain, lint/test commands"),
+        (
+            "delivery / deploy / iac",
+            f"{inputs.delivery} / {inputs.deploy} / {inputs.iac}",
+            "shapes CI, deploy workflow, devcontainer",
+        ),
+        (
+            "memory",
+            f"{inputs.memory} (tier {tier or '-'})",
+            "graph/RAG are opt-in rungs; pay off at multi-project scale",
+        ),
+        (
+            "devcontainer / mise / vscode",
+            f"{'on' if inputs.devcontainer else 'off'} / "
+            f"{'on' if inputs.mise else 'off'} / "
+            f"{'on' if inputs.vscode else 'off'}",
+            "reproducible dev env extras · more files",
+        ),
+        (
+            "docs / renovate",
+            f"{'on' if inputs.want_docs else 'off'} / {'on' if inputs.renovate else 'off'}",
+            "docs site config · automated dependency PRs",
+        ),
+        (
+            "owner / license",
+            f"{inputs.owner or '(none)'} / {inputs.license_choice}",
+            "CODEOWNERS + LICENSE files",
+        ),
+        (
+            "co-author trailer",
+            "on" if inputs.coauthor else "off",
+            "Co-Authored-By: Claude on commits",
+        ),
+    )
+    for concern, resolved, why in rows:
+        table.add_row(concern, resolved, why)
+    console.print(table)
+    console.print(
+        "[dim]safety.allow starts [] (deny-by-default) — hand-edit "
+        ".agents/config.yaml to extend; preserved on re-run.[/dim]"
+    )
+    if memory_from_preset:
+        # ADR-024: the wizard guidance must position the rag tier even when the
+        # preset pinned the stack and the ladder chooser never ran.
+        console.print(
+            f"[dim]Memory came from preset '{preset_name or 'the chosen preset'}' — "
+            "the full ladder (auto / obsidian / graphify / rag) is under "
+            "Customize; the rag tier pays off only at multi-project / monorepo "
+            "scale.[/dim]"
+        )
+
+
 def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map to prompts
     default_name: str,
     *,
@@ -696,6 +1206,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     cli_python_version: str | None = None,
     cli_review_cycles: int | None = None,
     target: Path | None = None,
+    preset_name: str = "",
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -711,10 +1222,15 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     resolves non-interactively (falling back to the catalog on a bad id); and the
     store_true toggles (browser/devcontainer/mise/vscode) skip their prompt when
     set.
+
+    ADR-029 (the gateway collapse): the default path asks six questions —
+    preset (before this function), name, description, language, the Customize
+    gateway, and bootstrap. Every other concern lives in a gateway group; a
+    group left unopened resolves to exactly the value its chooser's Enter
+    default produced pre-collapse (flags always win over everything), and the
+    full resolution is echoed before the final question.
     """
     _print_wizard_guidance()
-    resolved_profile = profile or _choose_profile_interactive()
-    no_plugin = _profile_delivery_no_plugin(resolved_profile, no_plugin)
     project_name = _prompt_validated("Project name", default=cli_name or default_name, flag="name")
     # Interactive accept-default flows need a usable description. The
     # non-interactive path still requires --description; here we derive a plain
@@ -758,126 +1274,91 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         governance_flag,
         observability_flag,
     ) = cli_overlays
-    resolved_delivery, resolved_deploy, resolved_iac = _resolve_overlays_interactive(
-        language, delivery_flag, deploy_flag, iac_flag
-    )
-
-    # MCP selection — honor --mcps/--browser if given, else catalog multi-select.
-    selected_mcps = _gather_mcps_interactive(cli_mcps, cli_browser)
-
-    # Governance (PI-145).
-    owner = _prompt_validated(
-        "Owner/team for CODEOWNERS + LICENSE (e.g. @org/team)",
-        default=cli_owner or "",
-        flag="owner",
-        allow_empty=True,
-    )
-    license_choice = _prompt_choice(
-        "License (mit/apache-2.0/proprietary/none)",
-        ("mit", "apache-2.0", "proprietary", "none"),
-        default=cli_license or "none",
-    )
-
-    # Toolchain toggles — each explains its value before asking (#472, ADR-023).
-    # A store_true CLI flag pre-accepts the toggle and skips its prompt.
-    devcontainer = cli_devcontainer or _choose_devcontainer_interactive()
-    mise = cli_mise or _choose_mise_interactive()
-    vscode = cli_vscode or _choose_vscode_interactive()
-    # Docs tooling axis (#477, ADR-022). The --no-docs flag wins (skip the
-    # prompt); otherwise default ON and only ask for the languages whose docs
-    # config ships (mkdocs→python, typedoc→node) — other languages get no docs
-    # file from the gate, so the question is skipped there.
-    if no_docs:
-        want_docs = False
-    elif language in ("python", "node"):
-        want_docs = _choose_docs_interactive(language)
-    else:
-        want_docs = True
-    # Renovate dependency-update config (#477, ADR-022). --no-renovate wins.
-    want_renovate = False if no_renovate else _choose_renovate_interactive()
-    # Multi-model switching overlay (ADR-016, #351/#352). The flag pre-accepts it;
-    # otherwise the wizard explains what it does + the alternatives, then asks.
-    resolved_multi_model = multi_model_flag or _choose_multi_model_interactive()
-    # AI-governance overlay (ADR-018, #410). The flag pre-accepts it; otherwise
-    # the wizard explains what it ships, then asks (strictly opt-in).
-    resolved_governance = governance_flag or _choose_governance_interactive()
-    # Observability overlay (ADR-019, #404). The flag pre-accepts it; otherwise
-    # the wizard explains what it ships, then asks (strictly opt-in).
-    resolved_observability = observability_flag or _choose_observability_interactive()
-    # Memory backend (#466). The --memory flag wins; otherwise the wizard explains
-    # the backends and asks, defaulting to the chosen preset's memory stack.
-    resolved_memory = memory_flag or _choose_memory_interactive(default=preset_memory)
-    # GitHub lifecycle tier (#476). The --lifecycle flag wins; otherwise the
-    # wizard explains it and asks, defaulting to the chosen preset's tier.
-    resolved_lifecycle = lifecycle_flag or _choose_lifecycle_interactive(default=preset_lifecycle)
-    # #714: cycles configure the scaffolded monitor_pr.sh, which only ships with
-    # the lifecycle. Asking a `--lifecycle none` user to size a review gate they
-    # will never run is noise, so the prompt is gated on the resolved tier.
-    #
-    # PR #717 review: a CLI value reaching the wizard used to be copied raw —
-    # `--review-cycles -1` wrote an invalid config that later crashed
-    # monitor_pr.sh, and a flag paired with an interactively-chosen
-    # `lifecycle none` was dropped in silence. main() rejects a negative value
-    # and an explicit `--lifecycle none` up front; what it cannot know is a tier
-    # the user picks at the prompt, so that case warns and drops here rather
-    # than aborting a wizard the user has already half-answered.
-    if resolved_lifecycle == "none":
-        if cli_review_cycles is not None:
-            console.print(
-                f"[yellow]--review-cycles {cli_review_cycles} ignored: no merge gate is "
-                "scaffolded with lifecycle 'none'.[/yellow]"
-            )
-        review_cycles = 0
-    elif cli_review_cycles is not None:
-        review_cycles = cli_review_cycles
-    else:
-        review_cycles = _choose_review_cycles_interactive()
-    # An explicit --agents (including `--agents claude` for a claude-only
-    # project) is honored; an absent flag (None) opens the surface chooser —
-    # mirroring how every other concern flag wins over its interactive prompt.
-    if cli_agents is not None:
-        try:
-            agents = resolve_agents(cli_agents)
-        except ValueError as e:
-            console.print(f"[red]{e}[/red]")
-            agents = _choose_agents_interactive()
-    else:
-        agents = _choose_agents_interactive()
-
-    return ScaffoldInputs(
-        project_name=project_name,
-        project_description=project_description,
+    seeds = _CliSeeds(
         language=language,
-        selected_mcps=selected_mcps,
-        owner=owner,
-        license_choice=license_choice,
-        devcontainer=devcontainer,
-        mise=mise,
-        vscode=vscode,
-        agents=agents,
-        no_plugin=no_plugin,
-        profile=resolved_profile,
-        no_egress=no_egress,
-        python_version=python_version,
-        review_cycles=review_cycles,
-        delivery=resolved_delivery,
-        deploy=resolved_deploy,
-        iac=resolved_iac,
-        multi_model=resolved_multi_model,
-        governance=resolved_governance,
-        observability=resolved_observability,
-        memory=resolved_memory,
-        lifecycle=resolved_lifecycle,
-        want_docs=want_docs,
-        renovate=want_renovate,
-        # Co-Authored-By: Claude commit trailer (#888). --no-coauthor pre-declines
-        # and skips the prompt, mirroring --no-docs / --no-renovate.
-        coauthor=False if no_coauthor else _choose_coauthor_interactive(),
-        # Post-scaffold bootstrap (#887) — the FINAL question (kwargs evaluate
-        # left-to-right, so this prompt follows coauthor's). --bootstrap
-        # pre-accepts and skips the prompt.
-        bootstrap=True if cli_bootstrap else _choose_bootstrap_interactive(),
+        delivery=delivery_flag,
+        deploy=deploy_flag,
+        iac=iac_flag,
+        multi_model=multi_model_flag,
+        governance=governance_flag,
+        observability=observability_flag,
+        memory=memory_flag,
+        preset_memory=preset_memory,
+        lifecycle=lifecycle_flag,
+        preset_lifecycle=preset_lifecycle,
+        no_docs=no_docs,
+        no_renovate=no_renovate,
+        no_coauthor=no_coauthor,
+        mcps=cli_mcps,
+        browser=cli_browser,
+        agents=cli_agents,
+        owner=cli_owner,
+        license_choice=cli_license,
+        devcontainer=cli_devcontainer,
+        mise=cli_mise,
+        vscode=cli_vscode,
+        review_cycles=cli_review_cycles,
+        profile=profile,
     )
+    # ── ADR-029: resolve every concern to its standard-path value first (each
+    # the value its chooser's Enter default produced pre-collapse; flags win). ──
+    state, force_open = _default_gateway_state(seeds)
+
+    def _build_inputs(*, bootstrap: bool) -> ScaffoldInputs:
+        return ScaffoldInputs(
+            project_name=project_name,
+            project_description=project_description,
+            language=language,
+            selected_mcps=state.mcps,
+            owner=state.owner,
+            license_choice=state.license_choice,
+            devcontainer=state.devcontainer,
+            mise=state.mise,
+            vscode=state.vscode,
+            agents=state.agents,
+            no_plugin=_profile_delivery_no_plugin(state.profile, no_plugin),
+            profile=state.profile,
+            no_egress=no_egress,
+            python_version=python_version,
+            review_cycles=state.review_cycles,
+            delivery=state.delivery,
+            deploy=state.deploy,
+            iac=state.iac,
+            multi_model=state.multi_model,
+            governance=state.governance,
+            observability=state.observability,
+            memory=state.memory,
+            lifecycle=state.lifecycle,
+            want_docs=state.want_docs,
+            renovate=state.renovate,
+            coauthor=state.coauthor,
+            bootstrap=bootstrap,
+        )
+
+    # The informed-consent preview (ADR-023 on the collapsed path): show the
+    # full annotated resolution BEFORE the gateway, so accepting the standard
+    # setup is a decision made looking at it, not a silent shortcut.
+    _print_resolution_summary(
+        _build_inputs(bootstrap=False),
+        preset_name=preset_name,
+        memory_from_preset=state.memory_from_preset,
+        title="Standard setup (accept, or customize any group)",
+    )
+    opened = _choose_gateway_interactive(_pinned_gateway_flags(seeds)) | force_open
+    _apply_opened_groups(state, opened, seeds)
+    if opened:
+        # Something changed — re-echo the final resolution before the last
+        # question so what scaffolds is never stale relative to what was shown.
+        _print_resolution_summary(
+            _build_inputs(bootstrap=False),
+            preset_name=preset_name,
+            memory_from_preset=state.memory_from_preset,
+            title="Resolved configuration",
+        )
+
+    # Post-scaffold bootstrap (#887) — the FINAL question. --bootstrap
+    # pre-accepts and skips the prompt.
+    return _build_inputs(bootstrap=True if cli_bootstrap else _choose_bootstrap_interactive())
 
 
 def _choose_delivery_interactive(language: str) -> str:

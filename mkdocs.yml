@@ -55,6 +55,7 @@ nav:
     - Tier-3 RAG engine (cocoindex): adr/adr-026-tier3-rag-engine-cocoindex.md
     - Claude config projection (.claude mirror): adr/adr-027-claude-config-projection.md
     - Session-scoped reminder injection: adr/adr-028-session-scoped-reminder-injection.md
+    - Gateway wizard (six-ask default path): adr/adr-029-gateway-wizard.md
   - Development:
     - Template system: development/template-system.md
     - Memory descriptor: development/memory-descriptor.md

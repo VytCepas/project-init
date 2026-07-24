@@ -479,6 +479,7 @@ def _cli(argv: list[str]) -> int:
             cli_python_version=args.python_version,
             cli_review_cycles=args.review_cycles,
             target=target,
+            preset_name=str(preset.get("name", "")),
             cli_overlays=(
                 args.delivery,
                 args.deploy,

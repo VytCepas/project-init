@@ -156,7 +156,7 @@ After the **git install** (`install.sh`), a `/project-init` slash command is ava
 /project-init
 ```
 
-This runs the interactive wizard in the current project directory. It asks for project name, language, delivery model, memory stack, and MCPs — then scaffolds `.agents/` for you. The recommended path is to answer the identity questions, then press Enter to accept each default unless you already know you need the extra capability.
+This runs the interactive wizard in the current project directory. The default path is **six questions** (ADR-029): preset, name, description, language, one **Customize?** gateway, and bootstrap. Every remaining concern (delivery, MCPs, memory ladder, lifecycle, governance, dev extras, …) resolves to its documented default, is annotated with its why/cost in a resolution preview shown *before* you accept, and is one gateway selection away when you want to shape it — each concern still explains itself before asking (ADR-023).
 
 ### Option 2: From a shell (non-interactive, for CI / scripts)
 
@@ -192,7 +192,7 @@ project-init . --non-interactive --preset core \
 You can add any declined concern later (see
 [Adding or removing a concern later](#adding-or-removing-a-concern-later)).
 
-The wizard asks (interactive mode only):
+The wizard's concerns (interactive: the identity questions up front, the rest grouped behind the Customize gateway per ADR-029 — a flag always pins its concern and skips the prompt):
 
 - Project name / description
 - Language (Python/Node/Go/Rust/none) — drives `lint_command`, `format_command`, `test_command`

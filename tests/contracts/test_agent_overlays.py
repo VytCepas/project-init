@@ -109,6 +109,9 @@ class TestAgentSelection:
         prompt_answers = iter(["proj", "desc", "python", "3.11", "@owner", "none"])
         ask_answers = iter(["4,10", "4"])
         monkeypatch.setattr(_wiz, "_prompt", lambda *a, **k: next(prompt_answers))
+        # ADR-029: open the integrations group so the surface chooser runs and
+        # the Prompt.ask iterator feeds it (not the gateway).
+        monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: {"integrations"})
         monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: next(ask_answers))
         monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
         monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)

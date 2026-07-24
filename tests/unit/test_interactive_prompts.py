@@ -107,8 +107,11 @@ def test_gather_inputs_interactive_honors_explicit_agents_claude(monkeypatch):
 
 
 def test_gather_inputs_interactive_absent_agents_opens_chooser(monkeypatch):
-    """An absent --agents flag (None) still opens the surface chooser."""
+    """An absent --agents flag (None) opens the surface chooser when the
+    integrations group is opened at the gateway (ADR-029); an unopened gateway
+    keeps the claude-only default, which the standard-path test pins."""
     monkeypatch.setattr(_wiz, "_prompt", lambda _label, default="": default)
+    monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: {"integrations"})
     monkeypatch.setattr("rich.prompt.Prompt.ask", lambda *a, **k: k.get("default", ""))
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: k.get("default", False))
 
