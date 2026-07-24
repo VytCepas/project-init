@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from project_init.box_profile import BoxProfile
 from project_init.cli_output import _presets_payload
 from project_init.console import (
     console,
@@ -885,6 +886,46 @@ def _default_gateway_state(seeds: _CliSeeds) -> tuple[_GatewayState, set[str]]:
     return state, force_open
 
 
+def _apply_box_profile(
+    state: _GatewayState, seeds: _CliSeeds, box: BoxProfile | None
+) -> str | None:
+    """Seed unflagged DEFAULTS from the box profile (BOX-1, advisory-only).
+
+    Returns the single advisory line to print, or None when no profile exists.
+    Flags always beat the box; the box only moves defaults, so every seed
+    remains changeable at the gateway. Unknown names are ignored and reported
+    in the same line — never an error (harbor CONTRACTS/box-profile.md v1).
+    """
+    if box is None:
+        return None
+    seeded: list[str] = []
+    ignored: list[str] = []
+    if box.harnesses and seeds.agents is None:
+        known_surfaces = {"claude"} | {name for name, _ in _AGENT_SURFACES}
+        valid = [s for s in box.harnesses if s in known_surfaces]
+        ignored += [s for s in box.harnesses if s not in known_surfaces]
+        if valid:
+            if "claude" not in valid:
+                valid.insert(0, "claude")
+            state.agents = list(dict.fromkeys(valid))
+            seeded.append(f"agents={','.join(state.agents)}")
+    if box.mcp_roster and not seeds.mcps.strip() and not seeds.browser:
+        by_id = {m["id"]: m for m in MCP_CATALOG}
+        by_id[PLAYWRIGHT_MCP["id"]] = PLAYWRIGHT_MCP
+        valid_mcps = [by_id[i] for i in dict.fromkeys(box.mcp_roster) if i in by_id]
+        ignored += [i for i in box.mcp_roster if i not in by_id]
+        if valid_mcps:
+            state.mcps = valid_mcps
+            seeded.append(f"mcps={','.join(m['id'] for m in valid_mcps)}")
+    if box.profile is not None and seeds.profile is None:
+        state.profile = box.profile
+        seeded.append(f"profile={box.profile}")
+    line = f"Box profile: {box.source} — seeded: {', '.join(seeded) or 'nothing (flags pinned)'}"
+    if ignored:
+        line += f"; ignored unknown: {', '.join(dict.fromkeys(ignored))}"
+    return line
+
+
 def _pinned_gateway_flags(seeds: _CliSeeds) -> dict[str, list[str]]:
     """Map each gateway group to the CLI flags already pinning part of it."""
     candidates: dict[str, tuple[tuple[str, object], ...]] = {
@@ -1207,6 +1248,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     cli_review_cycles: int | None = None,
     target: Path | None = None,
     preset_name: str = "",
+    box_profile: BoxProfile | None = None,
 ) -> ScaffoldInputs:
     """Prompt for the profile, project basics, MCPs, governance, and overlays.
 
@@ -1303,6 +1345,9 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
     # ── ADR-029: resolve every concern to its standard-path value first (each
     # the value its chooser's Enter default produced pre-collapse; flags win). ──
     state, force_open = _default_gateway_state(seeds)
+    box_advisory = _apply_box_profile(state, seeds, box_profile)
+    if box_advisory:
+        console.print(f"[dim]{box_advisory}[/dim]")
 
     def _build_inputs(*, bootstrap: bool) -> ScaffoldInputs:
         return ScaffoldInputs(

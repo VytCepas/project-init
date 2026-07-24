@@ -23,6 +23,13 @@ Post-scaffold bootstrap (#887): optionally initialize the environment.
 - `def run_bootstrap` — Initialize the scaffolded project in *target*; return per-step outcomes.
 - `def print_bootstrap_report` — Render the bootstrap outcome — one line per step, failures loud.
 
+### `project_init/box_profile.py`
+
+Harbor box-profile seam (BOX-1): advisory wizard defaults from the box.
+
+- `class BoxProfile` — A successfully-parsed box profile (already contract-validated).
+- `def load_box_profile` — Read the box profile; every failure path is silent and returns None.
+
 ### `project_init/capabilities.py`
 
 Deterministic capabilities inventory (PI-374, ADR-017).

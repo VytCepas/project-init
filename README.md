@@ -194,6 +194,8 @@ You can add any declined concern later (see
 
 The wizard's concerns (interactive: the identity questions up front, the rest grouped behind the Customize gateway per ADR-029 — a flag always pins its concern and skips the prompt):
 
+> **Box profile (optional):** a machine-local `~/.claude/box-profile.toml` (override: `PROJECT_INIT_BOX_PROFILE`) may seed the *defaults* for agent surfaces, the MCP selection, and the distribution profile — advisory only, every seed changeable, flags always win, and an absent/invalid file changes nothing (contract: `VytCepas/harbor` `CONTRACTS/box-profile.md`).
+
 - Project name / description
 - Language (Python/Node/Go/Rust/none) — drives `lint_command`, `format_command`, `test_command`
 - Delivery model (`--delivery library|service|prototype`) — how the project ships, driving its env/CI/release bundle (ADR-015). `service` adds the container **parity bundle** (Dockerfile + `compose.yaml` + devcontainer + `just up`/`build`) and unlocks the deploy overlay; `library` adds a tag-triggered release workflow (publish **disabled** until you wire the registry); `prototype` (default) adds nothing env-specific. `service` requires a language.

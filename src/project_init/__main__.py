@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 # Re-exported for backward compat (importers of project_init.__main__).
+from project_init.box_profile import load_box_profile
 from project_init.cli_output import (
     _MEMORY_NEXT_STEPS as _MEMORY_NEXT_STEPS,
 )
@@ -480,6 +481,9 @@ def _cli(argv: list[str]) -> int:
             cli_review_cycles=args.review_cycles,
             target=target,
             preset_name=str(preset.get("name", "")),
+            # BOX-1 (harbor CONTRACTS/box-profile.md): advisory defaults from
+            # the box; every failure path is None and changes nothing.
+            box_profile=load_box_profile(),
             cli_overlays=(
                 args.delivery,
                 args.deploy,
