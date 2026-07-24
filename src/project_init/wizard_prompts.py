@@ -675,7 +675,7 @@ _GATEWAY_GROUPS: tuple[tuple[str, str, str], ...] = (
     (
         "integrations",
         "Integrations",
-        "MCP servers, browser automation, agent surfaces — defaults: none, off, claude",
+        "MCP servers, browser automation, agent surfaces — defaults: none, off, claude+vscode",
     ),
     (
         "extras",
@@ -843,7 +843,11 @@ def _default_gateway_state(seeds: _CliSeeds) -> tuple[_GatewayState, set[str]]:
     elif seeds.browser:
         mcps = [PLAYWRIGHT_MCP]
 
-    agents = resolve_agents("claude")
+    # The chooser's Enter default is vscode-plus-claude (its option 1 is the
+    # vscode surface; panel says "Default: vscode only (plus claude)") — NOT
+    # the non-interactive path's claude-only default. Equivalence (ADR-029)
+    # binds the standard path to the CHOOSER's default (PR #896 review).
+    agents = ["claude", "vscode"]
     agents_pinned = False
     if seeds.agents is not None:
         try:

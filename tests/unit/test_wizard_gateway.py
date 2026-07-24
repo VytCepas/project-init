@@ -38,7 +38,10 @@ def test_enter_only_matches_the_pre_collapse_defaults(monkeypatch):
     assert inputs.devcontainer is False
     assert inputs.mise is False
     assert inputs.vscode is False
-    assert inputs.agents == ["claude"]
+    # Verified against _choose_agents_interactive itself: Enter (default "1")
+    # selects the vscode surface -> ["claude", "vscode"] (PR #896 review
+    # caught the claude-only literal this test originally pinned).
+    assert inputs.agents == ["claude", "vscode"]
     assert inputs.profile == "individual"
     assert inputs.python_version == ""
     assert inputs.review_cycles == 2
