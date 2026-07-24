@@ -137,6 +137,8 @@ def test_wizard_skips_the_prompt_when_lifecycle_is_declined(monkeypatch):
         return next(answers)
 
     monkeypatch.setattr(_wiz, "_prompt", fake_prompt)
+    # ADR-029: open the memory group so the lifecycle chooser runs.
+    monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: {"memory"})
     monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
     monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
     monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
@@ -158,6 +160,8 @@ def _wizard_with_flag(monkeypatch, *, lifecycle: str, cli_cycles: int | None):
 
     answers = iter(["proj", "desc", "go", "", "none"])
     monkeypatch.setattr(_wiz, "_prompt", lambda *a, **k: next(answers))
+    # ADR-029: open the memory group so lifecycle/review choosers are exercised.
+    monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: {"memory"})
     monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
     monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
     monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")

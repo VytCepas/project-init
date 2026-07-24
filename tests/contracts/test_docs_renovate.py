@@ -216,6 +216,8 @@ class TestInteractiveFlags:
         # "3.11" answers the target-Python prompt a python scaffold now asks (#628).
         answers = iter(["proj", "desc", "python", "3.11", "@owner", "none", "claude"])
         monkeypatch.setattr(_wiz, "_prompt", lambda *a, **k: next(answers))
+        # ADR-029: open the group under test so its prompts are reachable.
+        monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: {"quality"})
         monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
         monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
         monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")

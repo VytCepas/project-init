@@ -156,6 +156,8 @@ def _wizard(
         return next(answer_iter)
 
     monkeypatch.setattr(_wiz, "_prompt", fake_prompt)
+    # ADR-029: the gateway stays closed — identity prompts bind positionally.
+    monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: set())
     monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
     monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
     monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
