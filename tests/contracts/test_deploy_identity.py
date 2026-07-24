@@ -101,6 +101,25 @@ class TestRendering:
         assert '--region "europe-west1"' in workflow
         assert "$REGION" not in workflow
 
+    def test_deploy_workflow_stub_names_the_captured_app(self, tmp_path: Path):
+        """PR #900 review: a custom --deploy-app must reach the Cloud Run stubs
+        — otherwise following the generated workflow deploys the repo slug
+        instead of the captured service."""
+        _service_config(tmp_path, deploy_app="billing-api")
+        workflow = (tmp_path / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
+        assert "gcloud run deploy billing-api" in workflow
+
+    def test_backfill_preserves_the_slug_app_for_old_service_records(self):
+        """PR #900 review: the overlay-off spread later in the same dict was
+        clobbering the backfilled app to "" — an upgraded pre-capture service
+        must re-render app from its recorded slug, byte-identically."""
+        from project_init.upgrade import _backfill_variables
+
+        v = _backfill_variables({"project_slug": "old-svc", "language": "python"})
+        assert v["deploy_app"] == "old-svc"
+        assert v["deploy_region"] == "us-central1"
+        assert v["deploy_health_url"] == ""
+
 
 class TestValidation:
     @pytest.mark.parametrize("bad", ["has space", "sla/sh", "q!uote"])

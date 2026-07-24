@@ -77,9 +77,9 @@ jobs:
       - name: Deploy ${{ env.IMAGE }} to staging
         run: |
 {{#if deploy_cloud_run}}          # TODO: authenticate to GCP (workload identity), then:
-          # gcloud run deploy {{project_slug}} --image "$IMAGE" --region "{{deploy_region}}"
-{{/if deploy_cloud_run}}{{#if deploy_fly}}          # TODO: flyctl deploy --image "$IMAGE" --app {{project_slug}}-staging
-{{/if deploy_fly}}{{#if deploy_k8s}}          # TODO: kubectl set image deploy/{{project_slug}} app="$IMAGE" -n staging
+          # gcloud run deploy {{deploy_app}} --image "$IMAGE" --region "{{deploy_region}}"
+{{/if deploy_cloud_run}}{{#if deploy_fly}}          # TODO: flyctl deploy --image "$IMAGE" --app {{deploy_app}}-staging
+{{/if deploy_fly}}{{#if deploy_k8s}}          # TODO: kubectl set image deploy/{{deploy_app}} app="$IMAGE" -n staging
           #   (or: helm upgrade --set image="$IMAGE")
 {{/if deploy_k8s}}          echo "Deploy '$IMAGE' to staging — replace this with your ship command."
 
@@ -99,8 +99,8 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Deploy ${{ env.IMAGE }} to production
         run: |
-{{#if deploy_cloud_run}}          # TODO: gcloud run deploy {{project_slug}} --image "$IMAGE" --region "{{deploy_region}}"
-{{/if deploy_cloud_run}}{{#if deploy_fly}}          # TODO: flyctl deploy --image "$IMAGE" --app {{project_slug}}
-{{/if deploy_fly}}{{#if deploy_k8s}}          # TODO: kubectl set image deploy/{{project_slug}} app="$IMAGE" -n production
+{{#if deploy_cloud_run}}          # TODO: gcloud run deploy {{deploy_app}} --image "$IMAGE" --region "{{deploy_region}}"
+{{/if deploy_cloud_run}}{{#if deploy_fly}}          # TODO: flyctl deploy --image "$IMAGE" --app {{deploy_app}}
+{{/if deploy_fly}}{{#if deploy_k8s}}          # TODO: kubectl set image deploy/{{deploy_app}} app="$IMAGE" -n production
 {{/if deploy_k8s}}          echo "Deploy '$IMAGE' to production — replace this with your ship command."
 {{/if deploy_container}}

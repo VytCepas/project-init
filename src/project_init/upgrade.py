@@ -797,12 +797,6 @@ def _backfill_variables(variables: dict[str, str]) -> dict[str, str]:
     recorded_agents = _recorded_agents(v)
 
     derived: dict[str, str] = {
-        # Deploy identity (PI-899): a pre-capture record rendered app from the
-        # slug and the static us-central1/empty literals — backfill exactly
-        # those so a strict re-render reproduces the old block byte-for-byte.
-        "deploy_app": v.get("project_slug", "") or "my-app",
-        "deploy_region": "us-central1",
-        "deploy_health_url": "",
         # Descriptor contract (#498): a pre-field record backfills to current so
         # the staging strict-render succeeds; a post-field record carries its own
         # value, which the setdefault below preserves.
@@ -842,6 +836,14 @@ def _backfill_variables(variables: dict[str, str]) -> dict[str, str]:
         # Opt-in overlays + governance default off — they postdate the record;
         # shared with migration (PI-190).
         **_overlay_off_defaults(),
+        # Deploy identity (PI-899): AFTER the overlay-off spread, or its
+        # deploy_app="" would clobber this (PR #900 review) — a pre-capture
+        # service record rendered app from the slug and the static
+        # us-central1/empty literals; backfill exactly those so a strict
+        # re-render reproduces the old block byte-for-byte.
+        "deploy_app": v.get("project_slug", "") or "my-app",
+        "deploy_region": "us-central1",
+        "deploy_health_url": "",
         # Per-agent AGENTS.md gates (2026-07 QA) postdate older records — derive
         # from the recorded agents list, AFTER the off-defaults spread so the
         # derivation wins over the generic "" (a recorded flag still wins via
