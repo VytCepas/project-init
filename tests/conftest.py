@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from pathlib import Path
 
 import pytest
+
+# BOX-1 hermeticity (harbor CONTRACTS/box-profile.md): a developer's real
+# ~/.claude/box-profile.toml must never leak into the suite — point the loader
+# at a guaranteed-absent path unless a test overrides it (subprocess runs
+# inherit this env too).
+os.environ.setdefault("PROJECT_INIT_BOX_PROFILE", "/nonexistent/box-profile.toml")
 
 _PATH_MARKERS = {
     "unit": "unit",
