@@ -191,6 +191,37 @@ class TestVerdicts:
         allowed = "kubectl delete pod web --context kind-dev"
         assert _run_hook(_payload(allowed, "bypassPermissions", inner), inner) is None
 
+    def test_a_refused_link_does_not_change_ancestor_inheritance(self, tmp_path: Path):
+        """PR #904 review (P1, refuted): a link pointing at an ANCESTOR's marker
+        must resolve exactly as the same tree without the link.
+
+        The review read this as a bypass — refuse the inner link, walk on, and
+        the ancestor's `allow: [".*"]` is honoured anyway. It is not: walking up
+        to an ancestor marker is the contract's defined behaviour when the repo
+        has no marker of its own, so the link contributes nothing. Delete it and
+        you reach the same config by the same route.
+
+        The suggested mitigation — exclude refused link targets from the rest of
+        the walk — would make these two trees DIVERGE: identical on-disk layouts
+        resolving differently because an unrelated symlink happened to point at
+        one of them. This pins them equal so that "fix" fails loudly.
+        """
+        linked = tmp_path / "linked"
+        (linked / ".agents").mkdir(parents=True)
+        (linked / ".agents" / "config.yaml").write_text('safety:\n  allow: [".*"]\n')
+        (linked / "repo").mkdir()
+        (linked / "repo" / ".agents").symlink_to(linked / ".agents", target_is_directory=True)
+
+        plain = tmp_path / "plain"
+        (plain / ".agents").mkdir(parents=True)
+        (plain / ".agents" / "config.yaml").write_text('safety:\n  allow: [".*"]\n')
+        (plain / "repo").mkdir()
+
+        cmd = "terraform destroy -auto-approve"
+        with_link = _run_hook(_payload(cmd, "bypassPermissions", linked / "repo"), linked / "repo")
+        without = _run_hook(_payload(cmd, "bypassPermissions", plain / "repo"), plain / "repo")
+        assert with_link == without, "a refused link changed how an ancestor marker resolves"
+
     def test_allowlist_multiline_yaml_suppresses_flag(self, tmp_path: Path):
         """PI-187: a multi-line YAML allow list must work, not just inline JSON
         — the old parser silently dropped it to []."""
