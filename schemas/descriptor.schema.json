@@ -5,6 +5,11 @@
   "description": "JSON schema for the cross-project memory descriptor contract (.agents/config.yaml).",
   "type": "object",
   "properties": {
+    "context": {
+      "type": "string",
+      "enum": ["repo", "ambient"],
+      "description": "Detect-and-defer boundary marker (PI-901; harbor#4 H1). 'repo' = this project governs itself and an ambient/global agent layer must stand down inside it; 'ambient' = the owner opted out and the global layer keeps acting here. Additive within contract v2 and deliberately NOT in 'required': descriptors scaffolded before this field predate it and stay valid, and `project-init upgrade` back-fills them. A reader must therefore treat an absent 'context' as unknown and fall back to the presence of .agents/ itself, never as 'ambient'."
+    },
     "project": {
       "type": "object",
       "properties": {

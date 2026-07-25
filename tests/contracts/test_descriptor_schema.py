@@ -161,6 +161,21 @@ class TestContractVersionAndBlocks:
         config = _render_full(tmp_path)
         assert config["ci"]["status_field"] == ""
 
+    def test_emits_the_detect_and_defer_context_marker(self, tmp_path: Path):
+        # PI-901 / harbor#4 H1. This is the assertion that actually protects the
+        # marker: `context` is optional in the schema (pre-PI-901 descriptors
+        # must stay valid until `upgrade` back-fills them), so schema validation
+        # alone would pass with the key dropped from the template entirely.
+        config = _render_full(tmp_path)
+        assert config["context"] == "repo"
+
+    def test_does_not_overload_the_governance_boolean(self, tmp_path: Path):
+        # harbor CONTRACTS/marker.md: `governance` is already a project-init
+        # boolean (the ADR-018 overlay gate). The marker must not reuse the name
+        # — this scaffold renders WITH governance=True, so a collision would
+        # show up here as a stray top-level key.
+        assert "governance" not in _render_full(tmp_path)
+
 
 class TestSchemaAccessor:
     """PI-786: the schemas are a consumable, versioned artifact a downstream
@@ -170,8 +185,39 @@ class TestSchemaAccessor:
         schema = load_descriptor_schema()
         props = schema["properties"]
         # The v2 contract surfaces a root orchestrator reads must be defined.
-        assert {"deploy", "observability", "hooks", "tooling", "memory", "ci"} <= set(props)
+        assert {"deploy", "observability", "hooks", "tooling", "memory", "ci", "context"} <= set(
+            props
+        )
         assert "v2" in schema["title"]
+
+    def test_schema_rejects_a_mistyped_context_value(self):
+        # PI-901: the marker is read by three separate implementations across two
+        # languages, so a near-miss value ("Repo", "project") is the realistic
+        # failure — it looks marked to a human and resolves to nothing in code.
+        # The enum is what turns that into a validation error instead of silence.
+        schema = load_descriptor_schema()
+        descriptor = {
+            "project": {"name": "x", "description": "y"},
+            "language": "python",
+            "delivery": "library",
+            "context": "Repo",
+        }
+        with pytest.raises(jsonschema.exceptions.ValidationError):
+            jsonschema.validate(instance=descriptor, schema=schema)
+
+    def test_schema_still_accepts_a_descriptor_with_no_context(self):
+        # Every project scaffolded before PI-901 has one. Making `context`
+        # required would fail-closed on the entire installed base until the
+        # back-fill sweep finishes, so absence stays valid — and a reader is told
+        # (in the field description) to fall back to .agents/ presence, never to
+        # read absence as "ambient".
+        schema = load_descriptor_schema()
+        descriptor = {
+            "project": {"name": "x", "description": "y"},
+            "language": "python",
+            "delivery": "library",
+        }
+        jsonschema.validate(instance=descriptor, schema=schema)
 
     def test_usage_event_schema_loads(self):
         assert load_usage_event_schema()["type"] == "object"

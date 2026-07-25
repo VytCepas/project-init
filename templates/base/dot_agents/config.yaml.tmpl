@@ -1,6 +1,21 @@
 # project-init: record of choices made at init time.
 # Safe to hand-edit; re-running `project-init` will reconcile with this file.
 
+# Detect-and-defer boundary marker (PI-901; harbor#4 H1, harbor CONTRACTS/marker.md).
+# Declares to every layer ABOVE this repo — a root orchestrator, a global agent
+# environment, any hook that would otherwise write a machine-wide log — that this
+# project governs itself.
+#   repo    — this repo wins; the ambient layer stands down inside it (what a
+#             scaffold always emits)
+#   ambient — opt out: let the global layer keep acting here
+# Deliberately NOT `governance:` — that name is already a project-init boolean
+# (the AI-governance overlay gate, ADR-018), and overloading it collides in both
+# the wizard and the schema.
+# A reader also treats the PRESENCE of .agents/ as the marker, so deleting this
+# line does not hand the repo back to the ambient layer — it only removes the
+# explicit declaration a reader can act on.
+context: repo
+
 project:
   name: "{{project_name}}"
   description: "{{project_description}}"
