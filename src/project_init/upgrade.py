@@ -1297,6 +1297,55 @@ def _ensure_ci_block(text: str) -> str:
     return head + sep + tail
 
 
+_CONTEXT_BLOCK = (
+    "# Detect-and-defer boundary marker (PI-901; harbor#4 H1). repo = this project\n"
+    "# governs itself, so an ambient/global agent layer stands down inside it;\n"
+    "# ambient = opt out. Not `governance:` — that name is already a boolean.\n"
+    "context: repo\n"
+    "\n"
+)
+
+# The template renders `context:` immediately above `project:`, and `project:` is
+# the one top-level key present in EVERY config ever emitted (it predates the
+# descriptor contract itself). That is deliberate: the `ci:` splice anchored on a
+# key younger than the configs it had to reach and silently no-opped exactly when
+# it was needed (PI-880).
+_CONTEXT_ANCHOR_RE = re.compile(r"(?m)^project:")
+
+# Every spelling of a top-level `context` key that YAML accepts. A bare
+# `^context:` misses `context : ambient` and `"context": ambient` — both valid —
+# and the splice would then insert a SECOND logical `context` key. Duplicate-key-
+# tolerant readers keep whichever comes last (the inserted `repo`), silently
+# revoking the opt-out; stricter ones reject the descriptor outright (PR #902
+# review). Still anchored at column 0: `context` is top-level, and one indented
+# under another block is a different key that happens to share a name.
+# KEEP IN STEP with harbor's floor_in_repo, which reads the same key — a
+# spelling the writer preserves but the reader misses is an opt-out that
+# survives upgrade and is then ignored.
+_CONTEXT_KEY_RE = re.compile(r"""(?m)^(?:context|"context"|'context')[ \t]*:""")
+
+
+def _ensure_context_key(text: str) -> str:
+    """Backfill the detect-and-defer marker into a pre-PI-901 config (harbor#4 H1).
+
+    config.yaml is never re-rendered wholesale on upgrade, so the template line
+    alone would only ever reach *fresh* scaffolds — every already-scaffolded
+    project would stay unmarked and the layer above it could not tell that the
+    repo governs itself. Idempotent, and it never rewrites an existing value:
+    ``context: ambient`` is the owner's deliberate opt-out and an upgrade that
+    reset it to ``repo`` would silently revoke a decision.
+    """
+    head, sep, tail = text.partition(_RECORD_MARKER)
+    if _CONTEXT_KEY_RE.search(head):
+        return text
+    anchor = _CONTEXT_ANCHOR_RE.search(head)
+    if anchor:
+        head = head[: anchor.start()] + _CONTEXT_BLOCK + head[anchor.start() :]
+    else:
+        head = _CONTEXT_BLOCK + head
+    return head + sep + tail
+
+
 def _ensure_visible_project_fields(text: str, staging: Path) -> str:
     """Surface every `project:` field a fresh scaffold renders (#259, #498, PI-880).
 
@@ -1381,6 +1430,7 @@ def apply_drift(
         text = config_path.read_text(encoding="utf-8")
         text = _VERSION_LINE_RE.sub(rf"\g<1>{variables['project_init_version']}", text, count=1)
         text = _ensure_visible_project_fields(text, staging)
+        text = _ensure_context_key(text)
         text = _ensure_ci_block(text)
         text = _sync_memory_block(text, staging)
         config_path.write_text(text, encoding="utf-8", newline="\n")  # LF on all hosts (PI-362)

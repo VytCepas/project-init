@@ -128,15 +128,22 @@ def test_upgrade_backfills_every_field_a_fresh_scaffold_has(tmp_path: Path):
     head = re.sub(r"(?ms)^ci:\n.*?(?=^\w)", "", head, count=1)
     head = re.sub(r"(?ms)^hooks:\n.*?(?=^\w)", "", head, count=1)
     head = re.sub(r"(?m)^  (?:monitor_ignore_checks|review_cycles):.*\n", "", head)
+    # PI-901: the detect-and-defer marker, comment block and all — that whole
+    # region is what the splice has to re-create in a pre-901 config.
+    head = re.sub(r"(?ms)^# Detect-and-defer.*?^context: repo\n\n", "", head, count=1)
     config.write_text(head + sep + tail)
     gap_project, gap_top = _visible_shape(config)
     assert "ci" not in gap_top and "hooks" not in gap_top  # gap created
+    assert "context" not in gap_top  # gap created
     assert "monitor_ignore_checks" not in gap_project
 
     assert main(["upgrade", str(old), "--apply"]) == 0
     got_project, got_top = _visible_shape(config)
     assert got_project == want_project, got_project ^ want_project
     assert "ci" in got_top, "ci: must be backfilled even with no hooks: anchor"
+    # An unmarked repo is one the layer above never stands down in, so the
+    # back-fill is the whole reason the marker reaches the installed base.
+    assert "context" in got_top, "the detect-and-defer marker must be backfilled (PI-901)"
 
 
 def test_field_backfill_handles_a_reindented_project_block(tmp_path: Path):
