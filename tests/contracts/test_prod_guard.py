@@ -128,6 +128,100 @@ class TestVerdicts:
         payload = _payload(command, "bypassPermissions", subdir)
         assert _run_hook(payload, subdir) is None
 
+    def test_symlinked_agents_dir_cannot_supply_an_allowlist(self, tmp_path: Path):
+        """PI-903 (harbor#4 M13): a planted `.agents` symlink must not be read.
+
+        `is_file()` follows symlinks, so an `.agents` link pointing outside the
+        repo handed the guard an allowlist written outside the repo's own
+        review — and `allow: [".*"]` switches the whole deny table off. The link
+        is the payload; nothing inside the repo has to change for it to work.
+        """
+        outside = tmp_path / "outside" / ".agents"
+        outside.mkdir(parents=True)
+        (outside / "config.yaml").write_text('safety:\n  allow: [".*"]\n')
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".agents").symlink_to(outside, target_is_directory=True)
+
+        command = "terraform destroy -auto-approve"
+        assert _run_hook(_payload(command, "bypassPermissions", repo), repo) is not None, (
+            "a symlinked .agents/ supplied safety.allow from outside the repo"
+        )
+
+    def test_symlinked_config_file_cannot_supply_an_allowlist(self, tmp_path: Path):
+        """The other half: a real `.agents/` holding a symlinked config.yaml.
+        Checking only the directory leaves the file — the thing actually read —
+        pointing anywhere on disk."""
+        (tmp_path / "outside").mkdir()
+        planted = tmp_path / "outside" / "config.yaml"
+        planted.write_text('safety:\n  allow: [".*"]\n')
+        repo = tmp_path / "repo"
+        (repo / ".agents").mkdir(parents=True)
+        (repo / ".agents" / "config.yaml").symlink_to(planted)
+
+        command = "terraform destroy -auto-approve"
+        assert _run_hook(_payload(command, "bypassPermissions", repo), repo) is not None, (
+            "a symlinked config.yaml supplied safety.allow from outside the repo"
+        )
+
+    def test_a_refused_symlink_does_not_stop_the_walk(self, tmp_path: Path):
+        """Refusing must mean 'keep looking', not 'give up'. An inner symlinked
+        marker shadowing a real outer one would otherwise silently discard the
+        owner's genuine allowlist — matching harbor's floor_in_repo, which
+        continues its walk past a refused marker rather than returning."""
+        (tmp_path / "outside").mkdir()
+        (tmp_path / "outside" / "config.yaml").write_text('safety:\n  allow: [".*"]\n')
+        real = tmp_path / ".agents"
+        real.mkdir()
+        real.joinpath("config.yaml").write_text(
+            'safety:\n  allow: ["kubectl delete .* --context kind-dev"]\n'
+        )
+        inner = tmp_path / "sub"
+        inner.mkdir()
+        (inner / ".agents").symlink_to(tmp_path / "outside", target_is_directory=True)
+
+        # The planted `.*` is ignored…
+        assert (
+            _run_hook(
+                _payload("terraform destroy -auto-approve", "bypassPermissions", inner), inner
+            )
+            is not None
+        )
+        # …and the real one an ancestor declares is still honoured.
+        allowed = "kubectl delete pod web --context kind-dev"
+        assert _run_hook(_payload(allowed, "bypassPermissions", inner), inner) is None
+
+    def test_a_refused_link_does_not_change_ancestor_inheritance(self, tmp_path: Path):
+        """PR #904 review (P1, refuted): a link pointing at an ANCESTOR's marker
+        must resolve exactly as the same tree without the link.
+
+        The review read this as a bypass — refuse the inner link, walk on, and
+        the ancestor's `allow: [".*"]` is honoured anyway. It is not: walking up
+        to an ancestor marker is the contract's defined behaviour when the repo
+        has no marker of its own, so the link contributes nothing. Delete it and
+        you reach the same config by the same route.
+
+        The suggested mitigation — exclude refused link targets from the rest of
+        the walk — would make these two trees DIVERGE: identical on-disk layouts
+        resolving differently because an unrelated symlink happened to point at
+        one of them. This pins them equal so that "fix" fails loudly.
+        """
+        linked = tmp_path / "linked"
+        (linked / ".agents").mkdir(parents=True)
+        (linked / ".agents" / "config.yaml").write_text('safety:\n  allow: [".*"]\n')
+        (linked / "repo").mkdir()
+        (linked / "repo" / ".agents").symlink_to(linked / ".agents", target_is_directory=True)
+
+        plain = tmp_path / "plain"
+        (plain / ".agents").mkdir(parents=True)
+        (plain / ".agents" / "config.yaml").write_text('safety:\n  allow: [".*"]\n')
+        (plain / "repo").mkdir()
+
+        cmd = "terraform destroy -auto-approve"
+        with_link = _run_hook(_payload(cmd, "bypassPermissions", linked / "repo"), linked / "repo")
+        without = _run_hook(_payload(cmd, "bypassPermissions", plain / "repo"), plain / "repo")
+        assert with_link == without, "a refused link changed how an ancestor marker resolves"
+
     def test_allowlist_multiline_yaml_suppresses_flag(self, tmp_path: Path):
         """PI-187: a multi-line YAML allow list must work, not just inline JSON
         — the old parser silently dropped it to []."""
