@@ -12,6 +12,9 @@ An unmarked repo is one the layer above keeps acting in.
 
 from __future__ import annotations
 
+import pytest
+import yaml
+
 from project_init.scaffold import _RECORD_MARKER
 from project_init.upgrade import _ensure_context_key
 
@@ -70,6 +73,33 @@ def test_a_commented_out_marker_does_not_count_as_present() -> None:
     commented = "# context: repo\n" + _PRE_901
     out = _ensure_context_key(commented)
     assert "\ncontext: repo\n" in out
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "context: ambient",
+        "context : ambient",
+        'context:  "ambient"',
+        '"context": ambient',
+        "'context': ambient",
+    ],
+)
+def test_no_second_context_key_for_any_valid_yaml_spelling(line: str) -> None:
+    # PR #902 review. A bare `^context:` check misses `context : ambient` and
+    # `"context": ambient` — both valid YAML — and the splice then inserts a
+    # SECOND logical `context` key. Duplicate-key-tolerant readers keep whichever
+    # comes last (the inserted `repo`), silently revoking the opt-out; stricter
+    # ones reject the descriptor outright. Either way the owner's decision is
+    # gone and nothing says so.
+    #
+    # Asserted through a real YAML parser on the VALUE a reader would get, not
+    # by re-running the production regex over the output — a test that counts
+    # matches with the very pattern under test passes for every mutation of it.
+    # (The first draft of this test did exactly that and survived reverting the
+    # fix; caught by the mutation check CLAUDE.md asks for.)
+    out = _ensure_context_key(f"{line}\n{_PRE_901}")
+    assert yaml.safe_load(out.partition(_RECORD_MARKER)[0])["context"] == "ambient", out
 
 
 def test_backfill_reaches_a_config_with_no_project_key() -> None:

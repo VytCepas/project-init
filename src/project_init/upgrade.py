@@ -1312,6 +1312,18 @@ _CONTEXT_BLOCK = (
 # it was needed (PI-880).
 _CONTEXT_ANCHOR_RE = re.compile(r"(?m)^project:")
 
+# Every spelling of a top-level `context` key that YAML accepts. A bare
+# `^context:` misses `context : ambient` and `"context": ambient` — both valid —
+# and the splice would then insert a SECOND logical `context` key. Duplicate-key-
+# tolerant readers keep whichever comes last (the inserted `repo`), silently
+# revoking the opt-out; stricter ones reject the descriptor outright (PR #902
+# review). Still anchored at column 0: `context` is top-level, and one indented
+# under another block is a different key that happens to share a name.
+# KEEP IN STEP with harbor's floor_in_repo, which reads the same key — a
+# spelling the writer preserves but the reader misses is an opt-out that
+# survives upgrade and is then ignored.
+_CONTEXT_KEY_RE = re.compile(r"""(?m)^(?:context|"context"|'context')[ \t]*:""")
+
 
 def _ensure_context_key(text: str) -> str:
     """Backfill the detect-and-defer marker into a pre-PI-901 config (harbor#4 H1).
@@ -1324,7 +1336,7 @@ def _ensure_context_key(text: str) -> str:
     reset it to ``repo`` would silently revoke a decision.
     """
     head, sep, tail = text.partition(_RECORD_MARKER)
-    if re.search(r"(?m)^context:", head):
+    if _CONTEXT_KEY_RE.search(head):
         return text
     anchor = _CONTEXT_ANCHOR_RE.search(head)
     if anchor:
