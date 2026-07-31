@@ -108,6 +108,8 @@ Curated per-version upgrade notes surfaced by `project-init upgrade` (#244).
 
 Core scaffolding logic — pure functions, no user interaction.
 
+- `def templates_dir` — The directory this process renders templates from.
+- `def stale_install` — A project-init checkout at/above *cwd* whose templates differ from ours.
 - `class TemplateRenderError` — Raised in strict mode when unrendered placeholders survive scaffolding.
 - `def list_presets` — Return all available presets as parsed dicts, sorted by name.
 - `def parse_version` — Parse a leading ``X.Y.Z`` (optional ``v`` prefix) into a tuple, or None.
