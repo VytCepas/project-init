@@ -176,17 +176,54 @@ jobs:
           just-version: "1.57.0"
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      #
+      # Host-safe and OS/arch aware, because `runs-on` here is
+      # `vars.CI_RUNS_ON || ubuntu-24.04` and `just ci-local-on` sets that
+      # variable to `self-hosted`. Two consequences the original step got wrong:
+      #
+      #   1. A self-hosted runner shares $HOME with its operator. A step that
+      #      writes into ~/.local/bin modifies a real machine, not a throwaway
+      #      VM — so if a usable shfmt is already on PATH, leave it alone.
+      #   2. The asset must match the runner. Hardcoding linux_amd64 installed a
+      #      Linux x86 binary onto a macOS/ARM runner, which then failed the
+      #      lint step with "cannot execute binary file" *after* overwriting the
+      #      operator's working shfmt. A nightly cron repeated it unattended.
       - name: Install shfmt
         run: |
+          set -eu
+          if command -v shfmt >/dev/null 2>&1 && shfmt --version >/dev/null 2>&1; then
+            echo "shfmt $(shfmt --version) already present — leaving the host's copy alone"
+            exit 0
+          fi
+
+          version="3.8.0"
+          case "$(uname -s)" in
+            Linux)  os=linux ;;
+            Darwin) os=darwin ;;
+            *) echo "unsupported OS for shfmt install: $(uname -s)" >&2; exit 1 ;;
+          esac
+          case "$(uname -m)" in
+            x86_64|amd64)  arch=amd64 ;;
+            arm64|aarch64) arch=arm64 ;;
+            *) echo "unsupported arch for shfmt install: $(uname -m)" >&2; exit 1 ;;
+          esac
+          asset="shfmt_v${version}_${os}_${arch}"
+
           mkdir -p "$HOME/.local/bin"
           tmp="$(mktemp -d)"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
+          base="https://github.com/mvdan/sh/releases/download/v${version}"
+          curl -sSfL "$base/$asset" -o "$tmp/$asset"
           # Verify the binary against the release's published checksums before
-          # trusting it — no unverified curl|install of an executable.
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
-          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
-          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
-          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
+          # trusting it — no unverified curl|install of an executable. macOS
+          # ships shasum rather than sha256sum.
+          curl -sSfL "$base/sha256sums.txt" -o "$tmp/sha256sums.txt"
+          if command -v sha256sum >/dev/null 2>&1; then
+            ( cd "$tmp" && grep " $asset\$" sha256sums.txt | sha256sum -c - )
+          else
+            ( cd "$tmp" && grep " $asset\$" sha256sums.txt | shasum -a 256 -c - )
+          fi
+          chmod +x "$tmp/$asset"
+          mv "$tmp/$asset" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Sync dev dependencies
@@ -268,17 +305,54 @@ jobs:
           just-version: "1.57.0"
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      #
+      # Host-safe and OS/arch aware, because `runs-on` here is
+      # `vars.CI_RUNS_ON || ubuntu-24.04` and `just ci-local-on` sets that
+      # variable to `self-hosted`. Two consequences the original step got wrong:
+      #
+      #   1. A self-hosted runner shares $HOME with its operator. A step that
+      #      writes into ~/.local/bin modifies a real machine, not a throwaway
+      #      VM — so if a usable shfmt is already on PATH, leave it alone.
+      #   2. The asset must match the runner. Hardcoding linux_amd64 installed a
+      #      Linux x86 binary onto a macOS/ARM runner, which then failed the
+      #      lint step with "cannot execute binary file" *after* overwriting the
+      #      operator's working shfmt. A nightly cron repeated it unattended.
       - name: Install shfmt
         run: |
+          set -eu
+          if command -v shfmt >/dev/null 2>&1 && shfmt --version >/dev/null 2>&1; then
+            echo "shfmt $(shfmt --version) already present — leaving the host's copy alone"
+            exit 0
+          fi
+
+          version="3.8.0"
+          case "$(uname -s)" in
+            Linux)  os=linux ;;
+            Darwin) os=darwin ;;
+            *) echo "unsupported OS for shfmt install: $(uname -s)" >&2; exit 1 ;;
+          esac
+          case "$(uname -m)" in
+            x86_64|amd64)  arch=amd64 ;;
+            arm64|aarch64) arch=arm64 ;;
+            *) echo "unsupported arch for shfmt install: $(uname -m)" >&2; exit 1 ;;
+          esac
+          asset="shfmt_v${version}_${os}_${arch}"
+
           mkdir -p "$HOME/.local/bin"
           tmp="$(mktemp -d)"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
+          base="https://github.com/mvdan/sh/releases/download/v${version}"
+          curl -sSfL "$base/$asset" -o "$tmp/$asset"
           # Verify the binary against the release's published checksums before
-          # trusting it — no unverified curl|install of an executable.
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
-          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
-          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
-          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
+          # trusting it — no unverified curl|install of an executable. macOS
+          # ships shasum rather than sha256sum.
+          curl -sSfL "$base/sha256sums.txt" -o "$tmp/sha256sums.txt"
+          if command -v sha256sum >/dev/null 2>&1; then
+            ( cd "$tmp" && grep " $asset\$" sha256sums.txt | sha256sum -c - )
+          else
+            ( cd "$tmp" && grep " $asset\$" sha256sums.txt | shasum -a 256 -c - )
+          fi
+          chmod +x "$tmp/$asset"
+          mv "$tmp/$asset" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # Fresh scaffolds have no lockfile — or even a package.json (`bun
@@ -339,17 +413,54 @@ jobs:
         uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      #
+      # Host-safe and OS/arch aware, because `runs-on` here is
+      # `vars.CI_RUNS_ON || ubuntu-24.04` and `just ci-local-on` sets that
+      # variable to `self-hosted`. Two consequences the original step got wrong:
+      #
+      #   1. A self-hosted runner shares $HOME with its operator. A step that
+      #      writes into ~/.local/bin modifies a real machine, not a throwaway
+      #      VM — so if a usable shfmt is already on PATH, leave it alone.
+      #   2. The asset must match the runner. Hardcoding linux_amd64 installed a
+      #      Linux x86 binary onto a macOS/ARM runner, which then failed the
+      #      lint step with "cannot execute binary file" *after* overwriting the
+      #      operator's working shfmt. A nightly cron repeated it unattended.
       - name: Install shfmt
         run: |
+          set -eu
+          if command -v shfmt >/dev/null 2>&1 && shfmt --version >/dev/null 2>&1; then
+            echo "shfmt $(shfmt --version) already present — leaving the host's copy alone"
+            exit 0
+          fi
+
+          version="3.8.0"
+          case "$(uname -s)" in
+            Linux)  os=linux ;;
+            Darwin) os=darwin ;;
+            *) echo "unsupported OS for shfmt install: $(uname -s)" >&2; exit 1 ;;
+          esac
+          case "$(uname -m)" in
+            x86_64|amd64)  arch=amd64 ;;
+            arm64|aarch64) arch=arm64 ;;
+            *) echo "unsupported arch for shfmt install: $(uname -m)" >&2; exit 1 ;;
+          esac
+          asset="shfmt_v${version}_${os}_${arch}"
+
           mkdir -p "$HOME/.local/bin"
           tmp="$(mktemp -d)"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
+          base="https://github.com/mvdan/sh/releases/download/v${version}"
+          curl -sSfL "$base/$asset" -o "$tmp/$asset"
           # Verify the binary against the release's published checksums before
-          # trusting it — no unverified curl|install of an executable.
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
-          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
-          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
-          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
+          # trusting it — no unverified curl|install of an executable. macOS
+          # ships shasum rather than sha256sum.
+          curl -sSfL "$base/sha256sums.txt" -o "$tmp/sha256sums.txt"
+          if command -v sha256sum >/dev/null 2>&1; then
+            ( cd "$tmp" && grep " $asset\$" sha256sums.txt | sha256sum -c - )
+          else
+            ( cd "$tmp" && grep " $asset\$" sha256sums.txt | shasum -a 256 -c - )
+          fi
+          chmod +x "$tmp/$asset"
+          mv "$tmp/$asset" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # golangci-lint-action above doesn't run justfile recipes, so the .agents/
@@ -401,17 +512,54 @@ jobs:
           components: clippy, rustfmt, llvm-tools-preview
 
       # ShellCheck ships preinstalled on ubuntu-24.04 runners; shfmt does not.
+      #
+      # Host-safe and OS/arch aware, because `runs-on` here is
+      # `vars.CI_RUNS_ON || ubuntu-24.04` and `just ci-local-on` sets that
+      # variable to `self-hosted`. Two consequences the original step got wrong:
+      #
+      #   1. A self-hosted runner shares $HOME with its operator. A step that
+      #      writes into ~/.local/bin modifies a real machine, not a throwaway
+      #      VM — so if a usable shfmt is already on PATH, leave it alone.
+      #   2. The asset must match the runner. Hardcoding linux_amd64 installed a
+      #      Linux x86 binary onto a macOS/ARM runner, which then failed the
+      #      lint step with "cannot execute binary file" *after* overwriting the
+      #      operator's working shfmt. A nightly cron repeated it unattended.
       - name: Install shfmt
         run: |
+          set -eu
+          if command -v shfmt >/dev/null 2>&1 && shfmt --version >/dev/null 2>&1; then
+            echo "shfmt $(shfmt --version) already present — leaving the host's copy alone"
+            exit 0
+          fi
+
+          version="3.8.0"
+          case "$(uname -s)" in
+            Linux)  os=linux ;;
+            Darwin) os=darwin ;;
+            *) echo "unsupported OS for shfmt install: $(uname -s)" >&2; exit 1 ;;
+          esac
+          case "$(uname -m)" in
+            x86_64|amd64)  arch=amd64 ;;
+            arm64|aarch64) arch=arm64 ;;
+            *) echo "unsupported arch for shfmt install: $(uname -m)" >&2; exit 1 ;;
+          esac
+          asset="shfmt_v${version}_${os}_${arch}"
+
           mkdir -p "$HOME/.local/bin"
           tmp="$(mktemp -d)"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
+          base="https://github.com/mvdan/sh/releases/download/v${version}"
+          curl -sSfL "$base/$asset" -o "$tmp/$asset"
           # Verify the binary against the release's published checksums before
-          # trusting it — no unverified curl|install of an executable.
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
-          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
-          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
-          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
+          # trusting it — no unverified curl|install of an executable. macOS
+          # ships shasum rather than sha256sum.
+          curl -sSfL "$base/sha256sums.txt" -o "$tmp/sha256sums.txt"
+          if command -v sha256sum >/dev/null 2>&1; then
+            ( cd "$tmp" && grep " $asset\$" sha256sums.txt | sha256sum -c - )
+          else
+            ( cd "$tmp" && grep " $asset\$" sha256sums.txt | shasum -a 256 -c - )
+          fi
+          chmod +x "$tmp/$asset"
+          mv "$tmp/$asset" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install just
