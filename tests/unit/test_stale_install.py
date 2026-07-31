@@ -174,6 +174,30 @@ class TestUpgradeEmitsTheWarning:
         assert str(checkout) in err
         assert "uv pip install -e ." in err
 
+    def test_a_raising_detector_cannot_break_upgrade(self, capsys: pytest.CaptureFixture[str]):
+        """The class behind the #910 P2, not just that instance.
+
+        This runs before `upgrade` validates its target, and the detection walks
+        parent directories, parses arbitrary TOML and reads several hundred
+        files. An unreadable file or a deleted cwd must cost a warning, never the
+        run — so the caller swallows anything the detector raises.
+        """
+        import project_init.scaffold as scaffold_mod
+        from project_init import subcommands
+
+        def boom(cwd: Path | None = None) -> Path | None:
+            raise OSError("simulated: templates file vanished mid-walk")
+
+        saved = scaffold_mod.stale_install
+        scaffold_mod.stale_install = boom  # type: ignore[assignment]
+        try:
+            subcommands._warn_if_stale_install()  # must not raise
+        finally:
+            scaffold_mod.stale_install = saved  # type: ignore[assignment]
+
+        # Silent: a failed diagnostic is not worth alarming the user about.
+        assert capsys.readouterr().err == ""
+
     def test_silent_when_nothing_is_stale(self, capsys: pytest.CaptureFixture[str]):
         import project_init.scaffold as scaffold_mod
         from project_init import subcommands

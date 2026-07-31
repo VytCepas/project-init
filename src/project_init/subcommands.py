@@ -22,10 +22,22 @@ def _warn_if_stale_install() -> None:
     of it. Once the checkout moves on, `upgrade` renders the frozen copy and
     reports success — silently re-applying stale files. Kept advisory: a PyPI
     install used from inside a clone is legitimate.
+
+    An advisory diagnostic must never be able to fail the command it precedes.
+    The #910 review found one way it could — a non-table `project` value raising
+    AttributeError — but that was an instance, not the class: this runs before
+    `upgrade` validates its target, and the detection walks parent directories,
+    parses arbitrary TOML and reads several hundred files, so an unreadable file
+    or a deleted cwd is equally capable of aborting an unrelated upgrade with a
+    traceback. Type checks fix the known instance; the blanket guard here fixes
+    the class. Failing to diagnose staleness costs a warning, never the run.
     """
     from project_init.scaffold import stale_install, templates_dir
 
-    root = stale_install()
+    try:
+        root = stale_install()
+    except Exception:  # noqa: BLE001 — advisory only; see the docstring
+        return
     if root is None:
         return
     sys.stderr.write(
