@@ -813,7 +813,11 @@ def cmd_create_pr_nojira(type_: str, title: str, branch: str | None, base: str |
     # `gh pr view` with no selector also resolves the most recent CLOSED/MERGED
     # PR for the branch — reusing a branch name after a merge must open a new
     # PR, not report the merged one as "already exists" (matches check_pr_opened).
-    code, out = _gh(["pr", "view", "--json", "url,state"])
+    # Selector passed explicitly: with none, gh resolves the branch through its
+    # local remote-tracking ref, which a --single-branch/--depth clone never
+    # creates for anything but the default branch (see _create_pr in
+    # start_issue.sh). Naming the branch keeps the CLOSED/MERGED semantics above.
+    code, out = _gh(["pr", "view", branch, "--json", "url,state"])
     if code == 0:
         try:
             data = json.loads(out or "{}")
@@ -827,7 +831,9 @@ def cmd_create_pr_nojira(type_: str, title: str, branch: str | None, base: str |
     pr_title = f"{type_}: {title}"
     pr_body = "No linked issue (nojira)."
     # Single trunk: with no explicit --base, gh targets the repo default branch.
-    args = ["pr", "create", "--draft", "--title", pr_title, "--body", pr_body]
+    # --head explicit for the same reason as the selector above: gh's inference
+    # depends on a remote-tracking ref that a narrow fetch refspec never creates.
+    args = ["pr", "create", "--draft", "--head", branch, "--title", pr_title, "--body", pr_body]
     if base:
         args += ["--base", base]
     code, out = _gh(args)
