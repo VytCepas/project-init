@@ -60,8 +60,16 @@ def _is_project_init_checkout(root: Path) -> bool:
             data = tomllib.load(fh)
     except (OSError, tomllib.TOMLDecodeError):
         return False
-    name = data.get("project", {}).get("name")
-    return isinstance(name, str) and name == "project-init"
+    # Every level is type-checked before it is walked. `project` being a valid
+    # TOML *non-table* (`project = "invalid"`) is syntactically fine, so the
+    # decode above succeeds and a chained .get() then raises AttributeError —
+    # which, because this runs before upgrade validates its target, aborted every
+    # `upgrade` invoked from such a directory with a traceback. An advisory check
+    # that can harden into a crash is worse than no check (PR #910 review, P2).
+    project = data.get("project")
+    if not isinstance(project, dict):
+        return False
+    return project.get("name") == "project-init"
 
 
 def stale_install(cwd: Path | None = None) -> Path | None:

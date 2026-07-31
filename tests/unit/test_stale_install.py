@@ -107,6 +107,32 @@ class TestStaleInstallDetection:
         (root / "pyproject.toml").write_text("[project\nname = ", encoding="utf-8")
         assert stale_install(root) is None
 
+    @pytest.mark.parametrize(
+        "pyproject",
+        [
+            pytest.param('project = "invalid"\n', id="project-is-a-string"),
+            pytest.param("project = 42\n", id="project-is-an-int"),
+            pytest.param("project = []\n", id="project-is-an-array"),
+            pytest.param("[project]\nname = 42\n", id="name-is-not-a-string"),
+            pytest.param('[tool.poetry]\nname = "x"\n', id="no-project-table"),
+        ],
+    )
+    def test_a_valid_toml_with_an_unexpected_project_value_is_not_a_checkout(
+        self, tmp_path: Path, pyproject: str
+    ):
+        """PR #910 review (P2): syntactically valid TOML, wrong shape.
+
+        `project = "invalid"` decodes fine, so the TOMLDecodeError guard does not
+        catch it and a chained .get() raised AttributeError. Because the check
+        runs before `upgrade` validates its target, that traceback aborted EVERY
+        upgrade invoked from such a directory — an advisory warning hardened into
+        a crash. Reproduced before fixing.
+        """
+        root = tmp_path / "oddly-shaped"
+        (root / "templates").mkdir(parents=True)
+        (root / "pyproject.toml").write_text(pyproject, encoding="utf-8")
+        assert stale_install(root) is None
+
     def test_nearest_checkout_wins(self, tmp_path: Path):
         """An inner checkout shadows an outer one; the walk stops at the first."""
         outer = _fake_checkout(tmp_path / "outer", templates_from=templates_dir())
