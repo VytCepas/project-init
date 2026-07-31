@@ -15,6 +15,29 @@ from pathlib import Path
 from project_init import __version__
 
 
+def _warn_if_stale_install() -> None:
+    """Warn when the running package's templates are not the checkout's.
+
+    `templates/` is the product, so a non-editable install carries a frozen copy
+    of it. Once the checkout moves on, `upgrade` renders the frozen copy and
+    reports success — silently re-applying stale files. Kept advisory: a PyPI
+    install used from inside a clone is legitimate.
+    """
+    from project_init.scaffold import stale_install, templates_dir
+
+    root = stale_install()
+    if root is None:
+        return
+    sys.stderr.write(
+        f"warning: this project-init renders templates from {templates_dir()}, "
+        f"but you are inside the checkout at {root}, whose templates/ differ.\n"
+        "         `templates/` is the product, so the upgrade would apply the "
+        "INSTALLED copy — not what you are looking at — and report success.\n"
+        "         Fix: `uv pip install -e .` in that checkout, or run it as "
+        "`uv run project-init`.\n"
+    )
+
+
 def _upgrade_main(argv: list[str]) -> int:
     """Parse and run the `project-init upgrade` subcommand (PI-142)."""
     from project_init.upgrade import (
@@ -104,6 +127,11 @@ def _upgrade_main(argv: list[str]) -> int:
             "note: -i/--interactive only takes effect with --apply; this is a "
             "read-only drift report. Re-run with --apply -i to choose per file.\n"
         )
+
+    # Stale-install warning: an upgrade that renders a frozen copy of the
+    # templates while the user is looking at a newer checkout reports success
+    # having re-applied old files. Advisory by design — see scaffold.stale_install.
+    _warn_if_stale_install()
 
     # Clean-tree guard (#242): refuse --apply on a dirty git work tree so the
     # upgrade lands as one revertible diff. A CLI-layer precondition — kept out

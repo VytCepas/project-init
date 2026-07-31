@@ -23,6 +23,81 @@ if not _TEMPLATES_DIR.exists():
     # Dev mode: templates live at repo root, not inside the package.
     _TEMPLATES_DIR = _PACKAGE_DIR.parent.parent / "templates"
 
+
+def templates_dir() -> Path:
+    """The directory this process renders templates from.
+
+    Public because staleness is only diagnosable by comparing it to a source
+    checkout — see :func:`stale_install`.
+    """
+    return _TEMPLATES_DIR
+
+
+def _templates_digest(root: Path) -> str:
+    """Content digest of a templates tree: path + bytes of every file.
+
+    ~15ms for the 288-file tree, so it is cheap enough to run before an upgrade.
+    Content rather than mtimes: a fresh `uv pip install` rewrites mtimes without
+    changing a byte, and warning on that would be a false positive.
+    """
+    h = hashlib.sha256()
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        # Byte-compiled droppings are not part of the product, and one tree
+        # having them would otherwise read as drift.
+        if path.suffix == ".pyc" or "__pycache__" in path.parts:
+            continue
+        h.update(str(path.relative_to(root)).encode())
+        h.update(path.read_bytes())
+    return h.hexdigest()
+
+
+def _is_project_init_checkout(root: Path) -> bool:
+    pyproject = root / "pyproject.toml"
+    if not pyproject.is_file() or not (root / "templates").is_dir():
+        return False
+    try:
+        with pyproject.open("rb") as fh:
+            data = tomllib.load(fh)
+    except (OSError, tomllib.TOMLDecodeError):
+        return False
+    name = data.get("project", {}).get("name")
+    return isinstance(name, str) and name == "project-init"
+
+
+def stale_install(cwd: Path | None = None) -> Path | None:
+    """A project-init checkout at/above *cwd* whose templates differ from ours.
+
+    Returns the checkout root when this process would render templates that are
+    NOT the ones in the checkout the user is standing in, and their contents
+    actually differ. ``None`` otherwise.
+
+    Why this exists: ``templates/`` is the product, and a non-editable install
+    copies it *into* the package. Reinstall the package and the copy freezes;
+    keep committing to the checkout and the two diverge. ``project-init upgrade``
+    then renders the frozen copy while the user reasonably believes it is
+    applying the checkout they are looking at — it reports success having
+    re-applied stale files. That is how a fixed prod_guard was re-shipped with
+    its vulnerability intact (downstream of PI-903), because the installed
+    package still carried the pre-fix template.
+
+    Deliberately advisory, not fatal: someone with a legitimate PyPI install who
+    happens to ``cd`` into a clone is doing nothing wrong, and a guard that
+    blocks ordinary work gets switched off.
+    """
+    start = (cwd or Path.cwd()).resolve()
+    ours = _TEMPLATES_DIR.resolve()
+    for root in (start, *start.parents):
+        if not _is_project_init_checkout(root):
+            continue
+        theirs = (root / "templates").resolve()
+        if theirs == ours:
+            return None  # editable/dev install — already the checkout's own
+        if _templates_digest(theirs) != _templates_digest(ours):
+            return root
+        return None
+    return None
+
+
 _DOT_PREFIX = "dot_"
 _VAR_RE = re.compile(r"\{\{(\w+)\}\}")
 # Matches an INNERMOST conditional block — the tempered dot forbids another
