@@ -107,6 +107,32 @@ class TestStaleInstallDetection:
         (root / "pyproject.toml").write_text("[project\nname = ", encoding="utf-8")
         assert stale_install(root) is None
 
+    @pytest.mark.parametrize(
+        "pyproject",
+        [
+            pytest.param('project = "invalid"\n', id="project-is-a-string"),
+            pytest.param("project = 42\n", id="project-is-an-int"),
+            pytest.param("project = []\n", id="project-is-an-array"),
+            pytest.param("[project]\nname = 42\n", id="name-is-not-a-string"),
+            pytest.param('[tool.poetry]\nname = "x"\n', id="no-project-table"),
+        ],
+    )
+    def test_a_valid_toml_with_an_unexpected_project_value_is_not_a_checkout(
+        self, tmp_path: Path, pyproject: str
+    ):
+        """PR #910 review (P2): syntactically valid TOML, wrong shape.
+
+        `project = "invalid"` decodes fine, so the TOMLDecodeError guard does not
+        catch it and a chained .get() raised AttributeError. Because the check
+        runs before `upgrade` validates its target, that traceback aborted EVERY
+        upgrade invoked from such a directory — an advisory warning hardened into
+        a crash. Reproduced before fixing.
+        """
+        root = tmp_path / "oddly-shaped"
+        (root / "templates").mkdir(parents=True)
+        (root / "pyproject.toml").write_text(pyproject, encoding="utf-8")
+        assert stale_install(root) is None
+
     def test_nearest_checkout_wins(self, tmp_path: Path):
         """An inner checkout shadows an outer one; the walk stops at the first."""
         outer = _fake_checkout(tmp_path / "outer", templates_from=templates_dir())
@@ -147,6 +173,30 @@ class TestUpgradeEmitsTheWarning:
         assert "warning:" in err
         assert str(checkout) in err
         assert "uv pip install -e ." in err
+
+    def test_a_raising_detector_cannot_break_upgrade(self, capsys: pytest.CaptureFixture[str]):
+        """The class behind the #910 P2, not just that instance.
+
+        This runs before `upgrade` validates its target, and the detection walks
+        parent directories, parses arbitrary TOML and reads several hundred
+        files. An unreadable file or a deleted cwd must cost a warning, never the
+        run — so the caller swallows anything the detector raises.
+        """
+        import project_init.scaffold as scaffold_mod
+        from project_init import subcommands
+
+        def boom(cwd: Path | None = None) -> Path | None:
+            raise OSError("simulated: templates file vanished mid-walk")
+
+        saved = scaffold_mod.stale_install
+        scaffold_mod.stale_install = boom  # type: ignore[assignment]
+        try:
+            subcommands._warn_if_stale_install()  # must not raise
+        finally:
+            scaffold_mod.stale_install = saved  # type: ignore[assignment]
+
+        # Silent: a failed diagnostic is not worth alarming the user about.
+        assert capsys.readouterr().err == ""
 
     def test_silent_when_nothing_is_stale(self, capsys: pytest.CaptureFixture[str]):
         import project_init.scaffold as scaffold_mod
