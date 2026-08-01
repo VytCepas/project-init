@@ -90,11 +90,24 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     # that nags on ordinary dev work gets switched off. The cost is that a
     # bare `--full-refresh` against a profile whose DEFAULT target is prod is
     # not reached; naming the target is the supported way to be protected.
+    #
+    # THE TARGET VALUE IS QUOTED AS OFTEN AS NOT, and the first cut required
+    # `prod` immediately after whitespace — so `--target "prod"` and
+    # `--target="prod"` ran the destructive refresh straight through a rule
+    # written to stop it (PR #915 review, P1). The shell strips the quotes
+    # before dbt sees them; this guard reads the RAW command string, so it has
+    # to tolerate what the shell would remove.
+    #
+    # AND THE VALUE MUST END. `\s*prod` also matched `--target prod-dev`,
+    # flagging a dev target because its name starts with the same four letters
+    # (PR #915 review). `(?![\w-])` is the boundary — a plain `\b` does NOT
+    # help here, because `-` is a non-word character and `prod\b` matches
+    # happily inside `prod-dev`.
     (
         re.compile(
             r"\bdbt\b"
             rf"(?={_SEG}\s--full-refresh\b)"
-            rf"(?={_SEG}\s(?:--target[=\s]|-t\s)\s*prod)"
+            rf"(?={_SEG}\s(?:--target[=\s]|-t\s)\s*[\"']?(?:prod|production)(?![\w-]))"
         ),
         "dbt --full-refresh against a production target",
     ),
@@ -106,10 +119,16 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     # `roles/bigquery.dataViewer` grants stay unflagged; removals are flagged
     # unconditionally, because taking access away is destruction by another
     # name. `get-iam-policy` is read-only and matches neither.
+    #
+    # Same quoting problem as the dbt rule above, and the same severity (PR #915
+    # review, P1): `--role="roles/owner"` passes gcloud exactly the argument
+    # `roles/owner`, but the raw command carries a quote between `--role=` and
+    # `roles/`, so an unquoted-only pattern let the estate handover through in
+    # autonomous mode — where the verdict is a hard deny, not a prompt.
     (
         re.compile(
             rf"\bgcloud\b{_SEG}\badd-iam-policy-binding\b"
-            rf"{_SEG}--role[=\s]\s*roles/(?:owner|editor|\S*[Aa]dmin)"
+            rf"{_SEG}--role[=\s]\s*[\"']?roles/(?:owner|editor|\S*[Aa]dmin)"
         ),
         "gcloud IAM grant of owner/editor/admin",
     ),

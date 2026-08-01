@@ -63,11 +63,21 @@ DESTRUCTIVE = [
     "dbt run --target prod --full-refresh",
     "dbt run --full-refresh -t prod",
     "dbt run --full-refresh --target=production",
+    # Shell-quoted target values (PR #915 review, P1). The shell strips these
+    # before dbt sees them; the guard reads the raw command, so it must too.
+    'dbt run --full-refresh --target "prod"',
+    "dbt run --full-refresh --target='prod'",
+    'dbt run --full-refresh --target "production"',
     # IAM mutation on a shared identity: high-privilege grants and any removal.
     "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role roles/owner",
     "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role=roles/editor",
     "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role=roles/storage.admin",
     "gcloud projects remove-iam-policy-binding mbd --member=user:a@b.c --role=roles/viewer",
+    # Quoted role values (PR #915 review, P1) — gcloud receives an identical
+    # argument, so the guard must see through the quoting the shell removes.
+    'gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role="roles/owner"',
+    "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role='roles/editor'",
+    'gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role="roles/storage.admin"',
     # A full-table DELETE empties it as surely as TRUNCATE.
     'bq query --use_legacy_sql=false "DELETE FROM analytics.sessions WHERE 1=1"',
     "psql -c 'delete from users'",
@@ -113,6 +123,9 @@ SAFE = [
     "bq load --source_format=CSV my-proj:analytics.t gs://b/f.csv",
     # Reading the guarded command's own docs is not running it.
     "bq rm --help",
+    # The rule exempts BOTH help spellings; only the long one was pinned, so a
+    # regression that dropped `-h` would have gone unnoticed (PR #915 review).
+    "bq rm -h",
     "bq help rm",
     "gsutil ls gs://prod-assets",
     "gsutil cp gs://prod-assets/a.csv .",
@@ -130,6 +143,11 @@ SAFE = [
     "dbt run --target dev",
     # Deliberate: a full refresh against a DEV target is ordinary work.
     "dbt run --full-refresh --target dev",
+    # `prod-dev` is a DEV target whose name merely starts with the guarded
+    # letters. The first cut flagged it, because a plain `\b` after `prod`
+    # matches inside `prod-dev` — `-` is a non-word character (PR #915 review).
+    "dbt run --full-refresh --target prod-dev",
+    "dbt run --full-refresh --target=prod-staging",
     "dbt test",
     "dbt build --target dev",
     "gcloud projects get-iam-policy mbd",
