@@ -124,7 +124,31 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     # merely start with the word — `deleted_at`, `delete_log` — out, and the
     # `\b` before it keeps `is_deleted FROM …` out: the word must stand alone
     # and be immediately followed by FROM, which a SELECT never does.
-    (re.compile(r"\bdelete\s+from\b", re.IGNORECASE), "SQL DELETE FROM"),
+    #
+    # A TABLE MUST FOLLOW, AND THE CLAUSE MUST END. "delete from" is ordinary
+    # English, unlike "drop table" and "truncate table", so the bare form this
+    # rule first shipped with flagged six perfectly normal commands — measured
+    # against the live deny table, not supposed:
+    #     git commit -m "chore: delete from the stale cache"
+    #     git log --grep "delete from"
+    #     grep -rn "DELETE FROM" src/
+    #     echo 'how to delete from a list in python'
+    #     # TODO: delete from the queue once drained
+    #     echo "we should delete from that table eventually"
+    # Note the second-order problem: writing a commit message ABOUT this rule
+    # tripped it.
+    #
+    # Requiring an identifier and then a WHERE, a statement terminator or a
+    # closing quote separates the statement from the sentence — prose continues
+    # with more words, SQL does not. Measured after: 0 false positives on those
+    # six, 0 missed true positives on the destructive corpus.
+    (
+        re.compile(
+            r"\bdelete\s+from\s+[A-Za-z_`\"\[][\w.`\"\[\]$-]*\s*(?:\bwhere\b|;|\"|'|$)",
+            re.IGNORECASE,
+        ),
+        "SQL DELETE FROM",
+    ),
     (
         # Recursive + force can be bundled (-rf/-fr) OR split across separate
         # args in any order (rm -r -f /, rm --force --recursive /) — the old

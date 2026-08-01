@@ -96,6 +96,18 @@ SAFE = [
     # A SELECT may legitimately carry the word `delete` in a column, a literal
     # or an identifier — only `DELETE FROM` is the destructive statement.
     "bq query \"SELECT is_deleted FROM analytics.sessions WHERE state = 'delete'\"",
+    # "delete from" IS ORDINARY ENGLISH, unlike "drop table" or "truncate
+    # table". The first cut of this rule was a bare `\bdelete\s+from\b` and it
+    # flagged all six of these — measured against the real DENY_RULES, not
+    # supposed. Every one is a command someone types weekly, and the last three
+    # concern the guard's own subject matter, so writing a commit message about
+    # this very rule tripped it.
+    'git commit -m "chore: delete from the stale cache"',
+    'git log --grep "delete from"',
+    "echo 'how to delete from a list in python'",
+    'grep -rn "DELETE FROM" src/',
+    "# TODO: delete from the queue once drained",
+    'echo "we should delete from that table eventually"',
     "bq ls my-proj:analytics",
     "bq show my-proj:analytics.sessions",
     "bq load --source_format=CSV my-proj:analytics.t gs://b/f.csv",
