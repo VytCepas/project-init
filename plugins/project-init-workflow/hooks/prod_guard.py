@@ -54,9 +54,77 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
         "aws s3 bucket/recursive removal",
     ),
     (re.compile(rf"\bgcloud\b{_SEG}\bdelete\b"), "gcloud delete"),
+    # GCS recursive removal, both spellings (PI-906). The `gcloud delete` rule
+    # above LOOKS like it covers this and does not: it keys on the token
+    # `delete`, which neither `gsutil rm -r` nor the modern `gcloud storage rm
+    # -r` carries — so the highest-blast-radius GCS operation walked past a
+    # gcloud rule. (`gcloud storage buckets delete` does carry the token and is
+    # already caught above.) Shaped like the `aws s3 rm --recursive` rule: a
+    # single-object `rm` is not flagged, only the recursive form, which is what
+    # empties a bucket. `-\w*[rR]\w*` covers gsutil's `-r` and `-R`; the flag may
+    # sit before or after the URL, hence _SEG on both sides.
+    (
+        re.compile(rf"\bgsutil\b{_SEG}\brm\b{_SEG}\s(?:-\w*[rR]\w*|--recursive)\b"),
+        "gsutil recursive bucket removal",
+    ),
+    (
+        re.compile(rf"\bgcloud\b{_SEG}\bstorage\s+rm\b{_SEG}\s(?:-\w*[rR]\w*|--recursive)\b"),
+        "gcloud storage recursive bucket removal",
+    ),
+    # BigQuery dataset/table destruction (PI-906). Flag-specific rather than
+    # _SEG for `plan -destroy`'s reason: `bq query` takes SQL as an argument, so
+    # an _SEG reaching into the statement would fire on any query whose text
+    # happens to contain `rm`. Only global flags (`--project_id=…`,
+    # `--location=…`) may sit between `bq` and the verb. `--help`/`-h` is a
+    # read-only lookup of the very command being guarded — never flag it.
+    (
+        re.compile(r"\bbq\s+(?:-\S+\s+)*rm\b(?!\s+(?:--help|-h)\b)"),
+        "bq rm (BigQuery dataset/table removal)",
+    ),
     (re.compile(rf"\baz\b{_SEG}\bdelete\b"), "az delete"),
+    # dbt `--full-refresh` drops and rebuilds incremental models: data
+    # destruction wearing a build verb (PI-906). Two lookaheads because the
+    # flags appear in either order, the same idiom the `rm -r -f` rule below
+    # uses. DELIBERATE LIMIT: a production TARGET must be named explicitly, so
+    # routine `dbt run --full-refresh --target dev` stays unflagged — a guard
+    # that nags on ordinary dev work gets switched off. The cost is that a
+    # bare `--full-refresh` against a profile whose DEFAULT target is prod is
+    # not reached; naming the target is the supported way to be protected.
+    (
+        re.compile(
+            r"\bdbt\b"
+            rf"(?={_SEG}\s--full-refresh\b)"
+            rf"(?={_SEG}\s(?:--target[=\s]|-t\s)\s*prod)"
+        ),
+        "dbt --full-refresh against a production target",
+    ),
+    # IAM mutation on shared identities (PI-906). Granting access is not
+    # obviously "destructive" and so was never modelled, but where an identity
+    # is shared it changes other people's reach without their knowledge, and it
+    # is the least reversible thing in this table. Grants are narrowed to the
+    # roles that hand over the estate (owner/editor/any *Admin) so that routine
+    # `roles/bigquery.dataViewer` grants stay unflagged; removals are flagged
+    # unconditionally, because taking access away is destruction by another
+    # name. `get-iam-policy` is read-only and matches neither.
+    (
+        re.compile(
+            rf"\bgcloud\b{_SEG}\badd-iam-policy-binding\b"
+            rf"{_SEG}--role[=\s]\s*roles/(?:owner|editor|\S*[Aa]dmin)"
+        ),
+        "gcloud IAM grant of owner/editor/admin",
+    ),
+    (
+        re.compile(rf"\bgcloud\b{_SEG}\bremove-iam-policy-binding\b"),
+        "gcloud IAM binding removal",
+    ),
     (re.compile(r"\bdrop\s+(table|database|schema)\b", re.IGNORECASE), "SQL DROP"),
     (re.compile(r"\btruncate\s+table\b", re.IGNORECASE), "SQL TRUNCATE"),
+    # A full-table DELETE empties it as surely as a TRUNCATE, and neither rule
+    # above reaches it (PI-906). `\s+` after the verb keeps identifiers that
+    # merely start with the word — `deleted_at`, `delete_log` — out, and the
+    # `\b` before it keeps `is_deleted FROM …` out: the word must stand alone
+    # and be immediately followed by FROM, which a SELECT never does.
+    (re.compile(r"\bdelete\s+from\b", re.IGNORECASE), "SQL DELETE FROM"),
     (
         # Recursive + force can be bundled (-rf/-fr) OR split across separate
         # args in any order (rm -r -f /, rm --force --recursive /) — the old
