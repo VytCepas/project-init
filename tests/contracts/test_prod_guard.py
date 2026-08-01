@@ -45,6 +45,42 @@ DESTRUCTIVE = [
     "helm -n prod uninstall api",
     "aws --profile prod s3 rb s3://prod-assets --force",
     "aws --region eu-west-1 ec2 terminate-instances --instance-ids i-1",
+    # ── PI-906: the cloud/data verb set the table used to miss entirely ──
+    # BigQuery removal — dataset (-r -d) is the wide blast radius, table (-t)
+    # the common one; a global flag may precede the verb.
+    "bq rm -r -f -d my-proj:analytics",
+    "bq rm -f -t my-proj:analytics.sessions",
+    "bq --project_id=my-proj rm -r -f -d analytics",
+    # GCS recursive removal, BOTH spellings. `gcloud storage rm` carries no
+    # `delete` token, so the pre-existing `gcloud delete` rule never saw it.
+    "gsutil rm -r gs://prod-assets",
+    "gsutil -m rm -r gs://prod-assets/exports",
+    "gsutil rm -R gs://prod-assets",
+    "gcloud storage rm -r gs://prod-assets",
+    "gcloud storage rm --recursive gs://prod-assets/exports",
+    # dbt --full-refresh drops and rebuilds incrementals; flags in either order.
+    "dbt run --full-refresh --target prod",
+    "dbt run --target prod --full-refresh",
+    "dbt run --full-refresh -t prod",
+    "dbt run --full-refresh --target=production",
+    # Shell-quoted target values (PR #915 review, P1). The shell strips these
+    # before dbt sees them; the guard reads the raw command, so it must too.
+    'dbt run --full-refresh --target "prod"',
+    "dbt run --full-refresh --target='prod'",
+    'dbt run --full-refresh --target "production"',
+    # IAM mutation on a shared identity: high-privilege grants and any removal.
+    "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role roles/owner",
+    "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role=roles/editor",
+    "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role=roles/storage.admin",
+    "gcloud projects remove-iam-policy-binding mbd --member=user:a@b.c --role=roles/viewer",
+    # Quoted role values (PR #915 review, P1) — gcloud receives an identical
+    # argument, so the guard must see through the quoting the shell removes.
+    'gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role="roles/owner"',
+    "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role='roles/editor'",
+    'gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role="roles/storage.admin"',
+    # A full-table DELETE empties it as surely as TRUNCATE.
+    'bq query --use_legacy_sql=false "DELETE FROM analytics.sessions WHERE 1=1"',
+    "psql -c 'delete from users'",
 ]
 
 SAFE = [
@@ -63,6 +99,60 @@ SAFE = [
     "rm -rf /tmp/scratch",
     "uv run pytest",
     "psql -c 'select * from users'",
+    # ── PI-906 negative cases. These are DAILY commands: a guard that nags on
+    # them gets switched off, and a disabled guard protects nothing. Every rule
+    # added for PI-906 has its counterpart here.
+    'bq query --use_legacy_sql=false "SELECT 1"',
+    # A SELECT may legitimately carry the word `delete` in a column, a literal
+    # or an identifier — only `DELETE FROM` is the destructive statement.
+    "bq query \"SELECT is_deleted FROM analytics.sessions WHERE state = 'delete'\"",
+    # "delete from" IS ORDINARY ENGLISH, unlike "drop table" or "truncate
+    # table". The first cut of this rule was a bare `\bdelete\s+from\b` and it
+    # flagged all six of these — measured against the real DENY_RULES, not
+    # supposed. Every one is a command someone types weekly, and the last three
+    # concern the guard's own subject matter, so writing a commit message about
+    # this very rule tripped it.
+    'git commit -m "chore: delete from the stale cache"',
+    'git log --grep "delete from"',
+    "echo 'how to delete from a list in python'",
+    'grep -rn "DELETE FROM" src/',
+    "# TODO: delete from the queue once drained",
+    'echo "we should delete from that table eventually"',
+    "bq ls my-proj:analytics",
+    "bq show my-proj:analytics.sessions",
+    "bq load --source_format=CSV my-proj:analytics.t gs://b/f.csv",
+    # Reading the guarded command's own docs is not running it.
+    "bq rm --help",
+    # The rule exempts BOTH help spellings; only the long one was pinned, so a
+    # regression that dropped `-h` would have gone unnoticed (PR #915 review).
+    "bq rm -h",
+    "bq help rm",
+    "gsutil ls gs://prod-assets",
+    "gsutil cp gs://prod-assets/a.csv .",
+    # `-r` on a COPY is routine; only a recursive rm is flagged.
+    "gsutil -m cp -r ./dist gs://prod-assets/dist",
+    "gcloud storage ls gs://prod-assets",
+    "gcloud storage cp -r ./dist gs://prod-assets/dist",
+    # Deliberate parity with the `aws s3 rm --recursive` rule: a SINGLE-object
+    # delete is not flagged, only the recursive form that empties a bucket.
+    # Pinned because an over-match mutant that dropped the recursive
+    # requirement otherwise survived the whole suite (PI-906 mutation run).
+    "gsutil rm gs://prod-assets/one-export.csv",
+    "gcloud storage rm gs://prod-assets/one-export.csv",
+    "dbt run",
+    "dbt run --target dev",
+    # Deliberate: a full refresh against a DEV target is ordinary work.
+    "dbt run --full-refresh --target dev",
+    # `prod-dev` is a DEV target whose name merely starts with the guarded
+    # letters. The first cut flagged it, because a plain `\b` after `prod`
+    # matches inside `prod-dev` — `-` is a non-word character (PR #915 review).
+    "dbt run --full-refresh --target prod-dev",
+    "dbt run --full-refresh --target=prod-staging",
+    "dbt test",
+    "dbt build --target dev",
+    "gcloud projects get-iam-policy mbd",
+    # A low-privilege grant is not an estate handover.
+    "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role=roles/bigquery.dataViewer",
 ]
 
 
@@ -105,6 +195,43 @@ class TestVerdicts:
     @pytest.mark.parametrize("command", SAFE)
     def test_safe_commands_pass(self, tmp_path: Path, command: str):
         assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+
+    @pytest.mark.parametrize(
+        ("command", "label"),
+        [
+            ("bq rm -r -f -d my-proj:analytics", "bq rm (BigQuery dataset/table removal)"),
+            ("gsutil rm -r gs://prod-assets", "gsutil recursive bucket removal"),
+            # THE RULE DEFECT (PI-906): this used to slip past a rule that looks
+            # like it covers gcloud. `\bgcloud\b…\bdelete\b` keys on the token
+            # `delete`, and the modern spelling of recursive bucket deletion
+            # does not carry it. Pinning the LABEL, not just "flagged", is what
+            # makes that regression visible — a command caught incidentally by
+            # some other rule would report a different one.
+            (
+                "gcloud storage rm -r gs://prod-assets",
+                "gcloud storage recursive bucket removal",
+            ),
+            (
+                "dbt run --full-refresh --target prod",
+                "dbt --full-refresh against a production target",
+            ),
+            (
+                "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role roles/owner",
+                "gcloud IAM grant of owner/editor/admin",
+            ),
+            (
+                "gcloud projects remove-iam-policy-binding mbd --member=user:a@b.c --role=roles/x",
+                "gcloud IAM binding removal",
+            ),
+            ('psql -c "DELETE FROM sessions WHERE 1=1"', "SQL DELETE FROM"),
+        ],
+    )
+    def test_each_new_rule_is_the_one_that_fires(self, tmp_path: Path, command: str, label: str):
+        """PI-906: each command is caught by its OWN rule, not by accident."""
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict is not None, f"not flagged: {command}"
+        reason = verdict["hookSpecificOutput"]["permissionDecisionReason"]
+        assert f"'{label}'" in reason, reason
 
     def test_allowlist_suppresses_flag(self, tmp_path: Path):
         config = tmp_path / ".agents" / "config.yaml"
