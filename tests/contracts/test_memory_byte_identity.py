@@ -145,6 +145,13 @@ Exception (PI-745): the TDD-guidance alignment reworded two always-rendered docs
 content change, not move-drift — only those two keys were re-pinned across all
 four combos, after asserting no OTHER key drifted.
 
+Exception (PI-920): `review-status.yml` errored on every review event in a
+PRIVATE scaffolded repo — `gh pr view --json reviews` pulls
+reviews.nodes[].commit, which needs contents:read, and the workflow's explicit
+permissions: block sets unlisted scopes to none. Public repos resolved it
+anyway, so the defect was invisible in this repo's own CI. Only that one
+hash was re-pinned, after confirming it was the sole key that drifted in all
+eight fixtures.
 """
 
 from __future__ import annotations
