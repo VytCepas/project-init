@@ -692,3 +692,46 @@ class TestCommitMsgHookFormats:
     )
     def test_rejects_invalid_formats(self, message):
         assert self._run_commit_msg(message) != 0
+
+
+class TestIssueValidationCanReachTheAPI:
+    """The issue-validation job runs `gh` with no actions/checkout.
+
+    It only needs the issue payload, not the tree — but `gh` falls back to
+    reading the git remote to decide which repo it is talking to, and with no
+    checkout there is no git repo. Every `gh issue edit` / `gh label create` in
+    the job died with "failed to run git: fatal: not a git repository" and the
+    job exited 1.
+
+    It had NEVER passed. Measured across three scaffolded repos on 2026-08-02:
+    2, 2 and 3 runs, zero successes between them. A gate with a 100% failure
+    rate is one nobody reads, which is how it stayed broken.
+
+    GH_REPO tells gh the repository directly and skips the git lookup — cheaper
+    than adding a checkout purely to satisfy a remote lookup. Verified from a
+    non-git directory: without it, `gh issue view` reproduces the exact CI
+    error; with it, the call succeeds.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_path: Path):
+        scaffold(tmp_path, fallback_preset(), fallback_variables())
+        self.wf = tmp_path / ".github" / "workflows" / "issue-validation.yml"
+
+    def test_workflow_exists(self):
+        assert self.wf.is_file(), "issue-validation workflow not scaffolded"
+
+    def test_gh_can_resolve_the_repo_without_a_checkout(self):
+        import yaml
+
+        doc = yaml.safe_load(self.wf.read_text())
+        job = next(iter(doc["jobs"].values()))
+        checks_out = any("actions/checkout" in str(s.get("uses", "")) for s in job["steps"])
+        step = next(s for s in job["steps"] if "gh " in str(s.get("run", "")))
+        env = {**(job.get("env") or {}), **(step.get("env") or {})}
+        assert checks_out or "GH_REPO" in env, (
+            "the job runs gh with neither a checkout nor GH_REPO — gh will try to "
+            "read a git remote that does not exist"
+        )
+        if "GH_REPO" in env:
+            assert "github.repository" in env["GH_REPO"]
