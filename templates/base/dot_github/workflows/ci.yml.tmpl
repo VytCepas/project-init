@@ -686,16 +686,25 @@ jobs:
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.7"
-      # Mutmut needs a pyproject.toml (its [tool.mutmut] config lives there);
-      # a fresh scaffold ships none — skip the nightly run instead of failing.
-      - name: Check for pyproject.toml
+      # Mutmut needs a pyproject.toml *carrying a [tool.mutmut] section* — the
+      # comment above this job already says so, and source_paths is not
+      # optional: without it mutmut aborts with "Could not figure out where the
+      # code to mutate is."
+      #
+      # Testing only for the FILE is why this guard did not hold. `uv init`
+      # writes a pyproject.toml on day one with no [tool.mutmut] in it, so the
+      # gate opened on a project that had never configured mutation testing and
+      # the nightly went red from the first commit — the failure this skip was
+      # written to prevent. Test for the section, which is the thing mutmut
+      # actually requires.
+      - name: Check for a mutmut configuration
         id: pyproject
         run: |
-          if [ -f pyproject.toml ]; then
+          if [ -f pyproject.toml ] && grep -q '^\[tool\.mutmut\]' pyproject.toml; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No pyproject.toml yet — skipping mutation tests."
+            echo "No [tool.mutmut] section yet — skipping mutation tests."
           fi
       - if: steps.pyproject.outputs.exists == 'true'
         run: uv sync --group dev
@@ -1022,18 +1031,39 @@ jobs:
           # release matching" under GitHub API throttling and fails the job.
           just-version: "1.57.0"
 
-      # A fresh scaffold ships no manifest. Skip rather than fail: a nightly run
-      # that is red from day one is a notification people learn to ignore. Only
-      # one language renders per scaffold, so testing all four names needs no
-      # per-language variable.
-      - name: Check for a project manifest
+      # A fresh scaffold has nothing to fuzz. Skip rather than fail: a nightly
+      # run that is red from day one is a notification people learn to ignore.
+      # Only one language renders per scaffold, so testing all four names needs
+      # no per-language variable.
+      #
+      # A MANIFEST IS NOT THE SAME THING AS SOMETHING TO FUZZ, and testing only
+      # for the manifest is why this guard did not hold. `uv init` (or
+      # `npm init`, `go mod init`, `cargo init`) writes one on day one — long
+      # before the first test exists — which opens the gate on an empty project.
+      # pytest then exits 5, "no tests collected", and the nightly is red from
+      # the first commit: exactly the outcome the skip exists to prevent.
+      # Observed on a scaffold whose pyproject.toml came from `uv init` and
+      # which had no tests/ directory at all.
+      #
+      # The prunes matter: .venv and node_modules are full of third-party test
+      # files, and finding one of those would re-open the gate on a project
+      # that still has none of its own.
+      - name: Check for something to fuzz
         id: manifest
         run: |
-          if [ -f pyproject.toml ] || [ -f package.json ] || [ -f go.mod ] || [ -f Cargo.toml ]; then
+          if [ ! -f pyproject.toml ] && [ ! -f package.json ] && [ ! -f go.mod ] && [ ! -f Cargo.toml ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No project manifest yet — nothing to fuzz."
+          elif [ -d tests ] || [ -d test ] || find . \
+                 \( -name .git -o -name .venv -o -name node_modules \
+                    -o -name target -o -name vendor \) -prune -o \
+                 \( -name 'test_*.py' -o -name '*_test.py' -o -name '*_test.go' \
+                    -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' \) \
+                 -print -quit | grep -q .; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No project manifest yet — nothing to fuzz."
+            echo "Manifest present but no tests yet — nothing to fuzz."
           fi
 {{#if python}}
       - name: Install uv

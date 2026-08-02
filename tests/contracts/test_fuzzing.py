@@ -12,6 +12,7 @@ per run, so nightly is where repetition buys new inputs.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -181,3 +182,81 @@ class TestFuzzDocumented:
         assert "**When it runs:**" in rules, f"{rules_file} does not say when fuzzing runs"
         assert "schedule-only (nightly)" in rules
         assert "never on a PR" in rules
+
+
+class TestNightlyGuardsSkipEmptyProjects:
+    """The nightly fuzz and mutmut jobs must skip a project that has nothing to
+    run them against, and must NOT skip one that does.
+
+    Both guards originally tested for a manifest file. That is not the thing
+    either job needs. `uv init` writes a pyproject.toml on day one — long before
+    the first test exists and without any [tool.mutmut] section — so the gate
+    opened on an empty project and the nightly went red from the first commit.
+    pytest exits 5 ("no tests collected"); mutmut aborts with "Could not figure
+    out where the code to mutate is." That is precisely the outcome the skip was
+    written to prevent, and a nightly that is red from day one is a
+    notification people learn to ignore.
+
+    These run the guard's real shell rather than asserting on its text: a test
+    that only greps the YAML passes while the shell it describes is broken.
+    """
+
+    @staticmethod
+    def _guard(target: Path, job_name: str, step_name: str) -> str:
+        for step in job(load_workflow(target), job_name).get("steps", []):
+            if step.get("name") == step_name:
+                return step["run"]
+        raise AssertionError(f"step {step_name!r} not found in job {job_name!r}")
+
+    @staticmethod
+    def _run(script: str, cwd: Path) -> str:
+        """Execute the guard and return the `exists=` value it wrote."""
+        import subprocess
+
+        out = cwd / "gh_output"
+        out.write_text("")
+        proc = subprocess.run(
+            ["sh", "-c", script],
+            cwd=cwd,
+            env={"PATH": os.environ["PATH"], "GITHUB_OUTPUT": str(out)},
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0, f"guard errored: {proc.stderr}"
+        return out.read_text().strip()
+
+    def test_fuzz_skips_a_manifest_with_no_tests(self, tmp_path: Path):
+        guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
+        work = tmp_path / "empty"
+        (work / ".venv" / "lib").mkdir(parents=True)
+        # A third-party test file inside .venv must not count as ours.
+        (work / ".venv" / "lib" / "test_vendored.py").write_text("")
+        (work / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0"\n')
+        assert self._run(guard, work) == "exists=false"
+
+    def test_fuzz_runs_once_a_test_exists(self, tmp_path: Path):
+        guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
+        work = tmp_path / "real"
+        (work / "tests").mkdir(parents=True)
+        (work / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0"\n')
+        assert self._run(guard, work) == "exists=true"
+
+    def test_mutmut_skips_a_pyproject_with_no_config(self, tmp_path: Path):
+        guard = self._guard(
+            _scaffold(tmp_path / "p"), "mutation-tests", "Check for a mutmut configuration"
+        )
+        work = tmp_path / "empty"
+        work.mkdir()
+        (work / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0"\n')
+        assert self._run(guard, work) == "exists=false"
+
+    def test_mutmut_runs_once_configured(self, tmp_path: Path):
+        guard = self._guard(
+            _scaffold(tmp_path / "p"), "mutation-tests", "Check for a mutmut configuration"
+        )
+        work = tmp_path / "real"
+        work.mkdir()
+        (work / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\n\n[tool.mutmut]\nsource_paths = ["src"]\n'
+        )
+        assert self._run(guard, work) == "exists=true"
