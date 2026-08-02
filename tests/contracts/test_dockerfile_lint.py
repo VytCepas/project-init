@@ -117,7 +117,15 @@ class TestRuntimeStagesDropRoot:
 
     Parsed by stage rather than grepped for "USER" anywhere in the file: a USER
     line in the BUILD stage satisfies a substring check while leaving the
-    runtime running as root, which is the whole defect.
+    runtime running as root, which is the whole defect. The LAST USER in the
+    stage is the one that counts.
+
+    An earlier version of this class also asserted USER came before
+    CMD/ENTRYPOINT. That was WRONG and was removed in review: CMD and ENTRYPOINT
+    are image configuration, not build steps, so a USER after them still sets
+    the runtime identity. The test rejected valid Dockerfiles. Checking the
+    stage's final effective user, which test_runtime_stage_sets_a_non_root_user
+    does via users[-1], is the correct formulation.
     """
 
     @staticmethod
@@ -137,7 +145,7 @@ class TestRuntimeStagesDropRoot:
     def test_runtime_stage_sets_a_non_root_user(self, tmp_path: Path, language: str):
         df = (_service(tmp_path / language, language) / "Dockerfile").read_text()
         stages = self._runtime_stages(df)
-        assert stages, f"{language}: no runtime stage found"
+        assert "runtime" in stages, f"{language}: no runtime stage found"
         body = "\n".join(stages["runtime"])
         users = [ln.split()[1] for ln in body.split("\n") if ln.startswith("USER ")]
         assert users, f"{language}: runtime stage never drops root"
@@ -145,28 +153,14 @@ class TestRuntimeStagesDropRoot:
         assert uid not in ("root", "0"), f"{language}: last USER is root ({users[-1]})"
 
     @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
-    def test_user_precedes_the_entrypoint(self, tmp_path: Path, language: str):
-        """USER after CMD/ENTRYPOINT is a no-op for the running process."""
-        body = "\n".join(
-            self._runtime_stages(
-                (_service(tmp_path / language, language) / "Dockerfile").read_text()
-            )["runtime"]
-        )
-        lines = body.split("\n")
-        user_at = max(i for i, ln in enumerate(lines) if ln.startswith("USER "))
-        starts = [i for i, ln in enumerate(lines) if ln.startswith(("CMD ", "ENTRYPOINT "))]
-        assert starts, f"{language}: runtime stage has no CMD/ENTRYPOINT"
-        assert user_at < min(starts), f"{language}: USER comes after the entrypoint"
-
-    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
     def test_copied_tree_is_owned_by_that_uid(self, tmp_path: Path, language: str):
         """Dropping to a uid that cannot read its own files fails at runtime,
         not at build — the worst place to find out."""
-        body = "\n".join(
-            self._runtime_stages(
-                (_service(tmp_path / language, language) / "Dockerfile").read_text()
-            )["runtime"]
+        stages = self._runtime_stages(
+            (_service(tmp_path / language, language) / "Dockerfile").read_text()
         )
+        assert "runtime" in stages, f"{language}: no runtime stage found"
+        body = "\n".join(stages["runtime"])
         copies = [ln for ln in body.split("\n") if ln.startswith("COPY --from=build")]
         assert copies, f"{language}: runtime stage copies nothing from build"
         for c in copies:
