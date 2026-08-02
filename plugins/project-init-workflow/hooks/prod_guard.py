@@ -259,7 +259,16 @@ def _find_config(start: Path) -> Path | None:
     outside $HOME are untouched and still walk to ``/``. Resolved first, because
     the stop is an equality test and ``~/.`` names the same directory as ``~``.
     """
-    with contextlib.suppress(OSError):  # a path that cannot be resolved is used as spelled
+    # RuntimeError as well as OSError, and the difference is measurable rather
+    # than defensive (PR #927 review): `Path.resolve()` raises RuntimeError on a
+    # SYMLINK LOOP under Python 3.11 and 3.12 and stopped doing so in 3.13 —
+    # checked on all three. Both older versions are in this repo's CI matrix and
+    # this template ships to projects running whichever Python they have. An
+    # escaping exception here does not crash the session (the guard's outer
+    # handler is fail-open by design) — it makes the guard STAND DOWN, so a
+    # planted loop anywhere in the walk path switches the deny table off for
+    # that command. A path that cannot be resolved is used as spelled instead.
+    with contextlib.suppress(OSError, RuntimeError):
         start = start.resolve()
     try:
         home: Path | None = Path.home().resolve()

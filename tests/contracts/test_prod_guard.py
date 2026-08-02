@@ -612,6 +612,33 @@ class TestHomeStopCondition:
         monkeypatch.setenv("HOME", str(home))
         assert not _flagged(work)
 
+    def test_a_symlink_loop_in_the_walk_path_does_not_stand_the_guard_down(
+        self, tmp_path: Path, monkeypatch
+    ):
+        """PR #927 review. `Path.resolve()` raises RuntimeError on a symlink
+        loop under Python 3.11 and 3.12 — measured on all three, 3.13 no longer
+        does — and both are in this repo's CI matrix. An escaping exception does
+        not crash the session, because the guard's outer handler is fail-open;
+        it makes the guard STAND DOWN, so a planted loop switches the deny table
+        off for that command.
+
+        NOTE this assertion can only go red on 3.11/3.12. On 3.13+ resolve()
+        returns the unresolved path and the test passes with or without the fix
+        — which is why the fix was verified by running this file under 3.11
+        directly, not only by the local suite.
+        """
+        home = tmp_path / "home"
+        home.mkdir()
+        (home / "a").symlink_to(home / "b")
+        (home / "b").symlink_to(home / "a")
+        monkeypatch.setenv("HOME", str(home))
+        # The loop goes in the PAYLOAD's cwd, not the process's: a looping path
+        # cannot be chdir'd into, so `subprocess(cwd=...)` fails before the guard
+        # ever runs. The hook reads its cwd from the payload, which is the
+        # interface that actually carries an attacker-influenced path.
+        payload = _payload(_DESTRUCTIVE, "bypassPermissions", home / "a")
+        assert _run_hook(payload, tmp_path) is not None
+
     def test_the_boundary_is_before_home_not_at_it(self, tmp_path: Path, monkeypatch):
         """M30: a session whose cwd IS $HOME resolves the same way, and the
         spelling `$HOME/.` must not walk past a stop that compares paths."""
