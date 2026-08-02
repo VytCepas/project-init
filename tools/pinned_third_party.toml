@@ -10,7 +10,7 @@
 [tools.ccr]
 package = "@musistudio/claude-code-router"
 ecosystem = "npm"
-pinned = "2.0.0"
+pinned = "3.0.16"
 # The shell variable carrying this version in each used_in file (kept in lockstep
 # with `pinned` by `check_third_party_updates.py apply`).
 version_var = "CCR_VERSION"
