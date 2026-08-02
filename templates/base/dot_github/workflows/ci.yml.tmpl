@@ -784,11 +784,30 @@ jobs:
 
       # Upload even when the scan step failed on a finding, so the CVEs surface
       # under Security → Code scanning, not only in the failed job log.
+      #
+      # continue-on-error, because code scanning is not universally available:
+      # on a PRIVATE repo without GitHub Advanced Security this step fails with
+      # "Code scanning is not enabled for this repository", which turns a clean
+      # Trivy result into a red build and teaches people to ignore the job. The
+      # GATE is unaffected — it is the scan step's own exit-code: "1" above, and
+      # that still fails the job on a CRITICAL/HIGH finding.
       - name: Upload Trivy SARIF to code scanning
         if: always()
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3
         with:
           sarif_file: trivy-results.sarif
+
+      # ...and keep the findings reachable when that upload was refused, which
+      # is the normal case for a private repo. Without this, "code scanning is
+      # off" silently means "the scan output goes nowhere at all".
+      - name: Keep the Trivy SARIF as an artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: trivy-results-sarif
+          path: trivy-results.sarif
+          if-no-files-found: warn
 {{/if delivery_service}}
 {{#if delivery_service}}
   # Dockerfile lint (#578): hadolint catches missing base-image pins, running as
