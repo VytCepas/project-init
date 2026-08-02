@@ -628,3 +628,181 @@ class TestMonitorPrLocalBranchCleanup:
         assert self._branch_exists(clone, "feat/T-9-x"), (
             "an enqueued-but-unmerged PR's local branch must survive"
         )
+
+
+class TestPrCreationDoesNotRelyOnGhInference:
+    """A narrow fetch refspec makes `gh pr create` abort after a successful push.
+
+    `gh` resolves the head branch through the local remote-tracking ref. A
+    `--single-branch` or `--depth` clone configures only
+    ``remote.origin.fetch = +refs/heads/main:refs/remotes/origin/main``, so no
+    tracking ref is ever created for the branch just pushed — and gh aborts with
+    "you must first push the current branch to a remote, or use the --head flag"
+    even though the push succeeded and the branch exists on the remote.
+
+    Reproduced against a real clone: with the narrow refspec, `git rev-parse
+    @{upstream}` fails with "not stored as a remote-tracking branch" and PR
+    creation dies; widening the refspec and re-fetching fixes it. Both lifecycle
+    entry points therefore name the branch instead of letting gh infer it.
+    """
+
+    def test_start_issue_passes_head_explicitly(self, tmp_path: Path):
+        """Behavioural: run the real _create_pr with a fake gh recording argv."""
+        source = (_LIFECYCLE_SCRIPTS / "start_issue.sh").read_text()
+        m = re.search(r"^_create_pr\(\) \{\n.*?\n\}$", source, re.MULTILINE | re.DOTALL)
+        assert m, "_create_pr not found in start_issue.sh"
+
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        argv_log = tmp_path / "argv"
+        gh = bin_dir / "gh"
+        gh.write_text(
+            "#!/usr/bin/env bash\n"
+            f'printf "%s\\n" "$@" > {argv_log}\n'
+            'echo "https://github.com/o/r/pull/1"\n'
+        )
+        gh.chmod(0o755)
+
+        script = (
+            f"export PATH={bin_dir}:$PATH\n"
+            "set -euo pipefail\n"
+            'BASE_BRANCH=main\nBRANCH=feat/PI-1-x\nPR_TITLE="feat(PI-1): x"\nPR_BODY="Closes #1"\n'
+            f"{m.group(0)}\n_create_pr\n"
+        )
+        proc = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=False)
+        assert proc.returncode == 0, proc.stderr
+
+        argv = argv_log.read_text().splitlines()
+        assert "--head" in argv, f"gh pr create invoked without --head: {argv}"
+        assert argv[argv.index("--head") + 1] == "feat/PI-1-x", argv
+        # The base must still be passed — a --head fix that dropped it would
+        # silently retarget PRs at the repo default.
+        assert "--base" in argv and argv[argv.index("--base") + 1] == "main", argv
+
+    def test_create_pr_nojira_passes_head_explicitly(self, tmp_path: Path):
+        """The other entry point: dag_workflow's create-pr-nojira."""
+        import importlib.util
+
+        hook = _REPO_ROOT / "templates/lifecycle/dot_agents/hooks/dag_workflow.py"
+        spec = importlib.util.spec_from_file_location("dagw_head", hook)
+        assert spec and spec.loader
+        dag = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(dag)
+
+        calls: list[list[str]] = []
+
+        def fake_gh(args: list[str], **kwargs: object) -> tuple[int, str]:
+            calls.append(args)
+            if args[:2] == ["pr", "view"]:
+                # No open PR yet, so creation proceeds.
+                return 1, ""
+            return 0, "https://github.com/o/r/pull/2"
+
+        dag._gh = fake_gh  # type: ignore[assignment]
+        dag._git = lambda args, **kw: (0, "")  # type: ignore[assignment]
+        dag._current_branch = lambda: "feat/nojira-x"  # type: ignore[assignment]
+        dag.cmd_push = lambda *a, **k: 0  # type: ignore[assignment]
+
+        rc = dag.cmd_create_pr_nojira("feat", "Some title", None, None)
+        assert rc == 0, calls
+
+        create = [c for c in calls if c[:2] == ["pr", "create"]]
+        assert create, f"no gh pr create call recorded: {calls}"
+        args = create[0]
+        assert "--head" in args, f"create-pr-nojira invoked gh without --head: {args}"
+        assert args[args.index("--head") + 1] == "feat/nojira-x", args
+
+        # The existing-PR probe must also name the branch, for the same reason.
+        view = [c for c in calls if c[:2] == ["pr", "view"]]
+        assert view, f"no gh pr view probe recorded: {calls}"
+        assert "feat/nojira-x" in view[0], f"pr view relies on inference: {view[0]}"
+
+
+class TestPrCreationFixReachesGeneratedProjects:
+    """PR #912 review (P1): the tests above read templates/ directly.
+
+    They stay green if lifecycle overlay selection or rendering ever stops
+    shipping these files to generated projects — the fix would be present in the
+    source and absent from every scaffold, with nothing failing. CLAUDE.md
+    requires template changes to be exercised through a temporary generated
+    scaffold, so assert against the rendered output as well.
+    """
+
+    @staticmethod
+    def _scaffolded(tmp_path: Path) -> Path:
+        from project_init.scaffold import scaffold
+        from tests.helpers import fallback_preset, fallback_variables
+
+        target = tmp_path / "generated"
+        scaffold(target, fallback_preset(), fallback_variables())
+        return target
+
+    def test_generated_start_issue_passes_head(self, tmp_path: Path):
+        target = self._scaffolded(tmp_path)
+        script = target / ".agents" / "scripts" / "start_issue.sh"
+        assert script.is_file(), "lifecycle scaffold did not emit start_issue.sh"
+
+        m = re.search(
+            r"^_create_pr\(\) \{\n.*?\n\}$",
+            script.read_text(encoding="utf-8"),
+            re.MULTILINE | re.DOTALL,
+        )
+        assert m, "_create_pr missing from the GENERATED start_issue.sh"
+
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        argv_log = tmp_path / "argv"
+        gh = bin_dir / "gh"
+        gh.write_text(
+            "#!/usr/bin/env bash\n"
+            f'printf "%s\\n" "$@" > {argv_log}\n'
+            'echo "https://github.com/o/r/pull/1"\n'
+        )
+        gh.chmod(0o755)
+        proc = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f"export PATH={bin_dir}:$PATH\nset -euo pipefail\n"
+                'BASE_BRANCH=main\nBRANCH=feat/PI-1-x\nPR_TITLE="t"\nPR_BODY="b"\n'
+                f"{m.group(0)}\n_create_pr\n",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc.returncode == 0, proc.stderr
+        argv = argv_log.read_text().splitlines()
+        assert "--head" in argv, f"generated script omits --head: {argv}"
+        assert argv[argv.index("--head") + 1] == "feat/PI-1-x", argv
+
+    def test_generated_dag_workflow_passes_head(self, tmp_path: Path):
+        import importlib.util
+
+        target = self._scaffolded(tmp_path)
+        hook = target / ".agents" / "hooks" / "dag_workflow.py"
+        assert hook.is_file(), "lifecycle scaffold did not emit dag_workflow.py"
+
+        spec = importlib.util.spec_from_file_location("dagw_generated", hook)
+        assert spec and spec.loader
+        dag = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(dag)
+
+        calls: list[list[str]] = []
+
+        def fake_gh(args: list[str], **kwargs: object) -> tuple[int, str]:
+            calls.append(args)
+            if args[:2] == ["pr", "view"]:
+                return 1, ""
+            return 0, "https://github.com/o/r/pull/2"
+
+        dag._gh = fake_gh  # type: ignore[assignment]
+        dag._git = lambda args, **kw: (0, "")  # type: ignore[assignment]
+        dag._current_branch = lambda: "feat/nojira-x"  # type: ignore[assignment]
+        dag.cmd_push = lambda *a, **k: 0  # type: ignore[assignment]
+
+        assert dag.cmd_create_pr_nojira("feat", "Some title", None, None) == 0, calls
+        create = [c for c in calls if c[:2] == ["pr", "create"]]
+        assert create, f"no gh pr create recorded: {calls}"
+        assert "--head" in create[0], f"generated hook omits --head: {create[0]}"
+        assert create[0][create[0].index("--head") + 1] == "feat/nojira-x", create[0]

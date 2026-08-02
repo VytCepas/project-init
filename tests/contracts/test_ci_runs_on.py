@@ -10,11 +10,12 @@ never use the variable, so tokens never materialize on a user's machine.
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
-from tests.workflow import load_workflow
+from tests.workflow import _strip_shell_comments, load_workflow
 
 _EXPR = "${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}"
 
@@ -161,3 +162,91 @@ class TestCiRunsOnEscapeHatch:
         assert "public-fork" in guide
         # The don't-flip-without-a-runner warning.
         assert "queue forever" in guide
+
+
+class TestShfmtInstallIsHostSafe:
+    """PI-666 follow-up: the shfmt step ran as if the runner were always
+    GitHub-hosted ubuntu.
+
+    It curled `shfmt_v3.8.0_linux_amd64` and `mv`'d it over
+    `$HOME/.local/bin/shfmt`. On the macOS/ARM self-hosted runner that
+    `just ci-local-on` routes to, that installed a Linux x86 binary: the lint
+    step died with "cannot execute binary file", and because a self-hosted
+    runner shares $HOME with its operator it had already overwritten the
+    developer's working shfmt. A nightly cron then repeated it unattended.
+
+    Same class as `test_semgrep_uses_uvx_not_pip` above: correct on a hosted
+    runner, destructive on the runner this feature exists to enable.
+    """
+
+    @staticmethod
+    def _install_script(target: Path) -> str:
+        """The rendered `run:` body of the Install shfmt step, structurally."""
+        from tests.workflow import job, load_workflow, steps
+
+        found = [
+            s["run"]
+            for s in steps(job(load_workflow(target), "lint-and-test"))
+            if s.get("name") == "Install shfmt" and "run" in s
+        ]
+        assert found, "lint-and-test has no Install shfmt step with a run: body"
+        return found[0]
+
+    def test_asset_is_derived_from_the_runner_not_hardcoded(self, tmp_target: Path):
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
+        script = _strip_shell_comments(self._install_script(tmp_target))
+        # The hardcoded asset name must not survive in executable shell.
+        assert "shfmt_v3.8.0_linux_amd64" not in script, (
+            "shfmt asset is hardcoded to linux_amd64; wrong on any self-hosted "
+            f"macOS/ARM runner:\n{script}"
+        )
+        assert "uname -s" in script and "uname -m" in script, (
+            f"asset must be derived from the runner's OS/arch:\n{script}"
+        )
+        # macOS has no sha256sum — an unconditional call would abort under set -e
+        # before the checksum is ever verified.
+        assert "shasum" in script, f"no sha256sum fallback for macOS:\n{script}"
+
+    def test_it_leaves_an_existing_shfmt_untouched(self, tmp_path: Path, tmp_target: Path):
+        """Behavioural: run the rendered script with a shfmt already on PATH.
+
+        Asserting the guard's *text* would pass on a comment describing it. This
+        executes the real step against a fake HOME and proves nothing is written.
+        """
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
+        script = self._install_script(tmp_target)
+
+        home = tmp_path / "home"
+        (home / ".local" / "bin").mkdir(parents=True)
+        bindir = tmp_path / "hostbin"
+        bindir.mkdir()
+        host_shfmt = bindir / "shfmt"
+        host_shfmt.write_text("#!/bin/sh\necho 3.13.1\n")
+        host_shfmt.chmod(0o755)
+        sentinel = host_shfmt.read_bytes()
+
+        env = {
+            "HOME": str(home),
+            "PATH": f"{bindir}:/usr/bin:/bin:/usr/sbin:/sbin",
+            # The step appends to $GITHUB_PATH; give it a real file so the
+            # redirect cannot fail the script for an unrelated reason.
+            "GITHUB_PATH": str(tmp_path / "github_path"),
+        }
+        (tmp_path / "github_path").touch()
+
+        result = subprocess.run(
+            ["sh", "-c", script],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+
+        assert result.returncode == 0, f"step failed: {result.stderr}"
+        # The host's copy is byte-identical: not overwritten, not replaced.
+        assert host_shfmt.read_bytes() == sentinel, "the host's shfmt was modified"
+        # And nothing was installed into the operator's ~/.local/bin.
+        assert not (home / ".local" / "bin" / "shfmt").exists(), (
+            "step wrote into $HOME despite a usable shfmt already being on PATH"
+        )
