@@ -98,3 +98,70 @@ class TestDockerfilePassesClean:
     def test_node_and_go_need_no_ignores(self, tmp_path: Path, language: str):
         dockerfile = (_service(tmp_path / language, language) / "Dockerfile").read_text()
         assert "hadolint ignore" not in dockerfile
+
+
+class TestRuntimeStagesDropRoot:
+    """Every runtime stage must end up as a non-root user.
+
+    semgrep's dockerfile.security.missing-user is ON in the CI this scaffolder
+    ships, so a Dockerfile without USER makes a freshly scaffolded service fail
+    its own security gate on the first run — the template was internally
+    inconsistent, shipping a rule and a violation of it together. Observed on a
+    scaffolded service: "Ran 286 rules on 253 files: 1 finding", the finding
+    being this one, and that single finding was the whole reason its CI was red.
+
+    The uid is NUMERIC on purpose. A named user would need useradd (absent from
+    distroless, which has no shell at all) or an assumption about what the base
+    image already provides. A numeric uid needs no /etc/passwd entry and is
+    correct on every base the template uses.
+
+    Parsed by stage rather than grepped for "USER" anywhere in the file: a USER
+    line in the BUILD stage satisfies a substring check while leaving the
+    runtime running as root, which is the whole defect. The LAST USER in the
+    stage is the one that counts.
+
+    An earlier version of this class also asserted USER came before
+    CMD/ENTRYPOINT. That was WRONG and was removed in review: CMD and ENTRYPOINT
+    are image configuration, not build steps, so a USER after them still sets
+    the runtime identity. The test rejected valid Dockerfiles. Checking the
+    stage's final effective user, which test_runtime_stage_sets_a_non_root_user
+    does via users[-1], is the correct formulation.
+    """
+
+    @staticmethod
+    def _runtime_stages(dockerfile: str) -> dict[str, list[str]]:
+        stages: dict[str, list[str]] = {}
+        current = None
+        for line in dockerfile.split("\n"):
+            if line.startswith("FROM "):
+                current = line.rstrip().split(" AS ")[-1] if " AS " in line else None
+                if current:
+                    stages[current] = []
+            elif current:
+                stages[current].append(line)
+        return {k: v for k, v in stages.items() if k == "runtime"}
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_runtime_stage_sets_a_non_root_user(self, tmp_path: Path, language: str):
+        df = (_service(tmp_path / language, language) / "Dockerfile").read_text()
+        stages = self._runtime_stages(df)
+        assert "runtime" in stages, f"{language}: no runtime stage found"
+        body = "\n".join(stages["runtime"])
+        users = [ln.split()[1] for ln in body.split("\n") if ln.startswith("USER ")]
+        assert users, f"{language}: runtime stage never drops root"
+        uid = users[-1].split(":")[0]
+        assert uid not in ("root", "0"), f"{language}: last USER is root ({users[-1]})"
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_copied_tree_is_owned_by_that_uid(self, tmp_path: Path, language: str):
+        """Dropping to a uid that cannot read its own files fails at runtime,
+        not at build — the worst place to find out."""
+        stages = self._runtime_stages(
+            (_service(tmp_path / language, language) / "Dockerfile").read_text()
+        )
+        assert "runtime" in stages, f"{language}: no runtime stage found"
+        body = "\n".join(stages["runtime"])
+        copies = [ln for ln in body.split("\n") if ln.startswith("COPY --from=build")]
+        assert copies, f"{language}: runtime stage copies nothing from build"
+        for c in copies:
+            assert "--chown=10001:10001" in c, f"{language}: unowned copy — {c}"

@@ -18,10 +18,23 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev --frozen 2>/dev/n
 
 # --- runtime stage: copy the venv, drop the toolchain ---
 FROM python:3.13-slim AS runtime
+# Create the workdir ALREADY owned by the runtime uid. WORKDIR creates a missing
+# directory as root, and `COPY --chown` sets ownership on the copied CONTENTS,
+# not on a destination directory that already exists — so doing this the obvious
+# way leaves /app root-owned and HOME=/app unwritable, which surfaces as EACCES
+# the first time anything caches under $HOME. Caught in review, 2026-08-02.
+RUN install -d -o 10001 -g 10001 /app
 WORKDIR /app
-COPY --from=build /app /app
-ENV PATH="/app/.venv/bin:$PATH" PORT=8080
+COPY --from=build --chown=10001:10001 /app /app
+ENV PATH="/app/.venv/bin:$PATH" PORT=8080 HOME=/app
 EXPOSE 8080
+# Run as a non-root uid (semgrep dockerfile.security.missing-user). A NUMERIC
+# uid is deliberate: it needs no /etc/passwd entry and no useradd, so the same
+# line is correct on debian-slim, bun-slim and distroless alike — no assumption
+# about what user-management tooling the base image happens to ship. HOME is set
+# because a uid with no passwd entry makes getpwuid() fail, which breaks
+# anything calling os.path.expanduser("~").
+USER 10001:10001
 # TODO: replace with your app's entrypoint (e.g. uvicorn app.main:app --host 0.0.0.0 --port $PORT)
 CMD ["python", "-c", "import os; print('replace CMD: serving on', os.environ.get('PORT', '8080'))"]
 {{/if python}}{{#if node}}# --- build stage: install deps with bun ---
@@ -35,10 +48,13 @@ RUN bun run build 2>/dev/null || true
 # --- runtime stage ---
 FROM oven/bun:1-slim AS runtime
 WORKDIR /app
-COPY --from=build /app /app
+COPY --from=build --chown=10001:10001 /app /app
 ENV NODE_ENV=production PORT=8080
 EXPOSE 8080
 # TODO: replace with your app's start command (e.g. bun run start)
+# Non-root uid, numeric so it needs no /etc/passwd entry (see the python
+# runtime stage above for why).
+USER 10001:10001
 CMD ["bun", "run", "start"]
 {{/if node}}{{#if go}}# --- build stage: compile a static binary ---
 # Keep this Go version in step with mise.toml's `go` pin — a go.mod created
@@ -57,10 +73,13 @@ RUN CGO_ENABLED=0 go build -o /app/server .
 # --- runtime stage: distroless, no shell/toolchain ---
 FROM gcr.io/distroless/static-debian12 AS runtime
 WORKDIR /app
-COPY --from=build /app/server /app/server
+COPY --from=build --chown=10001:10001 /app/server /app/server
 ENV PORT=8080
 EXPOSE 8080
 # TODO: ensure your server reads $PORT and listens on 0.0.0.0
+# Non-root uid, numeric so it needs no /etc/passwd entry (see the python
+# runtime stage above for why).
+USER 10001:10001
 ENTRYPOINT ["/app/server"]
 {{/if go}}{{#if rust}}# --- build stage: compile a release binary ---
 FROM rust:1-slim-bookworm AS build
@@ -79,9 +98,12 @@ RUN cargo build --release && \
 # --- runtime stage: slim base (dynamically-linked glibc binary) ---
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
-COPY --from=build /src/server /app/server
+COPY --from=build --chown=10001:10001 /src/server /app/server
 ENV PORT=8080
 EXPOSE 8080
 # TODO: ensure your server reads $PORT and listens on 0.0.0.0
+# Non-root uid, numeric so it needs no /etc/passwd entry (see the python
+# runtime stage above for why).
+USER 10001:10001
 ENTRYPOINT ["/app/server"]
 {{/if rust}}{{/if delivery_service}}
