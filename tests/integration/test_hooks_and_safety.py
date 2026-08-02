@@ -271,6 +271,19 @@ class TestCiSecretScanMirror:
     def test_scans_full_history(self):
         assert "fetch-depth: 0" in self.ci
 
+    def test_download_path_is_per_job_temp(self):
+        """gitleaks-action downloads to a fixed $TMPDIR/gitleaks.tmp, refuses to
+        overwrite it, and never cleans up. Hosted runners hide that because the
+        machine is thrown away; on a self-hosted runner $TMPDIR persists and the
+        first GREEN run makes every later run die at install, so the repo stops
+        being secret-scanned while the job just looks flaky. Measured on
+        VytCepas/gtm: green 2026-08-01T20:43:55, red 88s later, red for two days.
+        RUNNER_TEMP is emptied per job on both runner kinds, so the download path
+        has to be fresh by construction rather than by anybody remembering.
+        """
+        scan = self.ci.split("secret-scan:", 1)[1].split("\n  semgrep:", 1)[0]
+        assert "TMPDIR: ${{ runner.temp }}" in scan
+
     def test_job_rendered_outside_language_conditionals(self, tmp_path: Path):
         """secret-scan must survive a non-python scaffold too."""
         target = tmp_path / "node-proj"

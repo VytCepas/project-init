@@ -686,16 +686,25 @@ jobs:
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: "0.11.7"
-      # Mutmut needs a pyproject.toml (its [tool.mutmut] config lives there);
-      # a fresh scaffold ships none — skip the nightly run instead of failing.
-      - name: Check for pyproject.toml
+      # Mutmut needs a pyproject.toml *carrying a [tool.mutmut] section* — the
+      # comment above this job already says so, and source_paths is not
+      # optional: without it mutmut aborts with "Could not figure out where the
+      # code to mutate is."
+      #
+      # Testing only for the FILE is why this guard did not hold. `uv init`
+      # writes a pyproject.toml on day one with no [tool.mutmut] in it, so the
+      # gate opened on a project that had never configured mutation testing and
+      # the nightly went red from the first commit — the failure this skip was
+      # written to prevent. Test for the section, which is the thing mutmut
+      # actually requires.
+      - name: Check for a mutmut configuration
         id: pyproject
         run: |
-          if [ -f pyproject.toml ]; then
+          if [ -f pyproject.toml ] && grep -q '^\[tool\.mutmut\]' pyproject.toml; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No pyproject.toml yet — skipping mutation tests."
+            echo "No [tool.mutmut] section yet — skipping mutation tests."
           fi
       - if: steps.pyproject.outputs.exists == 'true'
         run: uv sync --group dev
@@ -775,11 +784,30 @@ jobs:
 
       # Upload even when the scan step failed on a finding, so the CVEs surface
       # under Security → Code scanning, not only in the failed job log.
+      #
+      # continue-on-error, because code scanning is not universally available:
+      # on a PRIVATE repo without GitHub Advanced Security this step fails with
+      # "Code scanning is not enabled for this repository", which turns a clean
+      # Trivy result into a red build and teaches people to ignore the job. The
+      # GATE is unaffected — it is the scan step's own exit-code: "1" above, and
+      # that still fails the job on a CRITICAL/HIGH finding.
       - name: Upload Trivy SARIF to code scanning
         if: always()
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@411c4c9a36b3fca4d674f06b6396b2c6d23522c6 # v3
         with:
           sarif_file: trivy-results.sarif
+
+      # ...and keep the findings reachable when that upload was refused, which
+      # is the normal case for a private repo. Without this, "code scanning is
+      # off" silently means "the scan output goes nowhere at all".
+      - name: Keep the Trivy SARIF as an artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: trivy-results-sarif
+          path: trivy-results.sarif
+          if-no-files-found: warn
 {{/if delivery_service}}
 {{#if delivery_service}}
   # Dockerfile lint (#578): hadolint catches missing base-image pins, running as
@@ -815,6 +843,23 @@ jobs:
           # GITLEAKS_LICENSE is required only for organization-owned repos
           # (free key from gitleaks.io). Personal accounts need no license.
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          # The action downloads the release tarball to a FIXED path,
+          # $TMPDIR/gitleaks.tmp, aborts if that path already exists, and never
+          # deletes it on the way out. On a hosted runner the whole machine is
+          # discarded so nobody notices. On a self-hosted runner $TMPDIR is the
+          # persistent per-user temp dir, so the FIRST SUCCESSFUL RUN poisons
+          # every run after it — the scan then dies at install with
+          # "Destination file path ... already exists" and the repo silently
+          # stops being secret-scanned while the job merely looks flaky.
+          # Measured on a self-hosted macOS runner: green at 20:43:55, red 88 s
+          # later at 20:45:23, red every run for the following two days. The
+          # leftover tarball was byte-complete (5574778 B, matching upstream
+          # content-length) — not a partial download, which is what makes
+          # deleting it a fix that lasts exactly one run.
+          # RUNNER_TEMP is emptied by the runner at the start of every job on
+          # both hosted and self-hosted, so pointing TMPDIR at it makes the
+          # download path fresh by construction rather than by cleanup.
+          TMPDIR: ${{ runner.temp }}
 
   # Semgrep: semantic/AST security backstop. gitleaks (above) is string-
   # pattern secret scanning; semgrep catches unsafe subprocess calls, SQL
@@ -1005,18 +1050,39 @@ jobs:
           # release matching" under GitHub API throttling and fails the job.
           just-version: "1.57.0"
 
-      # A fresh scaffold ships no manifest. Skip rather than fail: a nightly run
-      # that is red from day one is a notification people learn to ignore. Only
-      # one language renders per scaffold, so testing all four names needs no
-      # per-language variable.
-      - name: Check for a project manifest
+      # A fresh scaffold has nothing to fuzz. Skip rather than fail: a nightly
+      # run that is red from day one is a notification people learn to ignore.
+      # Only one language renders per scaffold, so testing all four names needs
+      # no per-language variable.
+      #
+      # A MANIFEST IS NOT THE SAME THING AS SOMETHING TO FUZZ, and testing only
+      # for the manifest is why this guard did not hold. `uv init` (or
+      # `npm init`, `go mod init`, `cargo init`) writes one on day one — long
+      # before the first test exists — which opens the gate on an empty project.
+      # pytest then exits 5, "no tests collected", and the nightly is red from
+      # the first commit: exactly the outcome the skip exists to prevent.
+      # Observed on a scaffold whose pyproject.toml came from `uv init` and
+      # which had no tests/ directory at all.
+      #
+      # The prunes matter: .venv and node_modules are full of third-party test
+      # files, and finding one of those would re-open the gate on a project
+      # that still has none of its own.
+      - name: Check for something to fuzz
         id: manifest
         run: |
-          if [ -f pyproject.toml ] || [ -f package.json ] || [ -f go.mod ] || [ -f Cargo.toml ]; then
+          if [ ! -f pyproject.toml ] && [ ! -f package.json ] && [ ! -f go.mod ] && [ ! -f Cargo.toml ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No project manifest yet — nothing to fuzz."
+          elif [ -d tests ] || [ -d test ] || find . \
+                 \( -name .git -o -name .venv -o -name node_modules \
+                    -o -name target -o -name vendor \) -prune -o \
+                 \( -name 'test_*.py' -o -name '*_test.py' -o -name '*_test.go' \
+                    -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' \) \
+                 -print -quit | grep -q .; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "No project manifest yet — nothing to fuzz."
+            echo "Manifest present but no tests yet — nothing to fuzz."
           fi
 {{#if python}}
       - name: Install uv
