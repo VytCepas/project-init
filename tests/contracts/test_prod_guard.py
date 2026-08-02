@@ -539,6 +539,7 @@ class TestContextMarkerValue:
             ('"context": ambient\n', "M26 quoted key"),
             ('context: "ambient"\n', "M27 quoted value"),
             ("context: ambient  # opted out\n", "trailing comment"),
+            ("context: ambient\t# tab before the comment\n", "tab before the comment"),
         ],
     )
     def test_every_valid_top_level_spelling_counts(self, tmp_path: Path, spelling: str, case: str):
@@ -552,6 +553,24 @@ class TestContextMarkerValue:
         agents.mkdir()
         agents.joinpath("config.yaml").write_text(spelling + _PERMISSIVE)
         assert _flagged(tmp_path), f"{case}: a valid opt-out was not read"
+
+    @pytest.mark.parametrize(
+        "spelling",
+        ["context: ambient#typo\n", 'context: "ambient"#x\n', "context: ambientish\n"],
+    )
+    def test_a_hash_without_whitespace_is_part_of_the_value(self, tmp_path: Path, spelling: str):
+        """PR #927 review. `#` begins a YAML comment only when preceded by
+        whitespace; otherwise it belongs to the plain scalar. So
+        `context: ambient#typo` is the value `ambient#typo`, not `ambient`, and
+        reading it as an opt-out silently discards the repo's allowlist on a
+        typo. The direction is safe for this guard and still wrong — the
+        orchestrator's real YAML parser resolves the same line differently, and
+        three readers disagreeing about one line is what the shared fixtures
+        exist to prevent."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text(spelling + _PERMISSIVE)
+        assert not _flagged(tmp_path), f"{spelling!r} was read as an opt-out"
 
     def test_inner_optout_is_not_overruled_by_an_outer_marker(self, tmp_path: Path):
         """M19: the value is read AT the marker the walk finds and decides

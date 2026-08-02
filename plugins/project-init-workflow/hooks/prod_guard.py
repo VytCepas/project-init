@@ -203,8 +203,17 @@ _AUTONOMOUS_MODES = {"bypassPermissions", "dangerouslySkipPermissions"}
 # upgrade — a spelling the writer keeps but the reader misses is an opt-out that
 # survives in the file and is then ignored. KEEP IN STEP with harbor's
 # `floor_in_repo`, which reads the same key with the same tolerances.
+#
+# A COMMENT NEEDS WHITESPACE BEFORE IT (PR #927 review). `#` only begins a YAML
+# comment when preceded by whitespace; otherwise it is part of the plain scalar.
+# So `context: ambient#typo` is the value `ambient#typo` — NOT `ambient` — and
+# the first cut read it as an opt-out, silently discarding that repo's allowlist.
+# The direction is safe for this guard (no allowlist ⇒ keep guarding) and it is
+# still wrong: it disables a control the owner declared, on a typo, and the
+# orchestrator's real YAML parser resolves the same line differently, which is
+# precisely the three-readers divergence the shared fixtures exist to prevent.
 _CONTEXT_AMBIENT_RE = re.compile(
-    r"""^["']?context["']?[^\S\n]*:[^\S\n]*["']?ambient["']?[^\S\n]*(?:\#.*)?$""",
+    r"""^["']?context["']?[^\S\n]*:[^\S\n]*["']?ambient["']?(?:[^\S\n]+\#.*)?[^\S\n]*$""",
     re.MULTILINE,
 )
 
