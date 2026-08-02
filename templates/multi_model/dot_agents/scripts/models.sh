@@ -106,7 +106,13 @@ cmd_add() {
         '.Providers += [{"name":"ollama","api_base_url":$url,"api_key":"ollama","models":[]}]'
     fi
     if have ollama; then
-      info "Pulling $model…"
+      # BRACES, because the next character is a non-ASCII ellipsis. Bash decides
+      # where a bare `$name` ends with isalnum(), which is LOCALE-DEPENDENT: under
+      # a non-UTF-8 locale the three bytes of `…` (E2 80 A6) read as alphanumeric
+      # and get folded into the identifier, so this line died with
+      # `model\xe2: unbound variable` under `set -u`. Found 2026-08-02 by the
+      # overlay's own contract test, which then crashed decoding the error.
+      info "Pulling ${model}…"
       ollama pull "$model"
     else warn "ollama not installed — registering anyway."; fi
   else
@@ -130,7 +136,7 @@ cmd_rm() {
   _jq_write --arg p "$provider" --arg m "$model" \
     '(.Providers[] | select(.name==$p) | .models) |= ((. // []) - [$m])'
   if [ "$provider" = "ollama" ] && have ollama; then
-    info "Removing local model $model…"
+    info "Removing local model ${model}…"
     ollama rm "$model" 2>/dev/null || warn "ollama rm $model failed (not pulled?)."
   fi
   ok "Unregistered $model from $provider."
