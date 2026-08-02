@@ -815,6 +815,23 @@ jobs:
           # GITLEAKS_LICENSE is required only for organization-owned repos
           # (free key from gitleaks.io). Personal accounts need no license.
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          # The action downloads the release tarball to a FIXED path,
+          # $TMPDIR/gitleaks.tmp, aborts if that path already exists, and never
+          # deletes it on the way out. On a hosted runner the whole machine is
+          # discarded so nobody notices. On a self-hosted runner $TMPDIR is the
+          # persistent per-user temp dir, so the FIRST SUCCESSFUL RUN poisons
+          # every run after it — the scan then dies at install with
+          # "Destination file path ... already exists" and the repo silently
+          # stops being secret-scanned while the job merely looks flaky.
+          # Measured on a self-hosted macOS runner: green at 20:43:55, red 88 s
+          # later at 20:45:23, red every run for the following two days. The
+          # leftover tarball was byte-complete (5574778 B, matching upstream
+          # content-length) — not a partial download, which is what makes
+          # deleting it a fix that lasts exactly one run.
+          # RUNNER_TEMP is emptied by the runner at the start of every job on
+          # both hosted and self-hosted, so pointing TMPDIR at it makes the
+          # download path fresh by construction rather than by cleanup.
+          TMPDIR: ${{ runner.temp }}
 
   # Semgrep: semantic/AST security backstop. gitleaks (above) is string-
   # pattern secret scanning; semgrep catches unsafe subprocess calls, SQL
