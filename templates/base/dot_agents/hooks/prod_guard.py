@@ -22,6 +22,7 @@ Fail-open by design: any internal error lets the command proceed.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -193,6 +194,44 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
 _AUTONOMOUS_MODES = {"bypassPermissions", "dangerouslySkipPermissions"}
 
 
+# harbor#4 H1 / CONTRACTS/marker.md — `context: ambient` is the owner opting a
+# repo back in to the ambient (global) agent layer. Anchored at column 0: a
+# top-level YAML key cannot be indented, and matching an indented one would let
+# a `context: ambient` nested under some unrelated block opt the whole repo out.
+# Quoted keys/values and a space before the colon ARE valid top-level YAML, and
+# project-init's own `_CONTEXT_KEY_RE` preserves exactly those spellings on
+# upgrade — a spelling the writer keeps but the reader misses is an opt-out that
+# survives in the file and is then ignored. KEEP IN STEP with harbor's
+# `floor_in_repo`, which reads the same key with the same tolerances.
+#
+# A COMMENT NEEDS WHITESPACE BEFORE IT (PR #927 review). `#` only begins a YAML
+# comment when preceded by whitespace; otherwise it is part of the plain scalar.
+# So `context: ambient#typo` is the value `ambient#typo` — NOT `ambient` — and
+# the first cut read it as an opt-out, silently discarding that repo's allowlist.
+# The direction is safe for this guard (no allowlist ⇒ keep guarding) and it is
+# still wrong: it disables a control the owner declared, on a typo, and the
+# orchestrator's real YAML parser resolves the same line differently, which is
+# precisely the three-readers divergence the shared fixtures exist to prevent.
+_CONTEXT_AMBIENT_RE = re.compile(
+    r"""^["']?context["']?[^\S\n]*:[^\S\n]*["']?ambient["']?(?:[^\S\n]+\#.*)?[^\S\n]*$""",
+    re.MULTILINE,
+)
+
+
+def _declares_ambient(config: Path) -> bool:
+    """True iff *config* carries a top-level ``context: ambient`` declaration.
+
+    Unreadable is not ambient: an unreadable config supplies no allowlist
+    either, so the guard already keeps guarding, and inventing a verdict from a
+    failed read would be a guess.
+    """
+    try:
+        text = config.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return bool(_CONTEXT_AMBIENT_RE.search(text))
+
+
 def _find_config(start: Path) -> Path | None:
     """Walk up from *start* to the project's .agents/config.yaml, if any.
 
@@ -209,14 +248,50 @@ def _find_config(start: Path) -> Path | None:
     this walk agree with harbor's ``floor_in_repo``, which has refused symlinked
     markers since the 2026-07-24 marker-forgery finding. Nothing surfaced the
     disagreement while it existed.
+
+    Two further rules from the same frozen contract:
+
+    ``context: ambient`` (harbor#4 H1, M18/M19) — the owner declaring that this
+    repo does NOT govern itself and the ambient layer keeps acting here. A repo
+    that has opted out of governed status does not get to relax the deny table
+    with its own ``safety.allow``, so the declaration returns None (no
+    allowlist) rather than continuing the walk. Deciding AT the marker is the
+    contract's rule and the reason it is not a ``continue``: the innermost
+    marker wins, so an explicit inner opt-out must not fall through and be
+    overruled by an outer repo's config. A symlink is refused because it is
+    forged; an ``ambient`` value is honoured because it is the owner speaking.
+
+    ``$HOME`` (harbor#4 M14) — the walk stops before it. A marker sitting in
+    the home directory itself otherwise supplies an allowlist to every command
+    run anywhere beneath it, and it is written by accident rather than by
+    attack: project-init run once in the wrong cwd scaffolds one there. Paths
+    outside $HOME are untouched and still walk to ``/``. Resolved first, because
+    the stop is an equality test and ``~/.`` names the same directory as ``~``.
     """
+    # RuntimeError as well as OSError, and the difference is measurable rather
+    # than defensive (PR #927 review): `Path.resolve()` raises RuntimeError on a
+    # SYMLINK LOOP under Python 3.11 and 3.12 and stopped doing so in 3.13 —
+    # checked on all three. Both older versions are in this repo's CI matrix and
+    # this template ships to projects running whichever Python they have. An
+    # escaping exception here does not crash the session (the guard's outer
+    # handler is fail-open by design) — it makes the guard STAND DOWN, so a
+    # planted loop anywhere in the walk path switches the deny table off for
+    # that command. A path that cannot be resolved is used as spelled instead.
+    with contextlib.suppress(OSError, RuntimeError):
+        start = start.resolve()
+    try:
+        home: Path | None = Path.home().resolve()
+    except (RuntimeError, OSError):
+        home = None  # no home to stop before; inventing one would be a guess
     for candidate in (start, *start.parents):
+        if candidate == home:
+            break
         agents = candidate / ".agents"
         config = agents / "config.yaml"
         if agents.is_symlink() or config.is_symlink():
             continue
         if config.is_file():
-            return config
+            return None if _declares_ambient(config) else config
     return None
 
 
