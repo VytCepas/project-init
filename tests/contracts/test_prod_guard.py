@@ -460,3 +460,164 @@ class TestWiring:
         assert "cannot delete what the session cannot reach" in secrets
         agents_md = (target / "AGENTS.md").read_text()
         assert "prod_guard" in agents_md
+
+
+_DESTRUCTIVE = "terraform destroy -auto-approve"
+_PERMISSIVE = 'safety:\n  allow: [".*"]\n'
+
+
+def _flagged(cwd: Path) -> bool:
+    """True when the guard flags a destructive command run from *cwd*."""
+    return _run_hook(_payload(_DESTRUCTIVE, "bypassPermissions", cwd), cwd) is not None
+
+
+class TestContextMarkerValue:
+    """harbor#4 H1 — the `context:` value, whose reader lived only in harbor.
+
+    project-init has WRITTEN this key since PI-901 (template + upgrade splice)
+    and read it nowhere, so `context: ambient` was a field the schema defines,
+    the wizard emits and no code in this repo acts on. Every case here is a
+    fixture in harbor's shared suite (fixtures/marker/cases.json); the ids are
+    quoted so a divergence is traceable to one line of one contract.
+
+    What `ambient` means HERE: the owner declaring the repo does not govern
+    itself, so its `safety.allow` does not relax the deny table. The safe
+    direction, and the one the guard already takes when no config exists.
+    """
+
+    def test_ambient_repo_cannot_supply_an_allowlist(self, tmp_path: Path):
+        """M18: the opt-out decides, even though the marker is present."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text("context: ambient\n" + _PERMISSIVE)
+        assert _flagged(tmp_path), "an opted-out repo relaxed the deny table anyway"
+
+    def test_context_repo_still_supplies_its_allowlist(self, tmp_path: Path):
+        """M20: the value only ever ADDS an opt-out. `context: repo` is what
+        every fresh scaffold emits, and it must resolve exactly as presence
+        alone already did — the case that proves the reader discriminates
+        rather than merely rejecting everything."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text("context: repo\n" + _PERMISSIVE)
+        assert not _flagged(tmp_path), "a governed repo lost its own allowlist"
+
+    def test_absent_context_is_not_ambient(self, tmp_path: Path):
+        """M21: every config scaffolded before PI-901 lacks the key, which is
+        why `context` is optional in the schema. Absence means unknown and
+        falls back to presence; reading it as `ambient` would silently drop the
+        allowlist of the entire installed base."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text(_PERMISSIVE)
+        assert not _flagged(tmp_path)
+
+    def test_commented_out_ambient_is_documentation(self, tmp_path: Path):
+        """M22: `# context: ambient` is a note someone wrote, not a declaration."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text(
+            "# context: ambient\ncontext: repo\n" + _PERMISSIVE
+        )
+        assert not _flagged(tmp_path)
+
+    def test_nested_context_key_is_a_different_key(self, tmp_path: Path):
+        """M23: `context` is TOP-LEVEL. One indented under an unrelated block
+        shares a name and nothing else — matching it would opt a whole repo out
+        on the strength of a nested value nobody meant as a boundary."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text(
+            "context: repo\ntooling:\n  context: ambient\n" + _PERMISSIVE
+        )
+        assert not _flagged(tmp_path)
+
+    @pytest.mark.parametrize(
+        ("spelling", "case"),
+        [
+            ("context : ambient\n", "M25 space before the colon"),
+            ('"context": ambient\n', "M26 quoted key"),
+            ('context: "ambient"\n', "M27 quoted value"),
+            ("context: ambient  # opted out\n", "trailing comment"),
+        ],
+    )
+    def test_every_valid_top_level_spelling_counts(self, tmp_path: Path, spelling: str, case: str):
+        """M25-M27: the reader is deliberately the permissive one about
+        spelling, because MISSING a genuine opt-out is the unsafe direction —
+        the repo keeps a governed repo's privileges it disclaimed. `upgrade.py`
+        preserves exactly these spellings, so a spelling the writer keeps and
+        the reader misses is an opt-out that survives in the file and is then
+        ignored."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text(spelling + _PERMISSIVE)
+        assert _flagged(tmp_path), f"{case}: a valid opt-out was not read"
+
+    def test_inner_optout_is_not_overruled_by_an_outer_marker(self, tmp_path: Path):
+        """M19: the value is read AT the marker the walk finds and decides
+        there. Continuing the walk would let an outer repo's allowlist govern a
+        directory whose owner explicitly opted out."""
+        outer = tmp_path / ".agents"
+        outer.mkdir()
+        outer.joinpath("config.yaml").write_text("context: repo\n" + _PERMISSIVE)
+        inner = tmp_path / "sub"
+        (inner / ".agents").mkdir(parents=True)
+        (inner / ".agents" / "config.yaml").write_text("context: ambient\n")
+        assert _flagged(inner), "an inner opt-out fell through to the outer allowlist"
+        # …and the outer repo itself is unaffected.
+        assert not _flagged(tmp_path)
+
+
+class TestHomeStopCondition:
+    """harbor#4 M14 (owner decision 2026-08-02) — the walk stops before $HOME.
+
+    One `~/.agents/config.yaml` otherwise supplies `safety.allow` to every
+    command run anywhere beneath the home directory. The way it gets written is
+    not an attack: project-init run once in the wrong cwd scaffolds `.agents/`
+    right there, and M12's "a named FILE is required" does not help, because a
+    scaffolder writes named files.
+    """
+
+    def test_a_marker_at_home_supplies_nothing(self, tmp_path: Path, monkeypatch):
+        home = tmp_path / "home"
+        (home / ".agents").mkdir(parents=True)
+        (home / ".agents" / "config.yaml").write_text(_PERMISSIVE)
+        work = home / "projects" / "thing"
+        work.mkdir(parents=True)
+        monkeypatch.setenv("HOME", str(home))
+        assert _flagged(work), "a marker at $HOME switched the deny table off machine-wide"
+
+    def test_the_stop_does_not_swallow_repos_under_home(self, tmp_path: Path, monkeypatch):
+        """M28: every repo the operator owns lives UNDER $HOME. A stop that
+        swallowed them would un-govern the whole installed base while reading
+        as a security fix."""
+        home = tmp_path / "home"
+        repo = home / "projects" / "thing"
+        (repo / ".agents").mkdir(parents=True)
+        (repo / ".agents" / "config.yaml").write_text(_PERMISSIVE)
+        work = repo / "src"
+        work.mkdir()
+        monkeypatch.setenv("HOME", str(home))
+        assert not _flagged(work), "a real repo under $HOME lost its allowlist"
+
+    def test_a_repo_outside_home_still_walks_up(self, tmp_path: Path, monkeypatch):
+        """M29: the stop is a property of the path being walked, not a global
+        mode. /opt, a mounted volume and a CI checkout still walk to `/`."""
+        (tmp_path / "elsewhere" / ".agents").mkdir(parents=True)
+        (tmp_path / "elsewhere" / ".agents" / "config.yaml").write_text(_PERMISSIVE)
+        work = tmp_path / "elsewhere" / "src"
+        work.mkdir()
+        home = tmp_path / "somehome"
+        home.mkdir()
+        monkeypatch.setenv("HOME", str(home))
+        assert not _flagged(work)
+
+    def test_the_boundary_is_before_home_not_at_it(self, tmp_path: Path, monkeypatch):
+        """M30: a session whose cwd IS $HOME resolves the same way, and the
+        spelling `$HOME/.` must not walk past a stop that compares paths."""
+        home = tmp_path / "home"
+        (home / ".agents").mkdir(parents=True)
+        (home / ".agents" / "config.yaml").write_text(_PERMISSIVE)
+        monkeypatch.setenv("HOME", str(home))
+        assert _flagged(home)
+        assert _flagged(Path(str(home) + "/."))
