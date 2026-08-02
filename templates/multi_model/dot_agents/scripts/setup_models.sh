@@ -21,7 +21,7 @@ set -euo pipefail
 # hold every scaffolded project behind a bump PR on a fast-moving tool. It is
 # installed at upstream latest and is absent from the manifest by design.
 CCR_PKG="@musistudio/claude-code-router"
-CCR_VERSION="3.0.16"
+CCR_VERSION="3.0.18"
 CLAUDE_PKG="@anthropic-ai/claude-code"
 
 # --- paths --------------------------------------------------------------------
@@ -200,7 +200,7 @@ setup_ollama() {
     info "Nothing entered — skipping."
     return
   }
-  info "Pulling $choice…"
+  info "Pulling ${choice}…"
   ollama pull "$choice" && ok "Pulled $choice. Switch to it with: /model ollama,$choice"
 }
 
