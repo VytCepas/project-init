@@ -21,7 +21,7 @@ set -euo pipefail
 # hold every scaffolded project behind a bump PR on a fast-moving tool. It is
 # installed at upstream latest and is absent from the manifest by design.
 CCR_PKG="@musistudio/claude-code-router"
-CCR_VERSION="3.0.18"
+CCR_VERSION="3.0.20"
 CLAUDE_PKG="@anthropic-ai/claude-code"
 
 # --- paths --------------------------------------------------------------------
