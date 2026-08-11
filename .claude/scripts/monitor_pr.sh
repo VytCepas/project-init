@@ -524,8 +524,28 @@ fi
 
 # --no-review: explicit bypass — skip review gate entirely after CI passes.
 # Use only for solo-dev PRs where no reviewer will ever respond.
+#
+# It skips WAITING for a reviewer. It does not bypass branch protection, and until
+# 2026-08-11 it did: this branch went straight to _admin_merge, so on any host whose
+# profile refuses admin-merge the flag could never merge anything. A green, unblocked PR
+# needs the same plain squash the --merge path performs at the bottom of this script, and
+# routing it through the override made the one flag documented for solo repos the one
+# flag guaranteed to fail there.
 if [ "$NO_REVIEW" -eq 1 ] && [ "$MODE" = "--merge" ]; then
   echo "PR #$PR_NUMBER: CI passed. --no-review specified — skipping review gate."
+  MERGE_STATE=$(gh pr view "$PR_NUMBER" --json mergeStateStatus -q '.mergeStateStatus' 2>/dev/null || echo "UNKNOWN")
+  if [ "$MERGE_STATE" = "CLEAN" ] || [ "$MERGE_STATE" = "UNSTABLE" ]; then
+    if _merge_with_retry; then
+      echo "Merged PR #$PR_NUMBER"
+      _cleanup_local_branch
+      exit 0
+    fi
+    echo "ERROR: merge failed for PR #$PR_NUMBER" >&2
+    exit 1
+  fi
+  # Anything else is a server-side rule the review gate cannot satisfy, which is what
+  # --admin is for — and what _admin_merge refuses where hard enforcement must bind.
+  echo "PR #$PR_NUMBER is $MERGE_STATE — a plain merge will not take it."
   _admin_merge
   exit 0
 fi
