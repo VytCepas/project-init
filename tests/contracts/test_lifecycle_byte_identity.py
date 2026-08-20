@@ -226,6 +226,11 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
+    # PI-932: a fresh --language python scaffold shipped no pyproject.toml, so
+    # `just lint` died with "Failed to spawn: ruff" before a line of project
+    # code existed. The template is python-gated, so this path appears on a
+    # Python scaffold only.
+    "pyproject.toml",
     # PI-848: local agent specs removed — explore duplicates the built-in
     # Explore agent; code-reviewer ships only on --no-egress scaffolds.
     ".agents/agents/explore.md",

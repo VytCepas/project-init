@@ -183,6 +183,7 @@ project-init variable resolution: flag→prompt→preset precedence + template c
 - `def resolve_agents` — Parse/validate an --agents value; claude is always included first.
 - `def agent_layers` — Template layers contributed by the selected agents (no fallback).
 - `def deploy_identity_error` — Schema-pattern gate for the captured deploy identity (PI-899).
+- `def package_name` — Snake form of *project_slug* — the Python package/module identifier.
 - `def render_run_command` — Fill ``{project_slug}`` in a language ``run_command``.
 
 ### `project_init/wizard_prompts.py`

@@ -28,6 +28,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
     defaults = {
         "project_name": "my-project",
         "project_slug": "my-project",
+        "package_name": "my_project",
         "project_description": "A test project",
         "created_date": "2026-01-01",
         "project_init_version": "0.1.0",
