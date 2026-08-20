@@ -211,6 +211,11 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #   • token_efficiency skill (PI-647) — new default-on skill with token-frugal
 #     working habits; INDEX/AGENTS.md/justfile rows already excluded above
 _ADDED_SINCE_BASELINE = {
+    # PI-933: renovate.json gained a customManagers entry so a tool version
+    # pinned inside a workflow run step is maintained rather than frozen.
+    # (This set covers content drift as well as new paths — see
+    # dag_workflow.py above, which is here for a content change.)
+    "renovate.json",
     # PI-932: a fresh --language python scaffold shipped no pyproject.toml, so
     # `just lint` died with "Failed to spawn: ruff" before a line of project
     # code existed. The template is python-gated, so this path appears on a
