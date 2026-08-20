@@ -534,6 +534,19 @@ _LANGUAGE_COMMANDS: dict[str, tuple[str, str, str, str]] = {
 }
 
 
+def package_name(project_slug: str) -> str:
+    """Snake form of *project_slug* — the Python package/module identifier.
+
+    A kebab slug cannot name a package directory or a module, so PI-932's
+    pyproject template, ``render_run_command``'s ``python -m`` form and the
+    upgrade/migration variable builders all need this same conversion. It is one
+    function rather than four inline ``.replace("-", "_")`` calls because a
+    conversion copied per call site is the drift this repo keeps finding: the
+    first three agreed and the fourth would not have to.
+    """
+    return (project_slug or "my-app").replace("-", "_")
+
+
 def render_run_command(run_command: str, project_slug: str) -> str:
     """Fill ``{project_slug}`` in a language ``run_command``.
 
@@ -544,7 +557,7 @@ def render_run_command(run_command: str, project_slug: str) -> str:
     scaffold and upgrade/backfill paths so the module name can't drift back to
     the invalid kebab form on `project-init upgrade`.
     """
-    return run_command.replace("{project_slug}", (project_slug or "my-app").replace("-", "_"))
+    return run_command.replace("{project_slug}", package_name(project_slug))
 
 
 def _build_variables(
@@ -618,6 +631,13 @@ def _build_variables(
         # Kebab-cased name for identifier-ish slots (deploy app-name stubs);
         # a name with no ASCII alphanumerics falls back to a generic slug.
         "project_slug": slugify(project_name) or "my-app",
+        # Snake form, for the one slot a kebab slug cannot fill: a Python
+        # package directory and the [tool.hatch] packages entry that names it.
+        # `render_run_command` has done this same replacement since #547 for
+        # `uv run python -m {project_slug}`; PI-932 needs it in a TEMPLATE, and
+        # a second inline `.replace("-", "_")` at the call site is the copy this
+        # repo keeps finding. One variable, both consumers.
+        "package_name": package_name(slugify(project_name)),
         "project_description": project_description,
         "created_date": date.today().isoformat(),
         "project_init_version": __version__,

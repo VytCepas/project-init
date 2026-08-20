@@ -263,26 +263,116 @@ class TestCiSecretScanMirror:
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         self.ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
 
+    def _scan_job(self) -> str:
+        """The secret-scan job's text, with both delimiters asserted.
+
+        PR #940 review: chained ``split(...)[1]`` raised IndexError when either
+        delimiter moved, so every test in this class failed with a traceback
+        about list indices instead of "the job is gone" — and pytest does not
+        guarantee that the one test naming the job runs first. The delimiters are
+        a real dependency on the template's shape; asserting them makes that
+        dependency the failure message.
+        """
+        assert "secret-scan:" in self.ci, "no secret-scan job in the scaffolded CI"
+        after = self.ci.split("secret-scan:", 1)[1]
+        assert "\n  semgrep:" in after, (
+            "the semgrep job no longer follows secret-scan — this helper's end "
+            "delimiter is stale, so every assertion below is reading the wrong text"
+        )
+        return after.split("\n  semgrep:", 1)[0]
+
+    def _scan_code(self) -> str:
+        """The scan job with comment-only lines removed.
+
+        The absence assertions below have to read CODE, not prose: the step's
+        header explains at length why gitleaks-action and GITLEAKS_LICENSE were
+        dropped, so a plain substring check on the raw job fails on its own
+        rationale. Naming the reason is the point of the comment; a test that
+        punishes it would get the comment deleted instead of the check fixed.
+        """
+        return "\n".join(
+            ln for ln in self._scan_job().splitlines() if not ln.lstrip().startswith("#")
+        )
+
     def test_secret_scan_job_present(self):
         assert "secret-scan:" in self.ci
-        # SHA-pinned with a `# v3` comment (#629).
-        assert re.search(r"gitleaks/gitleaks-action@[0-9a-f]{40} # v3\b", self.ci)
+        assert "gitleaks git --redact --no-banner --verbose" in self._scan_job()
+
+    def test_the_licensed_action_is_gone(self):
+        """PI-933: gitleaks-action refuses to run on an ORGANISATION-owned repo
+        without GITLEAKS_LICENSE, so every org scaffold was born with a
+        permanently red secret-scan — and it fails WITHOUT SCANNING, so the one
+        gate whose redness is least affordable was both red and useless. Both
+        directions are asserted: the licensed action absent, and the binary's
+        scan command present above. Checking only the first would pass a job
+        that scans nothing at all.
+        """
+        code = self._scan_code()
+        assert "gitleaks-action" not in code
+        assert "GITLEAKS_LICENSE" not in code
 
     def test_scans_full_history(self):
         assert "fetch-depth: 0" in self.ci
 
+    def test_download_is_checksum_verified(self):
+        """Replacing a SHA-pinned action with a curl is a supply-chain downgrade
+        unless the bytes are checked before they are executed."""
+        code = self._scan_code()
+        # MEASURED, NOT NAMED. A first cut asserted `"checksums.txt" in scan`
+        # and stayed GREEN when the download of that file was deleted, because
+        # the name survived in the grep that consumes it. Assert the FETCH.
+        assert re.search(r"curl\b[^\n]*checksums\.txt", code)
+        assert re.search(r"(sha256sum|shasum -a 256) -c", code)
+        # The verify must precede the extract, or it guards nothing.
+        assert code.index("-c expected.sha256") < code.index("tar -xzf")
+        # The line whose checksum is verified must be selected by EQUALITY, not
+        # by a grep pattern — an asset name is full of dots, and grep reads every
+        # one of them as "any character" (PR #940 review).
+        assert "$2 == a" in code
+        # ...and selecting nothing must fail, or the verifier gets an empty file
+        # and reports success on no input.
+        assert "exit !found" in code
+
+    def test_version_is_pinned_and_renovate_can_see_it(self):
+        """A pinned scanner with no update path rots silently, which is worse
+        than an unpinned one. Renovate has no built-in manager for a version
+        literal in a shell step, so the marker comment is load-bearing —
+        renovate.json's customManagers entry keys on exactly this shape.
+        """
+        scan = self._scan_job()
+        assert re.search(r"GITLEAKS_VERSION:\s*\d+\.\d+\.\d+", scan)
+        assert "# renovate: datasource=github-releases depName=gitleaks/gitleaks" in scan
+
+    def test_os_and_arch_come_from_the_runner(self):
+        """`runs-on` is overridable through vars.CI_RUNS_ON and the runner that
+        found the TMPDIR bug below was self-hosted macOS, so a hardcoded
+        linux_x64 asset would 404 there and the security gate would fail for a
+        reason that has nothing to do with secrets.
+        """
+        code = self._scan_code()
+        # Same lesson as the checksum assertion: a first cut looked for
+        # `$RUNNER_OS` anywhere and stayed GREEN when the dispatch was replaced
+        # by a hardcoded `case "linux" in`, because the variable survived in the
+        # unsupported-value error message. Assert the DISPATCH, and that the
+        # asset name is built from what it produced.
+        assert 'case "$RUNNER_OS" in' in code
+        assert 'case "$RUNNER_ARCH" in' in code
+        assert "${os}_${arch}" in code
+
     def test_download_path_is_per_job_temp(self):
-        """gitleaks-action downloads to a fixed $TMPDIR/gitleaks.tmp, refuses to
-        overwrite it, and never cleans up. Hosted runners hide that because the
+        """gitleaks-action downloaded to a fixed $TMPDIR/gitleaks.tmp, refused to
+        overwrite it, and never cleaned up. Hosted runners hid that because the
         machine is thrown away; on a self-hosted runner $TMPDIR persists and the
-        first GREEN run makes every later run die at install, so the repo stops
-        being secret-scanned while the job just looks flaky. Measured on
+        first GREEN run made every later run die at install, so the repo stopped
+        being secret-scanned while the job just looked flaky. Measured on
         VytCepas/gtm: green 2026-08-01T20:43:55, red 88s later, red for two days.
         RUNNER_TEMP is emptied per job on both runner kinds, so the download path
-        has to be fresh by construction rather than by anybody remembering.
+        is fresh by construction rather than by anybody remembering. PI-933
+        retires the action, and this assertion moves with it: the binary is
+        downloaded and extracted under $RUNNER_TEMP for the same reason.
         """
-        scan = self.ci.split("secret-scan:", 1)[1].split("\n  semgrep:", 1)[0]
-        assert "TMPDIR: ${{ runner.temp }}" in scan
+        scan = self._scan_job()
+        assert 'cd "$RUNNER_TEMP"' in scan
 
     def test_job_rendered_outside_language_conditionals(self, tmp_path: Path):
         """secret-scan must survive a non-python scaffold too."""
