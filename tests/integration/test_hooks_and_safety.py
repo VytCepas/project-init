@@ -264,7 +264,22 @@ class TestCiSecretScanMirror:
         self.ci = (self.target / ".github" / "workflows" / "ci.yml").read_text()
 
     def _scan_job(self) -> str:
-        return self.ci.split("secret-scan:", 1)[1].split("\n  semgrep:", 1)[0]
+        """The secret-scan job's text, with both delimiters asserted.
+
+        PR #940 review: chained ``split(...)[1]`` raised IndexError when either
+        delimiter moved, so every test in this class failed with a traceback
+        about list indices instead of "the job is gone" — and pytest does not
+        guarantee that the one test naming the job runs first. The delimiters are
+        a real dependency on the template's shape; asserting them makes that
+        dependency the failure message.
+        """
+        assert "secret-scan:" in self.ci, "no secret-scan job in the scaffolded CI"
+        after = self.ci.split("secret-scan:", 1)[1]
+        assert "\n  semgrep:" in after, (
+            "the semgrep job no longer follows secret-scan — this helper's end "
+            "delimiter is stale, so every assertion below is reading the wrong text"
+        )
+        return after.split("\n  semgrep:", 1)[0]
 
     def _scan_code(self) -> str:
         """The scan job with comment-only lines removed.
@@ -310,6 +325,13 @@ class TestCiSecretScanMirror:
         assert re.search(r"(sha256sum|shasum -a 256) -c", code)
         # The verify must precede the extract, or it guards nothing.
         assert code.index("-c expected.sha256") < code.index("tar -xzf")
+        # The line whose checksum is verified must be selected by EQUALITY, not
+        # by a grep pattern — an asset name is full of dots, and grep reads every
+        # one of them as "any character" (PR #940 review).
+        assert "$2 == a" in code
+        # ...and selecting nothing must fail, or the verifier gets an empty file
+        # and reports success on no input.
+        assert "exit !found" in code
 
     def test_version_is_pinned_and_renovate_can_see_it(self):
         """A pinned scanner with no update path rots silently, which is worse

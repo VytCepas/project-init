@@ -897,9 +897,21 @@ jobs:
           cd "$RUNNER_TEMP"
           curl -sSfL --retry 3 -o "$asset" "${base}/${asset}"
           curl -sSfL --retry 3 -o checksums.txt "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
-          # `grep` first so a missing line fails here rather than passing an
-          # empty check to a verifier that would report success on no input.
-          grep " ${asset}$" checksums.txt > expected.sha256
+          # EXACT FIELD MATCH, NOT A grep PATTERN (PR #940 review). `grep
+          # " ${asset}$"` reads as an exact selection and is not one: the asset
+          # name is full of dots and grep treats them as "any character", so the
+          # line whose checksum gets verified is chosen by a regex that also
+          # matches names nobody intended. No sibling asset in this manifest
+          # differs from another only at a dot, so it cannot mis-select today —
+          # which is exactly why it would go unnoticed when a future asset name
+          # makes it possible. awk compares field 2 for equality and prints the
+          # line verbatim, so the format shasum expects is preserved.
+          #
+          # AND IT MUST FAIL WHEN NOTHING MATCHES. `exit !found` is why: an empty
+          # expected.sha256 handed to a verifier is a check that reports success
+          # on no input, which is the shape of a gate that guards nothing.
+          awk -v a="$asset" '$2 == a { print; found = 1 } END { exit !found }' \
+            checksums.txt > expected.sha256
           if command -v sha256sum >/dev/null 2>&1; then
             sha256sum -c expected.sha256
           else
