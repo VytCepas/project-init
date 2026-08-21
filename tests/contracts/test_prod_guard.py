@@ -81,6 +81,42 @@ DESTRUCTIVE = [
     # A full-table DELETE empties it as surely as TRUNCATE.
     'bq query --use_legacy_sql=false "DELETE FROM analytics.sessions WHERE 1=1"',
     "psql -c 'delete from users'",
+    # ── PI-906 part two: the verbs the first pass left on the table ──
+    # `bq truncate` is a subcommand, not SQL — the `truncate table` rule cannot
+    # see it because there is no `table` token in the command.
+    "bq truncate my-proj:analytics.sessions",
+    # `--replace` overwrites the destination; the prior contents are gone.
+    "bq load --replace my-proj:analytics.t gs://b/f.csv",
+    "bq load --source_format=CSV --replace=true my-proj:analytics.t gs://b/f.csv",
+    'bq query --replace --destination_table analytics.t "select 1"',
+    # Flag order is not fixed, and only the pair is destructive.
+    'bq query --destination_table analytics.t --replace "select 1"',
+    # MERGE rewrites and can DELETE rows in the target.
+    'psql -c "MERGE INTO users u USING staging s ON u.id = s.id WHEN MATCHED THEN DELETE"',
+    (
+        'bq query "MERGE analytics.sessions t USING staging.s s ON t.id = s.id '
+        'WHEN MATCHED THEN UPDATE SET x = 1"'
+    ),
+    # A dbt write against a PRODUCTION target, with or without --full-refresh:
+    # a `table` materialisation is a drop-and-recreate every run.
+    "dbt build --target prod",
+    "dbt run --target prod",
+    "dbt run-operation drop_old_relations --target prod",
+    "dbt seed --target production",
+    "dbt snapshot --target prod",
+    # Access mutation beyond the two binding verbs already covered.
+    "gcloud projects set-iam-policy mbd policy.json",
+    "gcloud iam service-accounts keys create key.json --iam-account=sa@p.iam.gserviceaccount.com",
+    "gsutil iam ch user:a@b.c:objectAdmin gs://prod-assets",
+    "gsutil iam set policy.json gs://prod-assets",
+    "bq set-iam-policy my-proj:analytics.sessions policy.json",
+    "bq add-iam-policy-binding --member=user:a@b.c --role=roles/bigquery.dataOwner my-proj:ds.t",
+    "bq update --source acl.json my-proj:analytics",
+    # Publishing a GTM container version goes live on every page at once.
+    (
+        "curl -X POST https://tagmanager.googleapis.com/tagmanager/v2/"
+        "accounts/1/containers/2/versions/3:publish"
+    ),
 ]
 
 SAFE = [
@@ -153,6 +189,39 @@ SAFE = [
     "gcloud projects get-iam-policy mbd",
     # A low-privilege grant is not an estate handover.
     "gcloud projects add-iam-policy-binding mbd --member=user:a@b.c --role=roles/bigquery.dataViewer",
+    # ── PI-906 part two: the negative case for every rule added above ──
+    # `--replace=false` is the DEFAULT written out. A bare `--replace\b` flags
+    # it, because `\b` matches before the `=` — so the command explicitly
+    # asking NOT to overwrite would have been the one that prompted.
+    "bq load --replace=false my-proj:analytics.t gs://b/f.csv",
+    # A destination_table WITHOUT --replace APPENDS. Only the pair destroys.
+    'bq query --destination_table analytics.t "select 1"',
+    "bq truncate --help",
+    "bq get-iam-policy my-proj:analytics.sessions",
+    "gsutil iam get gs://prod-assets",
+    "gcloud iam service-accounts list",
+    "gcloud iam service-accounts keys list --iam-account=sa@p.iam.gserviceaccount.com",
+    # dbt READ verbs against prod are how you inspect prod safely; flagging
+    # them would make the guard a nuisance on the exact command a careful
+    # person reaches for instead of a write.
+    "dbt test --target prod",
+    "dbt compile --target prod",
+    "dbt docs generate --target prod",
+    "dbt ls --target prod",
+    # "merge" is hopeless as a signal on its own — these are daily commands.
+    "git merge main",
+    "gh pr merge 42 --squash",
+    'git commit -m "chore: merge into staging"',
+    'git log --grep "merge into"',
+    # MEASURED false positive, not a supposed one: the first cut of the MERGE
+    # rule required only `USING ... ON`, and this sentence matched it. Every
+    # clause of that shape is ordinary English; `WHEN [NOT] MATCHED` is not,
+    # and no valid MERGE can omit it.
+    'echo "we should merge into that table using the new source on monday"',
+    # A GET on the same API is a read. Only `:publish` goes live.
+    "curl https://tagmanager.googleapis.com/tagmanager/v2/accounts/1/containers/2/versions/3",
+    # `--schema` is not `--source`: a column addition is not an ACL swap.
+    "bq update --schema schema.json my-proj:analytics.t",
 ]
 
 
@@ -224,6 +293,46 @@ class TestVerdicts:
                 "gcloud IAM binding removal",
             ),
             ('psql -c "DELETE FROM sessions WHERE 1=1"', "SQL DELETE FROM"),
+            # ── PI-906 part two ──
+            ("bq truncate my-proj:analytics.sessions", "bq truncate (BigQuery table truncation)"),
+            (
+                "bq load --replace my-proj:analytics.t gs://b/f.csv",
+                "bq load --replace (destination overwrite)",
+            ),
+            (
+                'bq query --replace --destination_table analytics.t "select 1"',
+                "bq query --replace (destination table overwrite)",
+            ),
+            (
+                'psql -c "MERGE INTO users u USING s ON u.id = s.id WHEN MATCHED THEN DELETE"',
+                "SQL MERGE",
+            ),
+            # NOT the --full-refresh rule: that one is more specific and sits
+            # earlier in the table, so pinning this label is what proves the
+            # new rule is doing the work for a plain prod write.
+            ("dbt build --target prod", "dbt write against a production target"),
+            ("gcloud projects set-iam-policy mbd policy.json", "gcloud IAM policy replacement"),
+            (
+                "gcloud iam service-accounts keys create k.json --iam-account=sa@p.iam.gserviceaccount.com",
+                "gcloud service-account key creation",
+            ),
+            ("gsutil iam ch user:a@b.c:objectAdmin gs://prod-assets", "gsutil bucket IAM mutation"),
+            ("bq set-iam-policy my-proj:analytics.sessions policy.json", "bq IAM policy mutation"),
+            (
+                "bq update --source acl.json my-proj:analytics",
+                "bq update --source (dataset ACL/schema replacement)",
+            ),
+            (
+                "curl -X POST https://tagmanager.googleapis.com/tagmanager/v2/"
+                "accounts/1/containers/2/versions/3:publish",
+                "GTM container version publish",
+            ),
+            # The --full-refresh rule must still own its case after the more
+            # general dbt rule joined the table below it.
+            (
+                "dbt run --full-refresh --target prod",
+                "dbt --full-refresh against a production target",
+            ),
         ],
     )
     def test_each_new_rule_is_the_one_that_fires(self, tmp_path: Path, command: str, label: str):

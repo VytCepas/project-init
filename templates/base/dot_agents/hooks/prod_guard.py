@@ -36,6 +36,10 @@ from pathlib import Path
 # command separators; the cost is rare false positives on odd resource
 # names, which the ask/allowlist paths absorb cheaply.
 _SEG = r"[^|;&]*?"
+# `--replace` / `--replace=true` but never `--replace=false` (PI-906): the
+# false spelling is the default written out, and flagging it would nag on a
+# command that is explicitly asking NOT to overwrite.
+_REPLACE = r"--replace(?:=true)?(?![\w=-])"
 DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     # OpenTofu (`tofu`) is a CLI-identical Terraform fork — guard both the same
     # way (PI-488). `(?:-\S+\s+)*` tolerates global options before the verb
@@ -82,6 +86,32 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"\bbq\s+(?:-\S+\s+)*rm\b(?!\s+(?:--help|-h)\b)"),
         "bq rm (BigQuery dataset/table removal)",
     ),
+    # `bq truncate` is a bq SUBCOMMAND, not SQL, so the `truncate table` rule
+    # below never sees it — there is no `table` token in `bq truncate ds.t`
+    # (PI-906). Same shape and same help exemption as `bq rm`.
+    (
+        re.compile(r"\bbq\s+(?:-\S+\s+)*truncate\b(?!\s+(?:--help|-h)\b)"),
+        "bq truncate (BigQuery table truncation)",
+    ),
+    # `--replace` overwrites the destination: the prior contents are gone as
+    # surely as after a DROP, while the verb reads like an ordinary write
+    # (PI-906). `--replace=false` is the DEFAULT spelled out and must not be
+    # flagged, which a bare `--replace\b` would do — `\b` matches before the
+    # `=`. Hence `_REPLACE`: the bare flag or `=true`, never `=false`.
+    (
+        re.compile(rf"\bbq\s+(?:-\S+\s+)*load\b{_SEG}\s{_REPLACE}"),
+        "bq load --replace (destination overwrite)",
+    ),
+    # A destination_table WITHOUT --replace appends, which is not destruction;
+    # both must be present, and the flags appear in either order.
+    (
+        re.compile(
+            rf"\bbq\s+(?:-\S+\s+)*query\b"
+            rf"(?={_SEG}\s--destination_table[=\s])"
+            rf"(?={_SEG}\s{_REPLACE})"
+        ),
+        "bq query --replace (destination table overwrite)",
+    ),
     (re.compile(rf"\baz\b{_SEG}\bdelete\b"), "az delete"),
     # dbt `--full-refresh` drops and rebuilds incremental models: data
     # destruction wearing a build verb (PI-906). Two lookaheads because the
@@ -112,6 +142,27 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
         ),
         "dbt --full-refresh against a production target",
     ),
+    # A dbt run/build/seed/snapshot against a PRODUCTION target rewrites prod
+    # relations whether or not `--full-refresh` is passed: a `table`
+    # materialisation is a drop-and-recreate every time, and `run-operation`
+    # executes an arbitrary macro (PI-906). The `--full-refresh` rule above
+    # stays first so its more specific label keeps firing for that case.
+    #
+    # JUDGMENT CALL, stated so it can be overruled: this flags the ordinary
+    # production deploy command, `dbt build --target prod`. It is `ask`, not
+    # deny, and the posture is that an agent shell reaching prod should confirm
+    # once — a deploy pipeline does not run through this hook, and a human who
+    # deploys by hand all day has `safety.allow`. Read-only verbs (test,
+    # compile, parse, docs, ls, debug, deps, show, source) are deliberately
+    # absent from the verb list.
+    (
+        re.compile(
+            r"\bdbt\b"
+            rf"(?={_SEG}\s(?:build|run|run-operation|seed|snapshot)\b)"
+            rf"(?={_SEG}\s(?:--target[=\s]|-t\s)\s*[\"']?(?:prod|production)(?![\w-]))"
+        ),
+        "dbt write against a production target",
+    ),
     # IAM mutation on shared identities (PI-906). Granting access is not
     # obviously "destructive" and so was never modelled, but where an identity
     # is shared it changes other people's reach without their knowledge, and it
@@ -136,6 +187,44 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(rf"\bgcloud\b{_SEG}\bremove-iam-policy-binding\b"),
         "gcloud IAM binding removal",
+    ),
+    # `set-iam-policy` REPLACES the whole policy from a file, so it revokes
+    # every binding the file omits — the widest access change in the set, and
+    # the one that looks least like one (PI-906). Flagged unconditionally: the
+    # roles are in the file, which this guard does not read.
+    (
+        re.compile(rf"\bgcloud\b{_SEG}\bset-iam-policy\b"),
+        "gcloud IAM policy replacement",
+    ),
+    # A service-account key is a long-lived credential that outlives the
+    # session, cannot be rotated by revoking a login, and is exactly what the
+    # credential-separation boundary (ADR-012) exists to keep out of an agent
+    # shell. `keys list` / `keys describe` are reads and match neither.
+    (
+        re.compile(rf"\bgcloud\b{_SEG}\biam\s+service-accounts\s+keys\s+create\b"),
+        "gcloud service-account key creation",
+    ),
+    # Bucket-level access. `iam ch` edits bindings, `iam set` replaces the
+    # policy wholesale; `iam get` is a read and is not flagged.
+    (
+        re.compile(rf"\bgsutil\b{_SEG}\biam\s+(?:ch|set)\b"),
+        "gsutil bucket IAM mutation",
+    ),
+    # The same three verbs exist on `bq` for datasets and tables, and none of
+    # the gcloud rules above reach them — different CLI, identical effect.
+    (
+        re.compile(
+            r"\bbq\s+(?:-\S+\s+)*"
+            r"(?:set-iam-policy|add-iam-policy-binding|remove-iam-policy-binding)\b"
+        ),
+        "bq IAM policy mutation",
+    ),
+    # `bq update --source <file>` replaces a dataset's ACL (or a table's
+    # schema) from a file — the pre-IAM spelling of set-iam-policy, still
+    # supported and still a wholesale replacement.
+    (
+        re.compile(rf"\bbq\s+(?:-\S+\s+)*update\b{_SEG}\s--source[=\s]"),
+        "bq update --source (dataset ACL/schema replacement)",
     ),
     (re.compile(r"\bdrop\s+(table|database|schema)\b", re.IGNORECASE), "SQL DROP"),
     (re.compile(r"\btruncate\s+table\b", re.IGNORECASE), "SQL TRUNCATE"),
@@ -169,6 +258,26 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
         ),
         "SQL DELETE FROM",
     ),
+    # MERGE rewrites and can DELETE rows in the target; only DROP/TRUNCATE and
+    # DELETE FROM were modelled (PI-906). "merge" alone is hopeless as a
+    # signal — `git merge`, `gh pr merge` and every commit message about a
+    # merge would match — so the rule keys on the SHAPE of the statement:
+    # target identifier, USING, ON, then WHEN [NOT] MATCHED.
+    #
+    # USING ... ON alone was NOT enough, measured rather than supposed: the
+    # sentence `echo "we should merge into that table using the new source on
+    # monday"` matched it. Every clause in that shape is ordinary English. The
+    # WHEN [NOT] MATCHED clause is not, and MERGE is invalid without at least
+    # one of them, so requiring it costs no true positive.
+    (
+        re.compile(
+            r"\bmerge\s+(?:into\s+)?[A-Za-z_`\"\[][\w.`\"\[\]$-]*"
+            r"\s+(?:(?:as\s+)?[A-Za-z_]\w*\s+)?using\b"
+            rf"{_SEG}\bon\b{_SEG}\bwhen\s+(?:not\s+)?matched\b",
+            re.IGNORECASE,
+        ),
+        "SQL MERGE",
+    ),
     (
         # Recursive + force can be bundled (-rf/-fr) OR split across separate
         # args in any order (rm -r -f /, rm --force --recursive /) — the old
@@ -183,6 +292,16 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
             r"(?:\s+-{1,2}[\w-]+)+\s+(/(?!tmp\b)|~)"
         ),
         "recursive force-remove outside the project",
+    ),
+    # Publishing a GTM container version pushes tags to every live page the
+    # container is on — instant, global, and not a git-mediated change
+    # (PI-906). THE HONEST LIMIT: this matcher sees a `curl` in a Bash tool
+    # call. The same publish through a non-Bash tool, an MCP server or the GTM
+    # UI bypasses it entirely. The durable control is a GTM-side permission;
+    # this only stops the spelling an agent shell reaches for.
+    (
+        re.compile(r"tagmanager\.googleapis\.com[^\s'\"]*:publish"),
+        "GTM container version publish",
     ),
     (re.compile(r"\bgh\s+repo\s+delete\b"), "gh repo delete"),
     (re.compile(r"\bdocker\s+(volume\s+prune|system\s+prune)\b"), "docker prune"),
