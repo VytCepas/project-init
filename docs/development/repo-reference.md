@@ -26,6 +26,41 @@ Use this table when adding new capabilities to this repo or its templates:
 
 After creating a skill, add an entry to `.agents/skills/INDEX.md` so it is discoverable without reading every file.
 
+## The weekly third-party bump, and the one secret it wants
+
+`third-party-updates.yml` opens a PR proposing a version bump for the pinned
+third-party tools (ADR-016 §5). It never auto-merges.
+
+**Set a repository secret `BUMP_PR_TOKEN`** — a PAT or a GitHub App
+installation token with `contents: write` and `pull-requests: write`. Without
+it the workflow still opens the PR, but under the `github-actions[bot]`
+identity, and this repository's Actions approval policy queues bot-actor runs
+at `action_required` instead of running them. The PR's head SHA then carries
+**zero check runs** — not red, not green, never reported — so branch
+protection is unsatisfiable and the PR sits at `BLOCKED` until someone clicks
+"Approve and run" in the Actions tab. Two PRs accumulated that way before
+anyone noticed, because nothing about the state looks like failure (#939).
+
+The fallback is deliberately not a hard failure: a missing secret must not
+turn the weekly check into a red build. It emits a `::warning::`, and a
+best-effort recovery step (`tools/approve_pending_bump_runs.sh`) approves what
+it can. **It cannot approve everything** — the endpoint refuses runs it did not
+queue, including the `pull_request_review` run that gates `review/decision`:
+
+```
+POST /actions/runs/{id}/approve
+403  This run is not from a fork pull request or queued by the Actions bot
+```
+
+For that one the remedy is a plain PR comment, which re-triggers
+`review-status.yml`; `monitor_pr.sh` now posts it automatically when the
+review gate has passed and the status has not caught up.
+
+The approval policy itself is a repository setting (Settings → Actions →
+General) and is **not readable or writable over the REST API for a public
+repo** — `/actions/permissions/access` answers 422. Narrowing it there is the
+only fix that removes the problem rather than working around it.
+
 ## What this repo does NOT include
 
 - No LLM calls from the scaffolder itself

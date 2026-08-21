@@ -11,6 +11,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # PI-939: needed to approve the PR's own pending workflow runs below. Harmless
+  # when the approve call is refused — the step is best-effort by construction.
+  actions: write
 
 jobs:
   check-and-propose:
@@ -29,10 +32,43 @@ jobs:
         run: |
           uv run python tools/check_third_party_updates.py check --json | tee updates.json
 
+      # PI-939: a PR opened with GITHUB_TOKEN is authored by github-actions[bot],
+      # and this repo's Actions policy queues bot-actor runs as `action_required`.
+      # The result is the worst shape a gate can have: the PR's head SHA carries
+      # ZERO check runs — not red, not green, never reported — so branch
+      # protection is unsatisfiable by construction and the PR sits at BLOCKED
+      # until a human clicks "Approve and run". Two bump PRs accumulated that way
+      # before anyone noticed, because nothing about the state looks like failure.
+      #
+      # BUMP_PR_TOKEN (a PAT or GitHub App installation token) is the real fix:
+      # a PR opened under a non-Actions identity triggers workflows normally.
+      # It is optional on purpose — a missing secret must not turn the weekly
+      # check into a hard failure, and the fallback still opens a usable PR.
       - name: Security-scan candidates and open PRs (no auto-merge)
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.BUMP_PR_TOKEN || github.token }}
+          BUMP_PR_TOKEN_PRESENT: ${{ secrets.BUMP_PR_TOKEN != '' }}
         run: |
+          if [ "$BUMP_PR_TOKEN_PRESENT" != "true" ]; then
+            echo "::warning::BUMP_PR_TOKEN is not set — opening the PR as" \
+              "github-actions[bot]. Its checks will queue at action_required" \
+              "and need a manual 'Approve and run' (PI-939)."
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           bash tools/propose_third_party_bumps.sh updates.json
+
+      # Best-effort recovery for the fallback path. Approving the bot's own
+      # queued runs is allowed for the runs the Actions bot queued; it is NOT
+      # allowed for every event (the `pull_request_review` run refuses with
+      # "This run is not from a fork pull request or queued by the Actions
+      # bot"), so this can only ever be a partial remedy and never a gate.
+      # Failures are swallowed deliberately: a PR that opened successfully must
+      # not be reported as a failed weekly check because a recovery step could
+      # not run.
+      - name: Approve any runs left waiting on the PRs just opened
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/approve_pending_bump_runs.sh
