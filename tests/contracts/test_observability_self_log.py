@@ -194,8 +194,18 @@ class TestHookWiring:
         assert (_PLUGIN_HOOKS / "_usage_log.sh").read_bytes() == _HELPER.read_bytes()
 
     def test_helper_never_reads_stdin_source(self):
-        """No stdin-consuming construct in the helper (cat/read/$(<)/</dev/stdin)."""
-        src = _HELPER.read_text(encoding="utf-8")
+        """No stdin-consuming construct in the helper (cat/read/$(<)/</dev/stdin).
+
+        COMMENTS ARE STRIPPED FIRST. The check is on what the shell executes,
+        and prose about the helper is not that: the phrase "read as safe" in a
+        comment tripped this as though the helper consumed stdin (PI-946). A
+        guard that fires on documentation gets the documentation deleted.
+        """
+        src = "\n".join(
+            line
+            for line in _HELPER.read_text(encoding="utf-8").splitlines()
+            if not line.lstrip().startswith("#")
+        )
         for bad in ("$(cat", "read ", "</dev/stdin", "$(<"):
             assert bad not in src, f"helper appears to read stdin: {bad!r}"
 

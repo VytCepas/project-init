@@ -2,6 +2,30 @@
 # _usage_log.sh — guarded hook self-log for the observability overlay (ADR-019,
 # #406). Sourced by the always-on shell hooks; defines usage_log().
 #
+# HOW TO SOURCE THIS FILE, and why the obvious way is wrong (PI-946).
+# `.` is a POSIX SPECIAL BUILTIN: when it fails, a non-interactive shell under
+# `set -e` exits IMMEDIATELY — before an `&&` short-circuit or a trailing
+# `|| true` is ever considered. Measured on macOS bash 3.2, the system shell
+# this repo runs a CI job to support:
+#
+#   set -e; . /nonexistent 2>/dev/null && x || true; echo AFTER   # never prints
+#
+# bash 5 on the Linux runner does NOT exit, which is why the old idiom read as
+# safe and stayed green in CI while failing on every macOS edit. `[ -r ]` alone
+# is not enough either — a syntactically broken include still aborts. The only
+# form that survives missing, empty AND corrupt is to turn errexit off across
+# the source and restore exactly the prior state:
+#
+#   _pi_errexit=0
+#   case $- in *e*) _pi_errexit=1 ;; esac
+#   set +e
+#   [ -r "$(dirname "$0")/_usage_log.sh" ] && . "$(dirname "$0")/_usage_log.sh"
+#   if [ "$_pi_errexit" = 1 ]; then set -e; fi
+#   if command -v usage_log >/dev/null 2>&1; then usage_log <hook> <event>; fi
+#
+# Guard the CALL on the function, not on the source succeeding: a file that
+# sourced cleanly and defined nothing is a real state.
+#
 # SHIPPED-ALWAYS-DORMANT: every scaffold carries this helper, but it no-ops
 # unless the observability overlay's marker directory (.agents/observability/)
 # exists — so it costs nothing until a project opts in by scaffolding the
@@ -47,8 +71,15 @@ usage_log() {
 
     if [ -n "$command" ]; then
       command="${command:0:500}"
-      # Redact basic auth in URLs (replaces longest match between :// and @)
-      command="${command//:\/\/*@/:\/\/***@}"
+      # Redact basic auth in URLs (replaces longest match between :// and @).
+      #
+      # THE REPLACEMENT HALF MUST NOT ESCAPE ITS SLASHES (PI-946). Only the
+      # pattern half needs them; in the replacement, bash 5 strips the
+      # backslash and bash 3.2 KEEPS it, so the shipped `:\/\/***@` logged
+      # `https:\/\/***@host` on macOS — backslashes that were never in the
+      # operator's command, written into a log people read to reconstruct what
+      # happened. Measured on 3.2.57; the unescaped form is identical on both.
+      command="${command//:\/\/*@/://***@}"
     fi
 
     local root
