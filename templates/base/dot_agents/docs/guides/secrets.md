@@ -69,6 +69,17 @@ genuinely needed, add a regex to `safety.allow` in `.agents/config.yaml` —
 but prefer having the value injected as an environment variable, which
 leaves nothing to read.
 
+If an allowlist entry does not take effect, the guard now says so in the
+permission prompt itself rather than failing silently. Either spelling works:
+
+```yaml
+safety:
+  allow: ["^cat \.env$"]     # inline
+  # or
+  allow:
+    - "^cat \.env$"          # multi-line
+```
+
 ## CI secrets
 
 Use the platform's mechanism (GitHub Actions secrets/environments), never

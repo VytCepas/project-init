@@ -976,3 +976,74 @@ class TestScaffoldedReadPermissions:
         assert "Read(**/.env.*)" not in tmpl, (
             "a blanket .env.* deny also blocks .env.example/.sample/.template"
         )
+
+
+class TestAllowlistParsing:
+    """PI-943: the guard's only escape hatch must work when written the
+    natural way, and must say so when it does not.
+
+    An inline `allow:` is parsed as JSON, and `\\.` is not a legal JSON
+    escape — so the most likely spelling of "a literal dot" made the whole
+    allowlist vanish, silently, and the operator saw a prompt for the command
+    they had just allowlisted.
+    """
+
+    def _config(self, tmp_path: Path, body: str) -> Path:
+        agents = tmp_path / ".agents"
+        agents.mkdir(exist_ok=True)
+        (agents / "config.yaml").write_text(body)
+        return tmp_path
+
+    def test_a_backslash_in_the_inline_form_is_honoured(self, tmp_path: Path):
+        root = self._config(tmp_path, 'safety:\n  allow: ["^cat \\.env$"]\n')
+        assert _run_hook(_payload("cat .env", "default", root), root) is None
+
+    def test_the_multiline_form_was_never_broken(self, tmp_path: Path):
+        """It does not go through json.loads, so it always worked. Pinned so a
+        future 'unify the two parsers' does not break the half that works."""
+        root = self._config(tmp_path, 'safety:\n  allow:\n    - "^cat \\.env$"\n')
+        assert _run_hook(_payload("cat .env", "default", root), root) is None
+
+    def test_a_deliberate_double_backslash_keeps_its_meaning(self, tmp_path: Path):
+        """Strict-then-lenient, in that order. `\\\\.` is valid JSON meaning a
+        literal backslash followed by any character; the lenient retry must not
+        get a chance to re-read input that already parsed."""
+        root = self._config(tmp_path, 'safety:\n  allow: ["^cat \\\\\\\\.env$"]\n')
+        # That pattern requires a literal backslash before `env`, which this
+        # command does not have — so it must NOT be allowlisted.
+        assert _run_hook(_payload("cat .env", "default", root), root) is not None
+
+    def test_the_allowlist_still_narrows(self, tmp_path: Path):
+        """The lenient retry must not turn into 'allow everything'."""
+        root = self._config(tmp_path, 'safety:\n  allow: ["^cat \\.env$"]\n')
+        assert _run_hook(_payload("cat id_rsa", "default", root), root) is not None
+
+    def test_one_bad_regex_does_not_discard_the_others(self, tmp_path: Path):
+        """The old compile-in-a-list-comprehension meant a single malformed
+        pattern threw away every rule in the file, including the good ones."""
+        root = self._config(tmp_path, 'safety:\n  allow: ["*broken(", "^cat \\.env$"]\n')
+        assert _run_hook(_payload("cat .env", "default", root), root) is None
+
+    def test_an_unparseable_allowlist_says_so_in_the_prompt(self, tmp_path: Path):
+        """Fail-open is right for a MISSING config and wrong for a malformed
+        one: the two are indistinguishable to the operator, and the malformed
+        case means a rule they wrote is not in force."""
+        root = self._config(tmp_path, "safety:\n  allow: [unquoted, nonsense\n")
+        verdict = _run_hook(_payload("cat .env", "default", root), root)
+        assert verdict is not None, "a broken allowlist must not open the gate"
+        reason = verdict["hookSpecificOutput"]["permissionDecisionReason"]
+        assert "safety.allow was not fully applied" in reason
+
+    def test_a_bad_regex_is_named_in_the_prompt(self, tmp_path: Path):
+        root = self._config(tmp_path, 'safety:\n  allow: ["*broken("]\n')
+        verdict = _run_hook(_payload("cat .env", "default", root), root)
+        assert verdict is not None
+        reason = verdict["hookSpecificOutput"]["permissionDecisionReason"]
+        assert "not a valid regex" in reason
+
+    def test_a_healthy_allowlist_adds_no_noise(self, tmp_path: Path):
+        """A note on every prompt would be the thing people learn to skip."""
+        root = self._config(tmp_path, 'safety:\n  allow: ["^cat \\.env$"]\n')
+        verdict = _run_hook(_payload("cat id_rsa", "default", root), root)
+        assert verdict is not None
+        assert "not fully applied" not in verdict["hookSpecificOutput"]["permissionDecisionReason"]

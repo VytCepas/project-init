@@ -617,19 +617,58 @@ def _unquote(value: str) -> str:
     return value
 
 
-def _allow_patterns(root: Path) -> list[re.Pattern[str]]:
-    """Read the safety.allow list from .agents/config.yaml (fail-open).
+def _parse_inline_allow(raw: str, problems: list[str]) -> list[str]:
+    """Parse the inline form, ``allow: ["a", "b"]``.
+
+    A REGEX IS NOT JSON (PI-943). ``["^cat \\.env$"]`` is the natural way to
+    write an escaped dot, and it is not valid JSON — ``\\.`` is not a legal
+    escape — so ``json.loads`` raised, the caller fell open, and the operator's
+    allowlist silently did not exist. They saw a prompt for the very command
+    they had just allowlisted, with nothing anywhere saying why.
+
+    Strict parse first, so an operator who correctly wrote ``\\\\.`` keeps the
+    literal backslash they asked for. Only on failure are backslashes escaped
+    and the parse retried — which is what someone writing a raw regex meant.
+    Doing it in that order is what keeps the lenient path from changing the
+    meaning of input that was already valid.
+    """
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        try:
+            parsed = json.loads(raw.replace("\\", "\\\\"))
+        except json.JSONDecodeError as exc:
+            problems.append(f"inline `allow:` could not be parsed ({exc.msg})")
+            return []
+    # A non-list allow (JSON string/object/number) must not be iterated
+    # character-by-character into an over-permissive allowlist or crash the
+    # guard — ignore it and keep guarding (PI-187 review).
+    if not isinstance(parsed, list):
+        problems.append("`allow:` is not a list — ignored")
+        return []
+    return [p for p in parsed if isinstance(p, str)]
+
+
+def _allow_patterns(root: Path) -> tuple[list[re.Pattern[str]], list[str]]:
+    """Read safety.allow from .agents/config.yaml → (patterns, problems).
 
     Accepts both an inline JSON list (``allow: ["a", "b"]``) and a multi-line
     YAML list (``allow:`` on its own line followed by ``- "a"`` items). The
     inline-only parser silently dropped the natural YAML form to ``[]`` (PI-187).
 
+    FAIL-OPEN IS RIGHT FOR A MISSING CONFIG AND WRONG FOR A MALFORMED ONE
+    (PI-943). The two are indistinguishable to the operator, and the malformed
+    case means a rule they wrote is not in force. So problems are collected and
+    returned rather than swallowed, and the caller puts them in front of the
+    person who is about to wonder why their allowlist did nothing.
+
     *root* is the Bash tool's cwd, which may be a subdirectory after `cd` —
     the config is located by walking up the tree.
     """
     config = _find_config(root)
+    problems: list[str] = []
     if config is None:
-        return []
+        return [], problems
     patterns: list[str] = []
     try:
         in_safety = False
@@ -652,18 +691,25 @@ def _allow_patterns(root: Path) -> list[re.Pattern[str]]:
             if stripped.startswith("allow:"):
                 raw = stripped.split(":", 1)[1].strip()
                 if raw:
-                    parsed = json.loads(raw)  # inline JSON list
-                    # A non-list allow (JSON string/object/number) must not be
-                    # iterated character-by-character into an over-permissive
-                    # allowlist or crash the guard — ignore it and keep
-                    # guarding (PI-187 review).
-                    if isinstance(parsed, list):
-                        patterns.extend(p for p in parsed if isinstance(p, str))
+                    patterns.extend(_parse_inline_allow(raw, problems))
                 else:
                     in_allow = True  # multi-line YAML list follows
-        return [re.compile(p) for p in patterns if p]
-    except (OSError, json.JSONDecodeError, re.error):
-        return []
+    except OSError as exc:
+        problems.append(f"could not read {config}: {exc.strerror or exc}")
+        return [], problems
+
+    # Compiled ONE AT A TIME. The old `[re.compile(p) for p in ...]` inside the
+    # try meant a single malformed pattern discarded every other rule in the
+    # file, including the ones that had parsed perfectly (PI-943).
+    compiled: list[re.Pattern[str]] = []
+    for pattern in patterns:
+        if not pattern:
+            continue
+        try:
+            compiled.append(re.compile(pattern))
+        except re.error as exc:
+            problems.append(f"safety.allow pattern {pattern!r} is not a valid regex ({exc.msg})")
+    return compiled, problems
 
 
 def _find_obs_dir(start: Path) -> Path | None:
@@ -720,8 +766,17 @@ def usage_log(payload: dict, root: Path, decision: str, command: str) -> None:
         return
 
 
-def _verdict(reason: str, permission_mode: str) -> dict:
-    """Build the hook verdict. Autonomous modes have no human to ask (ADR-012)."""
+def _verdict(reason: str, permission_mode: str, problems: list[str] | None = None) -> dict:
+    """Build the hook verdict. Autonomous modes have no human to ask (ADR-012).
+
+    *problems* is appended to the reason. This is the one place the operator is
+    guaranteed to read: they are staring at a prompt for a command they believe
+    they allowlisted, which is exactly the moment to tell them the allowlist
+    did not load (PI-943). stderr from a PreToolUse hook that exits 0 is not
+    reliably surfaced, so it cannot be the only channel.
+    """
+    if problems:
+        reason += " NOTE: safety.allow was not fully applied — " + "; ".join(problems) + "."
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -731,7 +786,12 @@ def _verdict(reason: str, permission_mode: str) -> dict:
     }
 
 
-def evaluate(command: str, permission_mode: str, allow: list[re.Pattern[str]]) -> dict | None:
+def evaluate(
+    command: str,
+    permission_mode: str,
+    allow: list[re.Pattern[str]],
+    problems: list[str] | None = None,
+) -> dict | None:
     """Return the hook verdict for *command*, or None to let it through."""
     if any(p.search(command) for p in allow):
         return None
@@ -744,6 +804,7 @@ def evaluate(command: str, permission_mode: str, allow: list[re.Pattern[str]]) -
                 "(Guardrail only — real protection is credential separation, "
                 "see .agents/docs/guides/secrets.md.)",
                 permission_mode,
+                problems,
             )
     exposure = _exposes_secret(command)
     if exposure is not None:
@@ -756,6 +817,7 @@ def evaluate(command: str, permission_mode: str, allow: list[re.Pattern[str]]) -
             "(Guardrail only — real protection is credential separation, "
             "see .agents/docs/guides/secrets.md.)",
             permission_mode,
+            problems,
         )
     return None
 
@@ -777,7 +839,11 @@ def main() -> int:
     mode = payload.get("permission_mode") or payload.get("permissionMode") or ""
     root = Path(payload.get("cwd") or ".")
     try:
-        verdict = evaluate(command, mode, _allow_patterns(root))
+        allow, problems = _allow_patterns(root)
+        for problem in problems:
+            # Best-effort second channel. Not the primary one — see _verdict.
+            print(f"prod_guard: {problem}", file=sys.stderr)
+        verdict = evaluate(command, mode, allow, problems)
     except Exception:  # noqa: BLE001 — guardrail must never break the session
         verdict = None
 
