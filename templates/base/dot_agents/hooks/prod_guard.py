@@ -1,6 +1,15 @@
-"""Prod-safety guard (PI-168, ADR-012): deny destructive infra/DB commands.
+"""Prod-safety guard (PI-168, ADR-012): destructive commands, and secret reads.
 
 PreToolUse hook on Bash. Deterministic deny-table — no LLM, no network.
+
+TWO CLASSES, one hook. Destruction is the original one. Reading a secret file
+is the second (PI-893): it destroys nothing, but the contents land in the model
+transcript, where they are re-sent on every subsequent turn and outlive the
+session. It lives here rather than in a sibling hook because it needs the
+identical machinery — the config walk with its symlink refusal, ``safety.allow``,
+the ask/deny-by-mode posture, fail-open — and a second copy of security-critical
+code is the drift this repo keeps finding. Extending this hook also reaches the
+non-Claude surfaces through ``agent_guard_adapter.py`` for free.
 Destructive operations that bypass the git/CI boundary (cloud deletes,
 DROP DATABASE, terraform destroy, …) get:
 
@@ -307,6 +316,118 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bdocker\s+(volume\s+prune|system\s+prune)\b"), "docker prune"),
 ]
 
+# ── Secret-file exposure (PI-893) ───────────────────────────────────────────
+# The scaffold's secret machinery is write/commit-oriented: gitleaks and the
+# pre-commit gate stop you COMMITTING a secret, .gitignore stops you tracking
+# one, and this table stopped you destroying things. Nothing stopped `cat .env`,
+# so the values land in the transcript — which is re-sent on every following
+# turn and outlives the session that read them.
+#
+# `permissions.deny` in the scaffolded settings.json closes the Read TOOL. It
+# cannot close Bash, because a permission rule matches a tool's arguments and
+# Bash's argument is one opaque string. That is this check's job.
+_SECRET_PATH = re.compile(
+    r"""
+    (?:^|[\s=:'"(<@])                 # a token boundary, never mid-word
+                                       # `@` because `curl -d @.env` is exfil
+    (?:[\w.@~-]*/)*                    # optional directory prefix
+    (?:
+        # `.env`, `<stem>.env` and `.env.<anything>` EXCEPT the four
+        # documented example spellings. Those are committed, value-free, and
+        # the file an agent reads to learn which variables exist — denying
+        # them would be a false positive on the safe half of the convention.
+        #
+        # THE STEM IS NOT DECORATION. Without `[\w-]*` the check missed
+        # `prod.env`, `staging.env` and `my.env.local` — three ordinary
+        # spellings of the file it exists to guard. A mutation run found it:
+        # deleting the leading token boundary changed no test result, which
+        # meant nothing pinned that part of the pattern, which meant nobody
+        # had checked what it excluded. direnv's `.envrc` is here for the
+        # same reason — it routinely holds `export AWS_SECRET_...`.
+        [\w-]*\.env(?:\.(?!example|sample|template|dist)[\w-]+)*(?![\w.-])
+      | \.envrc(?![\w.-])
+      | id_(?:rsa|dsa|ecdsa|ed25519)(?![\w.-])
+      | \.(?:netrc|pgpass|npmrc)(?![\w.-])
+      | [\w.-]*\.(?:pem|p12|pfx|jks|keystore)(?![\w.-])
+      | [\w.-]*(?:service[-_]?account|credentials|client[-_]secret)[\w.-]*\.json(?![\w.-])
+      | secrets?/[\w./-]+
+    )
+    """,
+    re.VERBOSE,
+)
+
+# Commands that cannot put a file's CONTENTS anywhere: they act on the name,
+# the metadata or the directory entry. `rm .env` is not exposure — it may be
+# unwise, but the values do not reach the transcript, and flagging it would nag
+# on the cleanup that follows every scaffold demo.
+#
+# `echo`/`printf` are here for one specific daily command: `echo ".env" >>
+# .gitignore`. WRITING a secret file is also not exposure — the values came
+# from the session, they did not enter it.
+_EXPOSURE_SAFE_VERBS = frozenset(
+    {
+        "ls",
+        "ll",
+        "stat",
+        "file",
+        "test",
+        "[",
+        "[[",
+        "touch",
+        "mkdir",
+        "rmdir",
+        "rm",
+        "chmod",
+        "chown",
+        "ln",
+        "echo",
+        "printf",
+        "basename",
+        "dirname",
+        "find",
+        "which",
+        "type",
+    }
+)
+
+# Tools whose FIRST non-flag argument is a pattern or a program, not a path.
+# `grep -rn ".env" src/` searches for the string and opens nothing named by it;
+# scanning that argument as a path made a routine search prompt. `sed`/`awk`
+# take a script first and their paths after, so only the first is skipped.
+_PATTERN_FIRST_ARG = frozenset(
+    {"grep", "egrep", "fgrep", "rg", "ag", "ack", "sed", "awk", "gawk", "nawk"}
+)
+
+# A commit message is prose, not an access. `git commit -m "docs: describe .env
+# handling"` is the same shape of false positive that the SQL DELETE rule hit —
+# writing about the guarded thing tripping the guard.
+_MESSAGE_ARG = re.compile(r"""(?:-m|-am|--message)[=\s]+(?P<q>['"]).*?(?P=q)""", re.DOTALL)
+
+
+def _exposes_secret(command: str) -> str | None:
+    """Return a label if *command* could read a secret-bearing file, else None.
+
+    Segment-wise, because `ls .env && cat .env` is two commands and only the
+    second one reads: a whole-string match would be decided by the harmless
+    verb that happens to come first.
+    """
+    for segment in re.split(r"[;&|\n]+", command):
+        seg = _MESSAGE_ARG.sub(" ", segment).strip()
+        if not seg:
+            continue
+        tokens = seg.split()
+        head = tokens[0].rsplit("/", 1)[-1]  # /bin/cat and cat are one verb
+        if head in _EXPOSURE_SAFE_VERBS:
+            continue
+        if head in _PATTERN_FIRST_ARG:
+            rest = [t for t in tokens[1:] if not t.startswith("-")]
+            if rest:
+                seg = seg.replace(rest[0], " ", 1)
+        if _SECRET_PATH.search(" " + seg):
+            return "read of a secret-bearing file"
+    return None
+
+
 # Fully autonomous mode: no human is watching the prompt, so "ask" is
 # meaningless — block outright. Other modes (default, plan, acceptEdits)
 # still surface an interactive permission prompt for Bash.
@@ -526,27 +647,43 @@ def usage_log(payload: dict, root: Path, decision: str, command: str) -> None:
         return
 
 
+def _verdict(reason: str, permission_mode: str) -> dict:
+    """Build the hook verdict. Autonomous modes have no human to ask (ADR-012)."""
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny" if permission_mode in _AUTONOMOUS_MODES else "ask",
+            "permissionDecisionReason": reason,
+        }
+    }
+
+
 def evaluate(command: str, permission_mode: str, allow: list[re.Pattern[str]]) -> dict | None:
     """Return the hook verdict for *command*, or None to let it through."""
     if any(p.search(command) for p in allow):
         return None
     for pattern, label in DENY_RULES:
         if pattern.search(command):
-            reason = (
+            return _verdict(
                 f"prod_guard: '{label}' is a destructive operation. "
                 "If this is intentional and safe, add a matching regex to "
                 "safety.allow in .agents/config.yaml, or run it yourself. "
                 "(Guardrail only — real protection is credential separation, "
-                "see .agents/docs/guides/secrets.md.)"
+                "see .agents/docs/guides/secrets.md.)",
+                permission_mode,
             )
-            decision = "deny" if permission_mode in _AUTONOMOUS_MODES else "ask"
-            return {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": decision,
-                    "permissionDecisionReason": reason,
-                }
-            }
+    exposure = _exposes_secret(command)
+    if exposure is not None:
+        return _verdict(
+            f"prod_guard: '{exposure}' — its contents would enter the transcript "
+            "and be re-sent on every following turn. Read the .example file, or "
+            "have the value injected as an environment variable. If the read is "
+            "genuinely needed, add a matching regex to safety.allow in "
+            ".agents/config.yaml, or run the command yourself. "
+            "(Guardrail only — real protection is credential separation, "
+            "see .agents/docs/guides/secrets.md.)",
+            permission_mode,
+        )
     return None
 
 

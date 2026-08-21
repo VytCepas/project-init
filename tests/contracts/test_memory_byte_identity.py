@@ -211,6 +211,14 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #   • token_efficiency skill (PI-647) — new default-on skill with token-frugal
 #     working habits; INDEX/AGENTS.md/justfile rows already excluded above
 _ADDED_SINCE_BASELINE = {
+    # PI-893: secret-bearing files are guarded against READS, not just writes
+    # and commits. settings.json gained a permissions.deny block closing the
+    # Read tool (it appears in the no-plugin manifest only — the plugin-mode
+    # copy is already dropped above), prod_guard.py gained the Bash half, and
+    # the secrets guide documents both and why neither covers the other.
+    ".agents/settings.json",
+    ".agents/hooks/prod_guard.py",
+    ".agents/docs/guides/secrets.md",
     # PI-933: renovate.json gained a customManagers entry so a tool version
     # pinned inside a workflow run step is maintained rather than frozen.
     # (This set covers content drift as well as new paths — see
