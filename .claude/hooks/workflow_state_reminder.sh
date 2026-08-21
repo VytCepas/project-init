@@ -22,7 +22,7 @@ _pi_errexit=0
 case $- in *e*) _pi_errexit=1 ;; esac
 set +e
 [ -r "$(dirname "$0")/_usage_log.sh" ] && . "$(dirname "$0")/_usage_log.sh"
-if [ "$_pi_errexit" = 1 ]; then set -e; fi
+if [ "$_pi_errexit" = 1 ]; then set -e; else set +e; fi
 if command -v usage_log >/dev/null 2>&1; then
   usage_log workflow_state_reminder UserPromptSubmit </dev/null || true
 fi
