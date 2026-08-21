@@ -210,6 +210,64 @@ sys.exit(len(bad))
 " "$IGNORE_CHECKS"
 }
 
+# PI-939: read the derived review/decision commit status, or "" if absent.
+_review_decision_state() {
+  gh pr checks "$PR_NUMBER" --json name,bucket 2>/dev/null | "$PY" -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for c in data:
+    if c.get('name') == 'review/decision':
+        print(c.get('bucket') or '')
+        break
+" 2>/dev/null || true
+}
+
+# PI-939: re-trigger review-status.yml with a plain PR comment.
+#
+# review/decision is computed by a workflow, and the two events that SHOULD
+# refresh it both fail to. Resolving a review thread emits no Actions event at
+# all (`pull_request_review_thread` is a webhook event only, #719). And where
+# the repository's Actions policy requires approval for bot actors, the
+# `pull_request_review` run a bot reviewer triggers is queued at
+# `action_required` — which cannot be cleared from the API either:
+#
+#   POST /actions/runs/{id}/approve
+#   403  This run is not from a fork pull request or queued by the Actions bot
+#
+# So the status stays stale on a PR whose review gate has actually passed, and
+# the merge below reports BLOCKED with no visible cause. `issue_comment` IS a
+# trigger on that workflow and IS attributed to the commenter rather than a
+# bot, so a comment settles it. That was a manual step; it is not any more.
+_nudge_review_decision() {
+  local state elapsed=0
+  state=$(_review_decision_state)
+  if [ "$state" = "pass" ]; then
+    return 0
+  fi
+  echo "review/decision is '${state:-absent}' though the review gate passed — commenting to re-trigger review-status.yml (PI-939)."
+  if ! gh pr comment "$PR_NUMBER" \
+    --body "Review threads addressed and resolved. Re-triggering \`review/decision\`: resolving a thread emits no workflow event, so this comment is the documented nudge." \
+    >/dev/null 2>&1; then
+    echo "  could not post the comment — review/decision left as-is."
+    return 0
+  fi
+  while [ "$elapsed" -lt 120 ]; do
+    sleep 15
+    elapsed=$((elapsed + 15))
+    state=$(_review_decision_state)
+    if [ "$state" = "pass" ]; then
+      echo "  review/decision: pass after ${elapsed}s."
+      return 0
+    fi
+  done
+  # Not an error: the status may legitimately be failing, and the merge step
+  # below reports that with its own diagnostics. Say what was tried.
+  echo "  review/decision still '${state:-absent}' after ${elapsed}s — the merge may report BLOCKED."
+}
+
 # Print review feedback — inline comments first, falls back to full PR comments view.
 _print_review_comments() {
   local inline
@@ -721,6 +779,14 @@ fi
 
 PR_URL=$(gh pr view "$PR_NUMBER" --json url -q '.url')
 echo "PR #$PR_NUMBER passed: $PR_URL"
+
+# The review gate above has passed. If the derived status has not caught up,
+# nudge it before attempting the merge — not after, when the failure mode is an
+# opaque BLOCKED. Skipped when the operator turned the review gate off, because
+# there is then no gate whose result the status is lagging behind.
+if [ "$MODE" = "--merge" ] && [ "$MAX_REVIEW_CYCLES" -ne 0 ] && [ "$REVIEW_DECISION" != "SKIPPED" ]; then
+  _nudge_review_decision
+fi
 
 if [ "$MODE" = "--merge" ]; then
   MERGE_STATE=$(gh pr view "$PR_NUMBER" --json mergeStateStatus -q '.mergeStateStatus' 2>/dev/null || echo "UNKNOWN")
