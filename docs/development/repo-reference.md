@@ -56,10 +56,29 @@ For that one the remedy is a plain PR comment, which re-triggers
 `review-status.yml`; `monitor_pr.sh` now posts it automatically when the
 review gate has passed and the status has not caught up.
 
-The approval policy itself is a repository setting (Settings → Actions →
-General) and is **not readable or writable over the REST API for a public
-repo** — `/actions/permissions/access` answers 422. Narrowing it there is the
-only fix that removes the problem rather than working around it.
+The approval policy itself **is** readable and writable over REST, and the
+one-liner below is the fix that removes the problem rather than working
+around it:
+
+```sh
+gh api repos/{owner}/{repo}/actions/permissions/fork-pr-contributor-approval
+# {"approval_policy":"first_time_contributors"}
+
+gh api --method PUT repos/{owner}/{repo}/actions/permissions/fork-pr-contributor-approval \
+  -f approval_policy=first_time_contributors_new_to_github
+```
+
+Allowed values are `first_time_contributors_new_to_github`,
+`first_time_contributors` and `all_external_contributors`; there is no
+"never require approval", so the first is the loosest. A bot actor counts as
+a first-time contributor under the middle tier, which is what queued the runs.
+
+An earlier revision of this page said the setting was **not** reachable over
+REST, on the strength of `/actions/permissions/access` answering 422. That is
+a *different* setting — workflow access from other repositories — and it is
+genuinely 422 for a public repo. Recording the mistake rather than quietly
+deleting it: the wrong endpoint returning a plausible error is exactly how a
+one-command fix turns into a documented dead end.
 
 ## What this repo does NOT include
 
