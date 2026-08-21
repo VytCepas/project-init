@@ -226,13 +226,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
-    # PI-893: secret-bearing files are guarded against READS, not just writes
-    # and commits. settings.json gained a permissions.deny block closing the
-    # Read tool (it appears in the no-plugin manifest only — the plugin-mode
-    # copy is already dropped above), prod_guard.py gained the Bash half, and
-    # the secrets guide documents both and why neither covers the other.
-    ".agents/settings.json",
-    ".agents/hooks/prod_guard.py",
+    # PI-893: the secrets guide documents the new read guard — both halves of
+    # it, and why neither covers the other. (settings.json and prod_guard.py
+    # also changed for PI-893 and are already listed further down.)
     ".agents/docs/guides/secrets.md",
     # PI-933: renovate.json gained a customManagers entry so a tool version
     # pinned inside a workflow run step is maintained rather than frozen.
