@@ -330,7 +330,10 @@ _SECRET_PATH = re.compile(
     r"""
     (?:^|[\s=:'"(<@])                 # a token boundary, never mid-word
                                        # `@` because `curl -d @.env` is exfil
-    (?:[\w.@~-]*/)*                    # optional directory prefix
+    (?:[\w.@~${}-]*/)*                 # optional directory prefix, incl. an
+                                       # expansion: `$PWD/.env`, `${HOME}/.netrc`
+                                       # and `"$HOME/.ssh/id_rsa"` all reach a
+                                       # real file and all missed without this
     (?:
         # `.env`, `<stem>.env` and `.env.<anything>` EXCEPT the four
         # documented example spellings. Those are committed, value-free, and
@@ -404,6 +407,71 @@ _PATTERN_FIRST_ARG = frozenset(
 _MESSAGE_ARG = re.compile(r"""(?:-m|-am|--message)[=\s]+(?P<q>['"]).*?(?P=q)""", re.DOTALL)
 
 
+# A command substitution hides a whole command inside another one, and the
+# outer verb is the one the exemption looks at. `echo "$(cat .env)"` prints the
+# secret while presenting `echo` as its head (PR #942 review, P1). Both
+# spellings, one nesting level — a deeper nest is unusual enough to leave to
+# the ask/deny posture rather than pretend to a parser.
+_SUBSTITUTION = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
+
+# `find` is exempt only when it is doing what makes it exempt. With an action,
+# or piped into something that reads, it becomes the READER'S argument list:
+# `find . -name .env -exec cat {} +` and `find . -name .env | xargs cat` both
+# print the file, and neither stage looks dangerous on its own — the path is in
+# the find, the verb is downstream (PR #942 review, P1).
+#
+# NOT "any pipe": `find . -name .env | wc -l` counts matches and reads nothing,
+# and a guard that prompts on it is the false positive that gets guards turned
+# off. The downstream verb has to actually consume contents.
+_FIND_ACTS = re.compile(r"\s-(?:exec|execdir|ok|okdir)\b")
+_READER_VERBS = frozenset(
+    {
+        "xargs",
+        "cat",
+        "bat",
+        "less",
+        "more",
+        "head",
+        "tail",
+        "nl",
+        "tee",
+        "strings",
+        "xxd",
+        "od",
+        "grep",
+        "egrep",
+        "rg",
+        "sed",
+        "awk",
+        "cut",
+        "cp",
+        "curl",
+        "wget",
+        "scp",
+        "base64",
+        "source",
+    }
+)
+
+
+def _leaf_commands(command: str) -> list[str]:
+    """Every simple command in *command*, including ones inside substitutions.
+
+    The outer text keeps its shape with substitutions blanked out, so an
+    exempt verb wrapping a read is judged on the read, not on the wrapper.
+    """
+    out: list[str] = []
+    pending = [command]
+    while pending and len(out) < 100:
+        chunk = pending.pop()
+        inner = [g for match in _SUBSTITUTION.finditer(chunk) for g in match.groups() if g]
+        if inner:
+            pending.extend(inner)
+            chunk = _SUBSTITUTION.sub(" ", chunk)
+        out.extend(re.split(r"[;&|\n]+", chunk))
+    return out
+
+
 def _exposes_secret(command: str) -> str | None:
     """Return a label if *command* could read a secret-bearing file, else None.
 
@@ -411,13 +479,18 @@ def _exposes_secret(command: str) -> str | None:
     second one reads: a whole-string match would be decided by the harmless
     verb that happens to come first.
     """
-    for segment in re.split(r"[;&|\n]+", command):
+    leaves = _leaf_commands(command)
+    heads = {seg.split()[0].rsplit("/", 1)[-1] for seg in leaves if seg.split()}
+    find_is_safe = not _FIND_ACTS.search(command) and not (heads & _READER_VERBS)
+    for segment in leaves:
         seg = _MESSAGE_ARG.sub(" ", segment).strip()
         if not seg:
             continue
         tokens = seg.split()
         head = tokens[0].rsplit("/", 1)[-1]  # /bin/cat and cat are one verb
-        if head in _EXPOSURE_SAFE_VERBS:
+        if head == "find" and not find_is_safe:
+            pass  # an action or a pipe turns it into a reader's argument list
+        elif head in _EXPOSURE_SAFE_VERBS:
             continue
         if head in _PATTERN_FIRST_ARG:
             rest = [t for t in tokens[1:] if not t.startswith("-")]

@@ -819,6 +819,22 @@ EXPOSING = [
     # per-segment for exactly this reason.
     "ls -la && cat .env",
     "sudo cat .env",
+    # ── PR #942 review: three bypasses, all reproduced before fixing ──
+    # A command substitution hides the read inside an EXEMPT verb. The head is
+    # `echo`, so the exemption cleared it and the secret printed anyway.
+    'echo "$(cat .env)"',
+    "echo `cat .env`",
+    "printf '%s' $(cat prod.env)",
+    # `find` is exempt because it acts on names. With an action, or piped into
+    # something that consumes contents, it is the READER'S argument list — and
+    # neither stage looks dangerous alone: the path is in the find, the verb is
+    # downstream.
+    "find . -name .env -exec cat {} +",
+    "find . -name .env | xargs cat",
+    # A shell expansion in the directory prefix reaches a real file.
+    "cat $PWD/.env",
+    "cat ${HOME}/.netrc",
+    'cat "$HOME/.ssh/id_rsa"',
     "docker run --rm -v $PWD:/w alpine cat /w/.env",
 ]
 
@@ -856,6 +872,12 @@ NOT_EXPOSING = [
     'grep -rn ".env" src/',
     'grep -rn "secrets/" docs/',
     "find . -name .env",
+    # NOT "any pipe": counting matches reads nothing. Pinning this is what
+    # keeps the fix for the `| xargs cat` bypass from becoming the false
+    # positive that gets the guard switched off.
+    "find . -name .env | wc -l",
+    "find . -name .env -print",
+    "find . -name .env -delete",
     "uv run pytest tests/test_env_loading.py",
     "cat package.json",
     "cat docs/credentials-guide.md",
@@ -926,6 +948,20 @@ class TestScaffoldedReadPermissions:
         ).read_text()
         for rule in ("Read(**/.env)", "Read(**/*.pem)", "Read(**/id_rsa)", "Read(**/secrets/**)"):
             assert rule in tmpl, f"missing deny rule: {rule}"
+
+    def test_the_two_halves_cover_the_same_spellings(self):
+        """PR #942 review, P1: the Bash half learned about `prod.env`,
+        `staging.env` and `.envrc`; the Read half had not, so the tool route
+        stayed open on exactly the filenames the hook calls secret."""
+        tmpl = (
+            Path(__file__).resolve().parents[2]
+            / "templates"
+            / "base"
+            / "dot_agents"
+            / "settings.json.tmpl"
+        ).read_text()
+        for rule in ("Read(**/*.env)", "Read(**/.envrc)", "Read(**/*.env.local)"):
+            assert rule in tmpl, f"stemmed spelling not denied to the Read tool: {rule}"
 
     def test_the_example_file_stays_readable(self):
         """`.env.example` is committed and value-free. A deny rule covering it
