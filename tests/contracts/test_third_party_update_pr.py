@@ -72,4 +72,9 @@ def test_the_recovery_script_only_touches_bot_authored_prs():
     script = (
         Path(__file__).resolve().parents[2] / "tools" / "approve_pending_bump_runs.sh"
     ).read_text()
-    assert 'select(.author.login == "app/github-actions")' in script
+    assert 'BOT_AUTHOR="app/github-actions"' in script
+    # The in-LOOP check is the one that matters: applying the filter only
+    # during discovery let an explicitly named PR bypass it entirely
+    # (PR #944 review, P1).
+    assert 'if [ "$author" != "$BOT_AUTHOR" ]; then' in script
+    assert "refusing to approve its runs" in script

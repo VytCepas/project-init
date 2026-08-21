@@ -26,6 +26,10 @@
 #
 # Usage: approve_pending_bump_runs.sh [pr-number ...]
 #        With no arguments, every open PR authored by github-actions[bot].
+#        An explicitly named PR is author-checked too — the filter is a
+#        boundary, not a discovery convenience.
+#
+# Env: APPROVE_WAIT_SECONDS (default 90), APPROVE_POLL_SECONDS (default 10).
 
 set -uo pipefail
 
@@ -34,12 +38,20 @@ command -v gh >/dev/null 2>&1 || {
   exit 0
 }
 
+# How long to wait for a PR's workflow runs to appear. PR event delivery and
+# workflow-run creation are asynchronous, and this script runs seconds after
+# the PR is opened — querying once can legitimately find nothing and then
+# report "no runs waiting" about a PR that is about to be stuck (PR #944
+# review, P2).
+WAIT_SECONDS="${APPROVE_WAIT_SECONDS:-90}"
+POLL_SECONDS="${APPROVE_POLL_SECONDS:-10}"
+
+# `app/github-actions` is how gh spells the bot author.
+BOT_AUTHOR="app/github-actions"
+
 prs=()
 [ $# -gt 0 ] && prs=("$@")
 if [ ${#prs[@]} -eq 0 ]; then
-  # `app/github-actions` is how gh spells the bot author. Restrict to it: this
-  # script approves runs, and approving a run is running code, so it must never
-  # reach a PR a human or a third party opened.
   # A while-read loop, not `mapfile`: this repo gates on macOS bash 3.2, which
   # has no mapfile, and a script that only ever runs on the Linux runner still
   # gets read by people on the machine that cannot run it.
@@ -47,7 +59,7 @@ if [ ${#prs[@]} -eq 0 ]; then
     [ -n "$n" ] && prs+=("$n")
   done < <(
     gh pr list --state open --json number,author \
-      --jq '.[] | select(.author.login == "app/github-actions") | .number' 2>/dev/null
+      --jq ".[] | select(.author.login == \"$BOT_AUTHOR\") | .number" 2>/dev/null
   )
 fi
 
@@ -61,20 +73,57 @@ refused=0
 
 for pr in "${prs[@]}"; do
   [ -n "$pr" ] || continue
+
+  # THE AUTHOR CHECK BELONGS HERE, not only in the discovery above. An explicit
+  # `approve_pending_bump_runs.sh 123` bypassed the filter entirely and could
+  # approve — that is, RUN — code on a PR a human or a third party opened,
+  # defeating the exact boundary this script's header claims to respect
+  # (PR #944 review, P1). Re-validating every PR costs one API call.
+  author=$(gh pr view "$pr" --json author --jq '.author.login' 2>/dev/null) || continue
+  if [ "$author" != "$BOT_AUTHOR" ]; then
+    echo "PR #${pr}: author is '${author:-unknown}', not ${BOT_AUTHOR} — refusing to approve its runs."
+    continue
+  fi
   head_sha=$(gh pr view "$pr" --json headRefOid --jq '.headRefOid' 2>/dev/null) || continue
   [ -n "$head_sha" ] || continue
 
   # Runs are matched on the head SHA, not the branch: a branch-name match would
   # also pick up runs from an earlier push that are no longer what the PR is
   # blocked on.
-  run_ids=$(
-    gh api "repos/{owner}/{repo}/actions/runs?head_sha=${head_sha}&per_page=100" \
-      --jq '.workflow_runs[] | select(.status == "action_required" or .conclusion == "action_required") | .id' \
-      2>/dev/null
-  )
+  #
+  # Polled, because "no runs yet" and "no runs ever" look identical at second
+  # zero and mean opposite things. Two cheap queries per round rather than one
+  # plus a JSON parse: `gh --jq` is already the idiom here and this repo keeps
+  # `jq` itself off the dependency list.
+  waited=0
+  run_ids=""
+  total_runs=0
+  while :; do
+    run_ids=$(
+      gh api "repos/{owner}/{repo}/actions/runs?head_sha=${head_sha}&per_page=100" \
+        --jq '.workflow_runs[] | select(.status == "action_required" or .conclusion == "action_required") | .id' \
+        2>/dev/null
+    )
+    total_runs=$(
+      gh api "repos/{owner}/{repo}/actions/runs?head_sha=${head_sha}&per_page=100" \
+        --jq '.total_count' 2>/dev/null
+    )
+    # Something to approve, or runs reporting normally: either way the question
+    # is answered and there is nothing left to wait for.
+    [ -n "$run_ids" ] && break
+    [ "${total_runs:-0}" -gt 0 ] 2>/dev/null && break
+    [ "$waited" -ge "$WAIT_SECONDS" ] && break
+    sleep "$POLL_SECONDS"
+    waited=$((waited + POLL_SECONDS))
+  done
 
   if [ -z "$run_ids" ]; then
-    echo "PR #${pr}: no runs waiting for approval."
+    if [ "${total_runs:-0}" -gt 0 ] 2>/dev/null; then
+      echo "PR #${pr}: ${total_runs} run(s) reporting normally — nothing to approve."
+    else
+      echo "PR #${pr}: NO workflow runs appeared within ${waited}s — that is the stuck state," \
+        "not a healthy one. Check the Actions tab for 'Approve and run'."
+    fi
     continue
   fi
 
