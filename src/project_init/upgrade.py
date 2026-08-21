@@ -1305,7 +1305,8 @@ def _ensure_ci_block(text: str) -> str:
 
 
 _CONTEXT_BLOCK = (
-    "# Detect-and-defer boundary marker (PI-901; harbor#4 H1). repo = this project\n"
+    "# Detect-and-defer boundary marker (PI-901; the ambient-layer marker\n"
+    "# contract). repo = this project\n"
     "# governs itself, so an ambient/global agent layer stands down inside it;\n"
     "# ambient = opt out. Not `governance:` — that name is already a boolean.\n"
     "context: repo\n"
@@ -1326,14 +1327,14 @@ _CONTEXT_ANCHOR_RE = re.compile(r"(?m)^project:")
 # revoking the opt-out; stricter ones reject the descriptor outright (PR #902
 # review). Still anchored at column 0: `context` is top-level, and one indented
 # under another block is a different key that happens to share a name.
-# KEEP IN STEP with harbor's floor_in_repo, which reads the same key — a
-# spelling the writer preserves but the reader misses is an opt-out that
-# survives upgrade and is then ignored.
+# KEEP IN STEP with the ambient layer's own marker reader, which reads the
+# same key — a spelling the writer preserves but the reader misses is an
+# opt-out that survives upgrade and is then ignored.
 _CONTEXT_KEY_RE = re.compile(r"""(?m)^(?:context|"context"|'context')[ \t]*:""")
 
 
 def _ensure_context_key(text: str) -> str:
-    """Backfill the detect-and-defer marker into a pre-PI-901 config (harbor#4 H1).
+    """Backfill the detect-and-defer marker into a pre-PI-901 config (PI-901).
 
     config.yaml is never re-rendered wholesale on upgrade, so the template line
     alone would only ever reach *fresh* scaffolds — every already-scaffolded

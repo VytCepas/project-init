@@ -507,15 +507,17 @@ def _exposes_secret(command: str) -> str | None:
 _AUTONOMOUS_MODES = {"bypassPermissions", "dangerouslySkipPermissions"}
 
 
-# harbor#4 H1 / CONTRACTS/marker.md — `context: ambient` is the owner opting a
+# THE MARKER CONTRACT (PI-901) — `context: ambient` is the owner opting a
 # repo back in to the ambient (global) agent layer. Anchored at column 0: a
 # top-level YAML key cannot be indented, and matching an indented one would let
 # a `context: ambient` nested under some unrelated block opt the whole repo out.
 # Quoted keys/values and a space before the colon ARE valid top-level YAML, and
 # project-init's own `_CONTEXT_KEY_RE` preserves exactly those spellings on
 # upgrade — a spelling the writer keeps but the reader misses is an opt-out that
-# survives in the file and is then ignored. KEEP IN STEP with harbor's
-# `floor_in_repo`, which reads the same key with the same tolerances.
+# survives in the file and is then ignored. KEEP IN STEP with the ambient
+# layer's own marker reader, which reads the same key with the same
+# tolerances — two readers of one contract that disagree is the failure the
+# contract exists to prevent.
 #
 # A COMMENT NEEDS WHITESPACE BEFORE IT (PR #927 review). `#` only begins a YAML
 # comment when preceded by whitespace; otherwise it is part of the plain scalar.
@@ -548,8 +550,8 @@ def _declares_ambient(config: Path) -> bool:
 def _find_config(start: Path) -> Path | None:
     """Walk up from *start* to the project's .agents/config.yaml, if any.
 
-    A SYMLINKED marker is refused and the walk continues (PI-903; harbor#4 M13,
-    harbor CONTRACTS/marker.md). ``is_file()`` follows symlinks, so this used to
+    A SYMLINKED marker is refused and the walk continues (PI-903; the marker
+    contract). ``is_file()`` follows symlinks, so this used to
     accept an ``.agents/`` — or an ``.agents/config.yaml`` — pointing anywhere on
     disk. That matters more here than it does for a boundary verdict: this
     function locates the file ``safety.allow`` is read from, so a link planted
@@ -558,13 +560,13 @@ def _find_config(start: Path) -> Path | None:
     repo's own review, which is exactly what the guard is defending.
 
     Refusing is the safe direction (no allowlist ⇒ keep guarding), and it makes
-    this walk agree with harbor's ``floor_in_repo``, which has refused symlinked
-    markers since the 2026-07-24 marker-forgery finding. Nothing surfaced the
+    this walk agree with the ambient layer's own marker reader, which has
+    refused symlinked markers since the 2026-07-24 marker-forgery finding. Nothing surfaced the
     disagreement while it existed.
 
     Two further rules from the same frozen contract:
 
-    ``context: ambient`` (harbor#4 H1, M18/M19) — the owner declaring that this
+    ``context: ambient`` (the marker contract) — the owner declaring that this
     repo does NOT govern itself and the ambient layer keeps acting here. A repo
     that has opted out of governed status does not get to relax the deny table
     with its own ``safety.allow``, so the declaration returns None (no
@@ -574,7 +576,7 @@ def _find_config(start: Path) -> Path | None:
     overruled by an outer repo's config. A symlink is refused because it is
     forged; an ``ambient`` value is honoured because it is the owner speaking.
 
-    ``$HOME`` (harbor#4 M14) — the walk stops before it. A marker sitting in
+    ``$HOME`` (the marker contract) — the walk stops before it. A marker sitting in
     the home directory itself otherwise supplies an allowlist to every command
     run anywhere beneath it, and it is written by accident rather than by
     attack: project-init run once in the wrong cwd scaffolds one there. Paths
