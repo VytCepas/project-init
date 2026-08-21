@@ -66,3 +66,43 @@ non-interactive, so the adapter invokes prod_guard in autonomous mode →
 destructive commands **block** outright (no "ask" path on a surface that
 can't render one). Still a guardrail, not a boundary: git/CI + credential
 separation remain the guarantee (ADR-007).
+
+## Update (PI-906)
+
+The deny-table's class list above described infrastructure destruction. Two
+extensions, both because running the live table against real data-stack
+commands showed the gap rather than reasoning about it:
+
+**Data-plane destruction.** BigQuery removal and truncation, `--replace`
+overwrites, GCS recursive removal in both spellings, SQL `DELETE FROM` and
+`MERGE`, and dbt writes against a production target. A `--replace` load and a
+`dbt run` on a `table` materialisation destroy the prior contents as surely as
+a `DROP`; the verb reading like an ordinary write is the reason they were
+missed. One of these was a defect in an existing rule, not a gap:
+`gcloud storage rm -r` carries no `delete` token, so the `gcloud delete` rule
+that appears to cover GCS never saw the modern spelling of emptying a bucket.
+
+**Access mutation, which is not destruction.** IAM binding changes, policy
+replacement, service-account key creation, bucket ACL changes, and GTM
+container publish. *Granting* access is not destructive and so was never
+modelled, but where an identity is shared it changes other people's reach
+without their knowledge, and it is the least reversible thing in the table.
+Grants are narrowed to owner/editor/admin so routine reader grants stay
+unflagged; removals and wholesale policy replacement are flagged
+unconditionally.
+
+The posture is unchanged — `ask` interactively, `deny` in autonomous modes —
+and it is load-bearing here, because these verbs have legitimate routine uses.
+`dbt run --full-refresh --target dev` is ordinary work, so the dbt rules
+require a production target to be *named*: the cost is that a profile whose
+default target is prod is not reached, and naming the target is the supported
+way to be protected.
+
+Two limits stated rather than papered over. The GTM rule matches a `curl` in a
+Bash call; the same publish through a non-Bash tool or an MCP server bypasses
+it entirely, and the durable control is a GTM-side permission. And **the
+false-positive rate of the new rules is unmeasured, not zero** — `bq` and
+`dbt` traffic is too rare in this repo's corpus to establish a rate. What is
+measured is that the rules fire zero times on the known-good corpus in
+`tests/contracts/test_prod_guard.py`, which grew a negative case for every
+rule added.
