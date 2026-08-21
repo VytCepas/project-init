@@ -226,6 +226,10 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
+    # PI-893: the secrets guide documents the new read guard — both halves of
+    # it, and why neither covers the other. (settings.json and prod_guard.py
+    # also changed for PI-893 and are already listed further down.)
+    ".agents/docs/guides/secrets.md",
     # PI-933: renovate.json gained a customManagers entry so a tool version
     # pinned inside a workflow run step is maintained rather than frozen.
     # (This set covers content drift as well as new paths — see

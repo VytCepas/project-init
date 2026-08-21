@@ -106,3 +106,33 @@ false-positive rate of the new rules is unmeasured, not zero** — `bq` and
 measured is that the rules fire zero times on the known-good corpus in
 `tests/contracts/test_prod_guard.py`, which grew a negative case for every
 rule added.
+
+## Update (PI-893)
+
+A second class joins the deny table: **reading a secret-bearing file**. It
+destroys nothing, which is why it was outside the original model, and the
+scaffold's whole secret apparatus turned out to be write/commit-oriented —
+gitleaks and the pre-commit gate stop you *committing* a secret, `.gitignore`
+stops you *tracking* one, and nothing stopped reading one in Bash. The
+contents land in the transcript, are re-sent on every following turn, and
+outlive the session.
+
+Two controls ship together because neither covers the other. `permissions.deny`
+in the scaffolded `settings.json` closes the `Read` **tool**; it cannot close
+Bash, because a permission rule matches a tool's arguments and Bash's argument
+is one opaque string. The hook closes Bash.
+
+It lives in `prod_guard.py` rather than a sibling hook, which is a deviation
+from how PI-893 proposed it. The check needs the identical machinery — the
+config walk with its symlink refusal, `safety.allow`, ask/deny-by-mode,
+fail-open — and a second copy of security-critical code is the drift this repo
+keeps finding. Extending this hook also reaches the non-Claude surfaces through
+`agent_guard_adapter.py` for free. The cost is that the module's name now
+understates its scope, which its docstring says out loud.
+
+The posture is deliberately narrow: name, metadata and directory-entry
+operations are not reads, writing a secret file is not exposure (the values
+came from the session, they did not enter it), and the four documented
+example spellings stay readable. This is still a guardrail. A base64
+round-trip, an unusual reader, or any non-Bash tool walks past it; credential
+separation remains the boundary.
