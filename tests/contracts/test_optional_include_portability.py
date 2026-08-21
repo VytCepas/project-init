@@ -61,7 +61,12 @@ def test_the_include_is_readability_tested_and_errexit_is_restored(hook: Path):
     assert '[ -r "$(dirname "$0")/_usage_log.sh" ]' in body, "include is sourced untested"
     assert "case $- in *e*)" in body, "errexit state is not saved"
     assert "set +e" in body, "errexit is not disabled across the source"
-    assert 'if [ "$_pi_errexit" = 1 ]; then set -e; fi' in body, "errexit is not restored"
+    # BOTH directions. A one-way restore keeps an errexit that the INCLUDE
+    # turned on, which breaks the one hook that deliberately runs without it
+    # (PR #947 review).
+    assert 'if [ "$_pi_errexit" = 1 ]; then set -e; else set +e; fi' in body, (
+        "errexit is not restored in both directions"
+    )
     # Guarding the CALL on the source's exit status would miss the real state
     # of a file that sourced cleanly and defined nothing.
     assert "command -v usage_log" in body, "the call is not guarded on the function"
@@ -125,4 +130,56 @@ def test_the_hook_survives_every_state_of_its_optional_include(tmp_path: Path, s
     the worst shape a failure can take."""
     assert _run_hook_with_include(tmp_path, state) == 0, (
         f"hook died with the include {state} — see PI-946"
+    )
+
+
+def test_an_include_that_enables_errexit_does_not_leak_it(tmp_path: Path):
+    """PR #947 review: the restore must run in BOTH directions.
+
+    A one-way `if [ "$_pi_errexit" = 1 ]; then set -e; fi` puts back an errexit
+    that was on, and silently keeps one the INCLUDE switched on. That breaks
+    `session_setup.sh`, which runs `set -uo pipefail` deliberately WITHOUT
+    `-e` because its fingerprint pipeline returns nonzero routinely — it
+    probes manifests that need not exist. A leaked errexit exits the hook
+    before bootstrap.
+
+    Exercised against the real snippet in the frame that hook runs in, rather
+    than against the hook itself: the failure is about shell option state, and
+    a scaffolded bootstrap would drown it in unrelated work.
+    """
+    include = tmp_path / "_usage_log.sh"
+    include.write_text("set -e\nusage_log() { :; }\n")
+
+    snippet = (
+        "_pi_errexit=0\n"
+        "case $- in *e*) _pi_errexit=1 ;; esac\n"
+        "set +e\n"
+        f'[ -r "{include}" ] && . "{include}"\n'
+        'if [ "$_pi_errexit" = 1 ]; then set -e; else set +e; fi\n'
+    )
+    # `set -uo pipefail` with NO -e is session_setup.sh's deliberate frame.
+    script = (
+        "set -uo pipefail\n"
+        + snippet
+        + "case $- in *e*) echo LEAKED ;; *) echo clean ;; esac\n"
+        + "false\n"
+        + "echo REACHED_BOOTSTRAP\n"
+    )
+    result = subprocess.run(
+        ["bash", "-c", script], capture_output=True, text=True, timeout=60, check=False
+    )
+    assert "LEAKED" not in result.stdout, "the include's `set -e` escaped the restore"
+    assert "REACHED_BOOTSTRAP" in result.stdout, (
+        "a nonzero command after the include killed the hook — errexit leaked"
+    )
+
+
+def test_the_hook_that_runs_without_errexit_still_does(tmp_path: Path):
+    """The same property, asserted on the shipped file rather than a snippet:
+    session_setup.sh must not have quietly acquired `set -e`."""
+    body = (_FALLBACK_HOOKS / "session_setup.sh").read_text(encoding="utf-8")
+    set_lines = [ln for ln in body.splitlines() if ln.startswith("set -")]
+    assert set_lines, "no `set` line at all"
+    assert not any("e" in ln.split("#")[0].split()[1].lstrip("-") for ln in set_lines[:1]), (
+        f"session_setup.sh opted out of errexit on purpose; found {set_lines[0]!r}"
     )

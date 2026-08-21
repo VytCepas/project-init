@@ -20,8 +20,16 @@
 #   case $- in *e*) _pi_errexit=1 ;; esac
 #   set +e
 #   [ -r "$(dirname "$0")/_usage_log.sh" ] && . "$(dirname "$0")/_usage_log.sh"
-#   if [ "$_pi_errexit" = 1 ]; then set -e; fi
+#   if [ "$_pi_errexit" = 1 ]; then set -e; else set +e; fi
 #   if command -v usage_log >/dev/null 2>&1; then usage_log <hook> <event>; fi
+#
+# RESTORE BOTH DIRECTIONS (PR #947 review). A one-way `if …; then set -e; fi`
+# restores an errexit that was ON and silently keeps one the INCLUDE turned on.
+# `session_setup.sh` runs `set -uo pipefail` without `-e` on purpose — its
+# fingerprint pipeline returns nonzero routinely, because it probes manifests
+# that need not exist — so a leaked errexit exits the hook before bootstrap.
+# Measured on bash 3.2 with an include containing `set -e`: one-way leaves
+# errexit ON, two-way leaves it off and the hook reaches bootstrap.
 #
 # Guard the CALL on the function, not on the source succeeding: a file that
 # sourced cleanly and defined nothing is a real state.
