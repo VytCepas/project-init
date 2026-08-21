@@ -14,8 +14,18 @@ set -euo pipefail
 # Self-log this firing (dormant unless the observability overlay is installed;
 # reads no stdin, so the payload below is untouched).
 # shellcheck source=/dev/null
-. "$(dirname "$0")/_usage_log.sh" 2>/dev/null &&
+# Optional include. The shape is load-bearing and non-obvious — a failed `.`
+# exits a `set -e` shell despite `|| true`, because it is a special builtin.
+# Full measurement and the four file states it covers: _usage_log.sh's header
+# (PI-946).
+_pi_errexit=0
+case $- in *e*) _pi_errexit=1 ;; esac
+set +e
+[ -r "$(dirname "$0")/_usage_log.sh" ] && . "$(dirname "$0")/_usage_log.sh"
+if [ "$_pi_errexit" = 1 ]; then set -e; fi
+if command -v usage_log >/dev/null 2>&1; then
   usage_log workflow_state_reminder UserPromptSubmit </dev/null || true
+fi
 
 INPUT=$(cat)
 
