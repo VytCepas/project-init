@@ -1410,9 +1410,7 @@ def _generate_claude_projection(
     shutil.rmtree(staging, ignore_errors=True)
     try:
         shutil.copytree(agents_dir, staging, ignore=_ignore)
-        projected = [
-            f.relative_to(staging).as_posix() for f in staging.rglob("*") if f.is_file()
-        ]
+        projected = [f.relative_to(staging).as_posix() for f in staging.rglob("*") if f.is_file()]
         shutil.copytree(staging, claude_dir, dirs_exist_ok=True)
     finally:
         shutil.rmtree(staging, ignore_errors=True)

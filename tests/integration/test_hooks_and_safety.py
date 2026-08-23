@@ -148,10 +148,25 @@ class TestGitleaksPreCommitHook:
         fake.write_text(f'#!/bin/bash\necho "$@" > "{log}"\nexit 1\n')
         fake.chmod(fake.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
+        # Neutralize the hook's stage-1 `just lint` gate, same reason and same
+        # stub as TestPrePushLifecycleGate: the hook resolves REPO_ROOT from the
+        # CWD, which under pytest is THIS repo, so a real `just` on PATH lints
+        # project-init itself. When project-init's own lint was red the hook
+        # exited 1 at stage 1, never reached gitleaks, and this test failed as
+        # `FileNotFoundError: args.log` — a message that names neither the gate
+        # nor the file that was actually unformatted. Only gitleaks delegation is
+        # under test here; the lint gate's own behaviour is not.
+        stub_bin = tmp_path / "stub-bin"
+        stub_bin.mkdir(exist_ok=True)
+        stub = stub_bin / "just"
+        stub.write_text("#!/bin/sh\nexit 1\n")
+        stub.chmod(0o755)
+
         env = os.environ.copy()
-        env["PATH"] = f"{fake_bin}:{env['PATH']}"
+        env["PATH"] = f"{fake_bin}:{stub_bin}:{env['PATH']}"
         result = _run_hook(self.hook, env=env)
         assert result.returncode == 1, "findings exit code must abort the commit"
+        assert log.exists(), "hook exited without invoking gitleaks; stderr:\n" + result.stderr
         assert "--staged" in log.read_text()
 
 
