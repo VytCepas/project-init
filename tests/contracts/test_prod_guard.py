@@ -856,6 +856,13 @@ EXPOSING = [
     # broke `2>&1`, `&>` and `|&`, tearing the producer away from its
     # downstream reader and reintroducing the bypass this fix closed.
     "ls .env 2>&1 | xargs cat",
+    # `|&` IS A PIPE — bash shorthand for `2>&1 |`. It survived the statement
+    # split, then the per-stage split on `|` left the downstream segment headed
+    # by `&` instead of the verb, so no reader was found at all.
+    "ls .env |& xargs cat",
+    "printf '.env\\n' |& xargs cat",
+    "echo .env |& xargs cat",
+    "find . -name .env |& xargs cat",
     "printf '.env\\n' 2>&1 | xargs cat",
     "ls .env &> /tmp/out | xargs cat",
     "cat .env >/dev/null 2>&1",
@@ -931,6 +938,11 @@ NOT_EXPOSING = [
     "sleep 1 & cat README.md",
     "ls .env & cat README.md",
     "cat README.md 2>&1",
+    # `|&` on nothing secret stays allowed — the control against normalising
+    # it into a blanket match.
+    "ls -la |& grep foo",
+    "cat README.md |& head",
+    "cat .env.example |& head",
     "ls -la 2>&1 | grep foo",
     # A keystore-shaped DOCUMENT is not a keystore.
     "cat keystore.md",
