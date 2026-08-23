@@ -138,6 +138,68 @@ def test_rebuild_keeps_a_file_the_projection_never_wrote(tmp_path: Path):
     assert (tmp_path / ".claude" / "settings.json").exists()
 
 
+def test_a_collision_at_the_old_staging_name_is_harmless(tmp_path: Path):
+    """PR #953 review: the staging directory had a FIXED name, with two faults.
+
+    The first cut staged the render in `<claude_dir>.projection-staging` and
+    cleared it with `shutil.rmtree(..., ignore_errors=True)`:
+
+      1. `rmtree` does not remove a FILE. A plain file at that path therefore
+         survived the clear, and `copytree` died on an unhandled FileExistsError
+         — measured on a real scaffold, the upgrade exited 1 with a traceback.
+      2. A pre-existing DIRECTORY there was deleted unconditionally, which is
+         correct for our own crash leftovers and wrong for anything else.
+
+    `mkdtemp` retires both: the name is unique, so there is nothing to collide
+    with and nothing to delete. This test plants BOTH shapes at the old fixed
+    name and requires the projection to succeed and to touch neither.
+    """
+    _mk_agents(tmp_path)
+    stale_file = tmp_path / ".claude.projection-staging"
+    stale_file.write_text("not ours, and not a directory\n")
+    stale_dir = tmp_path / ".claude.projection-staging.d"
+    stale_dir.mkdir()
+    (stale_dir / "keep.txt").write_text("someone else's data\n")
+
+    _generate_claude_projection(tmp_path)
+
+    assert stale_file.read_text() == "not ours, and not a directory\n"
+    assert (stale_dir / "keep.txt").read_text() == "someone else's data\n"
+    assert (tmp_path / ".claude" / "settings.json").exists(), "projection did not run"
+    # And no staging directory is left behind for the next run to trip over.
+    leftovers = sorted(q.name for q in tmp_path.glob(".projection-staging-*"))
+    assert leftovers == [], f"staging litter: {leftovers}"
+
+
+def test_an_unmanaged_file_survives_repeated_projections(tmp_path: Path):
+    """The arm that was missing, and the bug it would have caught.
+
+    The first version of the manifest recorded everything present under
+    `.claude/` after the copy — so a repo-authored file beside the projection was
+    listed as ours and the NEXT run deleted it. One projection looked fine; two
+    did not. Measured on a real repo:
+    `inject.d/10-deliverables-name-the-proof-tier.md` appeared in a 15-entry
+    manifest and was gone one run later.
+
+    Three runs, because the failure needed two.
+    """
+    _mk_agents(tmp_path)
+    _generate_claude_projection(tmp_path)
+
+    hand_written = tmp_path / ".claude" / "inject.d" / "10-local-rule.md"
+    hand_written.parent.mkdir(parents=True, exist_ok=True)
+    hand_written.write_text("repo-authored, no .agents/ counterpart\n")
+
+    for run in range(3):
+        _generate_claude_projection(tmp_path, first_scaffold=False)
+        assert hand_written.exists(), f"deleted on run {run + 2}"
+
+    import json
+
+    listed = json.loads((tmp_path / ".claude" / ".projection.json").read_text())["paths"]
+    assert "inject.d/10-local-rule.md" not in listed, "claimed a file it never wrote"
+
+
 def test_rebuild_is_still_delete_aware_once_recorded(tmp_path: Path):
     """The control for the arm above: delete-awareness must survive the fix.
 

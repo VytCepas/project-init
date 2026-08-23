@@ -856,6 +856,13 @@ EXPOSING = [
     # broke `2>&1`, `&>` and `|&`, tearing the producer away from its
     # downstream reader and reintroducing the bypass this fix closed.
     "ls .env 2>&1 | xargs cat",
+    # `|&` IS A PIPE — bash shorthand for `2>&1 |`. It survived the statement
+    # split, then the per-stage split on `|` left the downstream segment headed
+    # by `&` instead of the verb, so no reader was found at all.
+    "ls .env |& xargs cat",
+    "printf '.env\\n' |& xargs cat",
+    "echo .env |& xargs cat",
+    "find . -name .env |& xargs cat",
     "printf '.env\\n' 2>&1 | xargs cat",
     "ls .env &> /tmp/out | xargs cat",
     "cat .env >/dev/null 2>&1",
@@ -863,6 +870,19 @@ EXPOSING = [
     # shares a pipeline with the producer, even if another statement precedes it.
     "cat README.md && ls .env | xargs cat",
     "ls .env | xargs cat && cat README.md",
+    # PR #953 review, and this one was a BYPASS rather than a false positive.
+    # A NEWLINE SEPARATES STATEMENTS and shlex disagrees: it is whitespace, so
+    # `cmd1\\ncmd2` came back as ONE statement with `cmd2` read as an argument
+    # to `cmd1`. The head then became the exposure-safe `ls`, no reader appeared
+    # in `heads` because the verb was no longer a head, the producer was
+    # exempted, and the read went through. Measured before the fix: ALLOWED.
+    # The regex the tokenizer replaced listed `\\n` explicitly, and dropping it
+    # reopened this.
+    "ls -la\ncat .env",
+    "ls .env\ncat .env",
+    "cat README.md\ncat .env",
+    # Three lines, so the read is not merely adjacent to the safe verb.
+    "cd /tmp\nls -la\ncat .env",
 ]
 
 NOT_EXPOSING = [
@@ -931,10 +951,53 @@ NOT_EXPOSING = [
     "sleep 1 & cat README.md",
     "ls .env & cat README.md",
     "cat README.md 2>&1",
+    # `|&` on nothing secret stays allowed — the control against normalising
+    # it into a blanket match.
+    "ls -la |& grep foo",
+    "cat README.md |& head",
+    "cat .env.example |& head",
     "ls -la 2>&1 | grep foo",
     # A keystore-shaped DOCUMENT is not a keystore.
     "cat keystore.md",
     "cat docs/api-key-rotation.md",
+    # ── PR #953 review, P2: A QUOTED SEPARATOR IS TEXT, NOT AN OPERATOR. The
+    # splitter worked on the raw string, so it could not tell `|&` inside a
+    # quoted argument from a real pipeline: `echo '.env |& xargs cat'` reads
+    # nothing at all, yet `xargs` was counted as a downstream reader, the `echo`
+    # exemption was withdrawn, and the line prompted.
+    #
+    # ALL FIVE SEPARATORS WERE AFFECTED, not just the reported `|&`. The report
+    # named one spelling; measuring the others showed the same false positive on
+    # every one, which is why the mechanism changed to a tokenizer instead of the
+    # fourth lookaround in that function. Each line below reads NOTHING.
+    "echo '.env |& xargs cat'",
+    'echo ".env |& xargs cat"',
+    "echo '.env | xargs cat'",
+    "echo '.env && cat .env'",
+    "echo '.env ; cat .env'",
+    "echo '.env || cat .env'",
+    "echo 'cat .env'",
+    "printf '%s' '.env |& cat'",
+    # An UNQUOTED message argument. The old carve-out was anchored on the quote
+    # characters, so it only ever saw a quoted message; tokenizing drops the
+    # argument after the flag regardless of how it was written.
+    "git commit -m do-not-cat-.env",
+    "git commit -am fix-.env-handling",
+    # The newline fix must not become "any newline is suspicious". Each of these
+    # is two INDEPENDENT statements with no data path between them, exactly like
+    # the `;` cases above — and the merged-statement bug made the second one
+    # prompt on an everyday two-line paste.
+    'echo ".env" >> .gitignore\ncat README.md',
+    'cat README.md\necho ".env" >> .gitignore',
+    "ls .env\ncat README.md",
+    # A reader alone on its line has nothing feeding it: a pipe shares a data
+    # path, a newline does not.
+    "ls .env\nxargs cat",
+    # A QUOTED newline is text, not a separator. This is the property that keeps
+    # the fix inside the tokenizer rather than a pre-split on "\\n", which would
+    # tear a quoted string in half and leave both halves unparsable.
+    "echo 'first line\n.env second line'",
+    "printf 'a\nb' | cat",
 ]
 
 

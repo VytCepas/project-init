@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import time
 import tomllib
 from collections.abc import Callable, Iterator
@@ -1257,13 +1258,21 @@ def _read_projection_manifest(claude_dir: Path) -> set[str] | None:
     return set(paths)
 
 
-def _write_projection_manifest(claude_dir: Path) -> None:
-    """Record every file now under `.claude/` except our own state files."""
-    paths = sorted(
-        f.relative_to(claude_dir).as_posix()
-        for f in claude_dir.rglob("*")
-        if f.is_file() and f.relative_to(claude_dir).as_posix() not in _PROJECTION_OWN_STATE
-    )
+def _write_projection_manifest(claude_dir: Path, projected: list[str]) -> None:
+    """Record the paths THIS projection wrote — nothing else.
+
+    An earlier version of this recorded everything present under `.claude/` after
+    the copy, which quietly re-created the bug it was added to fix: a
+    repo-authored file sitting beside the projection was listed as ours, so the
+    NEXT run deleted it as ours. That deferred the data loss by one cycle instead
+    of preventing it, and it was caught only because the cycle came round.
+    Measured: `inject.d/10-deliverables-name-the-proof-tier.md` appeared in a
+    15-entry manifest it had no business being in, and was gone one run later.
+
+    So the list comes from the staged render — the files copytree actually
+    produced — and never from the destination directory.
+    """
+    paths = sorted(x for x in projected if x not in _PROJECTION_OWN_STATE)
     (claude_dir / PROJECTION_MANIFEST).write_text(
         json.dumps({"paths": paths}, indent=2) + "\n", encoding="utf-8"
     )
@@ -1395,8 +1404,33 @@ def _generate_claude_projection(
             skip |= {n for n in names if n in PLUGIN_PROVIDED_SKILLS}
         return skip
 
-    shutil.copytree(agents_dir, claude_dir, ignore=_ignore, dirs_exist_ok=True)
-    _write_projection_manifest(claude_dir)
+    # STAGED, so the set of projected paths is a fact rather than an inference.
+    # Rendering straight into `.claude/` leaves no way to tell what we just wrote
+    # from what was already beside it, and guessing is what broke this before.
+    #
+    # A FIXED STAGING NAME HAD TWO FAULTS, both raised in review of PR #953 and
+    # both reproduced. The first cut used `<claude_dir>.projection-staging` and
+    # cleared it with `rmtree(..., ignore_errors=True)`:
+    #
+    #   1. `rmtree` does not remove a FILE, so a plain file sitting at that path
+    #      left it in place and `copytree` died on an unhandled FileExistsError,
+    #      taking the whole upgrade with it (measured: rc=1, traceback).
+    #   2. It deleted whatever directory already stood there, which is right for
+    #      our own leftovers and wrong for anything else that picked the name.
+    #
+    # `mkdtemp` retires both rather than handling each: the name is unique, so
+    # there is nothing to collide with and nothing pre-existing to delete. It is
+    # created inside the project directory on purpose — a staging dir on another
+    # filesystem would turn the second copytree into a cross-device copy.
+    staging_parent = Path(tempfile.mkdtemp(prefix=".projection-staging-", dir=claude_dir.parent))
+    staging = staging_parent / "render"
+    try:
+        shutil.copytree(agents_dir, staging, ignore=_ignore)
+        projected = [f.relative_to(staging).as_posix() for f in staging.rglob("*") if f.is_file()]
+        shutil.copytree(staging, claude_dir, dirs_exist_ok=True)
+    finally:
+        shutil.rmtree(staging_parent, ignore_errors=True)
+    _write_projection_manifest(claude_dir, projected)
 
 
 def _emit_generated(
