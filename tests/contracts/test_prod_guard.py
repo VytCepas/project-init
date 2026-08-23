@@ -852,6 +852,13 @@ EXPOSING = [
     "printf '.env\\n' | xargs cat",
     "echo .env | xargs cat",
     "ls .env | xargs cat",
+    # A REDIRECTION IS NOT A SEPARATOR. Splitting statements on any `&`
+    # broke `2>&1`, `&>` and `|&`, tearing the producer away from its
+    # downstream reader and reintroducing the bypass this fix closed.
+    "ls .env 2>&1 | xargs cat",
+    "printf '.env\\n' 2>&1 | xargs cat",
+    "ls .env &> /tmp/out | xargs cat",
+    "cat .env >/dev/null 2>&1",
     # SAME PIPELINE, DIFFERENT STATEMENT. The reader must still be seen when it
     # shares a pipeline with the producer, even if another statement precedes it.
     "cat README.md && ls .env | xargs cat",
@@ -918,6 +925,13 @@ NOT_EXPOSING = [
     'echo ".env" >> .gitignore && cat README.md',
     "cat README.md; ls .env",
     "ls .env; cat README.md",
+    # A GENUINE background `&` still separates, so a reader after it is a
+    # different statement — the control that stops the redirection fix from
+    # simply never splitting on `&` at all.
+    "sleep 1 & cat README.md",
+    "ls .env & cat README.md",
+    "cat README.md 2>&1",
+    "ls -la 2>&1 | grep foo",
     # A keystore-shaped DOCUMENT is not a keystore.
     "cat keystore.md",
     "cat docs/api-key-rotation.md",
