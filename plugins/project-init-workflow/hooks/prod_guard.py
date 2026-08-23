@@ -438,7 +438,24 @@ _SUBSTITUTION = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
 # needed: shlex already emits `>&` and `&>` as distinct tokens, so a bare `&` is
 # unambiguously a separator and `2>&1` cannot be mistaken for one.
 _PIPE_TOKENS = frozenset({"|", "|&"})
-_BREAK_TOKENS = frozenset({"&&", "||", ";", "&"})
+# A NEWLINE IS A STATEMENT SEPARATOR, and shlex does not think so by default:
+# it is whitespace, so `cmd1\ncmd2` came back as ONE statement with `cmd2` read
+# as an argument to `cmd1`. That is not cosmetic — it reopened the bypass this
+# module exists to close. Measured before the fix, with a dotenv path:
+#     ls -la<newline>cat <dotenv>     -> allow   (WRONG, a read got through)
+#     cat README.md<newline>echo …    -> ask     (WRONG, the other direction)
+# The first is the one that matters: two lines merge, the head becomes `ls`
+# (exposure-safe), no reader appears in `heads` because `cat` is now an
+# argument, the producer is exempted, and the file is read. Caught in review of
+# PR #953 by Copilot; the regex this replaced listed `\n` explicitly and I
+# dropped it.
+_BREAK_TOKENS = frozenset({"&&", "||", ";", "&", "\n"})
+# Newline added to shlex's punctuation set, and removed from its whitespace, so
+# it is EMITTED as a token instead of being discarded. Doing it through the
+# tokenizer rather than by splitting the string on newlines first is what keeps
+# a QUOTED newline intact: `echo 'a<newline>b'` stays one token, where a
+# pre-split would tear it in half and leave both halves unparsable.
+_PUNCTUATION_CHARS = "();<>|&\n"
 # The token AFTER one of these is prose, not a path. Replaces a regex that
 # required the quotes to still be in the string — which they are not, after
 # tokenizing — and it now also covers an unquoted message the regex never saw.
@@ -452,8 +469,11 @@ def _tokenize(command: str) -> list[str] | None:
     which over-splits rather than under-splits: for a guard, keeping the old
     false positive on an unparsable command is the safe direction.
     """
-    lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lex = shlex.shlex(command, posix=True, punctuation_chars=_PUNCTUATION_CHARS)
     lex.whitespace_split = True
+    # Newline must stop being whitespace or it is thrown away before punctuation
+    # handling ever sees it, which is exactly how it stopped separating.
+    lex.whitespace = lex.whitespace.replace("\n", "")
     try:
         return list(lex)
     except ValueError:

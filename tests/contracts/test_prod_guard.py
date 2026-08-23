@@ -870,6 +870,19 @@ EXPOSING = [
     # shares a pipeline with the producer, even if another statement precedes it.
     "cat README.md && ls .env | xargs cat",
     "ls .env | xargs cat && cat README.md",
+    # PR #953 review, and this one was a BYPASS rather than a false positive.
+    # A NEWLINE SEPARATES STATEMENTS and shlex disagrees: it is whitespace, so
+    # `cmd1\\ncmd2` came back as ONE statement with `cmd2` read as an argument
+    # to `cmd1`. The head then became the exposure-safe `ls`, no reader appeared
+    # in `heads` because the verb was no longer a head, the producer was
+    # exempted, and the read went through. Measured before the fix: ALLOWED.
+    # The regex the tokenizer replaced listed `\\n` explicitly, and dropping it
+    # reopened this.
+    "ls -la\ncat .env",
+    "ls .env\ncat .env",
+    "cat README.md\ncat .env",
+    # Three lines, so the read is not merely adjacent to the safe verb.
+    "cd /tmp\nls -la\ncat .env",
 ]
 
 NOT_EXPOSING = [
@@ -970,6 +983,21 @@ NOT_EXPOSING = [
     # argument after the flag regardless of how it was written.
     "git commit -m do-not-cat-.env",
     "git commit -am fix-.env-handling",
+    # The newline fix must not become "any newline is suspicious". Each of these
+    # is two INDEPENDENT statements with no data path between them, exactly like
+    # the `;` cases above — and the merged-statement bug made the second one
+    # prompt on an everyday two-line paste.
+    'echo ".env" >> .gitignore\ncat README.md',
+    'cat README.md\necho ".env" >> .gitignore',
+    "ls .env\ncat README.md",
+    # A reader alone on its line has nothing feeding it: a pipe shares a data
+    # path, a newline does not.
+    "ls .env\nxargs cat",
+    # A QUOTED newline is text, not a separator. This is the property that keeps
+    # the fix inside the tokenizer rather than a pre-split on "\\n", which would
+    # tear a quoted string in half and leave both halves unparsable.
+    "echo 'first line\n.env second line'",
+    "printf 'a\nb' | cat",
 ]
 
 
