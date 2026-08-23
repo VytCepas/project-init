@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import time
 import tomllib
 from collections.abc import Callable, Iterator
@@ -1406,14 +1407,29 @@ def _generate_claude_projection(
     # STAGED, so the set of projected paths is a fact rather than an inference.
     # Rendering straight into `.claude/` leaves no way to tell what we just wrote
     # from what was already beside it, and guessing is what broke this before.
-    staging = claude_dir.with_name(claude_dir.name + ".projection-staging")
-    shutil.rmtree(staging, ignore_errors=True)
+    #
+    # A FIXED STAGING NAME HAD TWO FAULTS, both raised in review of PR #953 and
+    # both reproduced. The first cut used `<claude_dir>.projection-staging` and
+    # cleared it with `rmtree(..., ignore_errors=True)`:
+    #
+    #   1. `rmtree` does not remove a FILE, so a plain file sitting at that path
+    #      left it in place and `copytree` died on an unhandled FileExistsError,
+    #      taking the whole upgrade with it (measured: rc=1, traceback).
+    #   2. It deleted whatever directory already stood there, which is right for
+    #      our own leftovers and wrong for anything else that picked the name.
+    #
+    # `mkdtemp` retires both rather than handling each: the name is unique, so
+    # there is nothing to collide with and nothing pre-existing to delete. It is
+    # created inside the project directory on purpose — a staging dir on another
+    # filesystem would turn the second copytree into a cross-device copy.
+    staging_parent = Path(tempfile.mkdtemp(prefix=".projection-staging-", dir=claude_dir.parent))
+    staging = staging_parent / "render"
     try:
         shutil.copytree(agents_dir, staging, ignore=_ignore)
         projected = [f.relative_to(staging).as_posix() for f in staging.rglob("*") if f.is_file()]
         shutil.copytree(staging, claude_dir, dirs_exist_ok=True)
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        shutil.rmtree(staging_parent, ignore_errors=True)
     _write_projection_manifest(claude_dir, projected)
 
 

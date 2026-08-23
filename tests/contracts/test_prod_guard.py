@@ -947,6 +947,29 @@ NOT_EXPOSING = [
     # A keystore-shaped DOCUMENT is not a keystore.
     "cat keystore.md",
     "cat docs/api-key-rotation.md",
+    # ── PR #953 review, P2: A QUOTED SEPARATOR IS TEXT, NOT AN OPERATOR. The
+    # splitter worked on the raw string, so it could not tell `|&` inside a
+    # quoted argument from a real pipeline: `echo '.env |& xargs cat'` reads
+    # nothing at all, yet `xargs` was counted as a downstream reader, the `echo`
+    # exemption was withdrawn, and the line prompted.
+    #
+    # ALL FIVE SEPARATORS WERE AFFECTED, not just the reported `|&`. The report
+    # named one spelling; measuring the others showed the same false positive on
+    # every one, which is why the mechanism changed to a tokenizer instead of the
+    # fourth lookaround in that function. Each line below reads NOTHING.
+    "echo '.env |& xargs cat'",
+    'echo ".env |& xargs cat"',
+    "echo '.env | xargs cat'",
+    "echo '.env && cat .env'",
+    "echo '.env ; cat .env'",
+    "echo '.env || cat .env'",
+    "echo 'cat .env'",
+    "printf '%s' '.env |& cat'",
+    # An UNQUOTED message argument. The old carve-out was anchored on the quote
+    # characters, so it only ever saw a quoted message; tokenizing drops the
+    # argument after the flag regardless of how it was written.
+    "git commit -m do-not-cat-.env",
+    "git commit -am fix-.env-handling",
 ]
 
 

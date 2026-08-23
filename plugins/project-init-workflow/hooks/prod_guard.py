@@ -35,6 +35,7 @@ import contextlib
 import json
 import os
 import re
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -429,6 +430,36 @@ _SUBSTITUTION = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
 # NOT "any pipe": `find . -name .env | wc -l` counts matches and reads nothing,
 # and a guard that prompts on it is the false positive that gets guards turned
 # off. The downstream verb has to actually consume contents.
+# SEPARATORS AS TOKENS, NOT AS CHARACTERS IN A STRING. `shlex` with
+# punctuation_chars=True yields each shell operator as its own token and leaves
+# an operator that appeared inside quotes buried in the token it belongs to, so
+# `echo '.env |& xargs cat'` tokenizes to two tokens and nothing splits. Getting
+# this from the tokenizer also retires the redirection lookaround the regex
+# needed: shlex already emits `>&` and `&>` as distinct tokens, so a bare `&` is
+# unambiguously a separator and `2>&1` cannot be mistaken for one.
+_PIPE_TOKENS = frozenset({"|", "|&"})
+_BREAK_TOKENS = frozenset({"&&", "||", ";", "&"})
+# The token AFTER one of these is prose, not a path. Replaces a regex that
+# required the quotes to still be in the string — which they are not, after
+# tokenizing — and it now also covers an unquoted message the regex never saw.
+_MESSAGE_FLAGS = frozenset({"-m", "-am", "--message"})
+
+
+def _tokenize(command: str) -> list[str] | None:
+    """Split *command* into shell tokens, or None when it cannot be parsed.
+
+    None means unbalanced quotes. Callers fall back to the character split,
+    which over-splits rather than under-splits: for a guard, keeping the old
+    false positive on an unparsable command is the safe direction.
+    """
+    lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    try:
+        return list(lex)
+    except ValueError:
+        return None
+
+
 _FIND_ACTS = re.compile(r"\s-(?:exec|execdir|ok|okdir)\b")
 _READER_VERBS = frozenset(
     {
@@ -478,15 +509,23 @@ def _leaf_commands(command: str) -> list[str]:
     return out
 
 
-def _statements(command: str) -> list[str]:
-    """Split *command* into statements, keeping each pipeline intact.
+def _statements(command: str) -> list[list[str]]:
+    """Split *command* into statements as token lists, pipelines kept intact.
 
     `_leaf_commands` collapses `;`, `&` and `|` into one separator, which loses
     the distinction that matters for the reader check: `a | b` shares a data path
     and `a && b` does not. Substitutions are inlined the same way, so a read
     hidden inside one is still judged.
+
+    TOKENS, NOT SUBSTRINGS, and this is the fourth defect in this one function
+    that says why. Every previous cut split the raw string, so it could not tell
+    an operator from the same characters inside a quoted argument, and
+    `echo '.env |& xargs cat'` — which reads nothing — was asked about. Measured
+    on the character split: all five separators were affected (`|`, `|&`, `&&`,
+    `||`, `;`), not just the `|&` that was reported. Three earlier rounds each
+    fixed one spelling with another lookaround; this replaces the mechanism.
     """
-    out: list[str] = []
+    out: list[list[str]] = []
     pending = [command]
     while pending and len(out) < 100:
         chunk = pending.pop()
@@ -494,21 +533,37 @@ def _statements(command: str) -> list[str]:
         if inner:
             pending.extend(inner)
             chunk = _SUBSTITUTION.sub(" ", chunk)
-        # `|&` IS A PIPE. Bash's shorthand for `2>&1 |` survives the statement
-        # split intact (the `&` is excluded below), and then the per-stage split
-        # on `|` leaves the downstream segment headed by `&` instead of the real
-        # verb — so no reader is found, the producer is exempted, and the read
-        # goes through. Measured: `ls <dotenv> |& xargs cat` allowed, including
-        # the documented `find … | xargs cat` shape (PR #952 review, second
-        # round). Normalising here fixes both the statement split and the stage
-        # split, because both read this output.
-        chunk = chunk.replace("|&", "|")
-        # `&&` and `||` FIRST, or they split wrongly. And a bare `&` is only a
-        # separator when it is not part of a redirection: splitting on any `&`
-        # broke `2>&1` and `&>`, which tore a producer away from its downstream
-        # reader and REINTRODUCED the bypass — measured, `ls <dotenv> 2>&1 |
-        # xargs cat` went back to allow.
-        out.extend(re.split(r"(?:&&|\|\||;|\n|(?<![>&|])&(?![>&]))+", chunk))
+        tokens = _tokenize(chunk)
+        if tokens is None:
+            # Unparsable (unbalanced quotes). Fall back to the character split
+            # this function used before — it cannot tell a quoted separator from
+            # a real one, so it may over-split, and over-splitting only ever
+            # makes the guard MORE eager. Deliberate: the alternative is to skip
+            # an unparsable command, and a guard that skips what it cannot read
+            # is a guard with a documented bypass.
+            #
+            # The segments must come out as REAL TOKENS, not as one token holding
+            # the whole segment: the caller reads `leaf[0]` as the verb, so a
+            # single-token segment has no recognisable verb, matches no reader
+            # and no safe producer, and the fallback silently stops guarding.
+            # Measured while writing this — the corpus went 28 red on a forced
+            # fallback, and every one of those was this, not the split.
+            out.extend(
+                segment.replace("|&", " | ").replace("|", " | ").split()
+                for segment in re.split(r"(?:&&|\|\||;|\n|(?<![>&|])&(?![>&]))+", chunk)
+                if segment.strip()
+            )
+            continue
+        current: list[str] = []
+        for token in tokens:
+            if token in _BREAK_TOKENS:
+                if current:
+                    out.append(current)
+                current = []
+            else:
+                current.append(token)
+        if current:
+            out.append(current)
     return out
 
 
@@ -534,10 +589,25 @@ def _exposes_secret(command: str) -> str | None:
     return None
 
 
-def _statement_exposes(statement: str) -> str | None:
-    """The original per-segment check, scoped to one statement's pipeline."""
-    leaves = [seg for seg in statement.split("|") if seg.strip()]
-    heads = {seg.split()[0].rsplit("/", 1)[-1] for seg in leaves if seg.split()}
+def _statement_exposes(statement: list[str]) -> str | None:
+    """The original per-segment check, scoped to one statement's pipeline.
+
+    Takes TOKENS. Joining is safe wherever a regex still wants a string: any
+    separator left inside a token was quoted, and joining never re-splits — it
+    was the splitting that could not tell the two apart.
+    """
+    leaves: list[list[str]] = []
+    current: list[str] = []
+    for token in statement:
+        if token in _PIPE_TOKENS:
+            if current:
+                leaves.append(current)
+            current = []
+        else:
+            current.append(token)
+    if current:
+        leaves.append(current)
+    heads = {leaf[0].rsplit("/", 1)[-1] for leaf in leaves if leaf}
     # A PRODUCER IS ONLY SAFE WHILE NOTHING DOWNSTREAM CAN READ WHAT IT NAMES.
     # This gate existed for `find` alone, so every other producer in
     # _EXPOSURE_SAFE_VERBS was exempted unconditionally and the pipeline that
@@ -548,12 +618,29 @@ def _statement_exposes(statement: str) -> str | None:
     #   ls .env           | xargs cat   -> ALLOWED  (exempt, wrong)
     # The reader segment carries no path of its own, so once the naming segment
     # is skipped nothing is left to match and the contents reach the transcript.
-    producers_are_safe = not _FIND_ACTS.search(statement) and not (heads & _READER_VERBS)
-    for segment in leaves:
-        seg = _MESSAGE_ARG.sub(" ", segment).strip()
-        if not seg:
+    producers_are_safe = not _FIND_ACTS.search(" " + " ".join(statement)) and not (
+        heads & _READER_VERBS
+    )
+    for leaf in leaves:
+        # Drop a commit/tag message: it is prose that happens to contain a path,
+        # not an argument naming one. Dropping the token AFTER the flag also
+        # covers `-m do-not-cat-.env`, which the old quote-anchored regex could
+        # not see because it required the quotes to still be present.
+        tokens: list[str] = []
+        skip = False
+        for token in leaf:
+            if skip:
+                skip = False
+                continue
+            if token in _MESSAGE_FLAGS:
+                skip = True
+                continue
+            flag, _, inline = token.partition("=")
+            if inline and flag in _MESSAGE_FLAGS:
+                continue
+            tokens.append(token)
+        if not tokens:
             continue
-        tokens = seg.split()
         head = tokens[0].rsplit("/", 1)[-1]  # /bin/cat and cat are one verb
         if head == "find" and not producers_are_safe:
             pass  # an action or a pipe turns it into a reader's argument list
@@ -562,8 +649,8 @@ def _statement_exposes(statement: str) -> str | None:
         if head in _PATTERN_FIRST_ARG:
             rest = [t for t in tokens[1:] if not t.startswith("-")]
             if rest:
-                seg = seg.replace(rest[0], " ", 1)
-        if _SECRET_PATH.search(" " + seg):
+                tokens = [t for t in tokens if t is not rest[0]]
+        if _SECRET_PATH.search(" " + " ".join(tokens)):
             return "read of a secret-bearing file"
     return None
 
