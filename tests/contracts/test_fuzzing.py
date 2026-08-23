@@ -235,11 +235,86 @@ class TestNightlyGuardsSkipEmptyProjects:
         assert self._run(guard, work) == "exists=false"
 
     def test_fuzz_runs_once_a_test_exists(self, tmp_path: Path):
+        # THIS TEST USED TO CREATE AN EMPTY tests/ DIRECTORY AND NOTHING ELSE,
+        # so it asserted the opposite of its own name: the gate opened on a
+        # directory holding no test, and `just fuzz` then died the way the gate
+        # exists to prevent (pytest exits 5 on "no tests collected"). The body
+        # now matches the name.
         guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
         work = tmp_path / "real"
         (work / "tests").mkdir(parents=True)
         (work / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0"\n')
+        (work / "tests" / "test_a.py").write_text("def test_a():\n    assert True\n")
         assert self._run(guard, work) == "exists=true"
+
+    def test_fuzz_skips_an_empty_tests_directory(self, tmp_path: Path):
+        """A placeholder directory is not a test — the case the old body asserted."""
+        guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
+        work = tmp_path / "placeholder"
+        (work / "tests").mkdir(parents=True)
+        (work / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0"\n')
+        assert self._run(guard, work) == "exists=false"
+
+    def test_fuzz_sees_rust_tests_inline_in_the_source(self, tmp_path: Path):
+        """`#[cfg(test)]` in src/*.rs matches no filename pattern, and is the norm."""
+        guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
+        work = tmp_path / "crate"
+        (work / "src").mkdir(parents=True)
+        (work / "Cargo.toml").write_text('[package]\nname = "x"\nversion = "0.1.0"\n')
+        (work / "src" / "lib.rs").write_text(
+            "pub fn a() {}\n\n#[cfg(test)]\nmod t {\n    #[test]\n    fn x() {}\n}\n"
+        )
+        assert self._run(guard, work) == "exists=true"
+
+    def test_fuzz_skips_a_rust_crate_with_no_tests(self, tmp_path: Path):
+        """Control for the arm above — the inline check must not fire on any crate."""
+        guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
+        work = tmp_path / "crate-bare"
+        (work / "src").mkdir(parents=True)
+        (work / "Cargo.toml").write_text('[package]\nname = "x"\nversion = "0.1.0"\n')
+        (work / "src" / "lib.rs").write_text("pub fn a() {}\n")
+        assert self._run(guard, work) == "exists=false"
+
+    def test_fuzz_sees_a_bare_rust_test_attribute(self, tmp_path: Path):
+        """Cargo runs `#[test]` with no surrounding `#[cfg(test)]` module."""
+        guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
+        work = tmp_path / "crate-bare-attr"
+        (work / "src").mkdir(parents=True)
+        (work / "Cargo.toml").write_text('[package]\nname = "x"\nversion = "0.1.0"\n')
+        (work / "src" / "lib.rs").write_text("pub fn a() {}\n\n#[test]\nfn x() {}\n")
+        assert self._run(guard, work) == "exists=true"
+
+    def test_fuzz_sees_tests_in_a_cargo_workspace(self, tmp_path: Path):
+        """A workspace keeps crates in subdirectories; a root-only search finds none."""
+        guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
+        work = tmp_path / "ws"
+        (work / "crates" / "foo" / "src").mkdir(parents=True)
+        (work / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/foo"]\n')
+        (work / "crates" / "foo" / "src" / "lib.rs").write_text(
+            "#[cfg(test)]\nmod t {\n    #[test]\n    fn x() {}\n}\n"
+        )
+        assert self._run(guard, work) == "exists=true"
+
+    def test_fuzz_ignores_tests_that_belong_to_a_vendored_crate(self, tmp_path: Path):
+        """Control: a dependency's tests must not open the gate for a crate with none."""
+        guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
+        work = tmp_path / "vendored"
+        (work / "src").mkdir(parents=True)
+        (work / "target" / "dep" / "src").mkdir(parents=True)
+        (work / "Cargo.toml").write_text('[package]\nname = "x"\nversion = "0.1.0"\n')
+        (work / "src" / "lib.rs").write_text("pub fn a() {}\n")
+        (work / "target" / "dep" / "src" / "lib.rs").write_text("#[test]\nfn v() {}\n")
+        assert self._run(guard, work) == "exists=false"
+
+    def test_fuzz_sees_bun_spec_spellings(self, tmp_path: Path):
+        """`bun test` runs thing.spec.ts; the patterns covered only `.test`."""
+        guard = self._guard(_scaffold(tmp_path / "p"), "fuzz", "Check for something to fuzz")
+        for name in ("thing.spec.ts", "thing_spec.ts"):
+            work = tmp_path / f"bun-{name}"
+            (work / "src").mkdir(parents=True)
+            (work / "package.json").write_text('{"name":"x"}\n')
+            (work / "src" / name).write_text("")
+            assert self._run(guard, work) == "exists=true", name
 
     def test_mutmut_skips_a_pyproject_with_no_config(self, tmp_path: Path):
         guard = self._guard(

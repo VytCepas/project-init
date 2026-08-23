@@ -351,7 +351,13 @@ _SECRET_PATH = re.compile(
       | \.envrc(?![\w.-])
       | id_(?:rsa|dsa|ecdsa|ed25519)(?![\w.-])
       | \.(?:netrc|pgpass|npmrc)(?![\w.-])
-      | [\w.-]*\.(?:pem|p12|pfx|jks|keystore)(?![\w.-])
+        # `key` covers the `server.key` / `tls.key` convention. It was absent
+        # while `.gitignore` in every scaffolded repo already lists `*.key`,
+        # so the tree classified the file as a secret and the guard read it
+        # out loud: measured, `cat server.key` and `cat tls.key` were ALLOWED
+        # while `cat id_rsa` and `cat secrets.pem` asked. A false positive
+        # here costs one confirmation, which is the cheap side of the trade.
+      | [\w.-]*\.(?:pem|p12|pfx|jks|keystore|key)(?![\w.-])
       | [\w.-]*(?:service[-_]?account|credentials|client[-_]secret)[\w.-]*\.json(?![\w.-])
       | secrets?/[\w./-]+
     )
@@ -472,6 +478,31 @@ def _leaf_commands(command: str) -> list[str]:
     return out
 
 
+def _statements(command: str) -> list[str]:
+    """Split *command* into statements, keeping each pipeline intact.
+
+    `_leaf_commands` collapses `;`, `&` and `|` into one separator, which loses
+    the distinction that matters for the reader check: `a | b` shares a data path
+    and `a && b` does not. Substitutions are inlined the same way, so a read
+    hidden inside one is still judged.
+    """
+    out: list[str] = []
+    pending = [command]
+    while pending and len(out) < 100:
+        chunk = pending.pop()
+        inner = [g for match in _SUBSTITUTION.finditer(chunk) for g in match.groups() if g]
+        if inner:
+            pending.extend(inner)
+            chunk = _SUBSTITUTION.sub(" ", chunk)
+        # `&&` and `||` FIRST, or they split wrongly. And a bare `&` is only a
+        # separator when it is not part of a redirection: splitting on any `&`
+        # broke `2>&1`, `&>` and `|&`, which tore a producer away from its
+        # downstream reader and REINTRODUCED the bypass — measured,
+        # `ls .env 2>&1 | xargs cat` went back to allow (PR #952 review).
+        out.extend(re.split(r"(?:&&|\|\||;|\n|(?<![>&|])&(?![>&]))+", chunk))
+    return out
+
+
 def _exposes_secret(command: str) -> str | None:
     """Return a label if *command* could read a secret-bearing file, else None.
 
@@ -479,18 +510,45 @@ def _exposes_secret(command: str) -> str | None:
     second one reads: a whole-string match would be decided by the harmless
     verb that happens to come first.
     """
-    leaves = _leaf_commands(command)
+    # PER STATEMENT, NOT PER COMMAND. Computing the reader set over the whole
+    # string made any reader anywhere taint every safe segment, so
+    # `cat README.md && echo ".env" >> .gitignore` was flagged as a secret read
+    # — `cat` is a reader, `echo` was therefore not exempt, and the `.env` being
+    # written INTO .gitignore matched. Prompting on that is the false positive
+    # this guard cannot afford: it is ordinary work, and a guard that blocks
+    # ordinary work gets switched off. `|` shares a data path, `&&` and `;` do
+    # not, so the reader question is only meaningful inside one pipeline.
+    for statement in _statements(command):
+        found = _statement_exposes(statement)
+        if found:
+            return found
+    return None
+
+
+def _statement_exposes(statement: str) -> str | None:
+    """The original per-segment check, scoped to one statement's pipeline."""
+    leaves = [seg for seg in statement.split("|") if seg.strip()]
     heads = {seg.split()[0].rsplit("/", 1)[-1] for seg in leaves if seg.split()}
-    find_is_safe = not _FIND_ACTS.search(command) and not (heads & _READER_VERBS)
+    # A PRODUCER IS ONLY SAFE WHILE NOTHING DOWNSTREAM CAN READ WHAT IT NAMES.
+    # This gate existed for `find` alone, so every other producer in
+    # _EXPOSURE_SAFE_VERBS was exempted unconditionally and the pipeline that
+    # actually reads the file was skipped along with it. Measured before the fix:
+    #   find . -name .env | xargs cat   -> ask      (gated, correct)
+    #   printf '.env\n'   | xargs cat   -> ALLOWED  (exempt, wrong)
+    #   echo .env         | xargs cat   -> ALLOWED  (exempt, wrong)
+    #   ls .env           | xargs cat   -> ALLOWED  (exempt, wrong)
+    # The reader segment carries no path of its own, so once the naming segment
+    # is skipped nothing is left to match and the contents reach the transcript.
+    producers_are_safe = not _FIND_ACTS.search(statement) and not (heads & _READER_VERBS)
     for segment in leaves:
         seg = _MESSAGE_ARG.sub(" ", segment).strip()
         if not seg:
             continue
         tokens = seg.split()
         head = tokens[0].rsplit("/", 1)[-1]  # /bin/cat and cat are one verb
-        if head == "find" and not find_is_safe:
+        if head == "find" and not producers_are_safe:
             pass  # an action or a pipe turns it into a reader's argument list
-        elif head in _EXPOSURE_SAFE_VERBS:
+        elif head in _EXPOSURE_SAFE_VERBS and producers_are_safe:
             continue
         if head in _PATTERN_FIRST_ARG:
             rest = [t for t in tokens[1:] if not t.startswith("-")]

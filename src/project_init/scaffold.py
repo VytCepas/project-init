@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import fnmatch
 import hashlib
 import json
@@ -1232,6 +1233,66 @@ def _unique_backup_dir(claude_dir: Path) -> Path:
     return candidate
 
 
+PROJECTION_MANIFEST = ".projection.json"
+#: Paths inside `.claude/` that are ours regardless of any manifest — state we
+#: write ourselves, which must never be mistaken for user content.
+_PROJECTION_OWN_STATE = frozenset({PROJECTION_MANIFEST, ".upgrade-base.json"})
+
+
+def _read_projection_manifest(claude_dir: Path) -> set[str] | None:
+    """The relative paths the last projection wrote, or ``None`` if unrecorded.
+
+    ``None`` and ``set()`` are different answers: no manifest means an older
+    version built this tree and we must not guess, while an empty manifest means
+    the last projection wrote nothing.
+    """
+    record = claude_dir / PROJECTION_MANIFEST
+    try:
+        data = json.loads(record.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    paths = data.get("paths") if isinstance(data, dict) else None
+    if not isinstance(paths, list) or not all(isinstance(x, str) for x in paths):
+        return None
+    return set(paths)
+
+
+def _write_projection_manifest(claude_dir: Path) -> None:
+    """Record every file now under `.claude/` except our own state files."""
+    paths = sorted(
+        f.relative_to(claude_dir).as_posix()
+        for f in claude_dir.rglob("*")
+        if f.is_file() and f.relative_to(claude_dir).as_posix() not in _PROJECTION_OWN_STATE
+    )
+    (claude_dir / PROJECTION_MANIFEST).write_text(
+        json.dumps({"paths": paths}, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def _clear_prior_projection(claude_dir: Path, agents_dir: Path) -> None:
+    """Remove only what the previous projection wrote; keep everything else.
+
+    A blanket ``rmtree`` here deleted repo-authored files that live alongside the
+    projection (#951). The manifest makes the distinction exact. Without one, fall
+    back to "has an `.agents/` counterpart today" — which still clears the
+    plugin-mode twins (their counterpart exists, the projection skips them) while
+    keeping anything unrecognised.
+    """
+    recorded = _read_projection_manifest(claude_dir)
+    for path in sorted(claude_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        rel = path.relative_to(claude_dir).as_posix()
+        if path.is_dir():
+            with contextlib.suppress(OSError):
+                path.rmdir()  # only succeeds once emptied, so survivors keep theirs
+            continue
+        if rel in _PROJECTION_OWN_STATE:
+            continue
+        ours = rel in recorded if recorded is not None else (agents_dir / rel).exists()
+        if ours:
+            with contextlib.suppress(OSError):
+                path.unlink()
+
+
 def _generate_claude_projection(
     target: Path,
     *,
@@ -1266,8 +1327,24 @@ def _generate_claude_projection(
     that already exists is the user's own hand-written Claude config (custom
     commands/skills/settings), not our projection — so it is parked as a
     ``.claude.pre-project-init`` sibling and reported via *conflicts* instead of
-    being deleted. On any later run the dir is our own projection, so it is
-    rebuilt in place.
+    being deleted.
+
+    ON A LATER RUN THE DIRECTORY IS NOT PURELY OURS, and assuming it was cost
+    real files (#951). `rmtree` on the whole tree deleted everything without an
+    `.agents/` counterpart — repo-authored `.claude/inject.d/` rules, and a
+    project-scoped skill that a tool had installed there (`graphify install
+    --project`). Neither appears in any manifest, so nothing flagged the loss; it
+    was found by reading `git status` afterwards and recognising the filenames.
+    Measured three times on the same fleet — every re-render ate them again.
+
+    So the projection now records WHAT IT WROTE, in ``.claude/.projection.json``,
+    and on the next run deletes exactly those paths. Delete-awareness is
+    preserved — a file removed from `.agents/` was in the previous manifest, so it
+    is still cleaned — while anything we did not write is left alone. With no
+    manifest yet (a tree projected by an older version), the fallback is
+    conservative: clear only paths whose `.agents/` counterpart exists today, and
+    keep the rest. That is the migration case, and erring toward keeping is the
+    whole point.
 
     We COPY rather than symlink. A committed symlink is not portable: under git's
     default ``core.symlinks=false`` — the default on BOTH Windows (no symlink
@@ -1302,7 +1379,7 @@ def _generate_claude_projection(
     elif claude_dir.is_symlink() or claude_dir.is_file():
         claude_dir.unlink()
     elif real_dir:
-        shutil.rmtree(claude_dir)
+        _clear_prior_projection(claude_dir, agents_dir)
 
     agents_resolved = agents_dir.resolve()
 
@@ -1318,7 +1395,8 @@ def _generate_claude_projection(
             skip |= {n for n in names if n in PLUGIN_PROVIDED_SKILLS}
         return skip
 
-    shutil.copytree(agents_dir, claude_dir, ignore=_ignore)
+    shutil.copytree(agents_dir, claude_dir, ignore=_ignore, dirs_exist_ok=True)
+    _write_projection_manifest(claude_dir)
 
 
 def _emit_generated(
