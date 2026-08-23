@@ -836,6 +836,26 @@ EXPOSING = [
     "cat ${HOME}/.netrc",
     'cat "$HOME/.ssh/id_rsa"',
     "docker run --rm -v $PWD:/w alpine cat /w/.env",
+    # ── PR #952 review: the extension list and the producer exemption ──
+    # `.key` was absent while `.gitignore` in every scaffolded repo lists
+    # `*.key` — the tree called the file a secret and the guard read it aloud.
+    "cat server.key",
+    "cat tls.key",
+    "cat certs/api.key",
+    # The Read() denylist flags these two, so the Bash side must agree; a
+    # control that exists on one surface and not the other is not a control.
+    "cat store.jks",
+    "cat app.keystore",
+    # THE EXEMPTION WAS GATED FOR `find` ALONE. Every other producer handed the
+    # path to a reader and the segment naming it was skipped — and the reader
+    # segment carries no path of its own, so nothing was left to match.
+    "printf '.env\\n' | xargs cat",
+    "echo .env | xargs cat",
+    "ls .env | xargs cat",
+    # SAME PIPELINE, DIFFERENT STATEMENT. The reader must still be seen when it
+    # shares a pipeline with the producer, even if another statement precedes it.
+    "cat README.md && ls .env | xargs cat",
+    "ls .env | xargs cat && cat README.md",
 ]
 
 NOT_EXPOSING = [
@@ -887,6 +907,20 @@ NOT_EXPOSING = [
     # mutation run showed the boundary was otherwise held by nothing, and a
     # fragment no test holds is one a later edit deletes.
     "cat docs/managing-secrets/guide.md",
+    # ── PR #952 review, P1: a reader in ANOTHER STATEMENT must not taint a safe
+    # producer. `|` shares a data path; `&&` and `;` do not. Computing the reader
+    # set over the whole command string made `cat` here poison the `echo`, so this
+    # everyday line started prompting — and in autonomous mode, denying. It is the
+    # exact false positive that gets a guard switched off, and it was reachable
+    # only by COMBINING two commands each of which the suite already covered
+    # alone, which is why nothing caught it.
+    'cat README.md && echo ".env" >> .gitignore',
+    'echo ".env" >> .gitignore && cat README.md',
+    "cat README.md; ls .env",
+    "ls .env; cat README.md",
+    # A keystore-shaped DOCUMENT is not a keystore.
+    "cat keystore.md",
+    "cat docs/api-key-rotation.md",
 ]
 
 
