@@ -113,6 +113,84 @@ def test_rebuild_is_delete_aware(tmp_path: Path):
     assert (tmp_path / ".claude" / "settings.json").exists()
 
 
+def test_rebuild_keeps_a_file_the_projection_never_wrote(tmp_path: Path):
+    """#951: a blanket rmtree ate repo-authored files living beside the projection.
+
+    Measured on a real fleet three times: `.claude/inject.d/*.md` rules and a
+    project-scoped skill installed by a tool (`graphify install --project`) were
+    deleted on every re-render. Neither appears in any manifest, so nothing
+    flagged the loss.
+    """
+    _mk_agents(tmp_path)
+    _generate_claude_projection(tmp_path)
+
+    hand_written = tmp_path / ".claude" / "inject.d" / "10-local-rule.md"
+    hand_written.parent.mkdir(parents=True, exist_ok=True)
+    hand_written.write_text("a rule this repo wrote, not the scaffold\n")
+    own_skill = tmp_path / ".claude" / "skills" / "graphify" / "SKILL.md"
+    own_skill.parent.mkdir(parents=True, exist_ok=True)
+    own_skill.write_text("installed by a tool, no .agents/ counterpart\n")
+
+    _generate_claude_projection(tmp_path, first_scaffold=False)
+
+    assert hand_written.exists(), "a repo-authored .claude/ file was deleted"
+    assert own_skill.exists(), "a tool-installed project skill was deleted"
+    assert (tmp_path / ".claude" / "settings.json").exists()
+
+
+def test_rebuild_is_still_delete_aware_once_recorded(tmp_path: Path):
+    """The control for the arm above: delete-awareness must survive the fix.
+
+    Without this, "stop deleting things" would pass by simply never deleting
+    anything, and a file removed from `.agents/` would linger in `.claude/`
+    forever — the exact split-brain the projection exists to prevent.
+    """
+    _mk_agents(tmp_path)
+    _generate_claude_projection(tmp_path)
+    assert (tmp_path / ".claude" / "skills" / "demo").exists()
+    # A second run writes the manifest that records what is ours.
+    _generate_claude_projection(tmp_path, first_scaffold=False)
+
+    shutil.rmtree(tmp_path / ".agents" / "skills" / "demo")
+    _generate_claude_projection(tmp_path, first_scaffold=False)
+
+    assert not (tmp_path / ".claude" / "skills" / "demo").exists()
+
+
+def test_unrecorded_tree_falls_back_to_the_counterpart_rule(tmp_path: Path):
+    """Migration: a tree projected by an older version has no manifest.
+
+    The fallback keeps anything without an `.agents/` counterpart and clears
+    anything with one, so an upgrade from the pre-#951 code neither loses user
+    files nor leaves the managed copies stale.
+    """
+    _mk_agents(tmp_path)
+    _generate_claude_projection(tmp_path)
+    (tmp_path / ".claude" / ".projection.json").unlink()  # as an older version left it
+
+    stray = tmp_path / ".claude" / "inject.d" / "99-stray.md"
+    stray.parent.mkdir(parents=True, exist_ok=True)
+    stray.write_text("no counterpart\n")
+
+    _generate_claude_projection(tmp_path, first_scaffold=False)
+
+    assert stray.exists(), "fallback deleted a file with no .agents/ counterpart"
+    assert (tmp_path / ".claude" / "settings.json").exists()
+
+
+def test_projection_manifest_excludes_its_own_state(tmp_path: Path):
+    """The manifest must not list itself, or it becomes self-referential state."""
+    import json
+
+    _mk_agents(tmp_path)
+    _generate_claude_projection(tmp_path)
+    record = tmp_path / ".claude" / ".projection.json"
+    listed = json.loads(record.read_text())["paths"]
+    assert ".projection.json" not in listed
+    assert ".upgrade-base.json" not in listed
+    assert "settings.json" in listed
+
+
 def test_idempotent_and_reflects_edits(tmp_path: Path):
     _mk_agents(tmp_path)
     _generate_claude_projection(tmp_path)
