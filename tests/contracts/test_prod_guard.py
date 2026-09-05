@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -1060,10 +1061,19 @@ class TestScaffoldedReadPermissions:
         for rule in ("Read(**/.env)", "Read(**/*.pem)", "Read(**/id_rsa)", "Read(**/secrets/**)"):
             assert rule in tmpl, f"missing deny rule: {rule}"
 
-    def test_the_two_halves_cover_the_same_spellings(self):
+    def test_the_stemmed_env_spellings_are_denied_to_read(self):
         """PR #942 review, P1: the Bash half learned about `prod.env`,
         `staging.env` and `.envrc`; the Read half had not, so the tool route
-        stayed open on exactly the filenames the hook calls secret."""
+        stayed open on exactly the filenames the hook calls secret.
+
+        RENAMED. This was `test_the_two_halves_cover_the_same_spellings`, which
+        is not what it does: it checks three hand-written strings are present.
+        It was green while `.npmrc`, `*client_secret*.json`,
+        `*service_account*.json` and `secret/` were all secret to the Bash guard
+        and readable through the Read tool (PI-956). A name that claims a
+        property the body does not check is worse than no test, because it is
+        the reason nobody wrote the one below. The real cross-check is
+        TestReadDenyMatchesBashGuard."""
         tmpl = (
             Path(__file__).resolve().parents[2]
             / "templates"
@@ -1158,3 +1168,142 @@ class TestAllowlistParsing:
         verdict = _run_hook(_payload("cat id_rsa", "default", root), root)
         assert verdict is not None
         assert "not fully applied" not in verdict["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+# ── PI-956: the two halves are one policy, so they are checked against each ──
+# other rather than each against a hand-written list.
+#
+# WHY THIS EXISTS. `_SECRET_PATH` (Bash) and the `Read(...)` deny list
+# (settings.json.tmpl) express the same policy in two syntaxes, maintained by
+# hand, and nothing related them. They drifted on five spellings: `.npmrc`,
+# `*client-secret*.json`, `*client_secret*.json`, `*service_account*.json` and
+# `secret/` singular were all secret to the guard and reachable by asking the
+# agent to Read the file -- no shell, no hook consulted. `.npmrc` is the sharp
+# one: it routinely holds `_authToken` and every Node project has it.
+#
+# The guard deliberately accepts both spellings and both plurals
+# (`service[-_]?account`, `client[-_]secret`, `secrets?`); the deny list covered
+# half of each convention, and half a convention reads as complete.
+_READ_DENY_RE = re.compile(r'"Read\(([^)]*)\)"')
+
+
+def _read_deny_globs() -> list[str]:
+    tmpl = (_REPO_ROOT / "templates" / "base" / "dot_agents" / "settings.json.tmpl").read_text()
+    return _READ_DENY_RE.findall(tmpl)
+
+
+def _glob_to_regex(pattern: str) -> re.Pattern[str]:
+    """Claude Code permission-glob semantics: `**` spans path segments, `*` does
+    not, `?` is one character. Translated rather than handed to fnmatch, whose
+    `*` crosses `/` and would report every rule as matching everything -- a
+    matcher bug that makes this whole check pass vacuously, which is what
+    test_the_matcher_discriminates exists to catch."""
+    out: list[str] = []
+    i = 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out.append(r"(?:[^/]+/)*")
+            i += 3
+        elif pattern.startswith("**", i):
+            out.append(r".*")
+            i += 2
+        elif pattern[i] == "*":
+            out.append(r"[^/]*")
+            i += 1
+        elif pattern[i] == "?":
+            out.append(r"[^/]")
+            i += 1
+        else:
+            out.append(re.escape(pattern[i]))
+            i += 1
+    return re.compile("^" + "".join(out) + "$")
+
+
+def _denied_to_read(path: str) -> bool:
+    return any(_glob_to_regex(g).match(path) for g in _read_deny_globs())
+
+
+# Realistic spellings, not generated ones: each is a filename a project actually
+# has. The ones PI-956 found are marked so the regression stays legible.
+SECRET_BEARING_PATHS = [
+    ".env",
+    "config/prod.env",
+    ".envrc",
+    ".npmrc",  # PI-956 — holds `_authToken`
+    "packages/api/.npmrc",  # PI-956 — and not only at the root
+    "client-secret-1234.json",  # PI-956 — Google's hyphen spelling
+    "client_secret_1234.json",  # PI-956 — Google's underscore spelling
+    "service-account.json",
+    "service_account.json",  # PI-956 — the guard accepts both
+    "credentials.json",
+    "secrets/db-password",
+    "secret/db-password",  # PI-956 — singular, and people use it
+    "id_rsa",
+    ".ssh/id_ed25519",
+    "certs/tls.pem",
+    "server.key",
+    ".netrc",
+    ".pgpass",
+]
+
+# THE NEGATIVE CONTROL. Without it a deny list of `Read(**)` -- or a broken
+# translator -- would satisfy every assertion above while denying the agent its
+# own source tree. A guard that blocks ordinary work gets switched off, and a
+# disabled guard protects nothing.
+ORDINARY_PATHS = [
+    "README.md",
+    "src/main.py",
+    "docs/managing-secrets/guide.md",
+    "package.json",
+]
+
+
+class TestReadDenyMatchesBashGuard:
+    """PI-956: one policy, two syntaxes, checked against each other.
+
+    `prod_guard.py` intercepts Bash only. Anything it calls secret-bearing that
+    the Read deny list does not also cover is reachable by asking the agent to
+    Read the file. Neither half covers the other -- that is why both ship -- so
+    the only thing that can keep them equal is a test that reads both."""
+
+    def test_the_matcher_discriminates(self):
+        """FIRST, because every assertion below calls _denied_to_read and a
+        matcher answering True to everything would make all of them vacuous.
+        `*` must not cross a path separator; `**/` must."""
+        assert _glob_to_regex("**/.env").match(".env")
+        assert _glob_to_regex("**/.env").match("a/b/.env")
+        assert not _glob_to_regex("**/id_rsa").match("id_rsa.pub")
+        assert not _denied_to_read("README.md")
+        # THE SEPARATOR ASSERTIONS, AND THEY ARE THE POINT OF THIS TEST. An
+        # earlier draft checked `**/*.pem` against `certs/tls.pem/other`, which
+        # tests the END anchor and nothing else: mutating `*` from `[^/]*` to
+        # `.*` left all 27 assertions green. These two are the ones that go red,
+        # because each has a `*` that must not reach across a `/`.
+        assert _glob_to_regex("*.pem").match("tls.pem")
+        assert not _glob_to_regex("*.pem").match("certs/tls.pem")
+        assert not _glob_to_regex("**/secrets/*").match("secrets/nested/key")
+
+    def test_the_deny_list_was_actually_read(self):
+        """The other vacuity: a template path that stops resolving, or a regex
+        that stops matching, yields an empty rule list and a silent all-clear."""
+        globs = _read_deny_globs()
+        assert len(globs) >= 20, f"only {len(globs)} Read deny rules parsed — the list did not load"
+
+    @pytest.mark.parametrize("path", SECRET_BEARING_PATHS)
+    def test_a_path_the_bash_guard_calls_secret_is_denied_to_read(self, path, tmp_path):
+        verdict = _run_hook(_payload(f"cat {path}", cwd=tmp_path), tmp_path)
+        assert verdict is not None, (
+            f"corpus entry is not secret to the Bash guard: {path} — "
+            "fix the corpus or the guard, do not delete the row"
+        )
+        assert _denied_to_read(path), (
+            f"{path} is secret to the Bash hook but reachable via the Read tool — "
+            "add a matching rule to templates/base/dot_agents/settings.json.tmpl"
+        )
+
+    @pytest.mark.parametrize("path", ORDINARY_PATHS)
+    def test_neither_half_fires_on_an_ordinary_file(self, path, tmp_path):
+        assert not _denied_to_read(path), f"Read deny list blocks an ordinary file: {path}"
+        assert _run_hook(_payload(f"cat {path}", cwd=tmp_path), tmp_path) is None, (
+            f"Bash guard flags an ordinary file: {path}"
+        )
