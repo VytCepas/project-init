@@ -104,7 +104,7 @@ jobs:
                   pullRequest(number:$number) {
                     reviews(first:1) { totalCount }
                     reviewThreads(first:100) { nodes { isResolved } }
-                    comments(last:50) { nodes { author { login } body } }
+                    comments(last:100) { nodes { author { login } body } }
                   }
                 }
               }')
@@ -130,10 +130,20 @@ jobs:
           # count. The author's own comments cannot satisfy it: the body must
           # be the bot's own "Codex Review:" preamble, which only the connector
           # writes.
+          #
+          # `last:100` is GitHub's maximum page size, not a guess: the review
+          # comment is on the LAST page only while the thread is short, and a
+          # busy PR pushes it off a smaller window — which would put the check
+          # straight back to "Awaiting review" for exactly the PRs most likely
+          # to need it. The leading-whitespace strip is the same argument: the
+          # connector's preamble is first in the body today, and a match anchored
+          # to byte zero turns a stray newline into a lost review. Neither
+          # loosens anything — the author check is what carries the security.
           CODEX_REVIEWS=$(printf '%s' "$REVIEW_DATA" \
             | jq '[.data.repository.pullRequest.comments.nodes[]
                    | select(.author.login == "chatgpt-codex-connector")
-                   | select(.body | ascii_downcase | startswith("codex review:"))]
+                   | select(.body | sub("^[[:space:]]+"; "")
+                            | ascii_downcase | startswith("codex review:"))]
                   | length')
           REVIEWS=$(printf '%s' "$REVIEW_DATA" \
             | jq '.data.repository.pullRequest.reviews.totalCount')
