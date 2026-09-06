@@ -62,6 +62,7 @@ from project_init.scaffold import (
     load_preset,
     marketplace_source_vars,
     memory_tier,
+    normalize_memory_stack,
     overlay_layers,
     parse_version,
     read_preserve_globs,
@@ -667,7 +668,13 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict[str, str], dic
     # config ALWAYS wrote a memory block, so an absent stack uniquely identifies
     # core. Defaulting to obsidian-only here would wrongly re-enable memory for a
     # core project whose JSON record was deleted (Copilot review, PR #473).
-    stack = fields.get("memory.stack", "none")
+    # Canonicalised at the point of READ (#958). The recorded stack is exactly
+    # where a legacy alias lives, and three separate things downstream derive
+    # from it — the tier, the preset name, and the re-recorded `memory_stack`.
+    # Un-normalised, `obsidian` gave a blank tier beside a present vault_path,
+    # AND a preset name (`obsidian`) that `load_preset` rejects with ValueError,
+    # since the stack→preset map below passes unknown names straight through.
+    stack = normalize_memory_stack(fields.get("memory.stack", "none"))
     # Memory stacks map 1:1 onto preset names EXCEPT two that have no preset of
     # their own: the vault-free `none` stack (preset is `core` — load_preset("none")
     # would fail), and tier-3 `obsidian-graphify-rag`, which is --memory-only (#505)

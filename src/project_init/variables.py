@@ -28,6 +28,7 @@ from project_init.scaffold import (
     CONTRACT_VERSION,
     marketplace_source_vars,
     memory_tier,
+    normalize_memory_stack,
     overlay_layers,
     slugify,
 )
@@ -301,10 +302,14 @@ def _normalize_memory(value: str | None) -> str | None:
     """Normalize a --memory value to a canonical memory_stack, or None if unset.
 
     Accepts the friendly ``obsidian`` alias for ``obsidian-only`` (#466).
+
+    Delegates to ``scaffold.normalize_memory_stack`` rather than repeating the
+    mapping: two copies of the alias table is how #958 happened — this one was
+    right and the upgrade emit paths never consulted anything.
     """
     if not value:
         return None
-    return "obsidian-only" if value == "obsidian" else value
+    return normalize_memory_stack(value)
 
 
 _LIFECYCLE_TIERS = ("github", "none")

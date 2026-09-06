@@ -13,7 +13,8 @@ from pathlib import Path
 import pytest
 
 from project_init.__main__ import main
-from project_init.scaffold import memory_tier
+from project_init.scaffold import load_preset, memory_tier
+from project_init.upgrade import _migrate_semantic_config
 
 
 def _scaffold(target: Path, preset: str) -> None:
@@ -47,6 +48,26 @@ class TestMemoryTierDerivation:
         assert memory_tier("obsidian-graphify") == "2"
         assert memory_tier("obsidian-graphify-rag") == "3"
         assert memory_tier("none") == ""  # no descriptor
+
+    def test_the_permanent_legacy_alias_resolves_to_its_tier(self):
+        """#958 — `obsidian` is an alias the descriptor contract guarantees.
+
+        It returned "" before this, so the producer rendered a blank `tier:`
+        beside a PRESENT `vault_path` — a record both schemas reject and the
+        runtime reader then read as tier 0. A tier-2 project lost its retrieval
+        surfaces while `doctor` printed [ok] and `drift` printed none: nothing
+        on the read path objected.
+        """
+        assert memory_tier("obsidian") == memory_tier("obsidian-only") == "1"
+
+    def test_an_unknown_stack_still_has_no_tier(self):
+        """Control — this resolves documented aliases, it does not invent tiers.
+
+        Without it, "normalise everything to obsidian-only" would pass the test
+        above while giving a garbage stack a real-looking rung.
+        """
+        assert memory_tier("not-a-stack") == ""
+        assert memory_tier("") == ""
 
 
 class TestConfigDescriptor:
@@ -94,6 +115,43 @@ class TestCapabilitiesSurface:
         _scaffold(target, "core")
         caps = (target / ".agents" / "CAPABILITIES.md").read_text()
         assert "no memory backend" in caps.partition("## Memory")[2].partition("## Skills")[0]
+
+
+class TestLegacyAliasOnTheUpgradePath:
+    """#958 / #964 — the alias is only reachable on the UPGRADE path.
+
+    `concerns.py` and `variables.py` normalise on the scaffold path, so a fresh
+    project never carries it. `_migrate_semantic_config` reads the RECORDED
+    stack, which is exactly where a legacy spelling lives.
+    """
+
+    def test_recorded_alias_yields_a_tier_and_a_loadable_preset(self):
+        preset, variables, _ = _migrate_semantic_config(
+            ["language: python", "memory:", "  stack: obsidian"]
+        )
+        assert variables["memory_tier"] == "1", "blank tier beside a present vault"
+        assert variables["memory_stack"] == "obsidian-only", "alias re-recorded uncanonicalised"
+        # #964 rung 1: the stack->preset map passes unknown names through, so an
+        # un-normalised alias picked a preset that does not exist and
+        # load_preset raised ValueError mid-upgrade.
+        assert preset == "obsidian-only"
+        load_preset(preset)
+
+    def test_canonical_spellings_are_unchanged(self):
+        """Control — normalisation must not rewrite stacks that were already right."""
+        preset, variables, _ = _migrate_semantic_config(
+            ["language: python", "memory:", "  stack: obsidian-graphify"]
+        )
+        assert (preset, variables["memory_tier"]) == ("obsidian-graphify", "2")
+
+    def test_absent_memory_block_still_means_core(self):
+        """Control — the #466 rule that an absent stack uniquely identifies core."""
+        preset, variables, _ = _migrate_semantic_config(["language: python"])
+        assert (preset, variables["memory_stack"], variables["memory_tier"]) == (
+            "core",
+            "none",
+            "",
+        )
 
 
 class TestUpgradeRoundTrip:

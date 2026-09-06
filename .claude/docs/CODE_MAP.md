@@ -116,6 +116,7 @@ Core scaffolding logic — pure functions, no user interaction.
 - `def parse_version` — Parse a leading ``X.Y.Z`` (optional ``v`` prefix) into a tuple, or None.
 - `def load_preset` — Load a preset by name, resolving ``extends`` inheritance (#252).
 - `def generate_preset` — Write a starter company preset that extends *extends* (#252).
+- `def normalize_memory_stack` — Canonical stack name for *memory_stack*, resolving permanent aliases.
 - `def memory_tier` — Descriptor tier number for *memory_stack* (#498, ADR-024).
 - `def memory_layers` — Template layers contributed by the memory backend (#466, #497).
 - `def overlay_layers` — Extra template layers appended to a preset beyond its base definition.
