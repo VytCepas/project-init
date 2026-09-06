@@ -34,6 +34,7 @@ Harbor box-profile seam (BOX-1): advisory wizard defaults from the box.
 
 Deterministic capabilities inventory (PI-374, ADR-017).
 
+- `def canonical_skills_with_source` — Return (name, source, description) for every skill the scaffold ships.
 - `def canonical_skills` — Return (name, description) for every skill the scaffold ships.
 - `def canonical_hooks` — (event, script) pairs for the always-on hooks.
 - `def surface_hooks` — (hook file, events) for the GUI surfaces selected via --agents (#366).

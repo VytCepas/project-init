@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 from project_init.mcps import resolve_js_runner, servers_for_ids
@@ -35,8 +36,30 @@ def _skill_meta(skill_md: Path) -> tuple[str, str]:
     )
 
 
-def canonical_skills(variables: dict[str, str] | None = None) -> list[tuple[str, str]]:
-    """Return (name, description) for every skill the scaffold ships.
+#: Provenance labels for the skills table (#962). ``base`` skills are rendered
+#: into the project's own ``.agents/skills/``; the shared ``fallback`` /
+#: ``lifecycle_fallback`` sets are rendered there ONLY in no-plugin mode
+#: (ADR-010) and otherwise arrive via the declared plugin.
+_SOURCE_IN_TREE = "in-tree"
+_SOURCE_PLUGIN = "plugin"
+
+
+def canonical_skills_with_source(
+    variables: dict[str, str] | None = None,
+) -> list[tuple[str, str, str]]:
+    """Return (name, source, description) for every skill the scaffold ships.
+
+    Column order matches the rendered table exactly — ``Skill | Source |
+    Description`` — so the long free-text column stays last and a row cannot be
+    zipped against the wrong header.
+
+    ``source`` is where the skill physically lands, which is what a reader needs
+    to know and what the two-column table could not say (#962): a ``plugin`` row
+    is resolved by the declared plugin and is identical in every project on that
+    plugin version, while an ``in-tree`` row is a real file in this repo that a
+    later edit or deletion can make stale. Only the in-tree tier can drift from
+    what this document claims, so naming the tiers is what makes the drift
+    described in #961 locatable at all.
 
     Both the always-rendered base skills (e.g. ``plan``, as ``SKILL.md.tmpl``)
     and the shared fallback/plugin skill set — the canonical skill source.
@@ -45,22 +68,41 @@ def canonical_skills(variables: dict[str, str] | None = None) -> list[tuple[str,
     canonical full set, used by tests/tooling) includes them. Deduped by name,
     sorted.
     """
-    dirs = [
-        _TEMPLATES_DIR / "base" / "dot_agents" / "skills",
-        _TEMPLATES_DIR / "fallback" / "dot_agents" / "skills",
-    ]
+    # variables=None is the canonical full set for tests/tooling, which has no
+    # distribution choice recorded — read it as the DEFAULT (plugin) mode rather
+    # than inventing a third state.
+    no_plugin = bool(variables.get("no_plugin")) if variables else False
+    shared_source = _SOURCE_IN_TREE if no_plugin else _SOURCE_PLUGIN
+
+    dirs = [(_TEMPLATES_DIR / "base" / "dot_agents" / "skills", _SOURCE_IN_TREE)]
+    dirs.append((_TEMPLATES_DIR / "fallback" / "dot_agents" / "skills", shared_source))
     if variables is None or variables.get("lifecycle"):
-        dirs.append(_TEMPLATES_DIR / "lifecycle_fallback" / "dot_agents" / "skills")
-    seen: dict[str, tuple[str, str]] = {}
-    for skills_dir in dirs:
+        dirs.append(
+            (
+                _TEMPLATES_DIR / "lifecycle_fallback" / "dot_agents" / "skills",
+                shared_source,
+            )
+        )
+    seen: dict[str, tuple[str, str, str]] = {}
+    for skills_dir, source in dirs:
         if not skills_dir.exists():
             continue
         # SKILL.md and SKILL.md.tmpl (base 'plan' is templated; frontmatter is
         # static so the name/description read fine).
         for p in sorted(skills_dir.glob("*/SKILL.md*")):
             name, desc = _skill_meta(p)
-            seen.setdefault(name, (name, desc))
+            seen.setdefault(name, (name, source, desc))
     return sorted(seen.values())
+
+
+def canonical_skills(variables: dict[str, str] | None = None) -> list[tuple[str, str]]:
+    """Return (name, description) for every skill the scaffold ships.
+
+    Provenance-free view of :func:`canonical_skills_with_source`, kept because
+    callers that only enumerate names should not have to unpack a column they
+    do not use.
+    """
+    return [(name, desc) for name, _, desc in canonical_skills_with_source(variables)]
 
 
 def _script_name(command: str) -> str:
@@ -190,17 +232,23 @@ def _memory_descriptor(variables: dict[str, str]) -> list[tuple[str, str]]:
     return rows
 
 
-def _table(headers: tuple[str, str], rows: list[tuple[str, str]]) -> list[str]:
-    out = [f"| {headers[0]} | {headers[1]} |", "|---|---|"]
-    for a, b in rows:
+def _table(headers: tuple[str, ...], rows: Sequence[tuple[str, ...]]) -> list[str]:
+    """Render a markdown table. Column count comes from *headers* (#962).
+
+    Variadic rather than fixed at two columns: the skills table carries a
+    provenance column and the others do not, and one helper that counts its
+    own headers beats a second near-identical one.
+    """
+    out = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
+    for row in rows:
         # Escape pipes so descriptions can't break the table.
-        out.append(f"| {a} | {b.replace('|', chr(92) + '|')} |")
+        out.append("| " + " | ".join(c.replace("|", chr(92) + "|") for c in row) + " |")
     return out
 
 
 def render(variables: dict[str, str]) -> str:
     """The CAPABILITIES.md content for a scaffold described by *variables*."""
-    skills = canonical_skills(variables)
+    skills = canonical_skills_with_source(variables)
     hooks = canonical_hooks(variables)
     servers = servers_for_ids(_mcp_ids(variables), js_runner=resolve_js_runner(variables))
 
@@ -226,7 +274,13 @@ def render(variables: dict[str, str]) -> str:
         "",
         f"## Skills ({len(skills)})",
         "",
-        *_table(("Skill", "Description"), skills),
+        # Without this line the count is ambiguous: the 2026-08-24 audit read a
+        # 14-skill table against 2 dirs on disk as a 14x overstatement (#957),
+        # when 13 were plugin-resident and correct. Source says which is which.
+        "`in-tree` = a file under `.agents/skills/` in this repo. `plugin` = resolved",
+        "by the declared plugin, identical in every project on that version (ADR-010).",
+        "",
+        *_table(("Skill", "Source", "Description"), skills),
         "",
         "## Hooks",
         "",
