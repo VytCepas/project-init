@@ -70,11 +70,31 @@ def _payload_files(plugin_root: Path) -> list[Path]:
 
     The manifest and the lock live in `.claude-plugin/`; excluding it keeps the
     hash free of self-reference (the lock records this very hash).
+
+    BYTE-COMPILED DROPPINGS ARE EXCLUDED, and the same three words appear at
+    scaffold.py:49 and scaffold.py:861 because this is the third place the walk
+    had to learn them. `plugins/project-init-workflow/hooks/prod_guard.py` is a
+    real hook: importing it — which any local run of the guard does — writes
+    `__pycache__/prod_guard.cpython-*.pyc` NEXT TO IT, inside the payload dir.
+    Those files are gitignored, so a clean CI checkout never has them and the
+    committed lock is computed without them.
+
+    MEASURED 2026-09-06 on this box: two stray `.pyc` (cpython-311 and
+    cpython-314) made `test_lock_matches_the_committed_tree` fail locally while
+    the same test at the same SHA was green on CI. Removing them turned the
+    suite green with no other change. The test's own name is the argument — it
+    asserts the lock matches the COMMITTED tree, and untracked bytecode is not
+    in it. A tripwire that fires on artefacts of running the thing it guards is
+    the false positive CLAUDE.md No.2.11 forbids: the operator learns to ignore
+    a red that will one day be real drift.
     """
     return sorted(
         p
         for p in plugin_root.rglob("*")
-        if p.is_file() and ".claude-plugin" not in p.relative_to(plugin_root).parts
+        if p.is_file()
+        and ".claude-plugin" not in p.relative_to(plugin_root).parts
+        and "__pycache__" not in p.parts
+        and p.suffix not in (".pyc", ".pyo")
     )
 
 

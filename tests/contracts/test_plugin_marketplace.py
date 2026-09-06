@@ -210,6 +210,35 @@ class TestPayloadVersionLock:
             for hook in (root / "hooks").glob("*.sh"):
                 assert hook.stat().st_mode & 0o111, f"{root.name}/{hook.name} is not executable"
 
+    def test_bytecode_next_to_a_hook_does_not_move_the_hash(self, tmp_path):
+        # THE HASH IS OVER THE COMMITTED TREE, AND BYTECODE IS NOT IN IT.
+        # `hooks/prod_guard.py` is importable, so any local run of the guard
+        # writes `__pycache__/*.pyc` inside the payload dir. Measured 2026-09-06:
+        # two such files made test_lock_matches_the_committed_tree fail locally
+        # while the same SHA was green on CI, whose checkout has none. A red that
+        # ordinary local work manufactures is No.2.11's false positive, and the
+        # operator learns to ignore the one that will later be real drift.
+        (tmp_path / ".claude-plugin").mkdir()
+        (tmp_path / ".claude-plugin" / "plugin.json").write_text('{"version": "1.0.0"}')
+        hook = tmp_path / "hooks" / "h.py"
+        hook.parent.mkdir()
+        hook.write_text("x = 1\n")
+        clean = sync_plugin.payload_sha256(tmp_path)
+
+        # Both spellings the walk has to survive: a __pycache__ dir, and a stray
+        # .pyc sitting directly beside the source.
+        cache = hook.parent / "__pycache__"
+        cache.mkdir()
+        (cache / "h.cpython-314.pyc").write_bytes(b"\x00compiled")
+        (hook.parent / "h.pyc").write_bytes(b"\x00compiled")
+
+        assert sync_plugin.payload_sha256(tmp_path) == clean
+        # And the exclusion must not be a blanket one: a real payload file added
+        # in the same directory MUST still move the digest, or this test would
+        # pass just as well against a walk that returned nothing.
+        (hook.parent / "h2.py").write_text("y = 2\n")
+        assert sync_plugin.payload_sha256(tmp_path) != clean
+
 
 class TestScaffoldedSettingsWiring:
     def test_default_is_plugin_first(self, tmp_path: Path):
