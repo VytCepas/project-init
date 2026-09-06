@@ -884,6 +884,56 @@ EXPOSING = [
     "cat README.md\ncat .env",
     # Three lines, so the read is not merely adjacent to the safe verb.
     "cd /tmp\nls -la\ncat .env",
+    # ── PR #972 review, Codex P1 (a): A RUN OF PUNCTUATION IS ONE TOKEN.
+    # `punctuation_chars` COALESCES adjacent operators, so the newline fix above
+    # only ever worked for the one spelling its cases used. Every line here
+    # produced a token — ";\n", "&&\n", "\n\n" — that was not a member of
+    # _BREAK_TOKENS, so the statements merged and the read went through exactly
+    # as before #953. Measured against the 1041-line file: all three ALLOWED.
+    # This is the ordinary way a person formats a script, which is what makes it
+    # worse than the case that was fixed.
+    "ls -la;\ncat .env",
+    "ls -la &&\ncat .env",
+    "ls -la ||\ncat .env",
+    "ls -la\n\ncat .env",
+    "cd /tmp;\nls -la;\ncat .env",
+    # ── PR #972 review, Codex P1 (b): SHLEX THINKS `#` STARTS A COMMENT.
+    # Bash only treats it that way at the start of a word, so `README#old` is one
+    # ordinary argument. shlex's default commenters discarded everything from the
+    # `#` to end of line, the tokenizer returned ['cat', 'README'], and the secret
+    # argument did not exist for any later rule. Measured: ALLOWED. Silent
+    # truncation is the worst failure shape a guard has — it fails open and
+    # leaves no record of what it dropped.
+    "cat README#old .env",
+    "cat a#b .env",
+    "head -n1 notes#draft .env",
+    # ── PR #972 review, Codex P1 (c): `-m` IS NOT ALWAYS A MESSAGE FLAG.
+    # The elision was unconditional, so any `-m` swallowed the token after it. In
+    # `less` the flag is a display mode taking no argument, so the elision ate the
+    # PATH instead and the leaf became ['less']. Measured: ALLOWED. The carve-out
+    # is now scoped to the commands that actually have commit messages.
+    "less -m .env",
+    "sort -m .env",
+    "less --message .env",
+    # ── PR #974 review, Codex P2 (a), THE CONTROLS. Stripping real comments is
+    # what closes the false positive below, and the cheap way to do it — treat
+    # any token starting with `#` as a comment opener — turns that fix into a
+    # BYPASS, because shlex reports no quoting and `'#a'` is a filename. Each
+    # line here must still be seen; they fail the moment the strip stops being
+    # quote-aware.
+    "cat '#a' .env",
+    'cat "#a" .env',
+    "cat \\#a .env",
+    # A comment ends at the newline and MUST NOT swallow it — the newline is
+    # what separates the statements, so eating it merges the read into the safe
+    # verb above and re-opens #953.
+    "cat README.md # notes\ncat .env",
+    "ls -la # listing\n\ncat .env",
+    # ── PR #974 review, Codex P2 (b), THE CONTROL. Skipping assignment prefixes
+    # must find the REAL verb, not exempt the leaf: a reader is still a reader
+    # behind `FOO=bar`, and the assignment's own value is still an argument.
+    "FOO=bar cat .env",
+    "FOO=.env cat notes.md",
 ]
 
 NOT_EXPOSING = [
@@ -961,6 +1011,55 @@ NOT_EXPOSING = [
     # A keystore-shaped DOCUMENT is not a keystore.
     "cat keystore.md",
     "cat docs/api-key-rotation.md",
+    # ── PR #972 controls. Widening what counts as a separator, and narrowing the
+    # `-m` carve-out, both had an obvious over-correction available; these are the
+    # lines that would go red if either had been taken.
+    #
+    # A REDIRECTION IS NOT A STATEMENT BREAK. `>` and `<` are in
+    # _PUNCTUATION_CHARS so `2>&1` tokenizes, but treating them as breaks would
+    # split a leaf and lose the path it names — the guard would fail open on
+    # exactly the shape it is watching.
+    "ls -la > out.txt",
+    "echo hi >> out.txt",
+    "cat README.md > copy.md",
+    "sort < input.txt",
+    # Ordinary multi-statement work formatted the way people actually write it.
+    "cd /tmp;\nls -la",
+    "cd /tmp &&\nls -la",
+    "cd /tmp\n\nls -la",
+    # `#` mid-word must survive tokenizing without dragging a secret in with it.
+    "cat README#old.md",
+    "ls notes#draft",
+    # The commit-message carve-out this PR deliberately KEEPS — scoped to the
+    # verbs that have messages, not withdrawn.
+    "git commit -m do-not-cat-.env",
+    "git commit -am fix-.env-handling",
+    'git commit --message="tidy .env handling"',
+    "git tag -m release-.env v1",
+    # And `-m` on a non-VCS command with nothing secret stays quiet, which is the
+    # control proving the narrowing did not become "always look at -m's argument".
+    "less -m README.md",
+    "sort -m a.txt b.txt",
+    # ── PR #974 review, Codex P2 (a): A REAL COMMENT IS PROSE, NOT AN ARGUMENT.
+    # Clearing shlex's `commenters` to fix the mid-word `#` left the text after
+    # a genuine `#` in the token stream, so ordinary annotated commands — the
+    # way people actually write shell — prompted on a path they never read.
+    # A guard that fires on these gets switched off, and a switched-off guard
+    # protects nothing.
+    "cat README.md # mention .env handling",
+    "ls -la  # check whether .env exists",
+    "git status # ignore .env for now",
+    "cat README.md\n# a whole-line comment about .env",
+    # ── PR #974 review, Codex P2 (b): AN ASSIGNMENT PREFIX IS NOT THE VERB.
+    # `leaf[0]` was the assignment, so `git` never matched _MESSAGE_VERBS, the
+    # commit-message carve-out did not apply, and the message's prose was read
+    # as a path.
+    'FOO=bar git commit -m "docs: describe .env handling"',
+    "GIT_AUTHOR_NAME=x git commit -m do-not-cat-.env",
+    "VERSION=1.2 git tag -m release-.env v1",
+    # The assignment prefix must not resurrect the exposure-safe exemption
+    # either — `echo` stays quiet behind one, as it does in front.
+    "FOO=bar echo .env",
     # ── PR #953 review, P2: A QUOTED SEPARATOR IS TEXT, NOT AN OPERATOR. The
     # splitter worked on the raw string, so it could not tell `|&` inside a
     # quoted argument from a real pipeline: `echo '.env |& xargs cat'` reads
