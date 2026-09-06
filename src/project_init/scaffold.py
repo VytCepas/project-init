@@ -347,6 +347,23 @@ _MEMORY_TIERS = {
     "obsidian-graphify-rag": "3",
 }
 
+#: Legacy memory-stack spellings the descriptor contract declares PERMANENT
+#: aliases (#466), recording a prior rename regression as the reason. They are
+#: canonicalised here — in the lowest module that knows about stacks — rather
+#: than at each call site, because #958 was exactly a call site that forgot:
+#: `variables` normalised on the scaffold path, the two `upgrade` emit paths did
+#: not, and the recorded stack is precisely where a legacy alias lives.
+_MEMORY_STACK_ALIASES = {"obsidian": "obsidian-only"}
+
+
+def normalize_memory_stack(memory_stack: str) -> str:
+    """Canonical stack name for *memory_stack*, resolving permanent aliases.
+
+    Unknown values pass through unchanged: this resolves documented aliases, it
+    does not validate. `_MEMORY_STACKS` in `variables` owns validation.
+    """
+    return _MEMORY_STACK_ALIASES.get(memory_stack, memory_stack)
+
 
 def memory_tier(memory_stack: str) -> str:
     """Descriptor tier number for *memory_stack* (#498, ADR-024).
@@ -356,8 +373,14 @@ def memory_tier(memory_stack: str) -> str:
     ``obsidian-graphify``→2, ``obsidian-graphify-rag``→3. ``none`` returns ``""``
     (no descriptor — the config memory block is gated out). Single source for the
     scaffold + the two upgrade emit paths so they never diverge (PI-189).
+
+    Aliases are resolved first (#958). Before that, ``memory_tier("obsidian")``
+    — a spelling the contract guarantees forever — returned ``""``, and the
+    producer rendered a blank ``tier:`` beside a PRESENT ``vault_path``: a record
+    both schemas reject, which the runtime reader then read as tier 0. A tier-2
+    project lost its retrieval surfaces while `doctor` printed ``[ok]``.
     """
-    return _MEMORY_TIERS.get(memory_stack, "")
+    return _MEMORY_TIERS.get(normalize_memory_stack(memory_stack), "")
 
 
 def memory_layers(memory_stack: str) -> list[str]:
