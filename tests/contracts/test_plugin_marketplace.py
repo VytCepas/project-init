@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -238,6 +239,28 @@ class TestPayloadVersionLock:
         # pass just as well against a walk that returned nothing.
         (hook.parent / "h2.py").write_text("y = 2\n")
         assert sync_plugin.payload_sha256(tmp_path) != clean
+
+    def test_an_ancestor_named_pycache_does_not_empty_the_payload(self, tmp_path):
+        # PR #972, Codex P2. Testing `"__pycache__" in p.parts` asks about the
+        # WHOLE ABSOLUTE PATH, so a plugin root living beneath an ancestor of
+        # that name matches every candidate: the walk returns [], the digest
+        # becomes the digest of nothing, the lock agrees with itself forever and
+        # PI-881 stops detecting the stale-plugin drift it exists for. Silent,
+        # and in the unsafe direction. The exclusion must be plugin-relative.
+        root = tmp_path / "__pycache__" / "plugin"
+        (root / ".claude-plugin").mkdir(parents=True)
+        (root / ".claude-plugin" / "plugin.json").write_text('{"version": "1.0.0"}')
+        hook = root / "hooks" / "h.py"
+        hook.parent.mkdir(parents=True)
+        hook.write_text("x = 1\n")
+
+        assert sync_plugin._payload_files(root) == [hook]
+        # The digest must be the same one the plugin gets anywhere else, so the
+        # location of the checkout cannot change what the lock records.
+        elsewhere = tmp_path / "plain" / "plugin"
+        elsewhere.mkdir(parents=True)
+        shutil.copytree(root, elsewhere, dirs_exist_ok=True)
+        assert sync_plugin.payload_sha256(root) == sync_plugin.payload_sha256(elsewhere)
 
 
 class TestScaffoldedSettingsWiring:
