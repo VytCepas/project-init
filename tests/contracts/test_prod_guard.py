@@ -915,6 +915,25 @@ EXPOSING = [
     "less -m .env",
     "sort -m .env",
     "less --message .env",
+    # ── PR #974 review, Codex P2 (a), THE CONTROLS. Stripping real comments is
+    # what closes the false positive below, and the cheap way to do it — treat
+    # any token starting with `#` as a comment opener — turns that fix into a
+    # BYPASS, because shlex reports no quoting and `'#a'` is a filename. Each
+    # line here must still be seen; they fail the moment the strip stops being
+    # quote-aware.
+    "cat '#a' .env",
+    'cat "#a" .env',
+    "cat \\#a .env",
+    # A comment ends at the newline and MUST NOT swallow it — the newline is
+    # what separates the statements, so eating it merges the read into the safe
+    # verb above and re-opens #953.
+    "cat README.md # notes\ncat .env",
+    "ls -la # listing\n\ncat .env",
+    # ── PR #974 review, Codex P2 (b), THE CONTROL. Skipping assignment prefixes
+    # must find the REAL verb, not exempt the leaf: a reader is still a reader
+    # behind `FOO=bar`, and the assignment's own value is still an argument.
+    "FOO=bar cat .env",
+    "FOO=.env cat notes.md",
 ]
 
 NOT_EXPOSING = [
@@ -1021,6 +1040,26 @@ NOT_EXPOSING = [
     # control proving the narrowing did not become "always look at -m's argument".
     "less -m README.md",
     "sort -m a.txt b.txt",
+    # ── PR #974 review, Codex P2 (a): A REAL COMMENT IS PROSE, NOT AN ARGUMENT.
+    # Clearing shlex's `commenters` to fix the mid-word `#` left the text after
+    # a genuine `#` in the token stream, so ordinary annotated commands — the
+    # way people actually write shell — prompted on a path they never read.
+    # A guard that fires on these gets switched off, and a switched-off guard
+    # protects nothing.
+    "cat README.md # mention .env handling",
+    "ls -la  # check whether .env exists",
+    "git status # ignore .env for now",
+    "cat README.md\n# a whole-line comment about .env",
+    # ── PR #974 review, Codex P2 (b): AN ASSIGNMENT PREFIX IS NOT THE VERB.
+    # `leaf[0]` was the assignment, so `git` never matched _MESSAGE_VERBS, the
+    # commit-message carve-out did not apply, and the message's prose was read
+    # as a path.
+    'FOO=bar git commit -m "docs: describe .env handling"',
+    "GIT_AUTHOR_NAME=x git commit -m do-not-cat-.env",
+    "VERSION=1.2 git tag -m release-.env v1",
+    # The assignment prefix must not resurrect the exposure-safe exemption
+    # either — `echo` stays quiet behind one, as it does in front.
+    "FOO=bar echo .env",
     # ── PR #953 review, P2: A QUOTED SEPARATOR IS TEXT, NOT AN OPERATOR. The
     # splitter worked on the raw string, so it could not tell `|&` inside a
     # quoted argument from a real pipeline: `echo '.env |& xargs cat'` reads

@@ -525,6 +525,91 @@ _MESSAGE_FLAGS = frozenset({"-m", "-am", "--message"})
 # ordinary path. An exemption is only ever as safe as the set it applies to.
 _MESSAGE_VERBS = frozenset({"git", "hg", "svn", "bzr", "jj"})
 
+# A SHELL ASSIGNMENT PREFIX IS NOT THE COMMAND.
+# `FOO=bar git commit -m "docs: describe .env handling"` puts `FOO=bar` in
+# leaf[0], so the verb read as `FOO=bar`, `_MESSAGE_VERBS` did not match, the
+# commit message was scanned as an ordinary argument and the line prompted
+# (Codex P2 on #974). Every rule keyed on the verb had the same blind spot —
+# the reader set, the exposure-safe set and the message carve-out alike.
+# Skipping the prefixes cannot open a bypass: the assignment TOKENS stay in the
+# list, so `FOO=<dotenv> cat x` still matches _SECRET_PATH on the value.
+_ASSIGN_PREFIX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+
+def _verb_index(leaf: list[str]) -> int:
+    """Index of the verb in *leaf*, skipping `NAME=value` prefixes."""
+    i = 0
+    while i < len(leaf) and _ASSIGN_PREFIX.match(leaf[i]):
+        i += 1
+    return i if i < len(leaf) else 0
+
+
+def _strip_comments(command: str) -> str:
+    """Remove the comments a SHELL would remove, and only those.
+
+    `#` opens a comment at the START OF A WORD and nowhere else, and quoting
+    suppresses the rule outright. The three cases this has to keep apart:
+
+        cat README#old <dotenv>      -> `#` is mid-word, nothing is a comment
+        cat README.md # notes <dotenv-mention>  -> prose, dropped
+        cat '#a' <dotenv>            -> `#a` is a FILENAME, nothing is dropped
+
+    Clearing shlex's `commenters` (the #972 P1 fix) got the first case right
+    and created the mirror-image false positive in the second, where the prose
+    after a real `#` stayed in the token stream and its mention of a dotenv
+    path prompted the operator (Codex P2 on #974). Doing it here instead of in
+    shlex is what makes the third case safe: shlex reports no quoting, so a
+    token-level rule would read `#a` as a comment opener and DISCARD the secret
+    argument behind it — trading a false positive for a bypass.
+
+    A newline ending a comment is KEPT. It separates statements, and swallowing
+    it would merge the next command into this one, which is the exact hole
+    `_BREAK_TOKENS` exists to close.
+    """
+    out: list[str] = []
+    in_single = in_double = escaped = in_comment = False
+    at_word_start = True
+    for ch in command:
+        if in_comment:
+            if ch == "\n":
+                in_comment = False
+                out.append(ch)
+                at_word_start = True
+            continue
+        if escaped:
+            out.append(ch)
+            escaped = False
+            at_word_start = False
+            continue
+        if in_single:
+            out.append(ch)
+            in_single = ch != "'"
+            continue
+        if in_double:
+            out.append(ch)
+            if ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_double = False
+            continue
+        if ch == "\\":
+            out.append(ch)
+            escaped = True
+            at_word_start = False
+            continue
+        if ch in "'\"":
+            out.append(ch)
+            in_single = ch == "'"
+            in_double = ch == '"'
+            at_word_start = False
+            continue
+        if ch == "#" and at_word_start:
+            in_comment = True
+            continue
+        out.append(ch)
+        at_word_start = ch.isspace() or ch in _PUNCTUATION_CHARS
+    return "".join(out)
+
 
 def _tokenize(command: str) -> list[str] | None:
     """Split *command* into shell tokens, or None when it cannot be parsed.
@@ -533,6 +618,7 @@ def _tokenize(command: str) -> list[str] | None:
     which over-splits rather than under-splits: for a guard, keeping the old
     false positive on an unparsable command is the safe direction.
     """
+    command = _strip_comments(command)
     lex = shlex.shlex(command, posix=True, punctuation_chars=_PUNCTUATION_CHARS)
     lex.whitespace_split = True
     # Newline must stop being whitespace or it is thrown away before punctuation
@@ -548,6 +634,8 @@ def _tokenize(command: str) -> list[str] | None:
     # unquoted `#` inside one is an ordinary character and the truncation is pure
     # loss. A guard that silently drops the rest of the command is the worst shape
     # available: it fails open and leaves no trace of what it dropped.
+    # Real comments are already gone — `_strip_comments` above removed them with
+    # the quoting context shlex cannot report at this level.
     lex.commenters = ""
     try:
         return list(lex)
@@ -702,7 +790,7 @@ def _statement_exposes(statement: list[str]) -> str | None:
             current.append(token)
     if current:
         leaves.append(current)
-    heads = {leaf[0].rsplit("/", 1)[-1] for leaf in leaves if leaf}
+    heads = {leaf[_verb_index(leaf)].rsplit("/", 1)[-1] for leaf in leaves if leaf}
     # A PRODUCER IS ONLY SAFE WHILE NOTHING DOWNSTREAM CAN READ WHAT IT NAMES.
     # This gate existed for `find` alone, so every other producer in
     # _EXPOSURE_SAFE_VERBS was exempted unconditionally and the pipeline that
@@ -724,7 +812,7 @@ def _statement_exposes(statement: list[str]) -> str | None:
         # The verb decides whether `-m` is a message flag at all — read it from
         # the RAW leaf, before any elision, or the check would depend on the
         # elision it is meant to gate.
-        _raw_head = leaf[0].rsplit("/", 1)[-1] if leaf else ""
+        _raw_head = leaf[_verb_index(leaf)].rsplit("/", 1)[-1] if leaf else ""
         _elide_message = _raw_head in _MESSAGE_VERBS
         tokens: list[str] = []
         skip = False
@@ -741,13 +829,14 @@ def _statement_exposes(statement: list[str]) -> str | None:
             tokens.append(token)
         if not tokens:
             continue
-        head = tokens[0].rsplit("/", 1)[-1]  # /bin/cat and cat are one verb
+        verb_at = _verb_index(tokens)
+        head = tokens[verb_at].rsplit("/", 1)[-1]  # /bin/cat and cat are one verb
         if head == "find" and not producers_are_safe:
             pass  # an action or a pipe turns it into a reader's argument list
         elif head in _EXPOSURE_SAFE_VERBS and producers_are_safe:
             continue
         if head in _PATTERN_FIRST_ARG:
-            rest = [t for t in tokens[1:] if not t.startswith("-")]
+            rest = [t for t in tokens[verb_at + 1 :] if not t.startswith("-")]
             if rest:
                 tokens = [t for t in tokens if t is not rest[0]]
         if _SECRET_PATH.search(" " + " ".join(tokens)):
