@@ -120,3 +120,70 @@ def test_inventory_regenerated_on_rescaffold(tmp_path: Path):
     text = (t / _REL).read_text()
     assert "## MCP servers (1)" in text
     assert "context7" in text
+
+
+# --- #962: provenance column ------------------------------------------------
+#
+# The two-column table could not say where a skill physically lands, so a reader
+# saw "19 skill(s)" against 2 dirs on disk and had no way to tell both numbers
+# were right. The 2026-08-24 audit read exactly that as a 14x overstatement
+# before the count was explained (#957).
+#
+# These assert on the RENDERED DOCUMENT, not on capabilities.py — a
+# generator-side assertion passes while the shipped file loses the column (the
+# #902 lesson). They also parse the Skills SECTION rather than grepping the
+# whole file: `| plugin |` matches the Chosen options row `| Distribution |
+# plugin |`, which made a first draft of these tests pass under a mutation that
+# broke the column outright.
+
+
+def _skill_sources(text: str) -> dict[str, str]:
+    """{skill name: source} parsed from the Skills section of a rendered doc."""
+    out: dict[str, str] = {}
+    in_section = False
+    for line in text.splitlines():
+        if line.startswith("## Skills"):
+            in_section = True
+            continue
+        if in_section and line.startswith("## "):
+            break
+        cells = [c.strip() for c in line.split("|")[1:-1]]
+        if in_section and len(cells) == 3 and cells[0] not in ("Skill", "---"):
+            out[cells[0]] = cells[1]
+    return out
+
+
+def test_skills_table_carries_a_source_column(tmp_path: Path):
+    text = (_scaffold(tmp_path / "p", agents="claude") / _REL).read_text()
+    assert "| Skill | Source | Description |" in text
+    assert _skill_sources(text), "no skill rows parsed — the table shape changed"
+
+
+def test_base_and_shared_skills_are_tiered_apart(tmp_path: Path):
+    """The point of the column: `plan` ships in the tree, the shared set does not.
+
+    `plan` is the only base skill (templates/base); everything else arrives via
+    the declared plugin in plugin mode (ADR-010). A column that cannot tell them
+    apart is the ambiguity this issue is about.
+    """
+    sources = _skill_sources((_scaffold(tmp_path / "p", agents="claude") / _REL).read_text())
+    assert sources["plan"] == "in-tree"
+    shared = {n: s for n, s in sources.items() if n != "plan"}
+    assert shared, "fixture no longer renders any shared skills"
+    assert set(shared.values()) == {"plugin"}, f"shared set not marked plugin: {shared}"
+
+
+def test_source_follows_distribution_mode():
+    """Control — the tier is a function of distribution, not a constant.
+
+    In no-plugin mode (ADR-010) the shared skills render into the project, so a
+    table that still said `plugin` would be wrong in the other direction. Without
+    this, marking every row `in-tree` unconditionally would stay green.
+    """
+    plugin = _skill_sources(capabilities.render(make_variables(plugin_mode="true", no_plugin="")))
+    standalone = _skill_sources(
+        capabilities.render(make_variables(plugin_mode="", no_plugin="true"))
+    )
+    assert "plugin" in set(plugin.values())
+    assert set(standalone.values()) == {"in-tree"}
+    assert plugin["plan"] == standalone["plan"] == "in-tree"
