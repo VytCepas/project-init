@@ -317,6 +317,111 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bdocker\s+(volume\s+prune|system\s+prune)\b"), "docker prune"),
 ]
 
+# ── Prose is not execution (#965) ───────────────────────────────────────────
+# The deny table above regex-searches the RAW command string, so WRITING ABOUT a
+# destructive verb was indistinguishable from RUNNING it. Measured before this:
+# 5 of 5 pure documentation commands returned `ask`, including a commit message
+# that says never to run the verb it names.
+#
+#     git commit -m "docs: never run terraform destroy on prod"
+#     grep -rn 'terraform destroy' docs/
+#     echo 'the dangerous verb is DROP DATABASE'
+#     cat runbook.md | grep -c 'kubectl delete namespace'
+#
+# WHY THE `delete from` FIX DOES NOT GENERALISE. That rule solved its own
+# version of this by narrowing the RULE — requiring an identifier and then a
+# terminator — because "delete from" is ordinary English and real SQL is not.
+# That lever does not exist here: the text inside the commit message is
+# BYTE-IDENTICAL to the real command. `terraform destroy` is `terraform
+# destroy`. Only the CONTEXT it sits in separates the two, so context is what
+# this reads.
+#
+# FAIL-CLOSED BY CONSTRUCTION, and this is the whole safety argument: an
+# ALLOW-LIST of heads whose quoted arguments are inert, never a deny-list of
+# heads that execute. A deny-list has to enumerate `sh -c`, `bash -c`, `eval`,
+# `ssh`, `xargs`, `find -exec`, `su -c`, `env`, `timeout`, `watch`, `python -c`,
+# `perl -e`… and every one it misses is a fail-open. An allow-list that misses
+# something merely keeps today's prompt. `sh -c "terraform destroy"` is not
+# exempt because `sh` is not on the list.
+#
+# The exemption is also SUBTRACTIVE, never a short-circuit: a rule that still
+# matches once the prose is blanked out still fires, so `git commit -m "x" &&
+# terraform destroy` is unaffected. And blanking happens IN PLACE in the raw
+# string, preserving every other byte, because some rules match on quote
+# characters themselves (the `delete from` terminator class).
+_PROSE_HEADS = frozenset({"echo", "printf"})
+
+#: Searchers whose pattern argument is inert. DELIBERATELY NOT `_PATTERN_FIRST_ARG`,
+#: which exists for a different question (which arg is not a path) and includes
+#: `sed`/`awk`/`gawk`/`nawk`. Both of those EXECUTE: `awk 'BEGIN{system("…")}'`
+#: and GNU `sed 's/x/y/e'` run their argument, so exempting them would be a
+#: fail-open. Measured — both leaked through a draft of this that reused the
+#: other set.
+_PROSE_PATTERN_TOOLS = frozenset({"grep", "egrep", "fgrep", "rg", "ag", "ack"})
+
+#: A substitution inside a quoted string is code, whatever encloses it:
+#: `echo "$(terraform destroy)"` prints the OUTPUT of a real destroy. Blanking
+#: such a span would hide the verb from the deny table — the third fail-open a
+#: draft of this shipped.
+_HAS_SUBSTITUTION = re.compile(r"\$\(|`|\$\{")
+
+#: A quoted literal, honouring backslash escapes and not crossing quote styles.
+_QUOTED = re.compile(r"(['\"])(?:\\.|(?!\1).)*?\1", re.DOTALL)
+
+#: Statement separators. A quoted span's head is the first bare word after the
+#: last separator that is not itself inside quotes.
+_SEP = re.compile(r"[;&|\n]")
+
+
+def _prose_spans(command: str) -> list[tuple[int, int]]:
+    """Character spans in *command* that are prose rather than execution.
+
+    A quoted literal qualifies when the statement it belongs to is headed by a
+    command that only prints or searches its arguments, or when it is the value
+    of a commit-message flag.
+    """
+    spans: list[tuple[int, int]] = []
+    quoted = list(_QUOTED.finditer(command))
+    for match in quoted:
+        if _HAS_SUBSTITUTION.search(match.group(0)):
+            continue
+        start = match.start()
+        # Blank earlier quoted spans before looking for the separator, or a
+        # separator INSIDE an earlier string would be read as a real one — the
+        # substring-vs-token defect `_statements` was rewritten for.
+        prefix = list(command[:start])
+        for earlier in quoted:
+            if earlier.end() <= start:
+                for i in range(earlier.start(), earlier.end()):
+                    prefix[i] = " "
+        head_text = _SEP.split("".join(prefix))[-1]
+        words = head_text.split()
+        if not words:
+            continue
+        head = words[0].rsplit("/", 1)[-1]
+        if head in _PROSE_HEADS:
+            spans.append(match.span())
+        elif head in _PROSE_PATTERN_TOOLS:
+            # The pattern is what the tool searches FOR; it opens nothing.
+            spans.append(match.span())
+        elif _MESSAGE_ARG.search(head_text + match.group(0)):
+            # `git commit -m "…"`, `git tag -am "…"` — the value is prose.
+            spans.append(match.span())
+    return spans
+
+
+def _without_prose(command: str) -> str:
+    """*command* with prose spans blanked to spaces, same length and offsets."""
+    spans = _prose_spans(command)
+    if not spans:
+        return command
+    chars = list(command)
+    for start, end in spans:
+        for i in range(start, end):
+            chars[i] = " "
+    return "".join(chars)
+
+
 # ── Secret-file exposure (PI-893) ───────────────────────────────────────────
 # The scaffold's secret machinery is write/commit-oriented: gitleaks and the
 # pre-commit gate stop you COMMITTING a secret, .gitignore stops you tracking
@@ -1140,8 +1245,15 @@ def evaluate(
     """Return the hook verdict for *command*, or None to let it through."""
     if any(p.search(command) for p in allow):
         return None
+    # Computed once, not per rule: 20-odd rules over the same string.
+    prose_free = _without_prose(command)
     for pattern, label in DENY_RULES:
         if pattern.search(command):
+            # #965: the verb is real only if it survives blanking the prose. A
+            # rule that matches ONLY inside a commit message or a grep pattern
+            # was reading documentation, not an operation.
+            if not pattern.search(prose_free):
+                continue
             return _verdict(
                 f"prod_guard: '{label}' is a destructive operation. "
                 "If this is intentional and safe, add a matching regex to "

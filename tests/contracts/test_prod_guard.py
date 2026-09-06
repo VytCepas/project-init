@@ -247,6 +247,55 @@ def _payload(command: str, mode: str = "default", cwd: Path | None = None) -> di
     }
 
 
+# ── #965: writing ABOUT a destructive verb is not running it ────────────────
+# The deny table regex-searched the RAW command, so a commit message naming a
+# verb was indistinguishable from the verb. All five of these returned `ask`
+# before the prose exemption; the last one is a commit message that says never
+# to run the thing it names.
+PROSE = [
+    'git commit -m "docs: never run terraform destroy on prod"',
+    'git commit -m "fix: stop calling bq rm in the cleanup"',
+    "grep -rn 'terraform destroy' docs/",
+    "echo 'the dangerous verb is DROP DATABASE'",
+    "cat runbook.md | grep -c 'kubectl delete namespace'",
+    'printf "%s" "kubectl delete namespace is the one to avoid"',
+    "rg 'aws s3 rm --recursive' docs/",
+]
+
+# ── #965 fail-open guard. THIS IS THE IMPORTANT LIST. ───────────────────────
+# The prose exemption is the only place this guard can be talked out of a
+# verdict, so every one of these must still be flagged. Three of them LEAKED
+# through a draft and are pinned for that reason:
+#   * `awk 'BEGIN{system("…")}'` and GNU `sed 's/…/e'` EXECUTE their argument.
+#     The draft reused `_PATTERN_FIRST_ARG`, which contains both.
+#   * `echo "$(…)"` hides a real command inside a quoted span; blanking the
+#     span hid the verb from the table.
+# The rest pin the fail-closed design: an unknown head gets no exemption, and
+# the exemption is subtractive, so a second statement is untouched.
+PROSE_EVASION = [
+    'sh -c "terraform destroy"',
+    "bash -c 'kubectl delete namespace prod'",
+    'eval "terraform destroy"',
+    'su -c "terraform destroy"',
+    'ssh host "terraform destroy"',
+    'xargs -I{} sh -c "terraform destroy"',
+    "python -c \"import os; os.system('terraform destroy')\"",
+    "perl -e 'system(\"terraform destroy\")'",
+    "awk 'BEGIN{system(\"terraform destroy\")}'",
+    "sed 's/x/terraform destroy/e' f",
+    'echo "$(terraform destroy)"',
+    'echo "`terraform destroy`"',
+    'grep -rn "x" $(terraform destroy)',
+    'echo "safe" && terraform destroy',
+    'git commit -m "x" && terraform destroy',
+    "echo foo; terraform destroy",
+    "grep -rn 'x' docs/ ; terraform destroy",
+    "timeout 60 terraform destroy",
+    "env FOO=1 terraform destroy",
+    "find . -name x -exec terraform destroy ;",
+]
+
+
 class TestVerdicts:
     @pytest.mark.parametrize("command", DESTRUCTIVE)
     def test_destructive_asks_in_interactive(self, tmp_path: Path, command: str):
@@ -261,6 +310,25 @@ class TestVerdicts:
         assert hso["permissionDecision"] == "deny"
         assert "prod_guard" in hso["permissionDecisionReason"]
         assert "credential separation" in hso["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("command", PROSE)
+    def test_documentation_about_a_verb_is_not_the_verb(self, tmp_path: Path, command: str):
+        """#965 — prose naming a destructive verb must not be flagged."""
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+
+    @pytest.mark.parametrize("command", PROSE_EVASION)
+    def test_prose_exemption_cannot_be_used_to_hide_a_real_command(
+        self, tmp_path: Path, command: str
+    ):
+        """#965 fail-open guard — the exemption must never swallow a real verb.
+
+        Every entry here embeds a genuine destructive command in something that
+        LOOKS like prose. A regression that widened the exemption shows up here
+        first, and it is the only test in this file whose failure means the
+        guard stopped guarding rather than merely nagging.
+        """
+        verdict = _run_hook(_payload(command, "default", tmp_path), tmp_path)
+        assert verdict is not None, f"FAIL-OPEN — exemption swallowed: {command}"
 
     @pytest.mark.parametrize("command", SAFE)
     def test_safe_commands_pass(self, tmp_path: Path, command: str):
