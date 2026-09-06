@@ -169,6 +169,51 @@ class TestContractVersionAndBlocks:
         config = _render_full(tmp_path)
         assert config["context"] == "repo"
 
+    def test_agents_md_states_the_precedence_the_marker_declares(self, tmp_path: Path):
+        """#968 — the layer that must HONOUR the precedence is told it exists.
+
+        `context: repo` was announced to the wrong reader: a marker-walking hook
+        reads config.yaml, but a model reads AGENTS.md, and AGENTS.md said
+        nothing. Measured before this: `grep -rni ambient templates/` hit only
+        config.yaml.tmpl and prod_guard.py — zero hits in either instruction
+        surface. A claim made in a file the other side never opens has no
+        mechanism.
+
+        Asserted on the RENDERED scaffold and scoped to the rules section, not
+        the whole file: a schema property or a template comment does not fail
+        when the line is dropped (the #902 lesson).
+        """
+        _render_full(tmp_path)
+        agents_md = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+        rules = agents_md.split("## Key rules for agents", 1)
+        assert len(rules) == 2, "the rules section is gone — this test's anchor moved"
+        rules_body = rules[1].split("\n## ", 1)[0]
+        assert "context: repo" in rules_body
+        assert "ambient" in rules_body.lower()
+
+    def test_the_stand_down_is_declared_scoped_not_total(self, tmp_path: Path):
+        """#968 §4 — the substantive half, and the reason a sentence was not enough.
+
+        An unscoped `repo` conflates two categories. The repo genuinely knows
+        better on workflow, conventions and tooling. It does NOT restate safety
+        and verification posture, so a total stand-down DELETES those rather
+        than replacing them — a fresh scaffold would claim total authority while
+        its own instructions are still generic.
+
+        Both surfaces must carry the scope, and both are checked, because the
+        defect this closes was precisely the two disagreeing.
+        """
+        _render_full(tmp_path)
+        agents_md = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+        config_text = (tmp_path / ".agents" / "config.yaml").read_text(encoding="utf-8")
+        for surface, text in (("AGENTS.md", agents_md), ("config.yaml", config_text)):
+            lowered = text.lower()
+            assert "scoped" in lowered or "not total" in lowered, (
+                f"{surface} describes an UNSCOPED stand-down"
+            )
+            # The categories that survive it, named rather than implied.
+            assert "silent" in lowered, f"{surface} does not say what happens where it is silent"
+
     def test_does_not_overload_the_governance_boolean(self, tmp_path: Path):
         # harbor CONTRACTS/marker.md: `governance` is already a project-init
         # boolean (the ADR-018 overlay gate). The marker must not reuse the name
