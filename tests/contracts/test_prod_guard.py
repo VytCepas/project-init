@@ -260,6 +260,13 @@ PROSE = [
     "cat runbook.md | grep -c 'kubectl delete namespace'",
     'printf "%s" "kubectl delete namespace is the one to avoid"',
     "rg 'aws s3 rm --recursive' docs/",
+    # A `|` inside the quotes is text, not a pipeline — and the span sits in the
+    # LAST stage of a real pipeline here, so nothing consumes it.
+    "echo 'terraform destroy | sh is the dangerous shape'",
+    # A pipe in a LATER statement must not cost the earlier span its exemption.
+    # `_flows_onward` stops at the statement terminator for this reason; without
+    # that stop this ordinary command becomes a false positive.
+    'git commit -m "docs: never run terraform destroy" && git log --oneline | head -5',
 ]
 
 # ── #965 fail-open guard. THIS IS THE IMPORTANT LIST. ───────────────────────
@@ -293,6 +300,30 @@ PROSE_EVASION = [
     "timeout 60 terraform destroy",
     "env FOO=1 terraform destroy",
     "find . -name x -exec terraform destroy ;",
+    # Shell spelled other ways. These were REASONED about in a first pass and
+    # not run; running them is what found the pipe class below, so they are
+    # pinned rather than argued.
+    '/bin/sh -c "terraform destroy"',
+    'command sh -c "terraform destroy"',
+    '$SHELL -c "terraform destroy"',
+    '/usr/bin/env sh -c "terraform destroy"',
+    'exec sh -c "terraform destroy"',
+    'nohup sh -c "terraform destroy"',
+    'setsid sh -c "terraform destroy"',
+    # *** PROSE PIPED INTO AN EXECUTOR. The whole class a first pass missed. ***
+    # A prose head only stays prose while its output goes nowhere: `echo` prints,
+    # but `echo | sh` RUNS. Each of these is one step, not two, and each was
+    # caught by the raw scan before the exemption existed.
+    'echo "terraform destroy" | sh',
+    'echo "terraform destroy" | bash',
+    "printf 'terraform destroy' | sh",
+    'echo "kubectl delete namespace prod" | xargs -0 sh -c',
+    'grep -rn "terraform destroy" script.sh | sh',
+    # Redirection stages a script for a later `sh x.sh`, which carries no verb
+    # of its own and so is invisible to the table. The guard should not be the
+    # thing that made staging one quieter than it used to be.
+    'echo "terraform destroy" > /tmp/x.sh',
+    'echo "terraform destroy" >> /tmp/x.sh',
 ]
 
 

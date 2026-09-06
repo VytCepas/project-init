@@ -373,17 +373,54 @@ _QUOTED = re.compile(r"(['\"])(?:\\.|(?!\1).)*?\1", re.DOTALL)
 _SEP = re.compile(r"[;&|\n]")
 
 
+#: Statement terminators — where a pipeline ends and a new command begins.
+#: A `|` before one of these is downstream of the span; after it is a new
+#: statement the deny table judges on its own.
+_TERMINATOR = re.compile(r"(?:&&|\|\||;|\n)")
+
+
+def _flows_onward(command: str, span_end: int, quoted: list[re.Match[str]]) -> bool:
+    """True when the prose after *span_end* is piped or redirected somewhere.
+
+    THE EXEMPTION IS FOR PROSE THAT IS DISPLAYED OR SEARCHED, NOT PROSE THAT IS
+    SENT. `echo "terraform destroy" | sh` executes it; so does `printf … | bash`
+    and `grep -rn … script.sh | sh`. Each was a ONE-STEP fail-open that the raw
+    scan used to catch, found by testing the paths a first pass had only
+    reasoned about.
+
+    Downstream only. `cat runbook.md | grep -c 'kubectl delete namespace'` has a
+    pipe, but the span is in the LAST stage — nothing consumes it — so it stays
+    exempt. Redirection counts too: `echo "…" > x.sh` stages a script, and a
+    guard should not be the thing that made staging one quieter than it was.
+    """
+    tail = list(command[span_end:])
+    # Blank later quoted spans first: a `|` inside `echo 'a | b'` is text.
+    for later in quoted:
+        if later.start() >= span_end:
+            for i in range(later.start() - span_end, later.end() - span_end):
+                if 0 <= i < len(tail):
+                    tail[i] = " "
+    rest = "".join(tail)
+    terminator = _TERMINATOR.search(rest)
+    if terminator:
+        rest = rest[: terminator.start()]
+    return "|" in rest or ">" in rest
+
+
 def _prose_spans(command: str) -> list[tuple[int, int]]:
     """Character spans in *command* that are prose rather than execution.
 
     A quoted literal qualifies when the statement it belongs to is headed by a
     command that only prints or searches its arguments, or when it is the value
-    of a commit-message flag.
+    of a commit-message flag — AND its output goes nowhere. Prose that is
+    DISPLAYED or SEARCHED is inert; prose that is SENT somewhere is not.
     """
     spans: list[tuple[int, int]] = []
     quoted = list(_QUOTED.finditer(command))
     for match in quoted:
         if _HAS_SUBSTITUTION.search(match.group(0)):
+            continue
+        if _flows_onward(command, match.end(), quoted):
             continue
         start = match.start()
         # Blank earlier quoted spans before looking for the separator, or a
