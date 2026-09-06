@@ -152,6 +152,15 @@ permissions: block sets unlisted scopes to none. Public repos resolved it
 anyway, so the defect was invisible in this repo's own CI. Only that one
 hash was re-pinned, after confirming it was the sole key that drifted in all
 eight fixtures.
+
+Exception (mention-triggered Codex reviews): the same workflow gained a count of
+Codex review COMMENTS alongside `reviews.totalCount`. A review Codex posts on
+its own initiative is a pull request review object; one asked for with an
+`@codex review` comment is a plain issue comment carrying the same verdict, so
+the gate saw no review at all and sat at "Awaiting review" for ever — PI-715
+reopened through a different door. A deliberate gate fix, not move-drift. Only
+that one hash was re-pinned, and the failure named it as the sole drifted key in
+all four fixtures before the re-pin.
 """
 
 from __future__ import annotations
