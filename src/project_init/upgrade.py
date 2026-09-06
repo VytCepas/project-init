@@ -1311,10 +1311,18 @@ def _ensure_ci_block(text: str) -> str:
     return head + sep + tail
 
 
+# SCOPE MUST MATCH config.yaml.tmpl AND AGENTS.md (#968). This block is what an
+# UPGRADED repo gets, and it described an unscoped stand-down while a fresh
+# scaffold described a scoped one — the exact two-surfaces-disagree defect #968
+# exists to close, reintroduced on the path #968 did not touch. Caught in review
+# on PR #971, not by a test, which is why one exists now.
 _CONTEXT_BLOCK = (
     "# Detect-and-defer boundary marker (PI-901; the ambient-layer marker\n"
-    "# contract). repo = this project\n"
-    "# governs itself, so an ambient/global agent layer stands down inside it;\n"
+    "# contract). repo = this project governs itself on PROJECT matters —\n"
+    "# workflow, conventions, tooling — and an ambient/global agent layer stands\n"
+    "# down for those. SCOPED, NOT TOTAL: its safety and verification rules still\n"
+    "# apply wherever AGENTS.md is silent, because a scaffold does not restate\n"
+    "# them and an unscoped stand-down would delete rather than replace them.\n"
     "# ambient = opt out. Not `governance:` — that name is already a boolean.\n"
     "context: repo\n"
     "\n"
