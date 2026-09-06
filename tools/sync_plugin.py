@@ -70,11 +70,42 @@ def _payload_files(plugin_root: Path) -> list[Path]:
 
     The manifest and the lock live in `.claude-plugin/`; excluding it keeps the
     hash free of self-reference (the lock records this very hash).
+
+    BYTE-COMPILED DROPPINGS ARE EXCLUDED, the third place this walk had to learn
+    it — `_tree_digest` and `_iter_layer_sources` in scaffold.py already do,
+    the second with `.pyo` as well, so this matches both.
+    `plugins/project-init-workflow/hooks/prod_guard.py` is a real hook:
+    importing it — which any local run of the guard does — writes
+    `__pycache__/prod_guard.cpython-*.pyc` NEXT TO IT, inside the payload dir.
+    Those files are gitignored, so a clean CI checkout never has them and the
+    committed lock is computed without them.
+
+    MEASURED 2026-09-06 on this box: two stray `.pyc` (cpython-311 and
+    cpython-314) made `test_lock_matches_the_committed_tree` fail locally while
+    the same test at the same SHA was green on CI. Removing them turned the
+    suite green with no other change. The test's own name is the argument — it
+    asserts the lock matches the COMMITTED tree, and untracked bytecode is not
+    in it. A tripwire that fires on artefacts of running the thing it guards is
+    the false positive CLAUDE.md No.2.11 forbids: the operator learns to ignore
+    a red that will one day be real drift.
+
+    BOTH EXCLUSIONS TEST THE PLUGIN-RELATIVE PATH, NEVER THE ABSOLUTE ONE, and
+    the first draft of the bytecode clause got this wrong (PR #972, Codex P2).
+    `"__pycache__" not in p.parts` asks about the whole absolute path, so a
+    checkout — or any caller-supplied `plugin_root` — living beneath an ancestor
+    named `__pycache__` matches on EVERY candidate, `_payload_files` returns the
+    empty list, and `payload_sha256` becomes the digest of nothing. The lock
+    then agrees with itself forever and PI-881 stops detecting the stale-plugin
+    drift it exists for. That fails silently and in the unsafe direction, which
+    is the one shape a guard must not have.
     """
     return sorted(
         p
         for p in plugin_root.rglob("*")
-        if p.is_file() and ".claude-plugin" not in p.relative_to(plugin_root).parts
+        if p.is_file()
+        and ".claude-plugin" not in p.relative_to(plugin_root).parts
+        and "__pycache__" not in p.relative_to(plugin_root).parts
+        and p.suffix not in (".pyc", ".pyo")
     )
 
 
