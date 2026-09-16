@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 from pathlib import Path
@@ -82,6 +83,109 @@ def test_git_pre_push_runs_fast_ci(tmp_target: Path):
     assert "--no-verify" in pre_push
     # Skips (not tests) a dirty worktree — the pushed tree is the committed one.
     assert "git status --porcelain" in pre_push
+
+
+def _fake_just(bin_dir: Path, record: Path) -> None:
+    """A `just` that reports which repository a nested git command resolves to.
+
+    The hook only runs the recipe when `just --show fast-ci` succeeds, so the
+    stub answers that too. `fast-ci` then does what a real suite does — `git
+    init` a scratch repo and use it — and writes the absolute git dir that git
+    actually chose. That is the observation: with the environment inherited, git
+    ignores the scratch repo and answers with the repo being pushed from.
+    """
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    stub = bin_dir / "just"
+    stub.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [ "$1" = "--show" ]; then exit 0; fi\n'
+        'scratch="$(mktemp -d)"\n'
+        'cd "$scratch" || exit 1\n'
+        "git init -q . >/dev/null 2>&1\n"
+        f'git rev-parse --absolute-git-dir > "{record}" 2>&1\n'
+        "exit 0\n"
+    )
+    stub.chmod(0o755)
+
+
+def _push_stdin(sha: str) -> str:
+    """What git feeds a pre-push hook for one branch push."""
+    return f"refs/heads/chore/nojira-gate {sha} refs/heads/chore/nojira-gate {sha}\n"
+
+
+def test_pre_push_does_not_point_the_recipe_at_the_pushing_repo(tmp_target: Path):
+    """The gate must not hand its own GIT_DIR to the suite it runs.
+
+    git exports GIT_DIR (and GIT_WORK_TREE/GIT_INDEX_FILE in a worktree) to every
+    hook, so an unguarded `just fast-ci` gives every git subprocess in the suite a
+    pointer back at the repository being pushed from. Measured before the fix:
+    413 passed -> 5 failed here, 1508 passed -> 185 failed in
+    projects-orchestrator, and — worse than the red — the tests wrote to the
+    developer's index, which is where a pile of phantom staged deletions came
+    from.
+
+    Asserting the rendered TEXT would not catch this: a misspelled `env -u` entry
+    reads fine and restores the regression. So the hook is actually executed, with
+    the environment git would really hand it, and the observation is which
+    repository a nested `git init` ends up talking to.
+    """
+    _require_tool("git")
+    scaffold(
+        tmp_target, load_preset("obsidian-only"), make_variables(language="python", python="true")
+    )
+    (tmp_target / "justfile").write_text("fast-ci:\n\t@true\n")
+    subprocess.run(["git", "init", "-q", "."], cwd=tmp_target, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=tmp_target, check=True)
+    subprocess.run(
+        ["git", "-c", "user.email=t@e.st", "-c", "user.name=t", "commit", "-qm", "init"],
+        cwd=tmp_target,
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_target, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    # OUTSIDE the repo, both of them. The gate skips on a dirty worktree, so a
+    # stub or a scratch file left inside the tree makes this test pass by never
+    # running the thing it is testing — which is how the first draft of it
+    # "passed" against an unfixed hook.
+    record = tmp_target.parent / "resolved-git-dir.txt"
+    bin_dir = tmp_target.parent / "fakebin"
+    _fake_just(bin_dir, record)
+
+    pushing_git_dir = (tmp_target / ".git").resolve()
+    env = dict(os.environ)
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
+    # Exactly what git exports to a hook. This is the poison, and it is not
+    # synthetic: reproduce it by hand with `git push` and the same variables are
+    # in the hook's environment.
+    env["GIT_DIR"] = str(pushing_git_dir)
+    env["GIT_WORK_TREE"] = str(tmp_target)
+    env["GIT_INDEX_FILE"] = str(pushing_git_dir / "index")
+
+    hook = tmp_target / ".github" / "hooks" / "pre-push"
+    proc = subprocess.run(
+        ["bash", str(hook), "origin", "https://example.invalid/r.git"],
+        cwd=tmp_target,
+        input=_push_stdin(head),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, f"hook failed: {proc.stdout}\n{proc.stderr}"
+    assert "skipping" not in proc.stderr, (
+        f"the gate skipped instead of running, so nothing here was exercised: {proc.stderr}"
+    )
+    assert record.exists(), (
+        "the recipe never ran, so this test proves nothing about the environment "
+        f"it would have seen: {proc.stdout}\n{proc.stderr}"
+    )
+    resolved = pathlib.Path(record.read_text().strip())
+    assert resolved != pushing_git_dir, (
+        "the recipe inherited the pushing repository's GIT_DIR — every git "
+        "subprocess in the suite, including a test's own `git init`, is pointed "
+        f"at {pushing_git_dir} instead of its own tmpdir"
+    )
 
 
 def test_pre_commit_gate_has_per_file_shell_block(tmp_target: Path):
