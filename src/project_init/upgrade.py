@@ -237,6 +237,9 @@ def _overlay_off_defaults() -> dict[str, str]:
         "license_apache": "",
         "license_proprietary": "",
         "python_floor": "3.11",
+        # PI-954: pre-954 records carry no container base tag. Default it to the
+        # floor, which is what the tag was before an exact pin could reach it.
+        "python_image_tag": "3.11",
         # #847: pre-847 records carry no pin variable; empty means "never emit
         # .python-version" — read_scaffold_record recomputes it from the manifest.
         "python_version_pin": "",
@@ -974,6 +977,14 @@ def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, s
         variables.get("python_floor", "")
         if variables.get("python") and (owns_pin or no_pin)
         else ""
+    )
+    # PI-954: recompute the container base tag from the same live sources, so an
+    # upgrade over a project that has since pinned an exact patch re-renders the
+    # Dockerfile against that patch instead of a floating x.y tag.
+    from project_init.variables import _pinned_python_patch
+
+    variables["python_image_tag"] = _pinned_python_patch(target) or variables.get(
+        "python_floor", ""
     )
     # #849: the rag.md rule gates on the live rag_endpoint value — recompute so
     # wiring RAG (or a legacy record with no gate variables) re-renders right.

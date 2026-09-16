@@ -128,6 +128,70 @@ class TestRuntimeStageProvesItself:
             assert f"site-packages/{pkg}" in removal, f"{pkg} is not removed"
 
 
+class TestExactPatchPinIsPreserved:
+    """PI-954, found in review: an x.y tag is wrong when the project pins x.y.z.
+
+    `uv sync` inside the build stage honours an exact `.python-version`. A
+    floating `python:3.12-slim` whose patch differs therefore makes uv download
+    its own interpreter and the venv dangles again — the same defect, reached by
+    a different route. Reproduced with a real build before it was fixed: pinning
+    3.12.0 against a 3.12-slim image carrying 3.12.14 failed at the runtime
+    assertion with exit 127.
+    """
+
+    def _scaffold_over_pin(self, target: Path, pin: str) -> tuple[str, str]:
+        target.mkdir(parents=True, exist_ok=True)
+        (target / ".python-version").write_text(pin + "\n")
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "project_init",
+                str(target),
+                "--non-interactive",
+                "--preset",
+                "core",
+                "--name",
+                "t",
+                "--description",
+                "t",
+                "--language",
+                "python",
+                "--delivery",
+                "service",
+                "--deploy",
+                "none",
+                "--no-docs",
+                "--no-plugin",
+                "--lifecycle",
+                "none",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert proc.returncode == 0, proc.stderr
+        return (target / "Dockerfile").read_text(), (target / ".python-version").read_text().strip()
+
+    def test_exact_patch_reaches_the_image_tag(self, tmp_path: Path):
+        df, pin = self._scaffold_over_pin(tmp_path / "exact", "3.12.7")
+        assert pin == "3.12.7", "the project's own pin must never be clobbered"
+        assert _python_tags(df) == ["3.12.7", "3.12.7"]
+
+    def test_floor_only_pin_renders_the_floor(self, tmp_path: Path):
+        df, pin = self._scaffold_over_pin(tmp_path / "floor", "3.12")
+        assert pin == "3.12"
+        assert _python_tags(df) == ["3.12", "3.12"]
+
+    def test_the_floor_itself_stays_major_minor(self, tmp_path: Path):
+        """mise, mypy and the CI matrix still want x.y — only the tag differs."""
+        target = tmp_path / "floorcheck"
+        self._scaffold_over_pin(target, "3.12.7")
+        config = (target / ".agents" / "config.yaml").read_text()
+        assert '"python_floor": "3.12"' in config
+        assert '"python_image_tag": "3.12.7"' in config
+
+
 class TestRuntimeStagesAreMinimal:
     """PI-955: a runtime stage ships only what the binary actually calls."""
 

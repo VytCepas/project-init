@@ -153,6 +153,31 @@ def _python_floor_from_version_file(target: Path | None) -> str | None:
         return None
 
 
+def _pinned_python_patch(target: Path | None) -> str | None:
+    """The EXACT x.y.z a .python-version pins, if it pins one (PI-954).
+
+    `_python_floor_from_version_file` deliberately reduces a pin to its x.y
+    floor, which is right for mise/mypy/the CI matrix but wrong for a container
+    base tag: `uv sync` honours the exact pin, so a floating `python:3.12-slim`
+    whose patch differs makes uv download its own interpreter into the build
+    stage and the runtime venv then points at a path the runtime never copies.
+    Rendering the exact tag keeps one interpreter in play end to end.
+
+    Returns None when the file is absent, unparsable, or pins only x.y — in
+    which case the floor is already the most precise answer available.
+    """
+    if not target or not (target / ".python-version").exists():
+        return None
+    try:
+        import re
+
+        text = (target / ".python-version").read_text(encoding="utf-8").strip()
+        match = re.search(r"(\d+\.\d+\.\d+)", text.splitlines()[0] if text else "")
+        return match.group(1) if match else None
+    except Exception:
+        return None
+
+
 def _declared_python_floor(target: Path | None) -> str | None:
     """The Python floor the project's own files declare, if any (#628, #847).
 
@@ -619,10 +644,15 @@ def _build_variables(
     python_version_pin = ""
     if language == "python" and _python_floor_from_version_file(target) is None:
         python_version_pin = python_floor
+    # PI-954: the container base tag. Same value as python_floor, EXCEPT when the
+    # project pins an exact patch — then the tag has to carry it, or `uv sync`
+    # inside the build stage requests an interpreter the image does not have.
+    python_image_tag = _pinned_python_patch(target) or python_floor
 
     return {
         **rag_gate_variables(memory_stack, target),
         "python_floor": python_floor,
+        "python_image_tag": python_image_tag,
         "python_version_pin": python_version_pin,
         # #714: read back by gh_host.sh's review_cycles(); only rendered under
         # the {{#if lifecycle}} gate in config.yaml.tmpl.

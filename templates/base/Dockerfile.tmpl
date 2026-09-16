@@ -7,7 +7,7 @@
 # .python-version (PI-954). A hardcoded tag that disagrees with the pin makes
 # `uv sync` download its own interpreter into the build stage, and the venv is
 # then built against a path the runtime stage never copies.
-FROM python:{{python_floor}}-slim AS build
+FROM python:{{python_image_tag}}-slim AS build
 # uv is a build-stage-only tool binary (it never ships in the runtime image),
 # so pulling the latest uv here is intentional and safe.
 # hadolint ignore=DL3007
@@ -21,7 +21,7 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
 
 # --- runtime stage: copy the venv, drop the toolchain ---
-FROM python:{{python_floor}}-slim AS runtime
+FROM python:{{python_image_tag}}-slim AS runtime
 # Create the workdir ALREADY owned by the runtime uid. WORKDIR creates a missing
 # directory as root, and `COPY --chown` sets ownership on the copied CONTENTS,
 # not on a destination directory that already exists — so doing this the obvious

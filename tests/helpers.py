@@ -42,6 +42,7 @@ def make_variables(**overrides: str) -> dict[str, str]:
         "project_init_plugin_version": "0.1.0",
         "project_init_version_prev": "",
         "python_floor": "3.11",
+        "python_image_tag": "3.11",
         "python_version_pin": "",
         "review_cycles": "2",
         "language": "python",
@@ -141,6 +142,11 @@ def make_variables(**overrides: str) -> dict[str, str]:
         from project_init.scaffold import memory_tier
 
         defaults["memory_tier"] = memory_tier(stack)
+    # Mirror _build_variables (PI-954): the container base tag is the floor
+    # unless the project pins an exact patch, so a test that moves the floor
+    # moves the tag with it unless it says otherwise.
+    if "python_image_tag" not in overrides:
+        defaults["python_image_tag"] = defaults["python_floor"]
     # Mirror the lifecycle variable contract (#476): the `lifecycle` gate
     # derives from lifecycle_tier unless a test overrides it explicitly.
     if "lifecycle" not in overrides:
