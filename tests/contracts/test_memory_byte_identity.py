@@ -161,6 +161,17 @@ the gate saw no review at all and sat at "Awaiting review" for ever — PI-715
 reopened through a different door. A deliberate gate fix, not move-drift. Only
 that one hash was re-pinned, and the failure named it as the sole drifted key in
 all four fixtures before the re-pin.
+
+Exception (#983): the same workflow stopped reading the Codex marker out of a
+single `comments(last:100)` window and now paginates the whole comment history.
+The window is wrong in exactly the case the count exists for: when a requested
+review IS the only review and more than 100 comments follow its summary, the
+summary falls off, CODEX_REVIEWS drops to 0, and the check resets to "Awaiting
+review" on a PR that WAS reviewed. No page size is always enough, so the fix is
+pagination rather than a bigger number; the implementation has been running in
+projects-orchestrator since its #231. Only that one hash was re-pinned, after
+asserting in all four fixtures that it was the sole drifted key and that no path
+was added or removed.
 """
 
 from __future__ import annotations
