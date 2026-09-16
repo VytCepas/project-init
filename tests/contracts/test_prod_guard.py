@@ -934,6 +934,42 @@ EXPOSING = [
     # behind `FOO=bar`, and the assignment's own value is still an argument.
     "FOO=bar cat .env",
     "FOO=.env cat notes.md",
+    # ── studio#12 / estate#38 review, Codex P1 x3. Every one of these was
+    # ALLOWED by the guard as shipped, measured before fixing. The first two are
+    # older than the shlex rewrite and were allowed by the regex version too, so
+    # they are holes this suite never had an arm for rather than regressions.
+    #
+    # (a) A newline after a pipe CONTINUES the pipeline. `_is_break` knew that;
+    # nothing downstream did, because a coalesced "|\n" is not in _PIPE_TOKENS,
+    # so the producer and its reader landed in ONE leaf, `heads` saw only `ls`,
+    # and the exposure-safe producer was exempted with the read inside it.
+    "ls .env |\nxargs cat",
+    "ls .env |&\nxargs cat",
+    "find . -name .env |\nxargs cat",
+    # (b) Blanking a substitution with whitespace moves a mid-word `#` to the
+    # start of a word, where the comment stripper eats the rest of the line —
+    # including the secret argument. bash reads `README#suffix` and the dotenv
+    # as two arguments and never sees a comment.
+    "cat $(echo README)#suffix .env",
+    "cat `echo README`#suffix .env",
+    # (c) `-m` is a message flag under `git commit`, not under `git diff`, where
+    # it selects how merge commits are shown and takes no argument at all. The
+    # elision ate the path after it and the diff printed the file.
+    "git diff -m .env",
+    "git -C /tmp diff -m .env",
+    "git log -m .env",
+    # A subcommand word sitting AFTER the message flag is an argument, not a
+    # subcommand, and reading it as one would elide the path in front of it.
+    # This is why _takes_message stops at the flag instead of scanning the leaf.
+    "git diff -m .env commit",
+    "jj diff -m .env describe",
+    # THE SKIP LIST IS LOAD-BEARING, and this is the case that pins it. A global
+    # flag's ARGUMENT can spell a subcommand: without skipping `-C`'s argument,
+    # `commit` is seen before the message flag, the elision fires on a `diff`, and
+    # the path behind it is eaten. Contrived to type, trivial to hit in a repo
+    # with a directory named after a verb.
+    "git -C commit diff -m .env",
+    "hg --repository commit diff -m .env",
 ]
 
 NOT_EXPOSING = [
@@ -1056,6 +1092,26 @@ NOT_EXPOSING = [
     # as a path.
     'FOO=bar git commit -m "docs: describe .env handling"',
     "GIT_AUTHOR_NAME=x git commit -m do-not-cat-.env",
+    # ── The other half of the studio#12 / estate#38 P1s. Narrowing the message
+    # carve-out to message-TAKING subcommands must not narrow it to nothing, and
+    # a global flag with an argument must not hide the subcommand behind it.
+    "git -C /tmp commit -m do-not-cat-.env",
+    'git -c user.name=x commit -m "docs: describe .env handling"',
+    "git tag -m release-notes-mention-.env v1",
+    "git stash -m wip-on-.env",
+    "hg ci -m touches-.env",
+    # A global that eats its argument must not hide the subcommand behind it, in
+    # its LONG spelling as well as its short one (Codex P2 on #979): `/repo` read
+    # as the subcommand meant the message was scanned as a path.
+    "jj --repository /repo describe -m do-not-cat-.env",
+    "hg --repository /repo commit -m touches-.env",
+    "git --git-dir /tmp/x.git commit -m do-not-cat-.env",
+    'git commit --message="docs: describe .env handling"',
+    # Replacing the substitution blank must not make an ordinary comment stop
+    # being a comment: the `#` here IS at a word start, so the prose after it is
+    # prose, exactly as before.
+    "cat README.md # notes about .env",
+    "cat $(echo README).md # notes about .env",
     "VERSION=1.2 git tag -m release-.env v1",
     # The assignment prefix must not resurrect the exposure-safe exemption
     # either — `echo` stays quiet behind one, as it does in front.
