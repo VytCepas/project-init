@@ -958,6 +958,18 @@ EXPOSING = [
     "git diff -m .env",
     "git -C /tmp diff -m .env",
     "git log -m .env",
+    # A subcommand word sitting AFTER the message flag is an argument, not a
+    # subcommand, and reading it as one would elide the path in front of it.
+    # This is why _takes_message stops at the flag instead of scanning the leaf.
+    "git diff -m .env commit",
+    "jj diff -m .env describe",
+    # THE SKIP LIST IS LOAD-BEARING, and this is the case that pins it. A global
+    # flag's ARGUMENT can spell a subcommand: without skipping `-C`'s argument,
+    # `commit` is seen before the message flag, the elision fires on a `diff`, and
+    # the path behind it is eaten. Contrived to type, trivial to hit in a repo
+    # with a directory named after a verb.
+    "git -C commit diff -m .env",
+    "hg --repository commit diff -m .env",
 ]
 
 NOT_EXPOSING = [
@@ -1088,6 +1100,13 @@ NOT_EXPOSING = [
     "git tag -m release-notes-mention-.env v1",
     "git stash -m wip-on-.env",
     "hg ci -m touches-.env",
+    # A global that eats its argument must not hide the subcommand behind it, in
+    # its LONG spelling as well as its short one (Codex P2 on #979): `/repo` read
+    # as the subcommand meant the message was scanned as a path.
+    "jj --repository /repo describe -m do-not-cat-.env",
+    "hg --repository /repo commit -m touches-.env",
+    "git --git-dir /tmp/x.git commit -m do-not-cat-.env",
+    'git commit --message="docs: describe .env handling"',
     # Replacing the substitution blank must not make an ordinary comment stop
     # being a comment: the `#` here IS at a word start, so the prose after it is
     # prose, exactly as before.

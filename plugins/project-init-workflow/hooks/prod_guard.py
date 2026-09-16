@@ -598,25 +598,69 @@ _MESSAGE_SUBCOMMANDS = frozenset(
 )
 # Global flags that consume the NEXT token, so the subcommand is not simply the
 # first non-flag word: `git -C /path commit -m ...` must still find `commit`.
+# The long spellings are here because the short ones alone cost a false positive:
+# `jj --repository /repo describe -m "<prose>"` read `/repo` as the subcommand,
+# found no message subcommand, and scanned the commit message as a path (Codex P2
+# on #979). Any list like this is incomplete by construction, which is why it is
+# the second of two defences rather than the only one.
 _VCS_GLOBAL_ARG_FLAGS = frozenset(
-    {"-C", "-c", "-R", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--cwd"}
+    {
+        "-C",
+        "-c",
+        "-R",
+        "-d",
+        "--git-dir",
+        "--work-tree",
+        "--namespace",
+        "--exec-path",
+        "--cwd",
+        "--repository",
+        "--directory",
+        "--config",
+        "--config-toml",
+        "--config-dir",
+        "--config-option",
+        "--encoding",
+        "--at-operation",
+        "--at-op",
+    }
 )
 
 
-def _subcommand(leaf: list[str], verb_at: int) -> str:
-    """The first word after the verb that is not a flag or a flag's argument."""
+def _takes_message(leaf: list[str], verb_at: int) -> bool:
+    """True when a message-TAKING subcommand appears BEFORE the message flag.
+
+    NOT "the first non-flag word", and NOT "any word in the leaf". Both are wrong
+    in a way that matters, and they are wrong in opposite directions:
+
+      * first-non-flag depends on knowing every global that eats its argument, and
+        that list can never be complete. `jj --repository /repo describe` cost a
+        false positive on exactly that gap.
+      * any-word-in-the-leaf reads `git diff -m <dotenv> commit` as a commit,
+        elides the path, and the diff prints the file. That one is a BYPASS, so it
+        is the direction that decides the shape.
+
+    Scanning only the tokens before the message flag gets both: an argument sitting
+    AFTER `-m` can never masquerade as a subcommand, and a global's argument before
+    it is harmless unless it happens to spell a subcommand — which the skip list
+    above then covers. Two narrow defences rather than one wide one.
+    """
     skip = False
     for token in leaf[verb_at + 1 :]:
         if skip:
             skip = False
             continue
+        flag, sep, _ = token.partition("=")
+        if token in _MESSAGE_FLAGS or (sep and flag in _MESSAGE_FLAGS):
+            return False
         if token in _VCS_GLOBAL_ARG_FLAGS:
             skip = True
             continue
         if token.startswith("-"):
             continue
-        return token
-    return ""
+        if token in _MESSAGE_SUBCOMMANDS:
+            return True
+    return False
 
 
 # A SHELL ASSIGNMENT PREFIX IS NOT THE COMMAND.
@@ -922,9 +966,7 @@ def _statement_exposes(statement: list[str]) -> str | None:
         # elision it is meant to gate.
         _raw_at = _verb_index(leaf) if leaf else 0
         _raw_head = leaf[_raw_at].rsplit("/", 1)[-1] if leaf else ""
-        _elide_message = (
-            _raw_head in _MESSAGE_VERBS and _subcommand(leaf, _raw_at) in _MESSAGE_SUBCOMMANDS
-        )
+        _elide_message = _raw_head in _MESSAGE_VERBS and _takes_message(leaf, _raw_at)
         tokens: list[str] = []
         skip = False
         for token in leaf:
