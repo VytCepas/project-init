@@ -90,6 +90,14 @@ SHAPES: list[tuple[str, str, str]] = [
     ("newline", 'echo "safe"\n{P}', "executes"),
     ("backslash_cont", 'echo "safe" \\\n && {P}', "executes"),
     ("after_term_pipe", 'echo "safe"; echo "{P}" ' + PIPE + " " + SH, "executes"),
+    # PR #971 review: fd plumbing is not a destination. `echo "…" 2>&1`
+    # redirects STDERR, and the prose went to stdout — treating its `>` as
+    # "flows onward" reintroduced the exact false positive PI-965 removes.
+    ("stderr_dup", 'echo "{P}" 2>&1', "inert"),
+    ("stderr_to_null", 'echo "{P}" 2>/dev/null', "inert"),
+    ("stdout_to_stderr", 'echo "{P}" >&2', "inert"),
+    ("dup_then_pipe", 'echo "{P}" 2>&1 ' + PIPE + " " + SH, "executes"),
+    ("dup_then_redirect", 'echo "{P}" 2>&1 ' + REDIR + " run." + SH, "stages"),
     ("redirect", 'echo "{P}" ' + REDIR + " run." + SH, "stages"),
     ("append", 'echo "{P}" ' + REDIR + REDIR + " run." + SH, "stages"),
     ("tee", 'echo "{P}" ' + PIPE + " tee run." + SH, "stages"),

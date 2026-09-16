@@ -379,6 +379,12 @@ _SEP = re.compile(r"[;&|\n]")
 _TERMINATOR = re.compile(r"(?:&&|\|\||;|\n)")
 
 
+#: Redirections that move a FILE DESCRIPTOR rather than sending the prose to a
+#: destination — `2>&1`, `>&2`, `2>/dev/null`. stdout is where an exempt head
+#: writes, so a redirect of anything else cannot carry what it wrote.
+_FD_PLUMBING = re.compile(r"\d*>&\d*|2>\s*\S+")
+
+
 def _flows_onward(command: str, span_end: int, quoted: list[re.Match[str]]) -> bool:
     """True when the prose after *span_end* is piped or redirected somewhere.
 
@@ -404,6 +410,13 @@ def _flows_onward(command: str, span_end: int, quoted: list[re.Match[str]]) -> b
     terminator = _TERMINATOR.search(rest)
     if terminator:
         rest = rest[: terminator.start()]
+    # Plumbing that cannot carry the prose is not "onward" (PR #971 review).
+    # `echo "…" 2>&1` redirects STDERR, and the prose went to stdout, so the
+    # bare `>` in it is not a destination. Same for an fd duplication like
+    # `>&2`. Blanked BEFORE the check, never special-cased after it, so a real
+    # destination in the same statement still counts: `… 2>&1 > run.sh` keeps
+    # its `> run.sh` and stays unexempt.
+    rest = _FD_PLUMBING.sub(" ", rest)
     return "|" in rest or ">" in rest
 
 
