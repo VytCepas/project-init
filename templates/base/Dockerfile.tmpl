@@ -3,7 +3,11 @@
 # Multi-arch: build with `docker buildx build --platform linux/amd64,linux/arm64 .`
 # The app must listen on $PORT (default 8080) and 0.0.0.0.
 {{#if python}}# --- build stage: resolve deps with uv into a venv ---
-FROM python:3.13-slim AS build
+# The tag renders from `python_floor` — the SAME value that writes
+# .python-version (PI-954). A hardcoded tag that disagrees with the pin makes
+# `uv sync` download its own interpreter into the build stage, and the venv is
+# then built against a path the runtime stage never copies.
+FROM python:{{python_floor}}-slim AS build
 # uv is a build-stage-only tool binary (it never ships in the runtime image),
 # so pulling the latest uv here is intentional and safe.
 # hadolint ignore=DL3007
@@ -17,7 +21,7 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
 
 # --- runtime stage: copy the venv, drop the toolchain ---
-FROM python:3.13-slim AS runtime
+FROM python:{{python_floor}}-slim AS runtime
 # Create the workdir ALREADY owned by the runtime uid. WORKDIR creates a missing
 # directory as root, and `COPY --chown` sets ownership on the copied CONTENTS,
 # not on a destination directory that already exists — so doing this the obvious
@@ -26,6 +30,32 @@ FROM python:3.13-slim AS runtime
 RUN install -d -o 10001 -g 10001 /app
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /app /app
+# Drop build tooling, then prove the image is sound before it can ship.
+#
+# The removal: the app runs from /app/.venv/bin and never uses pip, setuptools
+# or wheel, and their VENDORED dependency trees are the only source of every
+# language-package finding a Trivy scan reports against this image (PI-955).
+# Paths are spelled out one per line on purpose — RUN uses /bin/sh, which is
+# dash here, and dash does NOT brace-expand, so `{pip,wheel}` would reach rm
+# as one literal path, match nothing, and exit 0 having removed nothing.
+#
+# The two assertions turn a broken image into a failed BUILD:
+#   1. the venv interpreter must resolve. A symlink dangling into the build
+#      stage still runs the placeholder CMD green, because `python` resolves
+#      PAST a non-executable venv entry to the base interpreter — so the app
+#      starts with none of its own dependencies and the first import fails as
+#      ModuleNotFoundError, pointing at the wrong file entirely (PI-954).
+#   2. pip must actually be gone, so the removal above cannot silently no-op.
+RUN rm -rf /usr/local/lib/python*/site-packages/pip \
+           /usr/local/lib/python*/site-packages/pip-* \
+           /usr/local/lib/python*/site-packages/setuptools \
+           /usr/local/lib/python*/site-packages/setuptools-* \
+           /usr/local/lib/python*/site-packages/wheel \
+           /usr/local/lib/python*/site-packages/wheel-* \
+           /usr/local/lib/python*/site-packages/pkg_resources \
+           /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.* \
+    && /app/.venv/bin/python -V \
+    && ! command -v pip
 ENV PATH="/app/.venv/bin:$PATH" PORT=8080 HOME=/app
 EXPOSE 8080
 # Run as a non-root uid (semgrep dockerfile.security.missing-user). A NUMERIC

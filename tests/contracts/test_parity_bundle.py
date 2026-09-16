@@ -15,7 +15,7 @@ def _scaffold(target: Path, **overrides: str) -> Path:
     return target
 
 
-def _service(target: Path, language: str = "python") -> Path:
+def _service(target: Path, language: str = "python", **overrides: str) -> Path:
     # make_variables sets the python/node/go/rust flags independently of
     # `language`, so set them explicitly to match the requested runtime.
     flags = {"python": "", "node": "", "go": "", "rust": ""}
@@ -27,6 +27,7 @@ def _service(target: Path, language: str = "python") -> Path:
         want_devcontainer="true",
         language=language,
         **flags,
+        **overrides,
     )
 
 
@@ -38,8 +39,13 @@ class TestParityBundlePresent:
         assert (target / ".dockerignore").is_file()
 
     def test_dockerfile_uses_language_base_image(self, tmp_path: Path):
-        py = _service(tmp_path / "py", "python")
-        assert "python:3.13-slim" in (py / "Dockerfile").read_text()
+        # Python is DERIVED from python_floor, not a literal: a hardcoded tag
+        # that disagrees with .python-version is PI-954, and asserting the
+        # literal here is what let that defect survive. The full derivation
+        # contract lives in tests/contracts/test_dockerfile_runtime_image.py.
+        py = _service(tmp_path / "py", "python", python_floor="3.12")
+        assert "python:3.12-slim" in (py / "Dockerfile").read_text()
+        assert "python:3.13-slim" not in (py / "Dockerfile").read_text()
         go = _service(tmp_path / "go", "go")
         # 1.24 to match mise.toml's `go` pin — a go.mod created under a newer
         # toolchain than the build image fails with "go.mod requires go >= X".
