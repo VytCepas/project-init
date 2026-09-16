@@ -247,6 +247,86 @@ def _payload(command: str, mode: str = "default", cwd: Path | None = None) -> di
     }
 
 
+# ── #965: writing ABOUT a destructive verb is not running it ────────────────
+# The deny table regex-searched the RAW command, so a commit message naming a
+# verb was indistinguishable from the verb. All five of these returned `ask`
+# before the prose exemption; the last one is a commit message that says never
+# to run the thing it names.
+PROSE = [
+    'git commit -m "docs: never run terraform destroy on prod"',
+    'git commit -m "fix: stop calling bq rm in the cleanup"',
+    "grep -rn 'terraform destroy' docs/",
+    "echo 'the dangerous verb is DROP DATABASE'",
+    "cat runbook.md | grep -c 'kubectl delete namespace'",
+    'printf "%s" "kubectl delete namespace is the one to avoid"',
+    "rg 'aws s3 rm --recursive' docs/",
+    # A `|` inside the quotes is text, not a pipeline — and the span sits in the
+    # LAST stage of a real pipeline here, so nothing consumes it.
+    "echo 'terraform destroy | sh is the dangerous shape'",
+    # A pipe in a LATER statement must not cost the earlier span its exemption.
+    # `_flows_onward` stops at the statement terminator for this reason; without
+    # that stop this ordinary command becomes a false positive.
+    'git commit -m "docs: never run terraform destroy" && git log --oneline | head -5',
+]
+
+# ── #965 fail-open guard. THIS IS THE IMPORTANT LIST. ───────────────────────
+# The prose exemption is the only place this guard can be talked out of a
+# verdict, so every one of these must still be flagged. Three of them LEAKED
+# through a draft and are pinned for that reason:
+#   * `awk 'BEGIN{system("…")}'` and GNU `sed 's/…/e'` EXECUTE their argument.
+#     The draft reused `_PATTERN_FIRST_ARG`, which contains both.
+#   * `echo "$(…)"` hides a real command inside a quoted span; blanking the
+#     span hid the verb from the table.
+# The rest pin the fail-closed design: an unknown head gets no exemption, and
+# the exemption is subtractive, so a second statement is untouched.
+PROSE_EVASION = [
+    'sh -c "terraform destroy"',
+    "bash -c 'kubectl delete namespace prod'",
+    'eval "terraform destroy"',
+    'su -c "terraform destroy"',
+    'ssh host "terraform destroy"',
+    'xargs -I{} sh -c "terraform destroy"',
+    "python -c \"import os; os.system('terraform destroy')\"",
+    "perl -e 'system(\"terraform destroy\")'",
+    "awk 'BEGIN{system(\"terraform destroy\")}'",
+    "sed 's/x/terraform destroy/e' f",
+    'echo "$(terraform destroy)"',
+    'echo "`terraform destroy`"',
+    'grep -rn "x" $(terraform destroy)',
+    'echo "safe" && terraform destroy',
+    'git commit -m "x" && terraform destroy',
+    "echo foo; terraform destroy",
+    "grep -rn 'x' docs/ ; terraform destroy",
+    "timeout 60 terraform destroy",
+    "env FOO=1 terraform destroy",
+    "find . -name x -exec terraform destroy ;",
+    # Shell spelled other ways. These were REASONED about in a first pass and
+    # not run; running them is what found the pipe class below, so they are
+    # pinned rather than argued.
+    '/bin/sh -c "terraform destroy"',
+    'command sh -c "terraform destroy"',
+    '$SHELL -c "terraform destroy"',
+    '/usr/bin/env sh -c "terraform destroy"',
+    'exec sh -c "terraform destroy"',
+    'nohup sh -c "terraform destroy"',
+    'setsid sh -c "terraform destroy"',
+    # *** PROSE PIPED INTO AN EXECUTOR. The whole class a first pass missed. ***
+    # A prose head only stays prose while its output goes nowhere: `echo` prints,
+    # but `echo | sh` RUNS. Each of these is one step, not two, and each was
+    # caught by the raw scan before the exemption existed.
+    'echo "terraform destroy" | sh',
+    'echo "terraform destroy" | bash',
+    "printf 'terraform destroy' | sh",
+    'echo "kubectl delete namespace prod" | xargs -0 sh -c',
+    'grep -rn "terraform destroy" script.sh | sh',
+    # Redirection stages a script for a later `sh x.sh`, which carries no verb
+    # of its own and so is invisible to the table. The guard should not be the
+    # thing that made staging one quieter than it used to be.
+    'echo "terraform destroy" > /tmp/x.sh',
+    'echo "terraform destroy" >> /tmp/x.sh',
+]
+
+
 class TestVerdicts:
     @pytest.mark.parametrize("command", DESTRUCTIVE)
     def test_destructive_asks_in_interactive(self, tmp_path: Path, command: str):
@@ -261,6 +341,25 @@ class TestVerdicts:
         assert hso["permissionDecision"] == "deny"
         assert "prod_guard" in hso["permissionDecisionReason"]
         assert "credential separation" in hso["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("command", PROSE)
+    def test_documentation_about_a_verb_is_not_the_verb(self, tmp_path: Path, command: str):
+        """#965 — prose naming a destructive verb must not be flagged."""
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+
+    @pytest.mark.parametrize("command", PROSE_EVASION)
+    def test_prose_exemption_cannot_be_used_to_hide_a_real_command(
+        self, tmp_path: Path, command: str
+    ):
+        """#965 fail-open guard — the exemption must never swallow a real verb.
+
+        Every entry here embeds a genuine destructive command in something that
+        LOOKS like prose. A regression that widened the exemption shows up here
+        first, and it is the only test in this file whose failure means the
+        guard stopped guarding rather than merely nagging.
+        """
+        verdict = _run_hook(_payload(command, "default", tmp_path), tmp_path)
+        assert verdict is not None, f"FAIL-OPEN — exemption swallowed: {command}"
 
     @pytest.mark.parametrize("command", SAFE)
     def test_safe_commands_pass(self, tmp_path: Path, command: str):
@@ -934,6 +1033,42 @@ EXPOSING = [
     # behind `FOO=bar`, and the assignment's own value is still an argument.
     "FOO=bar cat .env",
     "FOO=.env cat notes.md",
+    # ── studio#12 / estate#38 review, Codex P1 x3. Every one of these was
+    # ALLOWED by the guard as shipped, measured before fixing. The first two are
+    # older than the shlex rewrite and were allowed by the regex version too, so
+    # they are holes this suite never had an arm for rather than regressions.
+    #
+    # (a) A newline after a pipe CONTINUES the pipeline. `_is_break` knew that;
+    # nothing downstream did, because a coalesced "|\n" is not in _PIPE_TOKENS,
+    # so the producer and its reader landed in ONE leaf, `heads` saw only `ls`,
+    # and the exposure-safe producer was exempted with the read inside it.
+    "ls .env |\nxargs cat",
+    "ls .env |&\nxargs cat",
+    "find . -name .env |\nxargs cat",
+    # (b) Blanking a substitution with whitespace moves a mid-word `#` to the
+    # start of a word, where the comment stripper eats the rest of the line —
+    # including the secret argument. bash reads `README#suffix` and the dotenv
+    # as two arguments and never sees a comment.
+    "cat $(echo README)#suffix .env",
+    "cat `echo README`#suffix .env",
+    # (c) `-m` is a message flag under `git commit`, not under `git diff`, where
+    # it selects how merge commits are shown and takes no argument at all. The
+    # elision ate the path after it and the diff printed the file.
+    "git diff -m .env",
+    "git -C /tmp diff -m .env",
+    "git log -m .env",
+    # A subcommand word sitting AFTER the message flag is an argument, not a
+    # subcommand, and reading it as one would elide the path in front of it.
+    # This is why _takes_message stops at the flag instead of scanning the leaf.
+    "git diff -m .env commit",
+    "jj diff -m .env describe",
+    # THE SKIP LIST IS LOAD-BEARING, and this is the case that pins it. A global
+    # flag's ARGUMENT can spell a subcommand: without skipping `-C`'s argument,
+    # `commit` is seen before the message flag, the elision fires on a `diff`, and
+    # the path behind it is eaten. Contrived to type, trivial to hit in a repo
+    # with a directory named after a verb.
+    "git -C commit diff -m .env",
+    "hg --repository commit diff -m .env",
 ]
 
 NOT_EXPOSING = [
@@ -1056,6 +1191,26 @@ NOT_EXPOSING = [
     # as a path.
     'FOO=bar git commit -m "docs: describe .env handling"',
     "GIT_AUTHOR_NAME=x git commit -m do-not-cat-.env",
+    # ── The other half of the studio#12 / estate#38 P1s. Narrowing the message
+    # carve-out to message-TAKING subcommands must not narrow it to nothing, and
+    # a global flag with an argument must not hide the subcommand behind it.
+    "git -C /tmp commit -m do-not-cat-.env",
+    'git -c user.name=x commit -m "docs: describe .env handling"',
+    "git tag -m release-notes-mention-.env v1",
+    "git stash -m wip-on-.env",
+    "hg ci -m touches-.env",
+    # A global that eats its argument must not hide the subcommand behind it, in
+    # its LONG spelling as well as its short one (Codex P2 on #979): `/repo` read
+    # as the subcommand meant the message was scanned as a path.
+    "jj --repository /repo describe -m do-not-cat-.env",
+    "hg --repository /repo commit -m touches-.env",
+    "git --git-dir /tmp/x.git commit -m do-not-cat-.env",
+    'git commit --message="docs: describe .env handling"',
+    # Replacing the substitution blank must not make an ordinary comment stop
+    # being a comment: the `#` here IS at a word start, so the prose after it is
+    # prose, exactly as before.
+    "cat README.md # notes about .env",
+    "cat $(echo README).md # notes about .env",
     "VERSION=1.2 git tag -m release-.env v1",
     # The assignment prefix must not resurrect the exposure-safe exemption
     # either — `echo` stays quiet behind one, as it does in front.

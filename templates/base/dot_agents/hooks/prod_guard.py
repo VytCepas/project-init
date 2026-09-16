@@ -317,6 +317,161 @@ DENY_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bdocker\s+(volume\s+prune|system\s+prune)\b"), "docker prune"),
 ]
 
+# ── Prose is not execution (#965) ───────────────────────────────────────────
+# The deny table above regex-searches the RAW command string, so WRITING ABOUT a
+# destructive verb was indistinguishable from RUNNING it. Measured before this:
+# 5 of 5 pure documentation commands returned `ask`, including a commit message
+# that says never to run the verb it names.
+#
+#     git commit -m "docs: never run terraform destroy on prod"
+#     grep -rn 'terraform destroy' docs/
+#     echo 'the dangerous verb is DROP DATABASE'
+#     cat runbook.md | grep -c 'kubectl delete namespace'
+#
+# WHY THE `delete from` FIX DOES NOT GENERALISE. That rule solved its own
+# version of this by narrowing the RULE — requiring an identifier and then a
+# terminator — because "delete from" is ordinary English and real SQL is not.
+# That lever does not exist here: the text inside the commit message is
+# BYTE-IDENTICAL to the real command. `terraform destroy` is `terraform
+# destroy`. Only the CONTEXT it sits in separates the two, so context is what
+# this reads.
+#
+# FAIL-CLOSED BY CONSTRUCTION, and this is the whole safety argument: an
+# ALLOW-LIST of heads whose quoted arguments are inert, never a deny-list of
+# heads that execute. A deny-list has to enumerate `sh -c`, `bash -c`, `eval`,
+# `ssh`, `xargs`, `find -exec`, `su -c`, `env`, `timeout`, `watch`, `python -c`,
+# `perl -e`… and every one it misses is a fail-open. An allow-list that misses
+# something merely keeps today's prompt. `sh -c "terraform destroy"` is not
+# exempt because `sh` is not on the list.
+#
+# The exemption is also SUBTRACTIVE, never a short-circuit: a rule that still
+# matches once the prose is blanked out still fires, so `git commit -m "x" &&
+# terraform destroy` is unaffected. And blanking happens IN PLACE in the raw
+# string, preserving every other byte, because some rules match on quote
+# characters themselves (the `delete from` terminator class).
+_PROSE_HEADS = frozenset({"echo", "printf"})
+
+#: Searchers whose pattern argument is inert. DELIBERATELY NOT `_PATTERN_FIRST_ARG`,
+#: which exists for a different question (which arg is not a path) and includes
+#: `sed`/`awk`/`gawk`/`nawk`. Both of those EXECUTE: `awk 'BEGIN{system("…")}'`
+#: and GNU `sed 's/x/y/e'` run their argument, so exempting them would be a
+#: fail-open. Measured — both leaked through a draft of this that reused the
+#: other set.
+_PROSE_PATTERN_TOOLS = frozenset({"grep", "egrep", "fgrep", "rg", "ag", "ack"})
+
+#: A substitution inside a quoted string is code, whatever encloses it:
+#: `echo "$(terraform destroy)"` prints the OUTPUT of a real destroy. Blanking
+#: such a span would hide the verb from the deny table — the third fail-open a
+#: draft of this shipped.
+_HAS_SUBSTITUTION = re.compile(r"\$\(|`|\$\{")
+
+#: A quoted literal, honouring backslash escapes and not crossing quote styles.
+_QUOTED = re.compile(r"(['\"])(?:\\.|(?!\1).)*?\1", re.DOTALL)
+
+#: Statement separators. A quoted span's head is the first bare word after the
+#: last separator that is not itself inside quotes.
+_SEP = re.compile(r"[;&|\n]")
+
+
+#: Statement terminators — where a pipeline ends and a new command begins.
+#: A `|` before one of these is downstream of the span; after it is a new
+#: statement the deny table judges on its own.
+_TERMINATOR = re.compile(r"(?:&&|\|\||;|\n)")
+
+
+#: Redirections that move a FILE DESCRIPTOR rather than sending the prose to a
+#: destination — `2>&1`, `>&2`, `2>/dev/null`. stdout is where an exempt head
+#: writes, so a redirect of anything else cannot carry what it wrote.
+_FD_PLUMBING = re.compile(r"\d*>&\d*|2>\s*\S+")
+
+
+def _flows_onward(command: str, span_end: int, quoted: list[re.Match[str]]) -> bool:
+    """True when the prose after *span_end* is piped or redirected somewhere.
+
+    THE EXEMPTION IS FOR PROSE THAT IS DISPLAYED OR SEARCHED, NOT PROSE THAT IS
+    SENT. `echo "terraform destroy" | sh` executes it; so does `printf … | bash`
+    and `grep -rn … script.sh | sh`. Each was a ONE-STEP fail-open that the raw
+    scan used to catch, found by testing the paths a first pass had only
+    reasoned about.
+
+    Downstream only. `cat runbook.md | grep -c 'kubectl delete namespace'` has a
+    pipe, but the span is in the LAST stage — nothing consumes it — so it stays
+    exempt. Redirection counts too: `echo "…" > x.sh` stages a script, and a
+    guard should not be the thing that made staging one quieter than it was.
+    """
+    tail = list(command[span_end:])
+    # Blank later quoted spans first: a `|` inside `echo 'a | b'` is text.
+    for later in quoted:
+        if later.start() >= span_end:
+            for i in range(later.start() - span_end, later.end() - span_end):
+                if 0 <= i < len(tail):
+                    tail[i] = " "
+    rest = "".join(tail)
+    terminator = _TERMINATOR.search(rest)
+    if terminator:
+        rest = rest[: terminator.start()]
+    # Plumbing that cannot carry the prose is not "onward" (PR #971 review).
+    # `echo "…" 2>&1` redirects STDERR, and the prose went to stdout, so the
+    # bare `>` in it is not a destination. Same for an fd duplication like
+    # `>&2`. Blanked BEFORE the check, never special-cased after it, so a real
+    # destination in the same statement still counts: `… 2>&1 > run.sh` keeps
+    # its `> run.sh` and stays unexempt.
+    rest = _FD_PLUMBING.sub(" ", rest)
+    return "|" in rest or ">" in rest
+
+
+def _prose_spans(command: str) -> list[tuple[int, int]]:
+    """Character spans in *command* that are prose rather than execution.
+
+    A quoted literal qualifies when the statement it belongs to is headed by a
+    command that only prints or searches its arguments, or when it is the value
+    of a commit-message flag — AND its output goes nowhere. Prose that is
+    DISPLAYED or SEARCHED is inert; prose that is SENT somewhere is not.
+    """
+    spans: list[tuple[int, int]] = []
+    quoted = list(_QUOTED.finditer(command))
+    for match in quoted:
+        if _HAS_SUBSTITUTION.search(match.group(0)):
+            continue
+        if _flows_onward(command, match.end(), quoted):
+            continue
+        start = match.start()
+        # Blank earlier quoted spans before looking for the separator, or a
+        # separator INSIDE an earlier string would be read as a real one — the
+        # substring-vs-token defect `_statements` was rewritten for.
+        prefix = list(command[:start])
+        for earlier in quoted:
+            if earlier.end() <= start:
+                for i in range(earlier.start(), earlier.end()):
+                    prefix[i] = " "
+        head_text = _SEP.split("".join(prefix))[-1]
+        words = head_text.split()
+        if not words:
+            continue
+        head = words[0].rsplit("/", 1)[-1]
+        if head in _PROSE_HEADS:
+            spans.append(match.span())
+        elif head in _PROSE_PATTERN_TOOLS:
+            # The pattern is what the tool searches FOR; it opens nothing.
+            spans.append(match.span())
+        elif _MESSAGE_ARG.search(head_text + match.group(0)):
+            # `git commit -m "…"`, `git tag -am "…"` — the value is prose.
+            spans.append(match.span())
+    return spans
+
+
+def _without_prose(command: str) -> str:
+    """*command* with prose spans blanked to spaces, same length and offsets."""
+    spans = _prose_spans(command)
+    if not spans:
+        return command
+    chars = list(command)
+    for start, end in spans:
+        for i in range(start, end):
+            chars[i] = " "
+    return "".join(chars)
+
+
 # ── Secret-file exposure (PI-893) ───────────────────────────────────────────
 # The scaffold's secret machinery is write/commit-oriented: gitleaks and the
 # pre-commit gate stop you COMMITTING a secret, .gitignore stops you tracking
@@ -476,6 +631,32 @@ _BREAK_TOKENS = frozenset({"&&", "||", ";", "&", "\n"})
 _BREAK_CHARS = frozenset(";&|\n")
 
 
+def _is_pipe(token: str) -> bool:
+    """True when *token* is a pipe, INCLUDING a run that swallowed the newline.
+
+    `_is_break` already knew that `|<newline>` continues a pipeline and returns
+    False for it. Nothing downstream agreed: `_statement_exposes` asked
+    `token in _PIPE_TOKENS`, which a coalesced `"|\n"` fails, so the token was
+    appended to the leaf as an ordinary WORD. The pipeline then had one leaf,
+    `heads` held only the producer, no reader verb was visible, the producer was
+    exempted and the read went through. Reproduced against this file before
+    fixing (Codex P1 on studio#12, the same shape #972 fixed for the break side):
+
+        ls <dotenv> |<newline>xargs cat   -> allow
+
+    Break wins over pipe in a mixed run: `|<newline>;` ends the pipeline, and
+    saying otherwise would merge two statements — the hole `_BREAK_TOKENS` closes.
+    """
+    if token in _PIPE_TOKENS:
+        return True
+    if not token or not all(ch in _BREAK_CHARS for ch in token):
+        return False
+    rest = token.replace("&&", "\x00").replace("||", "\x00").replace("|&", "\x01")
+    if ";" in rest or "\x00" in rest or "&" in rest:
+        return False
+    return "|" in rest or "\x01" in rest
+
+
 def _is_break(token: str) -> bool:
     """True when *token* is a run of punctuation that separates STATEMENTS.
 
@@ -524,6 +705,118 @@ _MESSAGE_FLAGS = frozenset({"-m", "-am", "--message"})
 # do-not-cat-<dotenv>` stays quiet) and returns every other command to the
 # ordinary path. An exemption is only ever as safe as the set it applies to.
 _MESSAGE_VERBS = frozenset({"git", "hg", "svn", "bzr", "jj"})
+# AND ONLY UNDER A SUBCOMMAND THAT ACTUALLY TAKES A MESSAGE. Scoping the
+# carve-out to the VCS verb fixed `less -m` and left the same shape one level
+# down: `git diff -m` selects how merge commits are shown and takes NO argument,
+# so the elision ate the path after it. Reproduced against this file before
+# fixing (Codex P1 on estate#38), with a modified tracked dotenv in the tree:
+#     git diff -m <dotenv>   -> allow   (the diff prints the secret)
+# The previous round wrote "an exemption is only ever as safe as the set it
+# applies to" and then applied it to every subcommand there is. An UNKNOWN
+# subcommand does not elide: the guard stays strict, which is the direction that
+# costs a false positive rather than a bypass.
+_MESSAGE_SUBCOMMANDS = frozenset(
+    {
+        # git
+        "commit",
+        "tag",
+        "merge",
+        "revert",
+        "cherry-pick",
+        "stash",
+        "notes",
+        # hg / bzr
+        "ci",
+        "backout",
+        "graft",
+        # svn — every subcommand that takes a log message
+        "copy",
+        "cp",
+        "delete",
+        "del",
+        "remove",
+        "rm",
+        "import",
+        "mkdir",
+        "move",
+        "mv",
+        "rename",
+        "ren",
+        "lock",
+        # jj
+        "describe",
+        "desc",
+        "new",
+        "split",
+        "squash",
+    }
+)
+# Global flags that consume the NEXT token, so the subcommand is not simply the
+# first non-flag word: `git -C /path commit -m ...` must still find `commit`.
+# The long spellings are here because the short ones alone cost a false positive:
+# `jj --repository /repo describe -m "<prose>"` read `/repo` as the subcommand,
+# found no message subcommand, and scanned the commit message as a path (Codex P2
+# on #979). Any list like this is incomplete by construction, which is why it is
+# the second of two defences rather than the only one.
+_VCS_GLOBAL_ARG_FLAGS = frozenset(
+    {
+        "-C",
+        "-c",
+        "-R",
+        "-d",
+        "--git-dir",
+        "--work-tree",
+        "--namespace",
+        "--exec-path",
+        "--cwd",
+        "--repository",
+        "--directory",
+        "--config",
+        "--config-toml",
+        "--config-dir",
+        "--config-option",
+        "--encoding",
+        "--at-operation",
+        "--at-op",
+    }
+)
+
+
+def _takes_message(leaf: list[str], verb_at: int) -> bool:
+    """True when a message-TAKING subcommand appears BEFORE the message flag.
+
+    NOT "the first non-flag word", and NOT "any word in the leaf". Both are wrong
+    in a way that matters, and they are wrong in opposite directions:
+
+      * first-non-flag depends on knowing every global that eats its argument, and
+        that list can never be complete. `jj --repository /repo describe` cost a
+        false positive on exactly that gap.
+      * any-word-in-the-leaf reads `git diff -m <dotenv> commit` as a commit,
+        elides the path, and the diff prints the file. That one is a BYPASS, so it
+        is the direction that decides the shape.
+
+    Scanning only the tokens before the message flag gets both: an argument sitting
+    AFTER `-m` can never masquerade as a subcommand, and a global's argument before
+    it is harmless unless it happens to spell a subcommand — which the skip list
+    above then covers. Two narrow defences rather than one wide one.
+    """
+    skip = False
+    for token in leaf[verb_at + 1 :]:
+        if skip:
+            skip = False
+            continue
+        flag, sep, _ = token.partition("=")
+        if token in _MESSAGE_FLAGS or (sep and flag in _MESSAGE_FLAGS):
+            return False
+        if token in _VCS_GLOBAL_ARG_FLAGS:
+            skip = True
+            continue
+        if token.startswith("-"):
+            continue
+        if token in _MESSAGE_SUBCOMMANDS:
+            return True
+    return False
+
 
 # A SHELL ASSIGNMENT PREFIX IS NOT THE COMMAND.
 # `FOO=bar git commit -m "docs: describe .env handling"` puts `FOO=bar` in
@@ -674,6 +967,20 @@ _READER_VERBS = frozenset(
 )
 
 
+# WHAT REPLACES A SUBSTITUTION IS LOAD-BEARING, AND A SPACE WAS THE WRONG
+# CHOICE. `_tokenize` strips comments, and `#` opens one at the START OF A WORD;
+# blanking with whitespace is exactly what moves a mid-word `#` to a word start.
+# Reproduced against this file before fixing (Codex P1 on studio#12):
+#     cat $(echo README)#suffix <dotenv>   -> allow
+# bash reads `README#suffix` and the dotenv as two arguments; the blank turned
+# the outer text into `cat  #suffix <dotenv>`, the comment stripper ate the rest
+# of the line, and the secret argument stopped existing. `_` keeps the word
+# joined the way the shell joins it. It stays a word character on purpose: the
+# stem is not decoration in _SECRET_PATH either, so `cat $(f).env` still reads as
+# `_.env` and still matches.
+_SUBSTITUTION_BLANK = "_"
+
+
 def _leaf_commands(command: str) -> list[str]:
     """Every simple command in *command*, including ones inside substitutions.
 
@@ -687,7 +994,7 @@ def _leaf_commands(command: str) -> list[str]:
         inner = [g for match in _SUBSTITUTION.finditer(chunk) for g in match.groups() if g]
         if inner:
             pending.extend(inner)
-            chunk = _SUBSTITUTION.sub(" ", chunk)
+            chunk = _SUBSTITUTION.sub(_SUBSTITUTION_BLANK, chunk)
         out.extend(re.split(r"[;&|\n]+", chunk))
     return out
 
@@ -715,7 +1022,7 @@ def _statements(command: str) -> list[list[str]]:
         inner = [g for match in _SUBSTITUTION.finditer(chunk) for g in match.groups() if g]
         if inner:
             pending.extend(inner)
-            chunk = _SUBSTITUTION.sub(" ", chunk)
+            chunk = _SUBSTITUTION.sub(_SUBSTITUTION_BLANK, chunk)
         tokens = _tokenize(chunk)
         if tokens is None:
             # Unparsable (unbalanced quotes). Fall back to the character split
@@ -782,7 +1089,7 @@ def _statement_exposes(statement: list[str]) -> str | None:
     leaves: list[list[str]] = []
     current: list[str] = []
     for token in statement:
-        if token in _PIPE_TOKENS:
+        if _is_pipe(token):
             if current:
                 leaves.append(current)
             current = []
@@ -812,8 +1119,9 @@ def _statement_exposes(statement: list[str]) -> str | None:
         # The verb decides whether `-m` is a message flag at all — read it from
         # the RAW leaf, before any elision, or the check would depend on the
         # elision it is meant to gate.
-        _raw_head = leaf[_verb_index(leaf)].rsplit("/", 1)[-1] if leaf else ""
-        _elide_message = _raw_head in _MESSAGE_VERBS
+        _raw_at = _verb_index(leaf) if leaf else 0
+        _raw_head = leaf[_raw_at].rsplit("/", 1)[-1] if leaf else ""
+        _elide_message = _raw_head in _MESSAGE_VERBS and _takes_message(leaf, _raw_at)
         tokens: list[str] = []
         skip = False
         for token in leaf:
@@ -1140,8 +1448,15 @@ def evaluate(
     """Return the hook verdict for *command*, or None to let it through."""
     if any(p.search(command) for p in allow):
         return None
+    # Computed once, not per rule: 20-odd rules over the same string.
+    prose_free = _without_prose(command)
     for pattern, label in DENY_RULES:
         if pattern.search(command):
+            # #965: the verb is real only if it survives blanking the prose. A
+            # rule that matches ONLY inside a commit message or a grep pattern
+            # was reading documentation, not an operation.
+            if not pattern.search(prose_free):
+                continue
             return _verdict(
                 f"prod_guard: '{label}' is a destructive operation. "
                 "If this is intentional and safe, add a matching regex to "

@@ -62,6 +62,7 @@ from project_init.scaffold import (
     load_preset,
     marketplace_source_vars,
     memory_tier,
+    normalize_memory_stack,
     overlay_layers,
     parse_version,
     read_preserve_globs,
@@ -237,6 +238,9 @@ def _overlay_off_defaults() -> dict[str, str]:
         "license_apache": "",
         "license_proprietary": "",
         "python_floor": "3.11",
+        # PI-954: pre-954 records carry no container base tag. Default it to the
+        # floor, which is what the tag was before an exact pin could reach it.
+        "python_image_tag": "3.11",
         # #847: pre-847 records carry no pin variable; empty means "never emit
         # .python-version" — read_scaffold_record recomputes it from the manifest.
         "python_version_pin": "",
@@ -667,7 +671,13 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict[str, str], dic
     # config ALWAYS wrote a memory block, so an absent stack uniquely identifies
     # core. Defaulting to obsidian-only here would wrongly re-enable memory for a
     # core project whose JSON record was deleted (Copilot review, PR #473).
-    stack = fields.get("memory.stack", "none")
+    # Canonicalised at the point of READ (#958). The recorded stack is exactly
+    # where a legacy alias lives, and three separate things downstream derive
+    # from it — the tier, the preset name, and the re-recorded `memory_stack`.
+    # Un-normalised, `obsidian` gave a blank tier beside a present vault_path,
+    # AND a preset name (`obsidian`) that `load_preset` rejects with ValueError,
+    # since the stack→preset map below passes unknown names straight through.
+    stack = normalize_memory_stack(fields.get("memory.stack", "none"))
     # Memory stacks map 1:1 onto preset names EXCEPT two that have no preset of
     # their own: the vault-free `none` stack (preset is `core` — load_preset("none")
     # would fail), and tier-3 `obsidian-graphify-rag`, which is --memory-only (#505)
@@ -974,6 +984,14 @@ def read_scaffold_record(target: Path) -> tuple[str, dict[str, str], dict[str, s
         variables.get("python_floor", "")
         if variables.get("python") and (owns_pin or no_pin)
         else ""
+    )
+    # PI-954: recompute the container base tag from the same live sources, so an
+    # upgrade over a project that has since pinned an exact patch re-renders the
+    # Dockerfile against that patch instead of a floating x.y tag.
+    from project_init.variables import _pinned_python_patch
+
+    variables["python_image_tag"] = _pinned_python_patch(target) or variables.get(
+        "python_floor", ""
     )
     # #849: the rag.md rule gates on the live rag_endpoint value — recompute so
     # wiring RAG (or a legacy record with no gate variables) re-renders right.
@@ -1304,10 +1322,18 @@ def _ensure_ci_block(text: str) -> str:
     return head + sep + tail
 
 
+# SCOPE MUST MATCH config.yaml.tmpl AND AGENTS.md (#968). This block is what an
+# UPGRADED repo gets, and it described an unscoped stand-down while a fresh
+# scaffold described a scoped one — the exact two-surfaces-disagree defect #968
+# exists to close, reintroduced on the path #968 did not touch. Caught in review
+# on PR #971, not by a test, which is why one exists now.
 _CONTEXT_BLOCK = (
     "# Detect-and-defer boundary marker (PI-901; the ambient-layer marker\n"
-    "# contract). repo = this project\n"
-    "# governs itself, so an ambient/global agent layer stands down inside it;\n"
+    "# contract). repo = this project governs itself on PROJECT matters —\n"
+    "# workflow, conventions, tooling — and an ambient/global agent layer stands\n"
+    "# down for those. SCOPED, NOT TOTAL: its safety and verification rules still\n"
+    "# apply wherever AGENTS.md is silent, because a scaffold does not restate\n"
+    "# them and an unscoped stand-down would delete rather than replace them.\n"
     "# ambient = opt out. Not `governance:` — that name is already a boolean.\n"
     "context: repo\n"
     "\n"

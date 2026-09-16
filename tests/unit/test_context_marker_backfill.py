@@ -15,7 +15,7 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from project_init.scaffold import _RECORD_MARKER
+from project_init.scaffold import _RECORD_MARKER, _TEMPLATES_DIR
 from project_init.upgrade import _ensure_context_key
 
 _PRE_901 = """\
@@ -108,3 +108,38 @@ def test_backfill_reaches_a_config_with_no_project_key() -> None:
     out = _ensure_context_key("language: python\n")
     assert out.startswith("# Detect-and-defer")
     assert "\ncontext: repo\n" in out
+
+
+def test_backfilled_comment_states_the_same_scope_as_a_fresh_scaffold() -> None:
+    """#968 — an UPGRADED repo must not describe an unscoped stand-down.
+
+    #968 closed the gap between config.yaml and AGENTS.md for fresh scaffolds.
+    This block is the third surface, on the path that issue did not touch, and
+    it still said the ambient layer "stands down inside it" full stop. An
+    upgraded repo would therefore contradict a freshly scaffolded one — the
+    exact defect, reintroduced one path over.
+
+    Caught by review on PR #971 rather than by a test, so this is the test.
+    """
+    spliced = _ensure_context_key(_PRE_901)
+    lowered = spliced.lower()
+    assert "scoped, not total" in lowered
+    assert "silent" in lowered, "does not say what happens where AGENTS.md is silent"
+    # The unscoped wording must be gone, not merely supplemented.
+    assert "stands down inside it" not in lowered
+
+
+def test_backfilled_scope_matches_the_template_wording() -> None:
+    """The two producers must not drift — assert on both, not on one.
+
+    Reading the template rather than restating its text: a copy of the wording
+    in this test would pass while the template said something else, which is the
+    whole failure mode here.
+    """
+    template = (_TEMPLATES_DIR / "base" / "dot_agents" / "config.yaml.tmpl").read_text(
+        encoding="utf-8"
+    )
+    spliced = _ensure_context_key(_PRE_901)
+    for phrase in ("scoped", "silent", "project matters"):
+        assert phrase in template.lower(), f"template lost {phrase!r}"
+        assert phrase in spliced.lower(), f"upgrade block lost {phrase!r}"

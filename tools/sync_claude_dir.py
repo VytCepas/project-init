@@ -36,6 +36,7 @@ MIRRORED = (
     "skills",
     "agents",
     "config.yaml",
+    "inject.d",
     "docs/CODE_MAP.md",
 )
 
