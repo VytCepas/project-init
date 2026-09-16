@@ -128,6 +128,27 @@ class TestRuntimeStageProvesItself:
             assert f"site-packages/{pkg}" in removal, f"{pkg} is not removed"
 
 
+class TestRuntimeStagesAreMinimal:
+    """PI-955: a runtime stage ships only what the binary actually calls."""
+
+    @pytest.mark.parametrize(
+        ("language", "expected"),
+        [("go", "gcr.io/distroless/static-debian12"), ("rust", "gcr.io/distroless/cc-debian12")],
+    )
+    def test_compiled_languages_run_on_distroless(
+        self, tmp_path: Path, language: str, expected: str
+    ):
+        df = _service(tmp_path / language, language=language)
+        runtime = df[df.index("AS build") :]
+        assert f"FROM {expected} AS runtime" in runtime
+
+    def test_rust_uses_cc_not_static(self, tmp_path: Path):
+        """A cargo release binary links glibc dynamically — it needs libgcc_s.so.1
+        and libc.so.6, which `static` does not carry and `cc` does."""
+        df = _service(tmp_path / "rust", language="rust")
+        assert "distroless/static" not in df
+
+
 class TestScopedToPythonServices:
     def test_absent_for_non_service_delivery(self, tmp_path: Path):
         target = tmp_path / "proto"

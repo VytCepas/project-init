@@ -125,8 +125,13 @@ COPY . .
 RUN cargo build --release && \
     cp "target/release/$(grep -m1 '^name' Cargo.toml | sed -E 's/name *= *"(.*)"/\1/')" /src/server
 
-# --- runtime stage: slim base (dynamically-linked glibc binary) ---
-FROM debian:bookworm-slim AS runtime
+# --- runtime stage: distroless, no shell/toolchain ---
+# `cc` (not `static`) because a cargo release binary links glibc dynamically:
+# it needs libgcc_s.so.1 and libc.so.6, which is exactly what this image adds
+# over `static`. Verified by building this template's own Rust stage against it
+# and running the binary (PI-955); `debian:bookworm-slim` before it shipped a
+# whole userland the binary never calls.
+FROM gcr.io/distroless/cc-debian12 AS runtime
 WORKDIR /app
 COPY --from=build --chown=10001:10001 /src/server /app/server
 ENV PORT=8080
