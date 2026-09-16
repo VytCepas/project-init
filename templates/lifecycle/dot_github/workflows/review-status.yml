@@ -97,16 +97,6 @@ jobs:
           #
           # Asking for reviews.totalCount needs only pull-requests:read, keeps
           # the token narrow, and costs one fewer API round-trip.
-          REVIEW_DATA=$(gh api graphql \
-            -F owner="$OWNER" -F repo="$REPO_NAME" -F number="$PR_NUMBER" -f query='
-              query($owner:String!, $repo:String!, $number:Int!) {
-                repository(owner:$owner, name:$repo) {
-                  pullRequest(number:$number) {
-                    reviews(first:1) { totalCount }
-                    reviewThreads(first:100) { nodes { isResolved } }
-                  }
-                }
-              }')
           # A CODEX REVIEW ARRIVES BY TWO DIFFERENT DOORS AND ONLY ONE OF THEM
           # IS A REVIEW. Codex posts a formal pull request review when it picks
           # the PR up automatically on `opened`, but a review asked for with an
@@ -166,6 +156,27 @@ jobs:
                       | select(.body | sub("^[[:space:]]+"; "")
                                | ascii_downcase | startswith("codex review:"))]
                      | length')
+          # THREADS ARE SAMPLED LAST, AND THE ORDER IS THE CORRECTNESS ARGUMENT.
+          # This query used to run BEFORE the pagination above. `--paginate`
+          # walks pages sequentially, so a review published while the walk is in
+          # flight can be seen by a later page while `reviewThreads` still holds
+          # the pre-review state — the count says "a review landed", the thread
+          # state says "nothing unresolved", and the run posts SUCCESS over
+          # findings that exist. These runs are not serialized either, so the
+          # stale one can then overwrite the status a review-comment-triggered
+          # run published. Sampling threads after the marker scan cannot invert
+          # that: any review the scan saw has already produced its threads.
+          # Raised in review on #986.
+          REVIEW_DATA=$(gh api graphql \
+            -F owner="$OWNER" -F repo="$REPO_NAME" -F number="$PR_NUMBER" -f query='
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  pullRequest(number:$number) {
+                    reviews(first:1) { totalCount }
+                    reviewThreads(first:100) { nodes { isResolved } }
+                  }
+                }
+              }')
           REVIEWS=$(printf '%s' "$REVIEW_DATA" \
             | jq '.data.repository.pullRequest.reviews.totalCount')
           REVIEWS=$((REVIEWS + CODEX_REVIEWS))
