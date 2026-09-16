@@ -36,6 +36,7 @@ logs/
 !.agents/settings.json
 !.agents/agents
 !.agents/config.yaml
+!.agents/inject.d
 !.agents/docs
 .agents/docs/*
 !.agents/docs/CODE_MAP.md
