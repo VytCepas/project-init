@@ -51,6 +51,20 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SHIPPED_DIRS = ["templates", "plugins", "schemas"]
 _SHIPPED_FILES = ["src/project_init/upgrade.py", "README.md"]
 
+# Paths the BUILD CONFIG ships that this scan deliberately does not read, each
+# with its reason. Held explicitly, not by omission: the cross-check below
+# subtracts this set, so an exemption is a visible decision that has to be
+# argued for, and a path that stops being shipped makes the exemption go stale
+# loudly instead of sitting here forever. (PR #990 review.)
+_SCAN_EXEMPT = {
+    "src/project_init": (
+        "The package source names genuine integration seams whose modules are "
+        "called after them, so cleaning it is a rename with a different blast "
+        "radius — PI-949's declared scope. `upgrade.py` is covered individually "
+        "in _SHIPPED_FILES, for the text it writes into a user's config.yaml."
+    ),
+}
+
 # Lowercased substrings that name the private system or its internals. Kept as
 # a list so a second one can be added without reshaping the test.
 _PRIVATE_NAMES = ["harbor"]
@@ -108,6 +122,30 @@ def test_the_scan_actually_reaches_the_files_it_claims_to():
     assert len(scanned) > 100, f"only {len(scanned)} files scanned — the walk is not working"
 
 
+def test_every_declared_shipped_path_exists_and_is_readable():
+    """A declared path that is not there is scanned as nothing, silently.
+
+    `_shipped_paths` appends every `_SHIPPED_FILES` entry whether or not it
+    exists, and the scan loop swallows `OSError` — which includes
+    `FileNotFoundError`. So a typo, a rename, or a deleted file makes this
+    contract report green while covering one file fewer, and the positive control
+    above cannot catch it: that one checks the path STRING is in the scan list,
+    which a nonexistent path satisfies just as well. Raised in review on PR #990.
+
+    Directories get the same treatment, because an `rglob` over a missing
+    directory yields nothing rather than raising.
+    """
+    for f in _SHIPPED_FILES:
+        p = _REPO_ROOT / f
+        assert p.is_file(), f"_SHIPPED_FILES names {f}, which is not a file"
+        assert p.read_text(encoding="utf-8"), f"_SHIPPED_FILES names {f}, which is empty"
+
+    for d in _SHIPPED_DIRS:
+        p = _REPO_ROOT / d
+        assert p.is_dir(), f"_SHIPPED_DIRS names {d}, which is not a directory"
+        assert any(p.rglob("*")), f"_SHIPPED_DIRS names {d}, which is empty"
+
+
 def test_every_path_the_build_config_ships_is_scanned():
     """The list above is a COPY of a fact that lives in `pyproject.toml`, and it
     drifted twice before anyone noticed.
@@ -120,10 +158,18 @@ def test_every_path_the_build_config_ships_is_scanned():
     exposure and not a live one.
 
     So the fix is not "remember to add the directory". It is this assertion:
-    whatever the build config ships, the scan must reach. A SUBSET check rather
-    than equality, because the scan is legitimately wider — `plugins/` goes to a
-    user through the marketplace rather than the wheel, and `upgrade.py` is
-    covered for what it *writes* rather than for being copied.
+    whatever the build config ships, the scan must reach — or is exempt by a
+    reason written down in `_SCAN_EXEMPT`. A SUBSET check rather than equality,
+    because the scan is legitimately wider: `plugins/` goes to a user through
+    the marketplace rather than the wheel, and `upgrade.py` is covered for what
+    it *writes* rather than for being copied.
+
+    `packages` is read as well as `force-include`. The first cut of this test
+    read only `force-include` and the readme, which let the wheel's actual
+    package root — `src/project_init` — sit in neither `ships` nor `covered`, so
+    newly packaged code could carry a forbidden reference and this
+    packaging-drift guard would not have noticed. Raised in review on PR #990,
+    and it was the same defect as the one the test exists to catch, one level up.
     """
     import tomllib
 
@@ -135,6 +181,8 @@ def test_every_path_the_build_config_ships_is_scanned():
     )
     # force-include keys are source paths relative to the repo root
     ships.update(wheel.get("force-include", {}))
+    # packages are the wheel's actual contents, not an extra
+    ships.update(wheel.get("packages", []))
     readme = cfg.get("project", {}).get("readme")
     if isinstance(readme, str):
         ships.add(readme)
@@ -143,12 +191,20 @@ def test_every_path_the_build_config_ships_is_scanned():
 
     assert ships, "read no shipped paths out of pyproject.toml — the parse is wrong, not the config"
 
+    # An exemption for something no longer shipped is a stale excuse, and it
+    # would quietly widen the next one. Catch it here rather than let it rot.
+    stale = sorted(s for s in _SCAN_EXEMPT if s not in ships)
+    assert not stale, (
+        "_SCAN_EXEMPT names paths pyproject.toml no longer ships — drop them:\n  "
+        + "\n  ".join(stale)
+    )
+
     covered = set(_SHIPPED_DIRS) | set(_SHIPPED_FILES)
-    missing = sorted(s for s in ships if s not in covered)
+    missing = sorted(s for s in ships if s not in covered and s not in _SCAN_EXEMPT)
     assert not missing, (
         "pyproject.toml ships these and the private-reference scan does not reach them:\n  "
         + "\n  ".join(missing)
-        + "\nAdd each to _SHIPPED_DIRS or _SHIPPED_FILES."
+        + "\nAdd each to _SHIPPED_DIRS or _SHIPPED_FILES, or to _SCAN_EXEMPT with a reason."
     )
 
 
