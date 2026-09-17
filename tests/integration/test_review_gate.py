@@ -66,7 +66,14 @@ def test_monitor_pr_gates_on_reviews_and_unresolved_threads(tmp_target: Path):
 # PI_TEST_DECISION_LATE, when set, is returned from the SECOND reviewDecision
 # query onward — the first answers empty. That reproduces the real ordering: the
 # decision is read before any review exists, then a review lands.
+#
+# PI-981: the review count is filtered by a jq program the SCRIPT passes to
+# `gh --jq`. The stub runs that program with real jq over fixture JSON rather than
+# printing a canned count, because a canned count would pass while the filter
+# that ties a review to the head was deleted.
 _GH_STUB = """#!/bin/bash
+jqprog=""; prev=""
+for a in "$@"; do [ "$prev" = "--jq" ] && jqprog="$a"; prev="$a"; done
 case "$*" in
 *"--json headRefName"*) echo "feature false" ;;
 *"--json headRefOid"*) echo "$PI_TEST_SHA" ;;
@@ -79,7 +86,8 @@ case "$*" in
     echo ""
   fi
   ;;
-*"--json reviews"*) echo "$PI_TEST_REVIEWS" ;;
+*"/pulls/"*"/reviews"*) jq -r "$jqprog" "$PI_TEST_REVIEWS_JSON" ;;
+*"comments(first:100"*) jq -r "$jqprog" "$PI_TEST_COMMENTS_JSON" ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
 *"api graphql"*) echo "$PI_TEST_UNRESOLVED" ;;
 *"--json state"*) echo "OPEN" ;;
@@ -99,14 +107,31 @@ exec {real_git} "$@"
 """
 
 
+_HEAD = "a" * 40
+_OLDER = "b" * 40
+
+
+def _formal_review(sha: str) -> dict[str, object]:
+    """A formal review, as REST `pulls/{n}/reviews` lists it."""
+    return {"id": 1, "commit_id": sha, "state": "COMMENTED"}
+
+
+def _codex_comment_review(sha: str) -> dict[str, object]:
+    """A comment-form Codex review, as the GraphQL comments query returns it."""
+    body = f"Codex Review: Didn't find any major issues.\n\n**Reviewed commit:** `{sha[:10]}`\n"
+    return {"author": {"login": "chatgpt-codex-connector"}, "body": body}
+
+
 def _run_monitor(
     tmp_target: Path,
     tmp_path: Path,
     *,
-    reviews: str,
+    reviews: list[dict[str, object]],
     unresolved: str,
     decision_late: str = "",
 ):
+    """`reviews` mixes both shapes; each is served to the query that would see it."""
+    import json
     import shutil
 
     scaffold(tmp_target, fallback_preset(), fallback_variables())
@@ -118,10 +143,16 @@ def _run_monitor(
     (stub / "git").chmod(0o755)
     (stub / "sleep").write_text("#!/bin/sh\nexit 0\n")
     (stub / "sleep").chmod(0o755)
+    formal = [r for r in reviews if "commit_id" in r]
+    (tmp_path / "reviews.json").write_text(json.dumps(formal))
+    nodes = [r for r in reviews if "body" in r]
+    comments = {"data": {"repository": {"pullRequest": {"comments": {"nodes": nodes}}}}}
+    (tmp_path / "comments.json").write_text(json.dumps(comments))
     env = os.environ.copy()
     env["PATH"] = f"{stub}:{env['PATH']}"
-    env["PI_TEST_SHA"] = "a" * 40
-    env["PI_TEST_REVIEWS"] = reviews
+    env["PI_TEST_SHA"] = _HEAD
+    env["PI_TEST_REVIEWS_JSON"] = str(tmp_path / "reviews.json")
+    env["PI_TEST_COMMENTS_JSON"] = str(tmp_path / "comments.json")
     env["PI_TEST_UNRESOLVED"] = unresolved
     env["PI_TEST_DECISION_LATE"] = decision_late
     env["PI_TEST_STATE"] = str(tmp_path / "decision-seen")
@@ -139,14 +170,14 @@ def _run_monitor(
 def test_unresolved_comments_open_a_review_cycle_instead_of_merging(
     tmp_target: Path, tmp_path: Path
 ):
-    result = _run_monitor(tmp_target, tmp_path, reviews="1", unresolved="2")
+    result = _run_monitor(tmp_target, tmp_path, reviews=[_formal_review(_HEAD)], unresolved="2")
     assert result.returncode == 2
     assert "2 unresolved review comment(s)" in result.stdout
     assert "Merged" not in result.stdout
 
 
 def test_reviewed_with_no_open_comments_merges_without_override(tmp_target: Path, tmp_path: Path):
-    result = _run_monitor(tmp_target, tmp_path, reviews="1", unresolved="0")
+    result = _run_monitor(tmp_target, tmp_path, reviews=[_formal_review(_HEAD)], unresolved="0")
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Merged PR #1" in result.stdout
     assert "(admin)" not in result.stdout
@@ -163,10 +194,49 @@ def test_changes_requested_after_the_no_policy_wait_blocks_the_merge(
     result = _run_monitor(
         tmp_target,
         tmp_path,
-        reviews="1",
+        reviews=[_formal_review(_HEAD)],
         unresolved="0",
         decision_late="CHANGES_REQUESTED",
     )
     assert result.returncode == 2, result.stdout + result.stderr
     assert "Review/decision failed" in result.stdout
+    assert "Merged" not in result.stdout
+
+
+# ── PI-981 / #982: the monitor counts a review only for the commit it reviewed ──
+# The same predicate review-status.yml posts as `review/decision`. Before PI-981
+# the monitor counted any review ever posted, so after a push it called the new
+# head reviewed while the required check waited; and it never saw a comment-form
+# Codex review at all, so it timed out on PRs the gate had passed (#982).
+
+
+def test_a_review_of_an_older_commit_does_not_satisfy_the_monitor(tmp_target: Path, tmp_path: Path):
+    result = _run_monitor(tmp_target, tmp_path, reviews=[_formal_review(_OLDER)], unresolved="0")
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "Merged" not in result.stdout
+
+
+def test_a_comment_form_codex_review_of_the_head_satisfies_the_monitor(
+    tmp_target: Path, tmp_path: Path
+):
+    """#982: the review an `@codex review` comment asks for is a plain comment."""
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        reviews=[_codex_comment_review(_HEAD)],
+        unresolved="0",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Merged PR #1" in result.stdout
+
+
+def test_a_comment_form_codex_review_of_an_older_commit_does_not(tmp_target: Path, tmp_path: Path):
+    """The control for the test above: the comment must name THIS head."""
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        reviews=[_codex_comment_review(_OLDER)],
+        unresolved="0",
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
     assert "Merged" not in result.stdout

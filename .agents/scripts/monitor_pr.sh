@@ -409,13 +409,52 @@ _get_review_decision() {
   gh pr view "$PR_NUMBER" --json reviewDecision -q '.reviewDecision // ""' 2>/dev/null || echo "UNKNOWN"
 }
 
-# Check if any review activity exists (COMMENTED, APPROVED, or CHANGES_REQUESTED).
-# Bot reviewers like Codex post COMMENTED reviews that don't change reviewDecision,
-# so we use this as an early exit signal from the wait loop.
+# Check whether a review OF THE HEAD COMMIT exists (COMMENTED, APPROVED, or
+# CHANGES_REQUESTED). Bot reviewers like Codex post COMMENTED reviews that don't
+# change reviewDecision, so we use this as an early exit signal from the wait loop.
+#
+# PI-981: this is the predicate review-status.yml posts as `review/decision`, so
+# the monitor and the required check cannot disagree about whether THIS head was
+# reviewed. A review counts only for the commit it names: a formal review by its
+# REST `commit_id`, a comment-form Codex review by its "Reviewed commit:" line.
+# The old `--json reviews` count had two faults. It counted every review ever
+# posted, so after a push it called the new head reviewed while the required
+# check was still waiting. And it could not see a comment-form review at all,
+# so it waited out its timeout on PRs the gate had already passed (#982).
 _has_review_activity() {
-  local count
-  count=$(gh pr view "$PR_NUMBER" --json reviews -q '.reviews | length' 2>/dev/null) || count=0
-  [ "$count" -gt 0 ]
+  local head nwo owner repo formal codex
+  head=$(gh pr view "$PR_NUMBER" --json headRefOid -q '.headRefOid' 2>/dev/null) || return 1
+  # The SHA is spliced into the jq programs below, so it must be exactly one.
+  case "$head" in
+    '' | *[!0-9a-f]*) return 1 ;;
+  esac
+  [ "${#head}" -eq 40 ] || return 1
+  nwo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null) || return 1
+  owner=${nwo%%/*}
+  repo=${nwo##*/}
+  formal=$(gh api --paginate "repos/$owner/$repo/pulls/$PR_NUMBER/reviews" \
+    --jq ".[] | select(.commit_id == \"$head\" and .state != \"PENDING\") | .id" \
+    2>/dev/null | grep -c .) || formal=0
+  codex=$(gh api graphql --paginate \
+    -F owner="$owner" -F repo="$repo" -F number="$PR_NUMBER" -f query='
+      query($owner:String!, $repo:String!, $number:Int!, $endCursor:String) {
+        repository(owner:$owner, name:$repo) {
+          pullRequest(number:$number) {
+            comments(first:100, after:$endCursor) {
+              pageInfo { hasNextPage endCursor }
+              nodes { author { login } body }
+            }
+          }
+        }
+      }' \
+    --jq ".data.repository.pullRequest.comments.nodes[]
+          | select(.author.login == \"chatgpt-codex-connector\")
+          | select(.body | sub(\"^[[:space:]]+\"; \"\") | ascii_downcase | startswith(\"codex review:\"))
+          | select([.body | match(\"Reviewed commit:[*]*[[:space:]]*\`([0-9a-fA-F]{7,40})\`\").captures[0].string
+                    | ascii_downcase] | any(. as \$c | \"$head\" | startswith(\$c)))
+          | 1" \
+    2>/dev/null | grep -c .) || codex=0
+  [ "$((formal + codex))" -gt 0 ]
 }
 
 # PI-715: count review threads nobody has resolved. On solo profiles there is no
@@ -764,15 +803,15 @@ if [ -z "$REVIEW_DECISION" ] && [ "$MODE" = "--merge" ]; then
   if ! _has_review_activity; then
     if [ "$REVIEW_CYCLE" -lt "$MAX_REVIEW_CYCLES" ]; then
       NEXT=$((REVIEW_CYCLE + 1))
-      echo "PR #$PR_NUMBER: no review of any state has landed after ${REVIEW_TIMEOUT}s (cycle $REVIEW_CYCLE/$MAX_REVIEW_CYCLES)."
-      echo "CI is green — the review agent has not acted."
+      echo "PR #$PR_NUMBER: no review of the head commit has landed after ${REVIEW_TIMEOUT}s (cycle $REVIEW_CYCLE/$MAX_REVIEW_CYCLES)."
+      echo "CI is green — the review agent has not acted on this head. A review of an earlier commit does not count (PI-981); a PR comment reading '@codex review' asks for one."
       echo "A quota-limited bot (e.g. a Codex daily cap) may resume later. Re-run to give it another window:"
       echo "  .agents/scripts/monitor_pr.sh $PR_NUMBER --merge --review-cycle $NEXT"
       echo "After cycle $MAX_REVIEW_CYCLES with no review and no approval policy, the merge proceeds with a REVIEWER ABSENT warning."
       echo "--no-review skips the review gate entirely."
       exit 2
     fi
-    echo "WARNING: REVIEWER ABSENT — no review of any state landed within $MAX_REVIEW_CYCLES cycles and this branch has no approval policy."
+    echo "WARNING: REVIEWER ABSENT — no review of the head commit landed within $MAX_REVIEW_CYCLES cycles and this branch has no approval policy."
     echo "  Merging on green CI. Consider a follow-up review once the review agent recovers."
   fi
 fi
