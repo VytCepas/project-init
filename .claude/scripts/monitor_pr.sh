@@ -421,8 +421,14 @@ _get_review_decision() {
 # posted, so after a push it called the new head reviewed while the required
 # check was still waiting. And it could not see a comment-form review at all,
 # so it waited out its timeout on PRs the gate had already passed (#982).
+#
+# PI-1003: and the review must be SOMEONE ELSE'S. GitHub records a reply to a
+# review thread as a formal COMMENTED review by the replier, on the head the
+# reply was written against, so the author's own reply — which the review
+# protocol asks for on every comment — read as the review of a commit no
+# reviewer had seen.
 _has_review_activity() {
-  local head nwo owner repo formal codex
+  local head nwo owner repo author formal codex
   head=$(gh pr view "$PR_NUMBER" --json headRefOid -q '.headRefOid' 2>/dev/null) || return 1
   # The SHA is spliced into the jq programs below, so it must be exactly one.
   case "$head" in
@@ -432,9 +438,21 @@ _has_review_activity() {
   nwo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null) || return 1
   owner=${nwo%%/*}
   repo=${nwo##*/}
-  formal=$(gh api --paginate "repos/$owner/$repo/pulls/$PR_NUMBER/reviews" \
-    --jq ".[] | select(.commit_id == \"$head\" and .state != \"PENDING\") | .id" \
-    2>/dev/null | grep -c .) || formal=0
+  # REST on both sides: these logins are compared against the reviews' own
+  # `.user.login`, and GraphQL (`gh pr view --json author`) spells a bot's login
+  # without the `[bot]` suffix REST gives it, which would compare unequal for
+  # ever on a bot-authored PR. The login is matched as a fixed whole line rather
+  # than spliced into the jq program — jq sees only the head SHA, validated
+  # above. An author that cannot be read counts NO formal review, never all of
+  # them: review-status.yml answers the same way, so the monitor and the
+  # required check cannot disagree.
+  author=$(gh api "repos/$owner/$repo/pulls/$PR_NUMBER" --jq '.user.login' 2>/dev/null) || author=""
+  formal=0
+  if [ -n "$author" ]; then
+    formal=$(gh api --paginate "repos/$owner/$repo/pulls/$PR_NUMBER/reviews" \
+      --jq ".[] | select(.commit_id == \"$head\" and .state != \"PENDING\") | .user.login" \
+      2>/dev/null | grep -cvxF -- "$author") || formal=0
+  fi
   codex=$(gh api graphql --paginate \
     -F owner="$owner" -F repo="$repo" -F number="$PR_NUMBER" -f query='
       query($owner:String!, $repo:String!, $number:Int!, $endCursor:String) {
@@ -804,7 +822,7 @@ if [ -z "$REVIEW_DECISION" ] && [ "$MODE" = "--merge" ]; then
     if [ "$REVIEW_CYCLE" -lt "$MAX_REVIEW_CYCLES" ]; then
       NEXT=$((REVIEW_CYCLE + 1))
       echo "PR #$PR_NUMBER: no review of the head commit has landed after ${REVIEW_TIMEOUT}s (cycle $REVIEW_CYCLE/$MAX_REVIEW_CYCLES)."
-      echo "CI is green — the review agent has not acted on this head. A review of an earlier commit does not count (PI-981); a PR comment reading '@codex review' asks for one."
+      echo "CI is green — the review agent has not acted on this head. A review of an earlier commit does not count (PI-981), and a reply you posted on a review thread is not a review of it (PI-1003); a PR comment reading '@codex review' asks for one."
       echo "A quota-limited bot (e.g. a Codex daily cap) may resume later. Re-run to give it another window:"
       echo "  .agents/scripts/monitor_pr.sh $PR_NUMBER --merge --review-cycle $NEXT"
       echo "After cycle $MAX_REVIEW_CYCLES with no review and no approval policy, the merge proceeds with a REVIEWER ABSENT warning."

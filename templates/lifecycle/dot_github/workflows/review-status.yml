@@ -18,9 +18,16 @@ name: Review status
 # Codex review by its "Reviewed commit:" line. After a push the check waits for
 # a review of the new head, and an `@codex review` comment asks for one.
 #
+# PI-1003: and it must be SOMEONE ELSE'S review. GitHub records a reply to a
+# review thread as a formal COMMENTED review, by the replier, on the head the
+# reply was written against. The review protocol asks the author to answer every
+# comment, so the author's own reply landed as "the review of the head" on a
+# commit no reviewer had seen: push, reply, resolve, green.
+#
 # Status mapping (first match wins):
 #   CHANGES_REQUESTED             → failure  ("Changes requested")
 #   no review of the head commit  → pending  ("Awaiting review of <sha>")
+#     — by anyone other than the PR author
 #   unresolved review threads     → failure  ("N unresolved review comment(s)")
 #   APPROVED                      → success  ("Approved")
 #   head reviewed, nothing open   → success  ("Reviewed — no open comments")
@@ -80,6 +87,18 @@ jobs:
           # status to the wrong (or empty) SHA leaves the check missing (#719).
           SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
             --json headRefOid -q '.headRefOid')
+
+          # The PR author, read from the API for the same reason and compared
+          # against the formal reviews below (PI-1003). REST, not `gh pr view
+          # --json author`: these logins are compared with the REST reviews'
+          # `.user.login`, and GraphQL spells a bot's login without the `[bot]`
+          # suffix REST gives it (`copilot-pull-request-reviewer` vs
+          # `copilot-pull-request-reviewer[bot]`, measured 2026-09-17), so a
+          # bot-authored PR would compare unequal for ever and the filter would
+          # quietly stop filtering. `pulls/{n}` is listed under "Pull requests:
+          # read" for installation tokens, like `pulls/{n}/reviews` below, so
+          # this costs the job no extra scope.
+          AUTHOR=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.user.login')
 
           DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" \
             --json reviewDecision -q '.reviewDecision // ""')
@@ -184,9 +203,23 @@ jobs:
                      | length')
           # Formal reviews, tied to the head by `commit_id` (the REST note above).
           # PENDING is a review not yet submitted, so it has reviewed nothing.
+          #
+          # THE AUTHOR'S OWN REVIEWS COUNT FOR NOTHING (PI-1003). A reply to a
+          # review thread is recorded as a formal COMMENTED review — empty body,
+          # the replier as its user, the head it was written against as its
+          # commit_id. Measured on #1000: the author's reply 22s after pushing
+          # 313d6ef became a review OF 313d6ef, two minutes before the reviewer
+          # got to that commit. Nothing is lost by dropping them: GitHub refuses
+          # self-approval, so an author's review is always COMMENTED.
+          #
+          # An unreadable author (`$author == ""`) counts NO formal review rather
+          # than every one of them: the filter degrading to a no-op is the silent
+          # direction, and "Awaiting review of <sha>" is the loud one.
           # `--paginate` emits one JSON array per page, hence `-s` and `.[][]`.
           FORMAL_REVIEWS=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
-            | jq -s --arg sha "$SHA" '[.[][] | select(.commit_id == $sha and .state != "PENDING")]
+            | jq -s --arg sha "$SHA" --arg author "$AUTHOR" \
+                '[.[][] | select(.commit_id == $sha and .state != "PENDING"
+                                 and $author != "" and .user.login != $author)]
                      | length')
           # THREADS ARE SAMPLED LAST, AND THE ORDER IS THE CORRECTNESS ARGUMENT.
           # This query used to run BEFORE the pagination above. `--paginate`

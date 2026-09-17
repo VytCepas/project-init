@@ -29,6 +29,9 @@ _SCRIPTS = Path(".agents") / "scripts"
 # review" is an EMPTY answer from the reviews endpoint and the comments query.
 # The catch-all graphql arm below prints "0" for the thread count, and it must not
 # answer the comments query too: one line of output reads as one review.
+#
+# PI-1003: the PR object answers with an author login, so "no review" here is an
+# empty reviews list rather than an author lookup the monitor could not read.
 _GH_STUB = """#!/bin/bash
 case "$*" in
 *"--json headRefName"*) echo "feature false" ;;
@@ -36,6 +39,7 @@ case "$*" in
 *"pr checks"*) echo '[{"name":"ci","state":"SUCCESS","bucket":"pass"}]' ;;
 *"--json reviewDecision"*) echo "" ;;
 *"/pulls/"*"/reviews"*) : ;;
+*"api repos/"*"/pulls/"*) echo "pr-author" ;;
 *"comments(first:100"*) : ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
 *"api graphql"*) echo "0" ;;
