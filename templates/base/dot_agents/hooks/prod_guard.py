@@ -439,6 +439,10 @@ _REDIRECT_OPS = sorted(
     reverse=True,
 )
 
+#: A glob in a command name: `*`, `?`, or a bracket expression — but not the
+#: `[` and `[[` test commands themselves.
+_GLOB_NAME = re.compile(r"[*?]|\[(?!\[?$)")
+
 #: Directories an absolute prose head may be spelled from. A relative path is
 #: whatever file sits there: `./echo "…"` runs a local script named echo.
 _SYSTEM_BIN_DIRS = frozenset({"/bin", "/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"})
@@ -448,7 +452,10 @@ class _Word(NamedTuple):
     text: str
     #: Offsets of each quoted region in the whole command, quotes included.
     quoted: tuple[tuple[int, int], ...]
-    #: No quoting, escaping or expansion anywhere in the word.
+    #: No quote, backslash or `$` anywhere in the word. Glob, brace and tilde
+    #: characters do NOT clear it. That is safe only because every use compares
+    #: a plain word with a fixed name — a pattern cannot equal `echo` — and
+    #: `_ends_analysis` refuses a command name that could glob into one.
     plain: bool
 
 
@@ -596,11 +603,18 @@ def _ends_analysis(simple: _Simple) -> bool:
     """True when *simple* changes what the rest of the command means.
 
     That is a compound-command word or brace group, a name rebinding (see
-    `_UNMODELLED_NAMES`), or a name this cannot read at all — `$cmd` could be
-    any of them.
+    `_UNMODELLED_NAMES`), or a name this cannot read at all. `$cmd` could be
+    any of them, and so could a glob: with a file named `hash` in the directory,
+    `h?sh -p /bin/sh grep` rebinds `grep` in bash and zsh, and `al?as` did the
+    same to `echo` in zsh (PR #1002 review).
     """
     name = _command_name(simple)
-    return "$" in name or name.startswith(("{", "}")) or _dequote(name) in _UNMODELLED_NAMES
+    return (
+        "$" in name
+        or name.startswith(("{", "}"))
+        or _GLOB_NAME.search(name) is not None
+        or _dequote(name) in _UNMODELLED_NAMES
+    )
 
 
 def _head(word: _Word) -> str:

@@ -127,6 +127,8 @@ SHAPES: list[tuple[str, str, str]] = [
     # one argument, while bash and zsh run the middle statement.
     ("ansi_c_desync", "echo $'\\'' ; {P} ; echo \\'", "executes"),
     ("hash_rebinds_grep", "hash -p /bin/" + SH + ' grep; grep -c "{P}"', "executes"),
+    # Executes when a file named `hash` sits in the directory (PR #1002 review).
+    ("glob_spells_hash", "h?sh -p /bin/" + SH + ' grep; grep -c "{P}"', "executes"),
     ("alias_rebinds_echo", "alias echo='" + SH + ' -c\'\necho "{P}"', "executes"),
     ("printf_into_variable", 'printf -v c "{P}"; $c', "executes"),
     ("message_flag_after_c", 'bash -c -m "{P}"', "executes"),

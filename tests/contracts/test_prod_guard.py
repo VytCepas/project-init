@@ -277,6 +277,10 @@ PROSE = [
     '/usr/bin/git commit -m "docs: never run terraform destroy"',
     'git commit -m "docs: never run terraform destroy" # see the runbook',
     'echo # "\necho "; terraform destroy; echo "',
+    # The test commands are not globs, so the glob refusal (PR #1002 review)
+    # must not cost what follows them its exemption.
+    '[ -f notes.md ] && grep -c "terraform destroy" notes.md',
+    '[[ -f notes.md ]] && grep -c "terraform destroy" notes.md',
 ]
 
 # ── #965 fail-open guard. THIS IS THE IMPORTANT LIST. ───────────────────────
@@ -363,6 +367,10 @@ PROSE_EVASION = [
     "echo $'\\'' ; terraform destroy ; echo \\'",
     'hash -p /bin/sh grep; grep -c "terraform destroy"',
     "alias echo='sh -c'\necho \"terraform destroy\"",
+    # A glob can spell a rebinding builtin when a file of that name is present:
+    # both ran with a file named `alias` / `hash` in the directory (PR #1002).
+    "al?as echo='sh -c'\necho \"terraform destroy\"",
+    'h?sh -p /bin/sh grep; grep -c "terraform destroy"',
     'printf -v c "terraform destroy"; $c',
     # ...and the spelling only the `printf -v` check catches, since `$c` as a
     # command name is refused on its own.
