@@ -25,13 +25,18 @@ from tests.helpers import make_variables
 
 # Two pages. The marker is on the SECOND one, which is the whole point: a
 # single-page reader returns 0 here and a paginating one returns 1.
+#
+# The review names the head it reviewed, because since PI-981 a comment review
+# counts only for that commit (test_review_gate_current_head.py). Without the
+# line, this would read 0 for the wrong reason and prove nothing about paging.
+_HEAD = "c4c4817225" + "ab" * 15
 _PAGE_ONE = """{"data":{"repository":{"pullRequest":{"comments":{
   "pageInfo":{"hasNextPage":true,"endCursor":"CUR"},
   "nodes":[{"author":{"login":"someone"},"body":"unrelated chatter"}]}}}}}"""
 _PAGE_TWO = """{"data":{"repository":{"pullRequest":{"comments":{
   "pageInfo":{"hasNextPage":false,"endCursor":null},
   "nodes":[{"author":{"login":"chatgpt-codex-connector"},
-            "body":"Codex Review: found nothing"}]}}}}}"""
+            "body":"Codex Review: found nothing **Reviewed commit:** `c4c4817225`"}]}}}}}"""
 
 
 def _scaffold_with_lifecycle(target: Path) -> Path:
@@ -81,7 +86,7 @@ def _run_scan(script: str, bin_dir: Path, tmp: Path) -> str:
     runner.chmod(0o755)
     env = dict(os.environ)
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
-    env.update(OWNER="o", REPO_NAME="r", PR_NUMBER="1")
+    env.update(OWNER="o", REPO_NAME="r", PR_NUMBER="1", SHA=_HEAD)
     out = subprocess.run(["bash", str(runner)], capture_output=True, text=True, env=env, cwd=tmp)
     assert out.returncode == 0, f"scan failed: {out.stdout}\n{out.stderr}"
     return out.stdout.strip()

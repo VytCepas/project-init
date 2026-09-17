@@ -184,6 +184,13 @@ since its #231, and this lifts it upstream so the next re-render stops rendering
 the defective version over a working gate. Only that one hash was re-pinned,
 after asserting in all four fixtures that it was the sole drifted key and that no
 path was added or removed.
+
+Exception (PI-981): the same workflow now counts a review only for the commit it
+reviewed — a formal review by its REST `commit_id`, a comment-form Codex review by
+its "Reviewed commit:" line. A review used to count for ever, so every push after
+one went green on commits nobody had reviewed. Deliberate content change, not
+move-drift. Only that one hash was re-pinned, in all four fixtures, after this
+suite passed with the new hash and failed with the old one restored.
 """
 
 from __future__ import annotations

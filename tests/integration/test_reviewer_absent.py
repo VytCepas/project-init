@@ -24,13 +24,19 @@ _SCRIPTS = Path(".agents") / "scripts"
 
 # A reviewer that never acts: empty reviewDecision (no approval policy),
 # zero reviews of any state, no unresolved threads, CI green.
+#
+# PI-981: the monitor counts reviews of the head through `gh --jq`, so "no
+# review" is an EMPTY answer from the reviews endpoint and the comments query.
+# The catch-all graphql arm below prints "0" for the thread count, and it must not
+# answer the comments query too: one line of output reads as one review.
 _GH_STUB = """#!/bin/bash
 case "$*" in
 *"--json headRefName"*) echo "feature false" ;;
 *"--json headRefOid"*) echo "$PI_TEST_SHA" ;;
 *"pr checks"*) echo '[{"name":"ci","state":"SUCCESS","bucket":"pass"}]' ;;
 *"--json reviewDecision"*) echo "" ;;
-*"--json reviews"*) echo "0" ;;
+*"/pulls/"*"/reviews"*) : ;;
+*"comments(first:100"*) : ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
 *"api graphql"*) echo "0" ;;
 *"--json state"*) echo "OPEN" ;;

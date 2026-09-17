@@ -32,6 +32,10 @@ _SCRIPTS = Path(".agents") / "scripts"
 # `review/decision` reports pending until a comment is posted; posting one
 # creates PI_TEST_COMMENTED, after which it reports pass. That is the real
 # causal chain — the comment is what re-runs the workflow.
+#
+# The reviews endpoint answers with one line, standing in for `gh --jq` having
+# found one review of the head. That filter is not this file's subject; it is run
+# for real, over fixture JSON, in test_review_gate.py (PI-981).
 _GH_STUB = """#!/bin/bash
 case "$*" in
 *"--json headRefName"*) echo "feature false" ;;
@@ -50,7 +54,8 @@ case "$*" in
   fi
   ;;
 *"--json reviewDecision"*) echo "" ;;
-*"--json reviews"*) echo "1" ;;
+*"/pulls/"*"/reviews"*) echo "1" ;;
+*"comments(first:100"*) : ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
 *"api graphql"*) echo "0" ;;
 *"--json state"*) echo "OPEN" ;;
