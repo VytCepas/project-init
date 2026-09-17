@@ -101,6 +101,44 @@ SHAPES: list[tuple[str, str, str]] = [
     ("redirect", 'echo "{P}" ' + REDIR + " run." + SH, "stages"),
     ("append", 'echo "{P}" ' + REDIR + REDIR + " run." + SH, "stages"),
     ("tee", 'echo "{P}" ' + PIPE + " tee run." + SH, "stages"),
+    # PI-996. Each of these was run with a harmless payload before its kind was
+    # written: the first six were reported on #971 and ran on `main`, the rest
+    # were found while replacing the regexes with a lexer.
+    ("sq_backslash", "echo 'safe\\'; {P}; echo 'x'", "executes"),
+    ("procsub_first", "echo " + REDIR + " " + REDIR + "(" + SH + ') "{P}"', "executes"),
+    ("redirect_first", "echo " + REDIR + " x." + SH + ' "{P}"', "stages"),
+    ("null_pipe_nospace", 'echo "{P}" 2>/dev/null' + PIPE + SH, "executes"),
+    ("errfile_pipe_nospace", 'echo "{P}" 2>err.log' + PIPE + "bash", "executes"),
+    ("null_then_file_nospace", 'echo "{P}" 2>/dev/null' + REDIR + "run." + SH, "stages"),
+    ("stderr_file_then_dup", 'echo "{P}" 2>run.' + SH + " " + REDIR + "&2", "stages"),
+    (
+        "multios_file_then_null",
+        'echo "{P}" ' + REDIR + " run." + SH + " " + REDIR + " /dev/null",
+        "stages",
+    ),
+    ("exec_redirect", "exec " + REDIR + "run." + SH + '; echo "{P}"', "stages"),
+    # A body on its own lines, so `echo` heads a statement of its own and only
+    # the refusal of `do`/`done` and `{`/`}` stands between the body and `| sh`.
+    ("loop_body_piped", 'for x in 1; do\necho "{P}"\ndone ' + PIPE + " " + SH, "executes"),
+    ("group_piped", '{{\necho "{P}"\n}} ' + PIPE + " " + SH, "executes"),
+    ("heredoc_desync", "cat <<'EOF'\necho \"\nEOF\n{P}\necho \"", "executes"),
+    ("ansi_c_quote", "echo $'\\'' ; {P} ; echo $'\\''", "executes"),
+    # The spelling only the `$'` refusal catches: POSIX quoting pairs it into
+    # one argument, while bash and zsh run the middle statement.
+    ("ansi_c_desync", "echo $'\\'' ; {P} ; echo \\'", "executes"),
+    ("hash_rebinds_grep", "hash -p /bin/" + SH + ' grep; grep -c "{P}"', "executes"),
+    ("alias_rebinds_echo", "alias echo='" + SH + ' -c\'\necho "{P}"', "executes"),
+    ("printf_into_variable", 'printf -v c "{P}"; $c', "executes"),
+    ("message_flag_after_c", 'bash -c -m "{P}"', "executes"),
+    ("relative_echo", './echo "{P}"', "executes"),
+    ("grep_dup_first", "grep 2>&1 '{P}' notes.md", "inert"),
+    ("stderr_to_file", 'echo "{P}" 2>err.log', "inert"),
+    ("grep_stderr_to_null", "grep -rn '{P}' docs/ 2>/dev/null", "inert"),
+    ("stdout_to_null", 'echo "{P}" ' + REDIR + " /dev/null", "inert"),
+    # A comment is not a statement. Every shell mode measured printed the second
+    # line's quoted text here rather than running it.
+    ("comment_then_quote", 'echo # "\necho "; {P}; echo "', "inert"),
+    ("message_then_comment", 'git commit -m "{P}" # see the runbook', "inert"),
 ]
 
 #: One representative destructive command per DENY_RULES entry. Quote characters
@@ -222,6 +260,40 @@ class TestNoFailOpens:
         assert _fail_opens(guard), (
             "disabling the pipe/redirect check produced no fail-opens, so this "
             "fuzz is not capable of detecting one and its clean runs mean nothing"
+        )
+
+    def test_the_fuzz_sees_a_rebinding_or_compound_hole(self, guard, monkeypatch):
+        """PI-996: the refusal of compound bodies and rebinding names is load-bearing.
+
+        Switching it off must surface the loop, group, `hash`, `alias` and `exec`
+        shapes as fail-opens, or the refusal is not what keeps them flagged. A
+        first draft of this test failed for exactly that reason: its loop and
+        group put `echo` after `do` and `{` on one line, where it heads no
+        statement and was never exempt to begin with.
+        """
+        monkeypatch.setattr(guard, "_ends_analysis", lambda *a, **k: False)
+        leaked = _fail_opens(guard)
+        for marker in ("done |", "} |", "hash -p", "alias echo", "exec >"):
+            assert any(marker in command for command in leaked), (
+                f"no fail-open containing {marker!r} once the refusal was removed, "
+                "so the corpus does not exercise that refusal"
+            )
+
+    def test_the_fuzz_sees_a_regex_that_guesses_at_quotes(self, guard, monkeypatch):
+        """PI-996: plant the mechanism this replaced — any quoted span behind a
+        prose head is prose — and require the fuzz to catch it.
+        """
+        import re
+
+        naive = re.compile(r"(['\"])(?:\\.|(?!\1).)*?\1", re.DOTALL)
+
+        def every_quoted_span(command: str) -> list[tuple[int, int]]:
+            return [m.span() for m in naive.finditer(command)] if "echo" in command else []
+
+        monkeypatch.setattr(guard, "_prose_spans", every_quoted_span)
+        assert _fail_opens(guard), (
+            "a guess-the-quotes exemption produced no fail-opens, so this fuzz "
+            "cannot tell the lexer from the regex it replaced"
         )
 
 

@@ -264,9 +264,19 @@ PROSE = [
     # LAST stage of a real pipeline here, so nothing consumes it.
     "echo 'terraform destroy | sh is the dangerous shape'",
     # A pipe in a LATER statement must not cost the earlier span its exemption.
-    # `_flows_onward` stops at the statement terminator for this reason; without
-    # that stop this ordinary command becomes a false positive.
+    # `_flows_onward` judges each simple command's own output; without that
+    # this ordinary command becomes a false positive.
     'git commit -m "docs: never run terraform destroy" && git log --oneline | head -5',
+    # PI-996: plumbing that cannot carry the prose leaves it prose, wherever it
+    # is written. The first was a Copilot finding on #971: `2>&1` before the
+    # pattern used to end the statement, so the head read as `1`.
+    "grep 2>&1 'terraform destroy' notes.md",
+    'echo "terraform destroy" 2>err.log',
+    "grep -rn 'terraform destroy' docs/ 2>/dev/null",
+    'echo "terraform destroy" > /dev/null',
+    '/usr/bin/git commit -m "docs: never run terraform destroy"',
+    'git commit -m "docs: never run terraform destroy" # see the runbook',
+    'echo # "\necho "; terraform destroy; echo "',
 ]
 
 # ── #965 fail-open guard. THIS IS THE IMPORTANT LIST. ───────────────────────
@@ -324,6 +334,41 @@ PROSE_EVASION = [
     # thing that made staging one quieter than it used to be.
     'echo "terraform destroy" > /tmp/x.sh',
     'echo "terraform destroy" >> /tmp/x.sh',
+    # *** PI-996: A REGEX GUESSING AT SHELL SYNTAX. Every one of these ran its
+    # verb with no verdict on `main`, and each was run with a harmless payload
+    # in bash and zsh. The first six were reported on #971 before it merged.
+    "echo 'safe\\'; terraform destroy; echo 'x'",
+    # The spelling only the POSIX single-quote rule catches: a lexer that let
+    # `\'` escape inside '…' pairs these quotes into one argument and blanks
+    # the verb, while bash runs the middle statement. Found by brute force over
+    # short quote/backslash strings, then run.
+    "echo '\\' ; terraform destroy ; echo '\\'",
+    'echo > >(sh) "terraform destroy"',
+    'echo > x.sh "terraform destroy"',
+    'echo "terraform destroy" 2>/dev/null|sh',
+    'echo "terraform destroy" 2>err.log|bash',
+    'echo "terraform destroy" 2>/dev/null>run.sh',
+    # Found while replacing the regexes: a descriptor duplicated onto a file,
+    # zsh MULTIOS, a rebound name, a compound body, and quoting with its own
+    # escape rules.
+    'echo "terraform destroy" 2>run.sh >&2',
+    'echo "terraform destroy" > run.sh > /dev/null',
+    'exec >run.sh; echo "terraform destroy"',
+    'for x in 1; do echo "terraform destroy"; done | sh',
+    'for x in 1; do\necho "terraform destroy"\ndone | sh',
+    '{ echo "terraform destroy"; } | sh',
+    '{\necho "terraform destroy"\n} | sh',
+    "cat <<'EOF'\necho \"\nEOF\nterraform destroy\necho \"",
+    "echo $'\\'' ; terraform destroy ; echo $'\\''",
+    "echo $'\\'' ; terraform destroy ; echo \\'",
+    'hash -p /bin/sh grep; grep -c "terraform destroy"',
+    "alias echo='sh -c'\necho \"terraform destroy\"",
+    'printf -v c "terraform destroy"; $c',
+    # ...and the spelling only the `printf -v` check catches, since `$c` as a
+    # command name is refused on its own.
+    'printf -v c "terraform destroy"; sh -c "$c"',
+    'bash -c -m "terraform destroy"',
+    './echo "terraform destroy"',
 ]
 
 
