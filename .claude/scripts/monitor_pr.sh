@@ -426,7 +426,7 @@ _has_review_activity() {
   head=$(gh pr view "$PR_NUMBER" --json headRefOid -q '.headRefOid' 2>/dev/null) || return 1
   # The SHA is spliced into the jq programs below, so it must be exactly one.
   case "$head" in
-    '' | *[!0-9a-f]*) return 1 ;;
+  '' | *[!0-9a-f]*) return 1 ;;
   esac
   [ "${#head}" -eq 40 ] || return 1
   nwo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null) || return 1
