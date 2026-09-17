@@ -151,3 +151,26 @@ dropping machinery from its mirror is a tracked follow-up.
 - **Follow-up:** migrate this repo's own skills off `.claude/scripts|hooks/…` to
   canonical `.agents/…` paths, then drop machinery from the repo mirror so it
   matches the scaffolded projection exactly.
+
+## Update (PI-997): `rules/` is translated, not copied
+
+Every rule the templates ship scopes itself in Cursor's frontmatter, `globs:`
+plus `alwaysApply: false`, and the projection copied it verbatim. Claude Code
+scopes a rule only by `paths:` and loads a rule without it at session start, so
+every projected rule loaded in every session, whatever the session touched.
+Measured with Claude Code 2.1.274 and an `InstructionsLoaded` hook: in a fresh
+Python scaffold the projected `python.md` and `hooks.md` both logged
+`load_reason: session_start`.
+
+`rules/` is now the one surface the projection translates rather than copies
+(`_claude_rule_text` in `scaffold.py`). The `.agents/rules/` source stays single
+and keeps Cursor's keys (#641). The `.claude/rules/` copy carries the same
+patterns as a `paths:` list; `alwaysApply: true` projects unscoped, as Cursor
+itself ignores globs on such a rule. The body and every other key are kept byte
+for byte, and a `globs:` value the translator cannot read is projected as
+authored, so it still loads as before instead of being scoped to a guess.
+`.claude/` is still a pure function of `.agents/`; for `rules/` that function is
+no longer the identity. `upgrade --apply` re-runs the projection, so existing
+scaffolds pick it up there. After the change the same hook logged no rule at
+session start, and logged `python.md` with `load_reason: path_glob_match` when
+the session read a `.py` file.
