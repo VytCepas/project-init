@@ -14,7 +14,7 @@ flowchart TB
         PTU["PreToolUse(Bash)\n.agents/hooks/github_command_guard.sh"]
         DAG["dag_workflow.py guard\nCOMMAND_RULES: blocks/redirects\ngit push main · gh pr merge · gh api .../merge\ngh pr ready · gh pr create · gh issue create · bare git push"]
         SCRIPTS[".agents/scripts/*.sh\npush_branch · promote_review · monitor_pr\nfinish_pr · create_nojira_pr · push_wiki"]
-        UPS["UserPromptSubmit\nworkflow_state_reminder.sh\ninjects DAG rules + live node state"]
+        UPS["UserPromptSubmit\nworkflow_state_reminder.sh\ninjects DAG rules once per session"]
         DEV -->|"raw git/gh command"| PTU --> DAG
         DAG -->|"blocked, redirected to"| SCRIPTS
         SCRIPTS -->|"safe git/gh call"| PREPUSH
