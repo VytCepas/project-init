@@ -1419,27 +1419,29 @@ def _parse_globs(inline: str, continuation: list[str]) -> list[str] | None:
     (``*.{ts,tsx}``) never splits a pattern.
     """
     value = _strip_yaml_comment(inline)
+    lines = [entry for entry in map(_strip_yaml_comment, continuation) if entry]
     items: list[str | None]
-    if value.startswith("["):
-        raw = _split_items(value[1:-1], quoted=True) if value.endswith("]") else None
-        if raw is None:
+    if not value:
+        if not all(entry.startswith("-") for entry in lines):
             return None
-        items = [_unquote(r) for r in raw]
-    elif value:
-        whole = _unquote(value)
-        raw = None if whole is None else _split_items(whole, quoted=False)
-        if raw is None:
-            return None
-        items = [r.strip() for r in raw]
+        items = [_unquote(entry[1:]) for entry in lines]
     else:
-        items = []
-        for line in continuation:
-            entry = _strip_yaml_comment(line)
-            if not entry:
-                continue
-            if not entry.startswith("-"):
+        # A flow list or a string may run on over several lines (`globs: [` and
+        # one pattern per line). YAML folds those lines into one value, so fold
+        # them here too. Reading the first line alone left a multi-line list
+        # untranslated and cut a multi-line string short (PR #1001 review).
+        value = " ".join([value, *lines])
+        if value.startswith("["):
+            raw = _split_items(value[1:-1], quoted=True) if value.endswith("]") else None
+            if raw is None:
                 return None
-            items.append(_unquote(entry[1:]))
+            items = [_unquote(r) for r in raw]
+        else:
+            whole = _unquote(value)
+            raw = None if whole is None else _split_items(whole, quoted=False)
+            if raw is None:
+                return None
+            items = [r.strip() for r in raw]
     if any(item is None for item in items):
         return None
     return [item for item in items if item]

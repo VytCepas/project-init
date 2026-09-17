@@ -41,6 +41,19 @@ _BODY = "\n## Python environment\n\nUse `uv run`.\n"
             id="block-list",
         ),
         pytest.param(
+            # YAML folds a value that runs on over several lines into one.
+            '---\nglobs: [\n  "**/*.py",  # sources\n  "pyproject.toml"\n]\n---\n' + _BODY,
+            '---\npaths:\n  - "**/*.py"\n  - "pyproject.toml"\n---\n' + _BODY,
+            id="multiline-flow-list",
+        ),
+        pytest.param(
+            # Reading only the first line would scope this rule to `.ts` files
+            # and silently lose the second pattern.
+            "---\nglobs: src/**/*.ts,\n  docs/**/*.md\nalwaysApply: false\n---\n" + _BODY,
+            '---\npaths:\n  - "src/**/*.ts"\n  - "docs/**/*.md"\n---\n' + _BODY,
+            id="multiline-comma-string",
+        ),
+        pytest.param(
             # Cursor ignores globs on an always-apply rule, so Claude gets it unscoped.
             '---\ndescription: Always\nglobs: ["**/*.py"]\nalwaysApply: true\n---\n' + _BODY,
             "---\ndescription: Always\n---\n" + _BODY,
