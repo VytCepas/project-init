@@ -180,6 +180,16 @@ jobs:
           # line counts for nothing: if the connector ever stops writing it, the
           # check sits at "Awaiting review of <sha>", which is loud. Counting it
           # anyway would be the silent direction, a green over an unreviewed head.
+          #
+          # AND NOT WHEN THE CONNECTOR IS THE PR AUTHOR (PI-1003, raised in review
+          # on #1004). The login check above is what keeps this leg honest, but on
+          # a PR the connector itself opened it stops being a check on somebody
+          # else: a requested `Codex Review:` comment would then be the author
+          # reviewing their own head, the same hole the formal leg just closed.
+          # The two logins are spelled differently on purpose — GraphQL gives a
+          # bot's login bare, REST appends `[bot]` — so the REST author is
+          # rtrimstr'd before the comparison. An unreadable author counts no
+          # comment-form review either, for the reason given below.
           CODEX_REVIEWS=$(gh api graphql --paginate \
             -F owner="$OWNER" -F repo="$REPO_NAME" -F number="$PR_NUMBER" -f query='
               query($owner:String!, $repo:String!, $number:Int!, $endCursor:String) {
@@ -192,8 +202,10 @@ jobs:
                   }
                 }
               }' \
-            | jq -s --arg sha "$SHA" '[.[].data.repository.pullRequest.comments.nodes[]
+            | jq -s --arg sha "$SHA" --arg author "$AUTHOR" \
+                '[.[].data.repository.pullRequest.comments.nodes[]
                       | select(.author.login == "chatgpt-codex-connector")
+                      | select($author != "" and ($author | rtrimstr("[bot]")) != .author.login)
                       | select(.body | sub("^[[:space:]]+"; "")
                                | ascii_downcase | startswith("codex review:"))
                       | select(.body

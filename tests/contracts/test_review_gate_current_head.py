@@ -277,3 +277,41 @@ def test_an_unreadable_author_counts_no_formal_review(tmp_path: Path):
     """
     fields = _run_step(tmp_path, reviews=[_review(HEAD)], pr={"number": 7, "user": None})
     assert fields["state"] == "pending"
+
+
+def test_the_connectors_comment_review_of_its_own_pr_does_not_count(tmp_path: Path):
+    """Raised in review on #1004: the comment leg had the same hole.
+
+    Its login check keeps the leg honest only while the connector is somebody
+    else. On a PR the connector opened, a requested `Codex Review:` comment is
+    the author reviewing their own head. REST names that author
+    `chatgpt-codex-connector[bot]`; GraphQL spells the commenter bare.
+    """
+    fields = _run_step(
+        tmp_path,
+        comments=[_codex_comment(_clean_codex_review(HEAD))],
+        pr={"number": 7, "user": {"login": "chatgpt-codex-connector[bot]"}},
+    )
+    assert fields["state"] == "pending"
+    assert fields["description"] == f"Awaiting review of {HEAD[:7]}"
+
+
+def test_a_reviewer_of_a_connector_authored_pr_still_counts(tmp_path: Path):
+    """The control for the test above: only the connector's own comment is dropped."""
+    fields = _run_step(
+        tmp_path,
+        reviews=[_review(HEAD)],
+        comments=[_codex_comment(_clean_codex_review(HEAD))],
+        pr={"number": 7, "user": {"login": "chatgpt-codex-connector[bot]"}},
+    )
+    assert fields["state"] == "success"
+
+
+def test_an_unreadable_author_counts_no_comment_review_either(tmp_path: Path):
+    """Fail closed on both legs, or the gate is only half fail-closed."""
+    fields = _run_step(
+        tmp_path,
+        comments=[_codex_comment(_clean_codex_review(HEAD))],
+        pr={"number": 7, "user": None},
+    )
+    assert fields["state"] == "pending"

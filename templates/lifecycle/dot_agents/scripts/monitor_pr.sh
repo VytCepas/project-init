@@ -438,40 +438,46 @@ _has_review_activity() {
   nwo=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null) || return 1
   owner=${nwo%%/*}
   repo=${nwo##*/}
-  # REST on both sides: these logins are compared against the reviews' own
-  # `.user.login`, and GraphQL (`gh pr view --json author`) spells a bot's login
-  # without the `[bot]` suffix REST gives it, which would compare unequal for
-  # ever on a bot-authored PR. The login is matched as a fixed whole line rather
-  # than spliced into the jq program — jq sees only the head SHA, validated
-  # above. An author that cannot be read counts NO formal review, never all of
-  # them: review-status.yml answers the same way, so the monitor and the
-  # required check cannot disagree.
+  # The author is read from REST, because it is compared against logins REST
+  # also spells: `gh pr view --json author` would give a bot's login without the
+  # `[bot]` suffix REST appends, and a bot-authored PR would then compare unequal
+  # for ever. Each leg lists the logins that reviewed the head and drops the
+  # author's own lines with a fixed whole-line match, so no login is ever spliced
+  # into a jq program — jq sees only the head SHA, validated above. The comment
+  # leg compares against the login with `[bot]` trimmed, because THAT one comes
+  # back from GraphQL, which spells it bare.
+  #
+  # An author that cannot be read counts NO review at all, on either leg: with no
+  # author known, "by somebody other than the author" is unanswerable for every
+  # review, and review-status.yml answers it the same way — so the monitor and
+  # the required check cannot disagree.
   author=$(gh api "repos/$owner/$repo/pulls/$PR_NUMBER" --jq '.user.login' 2>/dev/null) || author=""
   formal=0
+  codex=0
   if [ -n "$author" ]; then
     formal=$(gh api --paginate "repos/$owner/$repo/pulls/$PR_NUMBER/reviews" \
       --jq ".[] | select(.commit_id == \"$head\" and .state != \"PENDING\") | .user.login" \
       2>/dev/null | grep -cvxF -- "$author") || formal=0
-  fi
-  codex=$(gh api graphql --paginate \
-    -F owner="$owner" -F repo="$repo" -F number="$PR_NUMBER" -f query='
-      query($owner:String!, $repo:String!, $number:Int!, $endCursor:String) {
-        repository(owner:$owner, name:$repo) {
-          pullRequest(number:$number) {
-            comments(first:100, after:$endCursor) {
-              pageInfo { hasNextPage endCursor }
-              nodes { author { login } body }
+    codex=$(gh api graphql --paginate \
+      -F owner="$owner" -F repo="$repo" -F number="$PR_NUMBER" -f query='
+        query($owner:String!, $repo:String!, $number:Int!, $endCursor:String) {
+          repository(owner:$owner, name:$repo) {
+            pullRequest(number:$number) {
+              comments(first:100, after:$endCursor) {
+                pageInfo { hasNextPage endCursor }
+                nodes { author { login } body }
+              }
             }
           }
-        }
-      }' \
-    --jq ".data.repository.pullRequest.comments.nodes[]
-          | select(.author.login == \"chatgpt-codex-connector\")
-          | select(.body | sub(\"^[[:space:]]+\"; \"\") | ascii_downcase | startswith(\"codex review:\"))
-          | select([.body | match(\"Reviewed commit:[*]*[[:space:]]*\`([0-9a-fA-F]{7,40})\`\").captures[0].string
-                    | ascii_downcase] | any(. as \$c | \"$head\" | startswith(\$c)))
-          | 1" \
-    2>/dev/null | grep -c .) || codex=0
+        }' \
+      --jq ".data.repository.pullRequest.comments.nodes[]
+            | select(.author.login == \"chatgpt-codex-connector\")
+            | select(.body | sub(\"^[[:space:]]+\"; \"\") | ascii_downcase | startswith(\"codex review:\"))
+            | select([.body | match(\"Reviewed commit:[*]*[[:space:]]*\`([0-9a-fA-F]{7,40})\`\").captures[0].string
+                      | ascii_downcase] | any(. as \$c | \"$head\" | startswith(\$c)))
+            | .author.login" \
+      2>/dev/null | grep -cvxF -- "${author%\[bot\]}") || codex=0
+  fi
   [ "$((formal + codex))" -gt 0 ]
 }
 

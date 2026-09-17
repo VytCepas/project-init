@@ -292,6 +292,25 @@ def test_a_reviewer_of_the_head_beside_the_authors_reply_merges(tmp_target: Path
     assert "Merged PR #1" in result.stdout
 
 
+def test_the_connectors_comment_review_of_its_own_pr_does_not_satisfy_the_monitor(
+    tmp_target: Path, tmp_path: Path
+):
+    """Raised in review on #1004: the comment leg had the same hole as the formal
+    one. REST names a connector-authored PR's author `chatgpt-codex-connector[bot]`
+    while GraphQL spells the commenter bare, so the monitor trims `[bot]` before
+    comparing — a comparison that skipped the trim would never match and the hole
+    would stay open."""
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        reviews=[_codex_comment_review(_HEAD)],
+        unresolved="0",
+        pr={"number": 1, "user": {"login": "chatgpt-codex-connector[bot]"}},
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "Merged" not in result.stdout
+
+
 def test_an_unreadable_author_leaves_the_monitor_waiting(tmp_target: Path, tmp_path: Path):
     """Fail closed, and the same way the workflow does: an author the API did not
     name counts no formal review, rather than counting every one of them."""

@@ -86,7 +86,9 @@ def _run_scan(script: str, bin_dir: Path, tmp: Path) -> str:
     runner.chmod(0o755)
     env = dict(os.environ)
     env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
-    env.update(OWNER="o", REPO_NAME="r", PR_NUMBER="1", SHA=_HEAD)
+    # AUTHOR is the PR author the scan compares the commenter against (PI-1003).
+    # Anyone but the connector, so this file keeps measuring pagination alone.
+    env.update(OWNER="o", REPO_NAME="r", PR_NUMBER="1", SHA=_HEAD, AUTHOR="pr-author")
     out = subprocess.run(["bash", str(runner)], capture_output=True, text=True, env=env, cwd=tmp)
     assert out.returncode == 0, f"scan failed: {out.stdout}\n{out.stderr}"
     return out.stdout.strip()

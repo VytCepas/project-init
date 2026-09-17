@@ -41,6 +41,9 @@ case "$*" in
   ;;
 *"--json reviewDecision"*) echo "" ;;
 *"--json reviews"*) echo "1" ;;
+# PI-1003: the monitor reads the PR author before counting reviews of the head,
+# and counts none at all when it cannot be read.
+*"api repos/"*"/pulls/"*) echo "pr-author" ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
 *"api graphql"*) echo "0" ;;
 *"--json state"*) echo "OPEN" ;;
