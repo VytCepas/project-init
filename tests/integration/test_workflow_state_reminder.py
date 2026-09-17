@@ -104,7 +104,8 @@ class TestSessionScopedInjection:
         call, and the sentinel's content is overwritten (what the removed
         detection compared against). The rules still inject exactly once, and
         carry nothing state-derived: a fresh session in the moved state gets
-        byte-identical text.
+        byte-identical text. The state source is never consulted either, so
+        per-prompt polling cannot come back unnoticed even if it injects nothing.
         """
         (self.hook.parent / "dag_workflow.py").write_text(_SHIFTING_STATE_STUB)
         git = ["git", "-C", str(self.target)]
@@ -130,6 +131,10 @@ class TestSessionScopedInjection:
 
         fresh = _run_hook(self.hook, "implement it", "sess-state-2", tmp_path)
         assert fresh == first
+
+        assert not (self.hook.parent / "stub_calls").exists(), (
+            "the reminder ran dag_workflow.py: per-prompt lifecycle-state polling is back"
+        )
 
     def test_new_session_reinjects_full_rules(self, tmp_path: Path):
         _run_hook(self.hook, "implement it", "sess-c", tmp_path)

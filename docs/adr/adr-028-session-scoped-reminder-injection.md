@@ -109,4 +109,6 @@ Two fixes were weighed in #998: hash real per-branch state from the
   `test_lifecycle_state_changes_never_reinject`, which moves lifecycle state
   between prompts (a switch to an issue branch, a `dag_workflow.py` stand-in
   that reports a new state on every call, an overwritten sentinel) and fails if
-  anything re-injects or if the one injection carries state-derived text.
+  anything re-injects, if the one injection carries state-derived text, or if
+  the hook runs `dag_workflow.py` at all (per-prompt polling with no visible
+  output would otherwise pass).
