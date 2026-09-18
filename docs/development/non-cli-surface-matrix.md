@@ -136,7 +136,7 @@ file out of one layer cannot hide it from another.
 | Codex | honoured | a generated `agents/openai.yaml` with `policy.allow_implicit_invocation: false`; explicit `$skill` still works | **run**: with codex-cli 0.144.3, `codex debug prompt-input` lists a skill that has only Claude's key and drops it once the file is added (`TestCodexLoader`, skipped where `codex` is not installed) |
 | Amp | demoted: always listed | none documented (frontmatter `name`, `description`, `mcpServers`) | docs only, not run |
 | Antigravity | demoted: always listed | none documented (`name`, `description`) | docs only, not run |
-| Junie | demoted: always listed | none per skill (`/skills` switches skills on or off all together) | docs only, not run |
+| Junie | demoted: always listed | none per skill (`/skills` turns skills on or off globally) | docs only, not run |
 
 Each invoked-only skill gets an `INVOCATION.md` beside it with this table, and
 `just sync-plugin` prints a line per tree naming the demoted harnesses. The
