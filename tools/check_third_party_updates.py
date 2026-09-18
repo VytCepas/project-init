@@ -89,29 +89,56 @@ def _http_get_json(url: str) -> dict:
         return json.load(resp)
 
 
-def fetch_latest(tool: dict, *, get_json=_http_get_json) -> str:
-    """Return the upstream 'latest' version for a manifest tool entry."""
+def _fetch_doc(tool: dict, *, get_json=_http_get_json) -> dict:
+    """The registry document for a manifest tool entry."""
     ecosystem = tool.get("ecosystem", "npm")
     if ecosystem != "npm":
         raise ValueError(f"unsupported ecosystem: {ecosystem!r} (only npm so far)")
     # Scoped packages need the "/" encoded as %2F for the registry doc endpoint
     # (keep the leading "@"); the unencoded form happens to resolve too.
-    data = get_json(f"https://registry.npmjs.org/{quote(tool['package'], safe='@')}")
-    return data["dist-tags"]["latest"]
+    return get_json(f"https://registry.npmjs.org/{quote(tool['package'], safe='@')}")
+
+
+def fetch_latest(tool: dict, *, get_json=_http_get_json) -> str:
+    """Return the upstream 'latest' version for a manifest tool entry."""
+    return _fetch_doc(tool, get_json=get_json)["dist-tags"]["latest"]
+
+
+def newest_below_hold(doc: dict, tool: dict) -> str | None:
+    """The newest stable release in *doc* that the hold still allows.
+
+    A held ``latest`` must not freeze the pin (#1006 review): upstream can keep
+    ``latest`` on the held line while publishing a safe patch on the old one, and
+    that patch should still be proposed. Pre-releases are never candidates.
+    """
+    stable = [
+        v
+        for v in (doc.get("versions") or {})
+        if re.fullmatch(r"\d+(\.\d+)*", v) and not held(v, tool)
+    ]
+    return max(stable, key=_version_key, default=None)
 
 
 def check(manifest: dict, *, get_json=_http_get_json) -> list[dict]:
-    """Report pinned-vs-latest for each tool. Network errors → error field set."""
+    """Report pinned-vs-latest for each tool. Network errors → error field set.
+
+    When upstream ``latest`` is held, ``latest`` in the row becomes the newest
+    release below the hold (what a bump would target) and ``held_latest`` keeps
+    the upstream one, so the proposer never needs to know holds exist.
+    """
     rows = []
     for tool_id, tool in manifest.items():
         row = {"tool": tool_id, "package": tool["package"], "pinned": tool["pinned"]}
         try:
-            latest = fetch_latest(tool, get_json=get_json)
-            row["latest"] = latest
+            doc = _fetch_doc(tool, get_json=get_json)
+            latest = doc["dist-tags"]["latest"]
             hold = held(latest, tool)
             if hold:
                 row["held"] = hold
-            row["update_available"] = is_newer(latest, tool["pinned"]) and not hold
+                row["held_latest"] = latest
+                latest = newest_below_hold(doc, tool) or tool["pinned"]
+            row["latest"] = latest
+            row["update_available"] = is_newer(latest, tool["pinned"])
         except Exception as exc:  # noqa: BLE001 — report, don't crash the sweep
             row["error"] = f"{type(exc).__name__}: {exc}"
             row["update_available"] = False
@@ -206,8 +233,11 @@ def main(argv: list[str] | None = None) -> int:
             for r in rows:
                 if r.get("error"):
                     print(f"  {r['tool']}: ERROR {r['error']}")
-                elif r.get("held"):
-                    print(f"  {r['tool']}: {r['pinned']} (latest {r['latest']} HELD: {r['held']})")
+                elif r.get("held") and not r["update_available"]:
+                    print(
+                        f"  {r['tool']}: {r['pinned']} "
+                        f"(latest {r['held_latest']} HELD: {r['held']})"
+                    )
                 elif r["update_available"]:
                     print(f"  {r['tool']}: {r['pinned']} → {r['latest']}  UPDATE AVAILABLE")
                 else:

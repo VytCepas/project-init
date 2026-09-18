@@ -82,6 +82,25 @@ def test_check_never_proposes_a_held_release(latest, available, is_held):
     assert ("held" in rows[0]) is is_held
 
 
+def test_a_held_latest_still_proposes_the_newest_release_below_the_hold():
+    """A hold must not freeze the pin (PR #1006 review): a safe patch on the old
+    line is still proposed while `latest` sits on the held one. Pre-releases and
+    the held line itself are never candidates."""
+    doc = {
+        "dist-tags": {"latest": "3.1.1"},
+        "versions": {v: {} for v in ("1.9.0", "2.0.0", "2.0.1", "2.0.2-beta.1", "3.0.0", "3.1.1")},
+    }
+    rows = mod.check({"ccr": _HELD}, get_json=lambda url: doc)
+    assert rows[0]["update_available"] is True
+    assert rows[0]["latest"] == "2.0.1"  # what `apply` will be asked for
+    assert rows[0]["held_latest"] == "3.1.1"
+
+    doc["versions"] = {v: {} for v in ("2.0.0", "3.1.1")}
+    rows = mod.check({"ccr": _HELD}, get_json=lambda url: doc)
+    assert rows[0]["update_available"] is False
+    assert rows[0]["latest"] == "2.0.0"
+
+
 def test_apply_refuses_a_held_release(tmp_path, monkeypatch):
     """A hand-run `apply` cannot bypass the hold either, and writes nothing."""
     (tmp_path / "tools").mkdir()
