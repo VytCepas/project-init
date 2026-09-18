@@ -68,6 +68,38 @@ def test_config_surface_is_projected(tmp_path: Path):
     assert (claude / "rules" / "python.md").exists()
 
 
+def test_rules_are_projected_in_the_scoping_claude_reads(tmp_path: Path):
+    """#997: `rules/` is translated on the way into `.claude/`, and nothing else is.
+
+    Claude Code scopes a rule only by `paths:`, and discovers rules recursively,
+    so a nested rule needs it too. The source keeps Cursor's `globs:`, a
+    `rules/` directory that is not Claude's (inside a skill) is copied as-is, and
+    a re-run translates from the source again rather than from its own output.
+    """
+    _mk_agents(tmp_path)
+    agents = tmp_path / ".agents"
+    cursor_rule = '---\ndescription: d\nglobs: ["**/*.py"]\nalwaysApply: false\n---\nbody\n'
+    claude_rule = '---\ndescription: d\npaths:\n  - "**/*.py"\n---\nbody\n'
+    (agents / "rules" / "scoped.md").write_text(cursor_rule)
+    (agents / "rules" / "team").mkdir()
+    (agents / "rules" / "team" / "nested.md").write_text(cursor_rule)
+    (agents / "skills" / "demo" / "rules").mkdir()
+    (agents / "skills" / "demo" / "rules" / "notes.md").write_text(cursor_rule)
+
+    for first_scaffold in (True, False):
+        _generate_claude_projection(tmp_path, first_scaffold=first_scaffold)
+        claude = tmp_path / ".claude"
+        assert (claude / "rules" / "scoped.md").read_text() == claude_rule
+        assert (claude / "rules" / "team" / "nested.md").read_text() == claude_rule
+        assert (claude / "skills" / "demo" / "rules" / "notes.md").read_text() == cursor_rule
+        assert (agents / "rules" / "scoped.md").read_text() == cursor_rule, "source was rewritten"
+
+    import json
+
+    listed = json.loads((tmp_path / ".claude" / ".projection.json").read_text())["paths"]
+    assert "rules/scoped.md" in listed, "a translated rule must still be owned by the projection"
+
+
 def test_state_and_machinery_are_excluded(tmp_path: Path):
     # The heart of #627: state must live only in canonical .agents/ (no
     # split-brain), and machinery is dead weight in .claude/.

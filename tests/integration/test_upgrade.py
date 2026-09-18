@@ -553,6 +553,38 @@ class TestUpgradeApply:
         assert not (target / ".claude" / "memory").exists()
         assert not (target / ".claude").is_symlink()
 
+    def test_apply_rescopes_rules_an_older_projection_copied_verbatim(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # #997: before the fix, the projection copied `.agents/rules/` byte for
+        # byte, so an existing project's `.claude/rules/` is scoped only by
+        # Cursor's `globs:`, which Claude Code ignores: every rule loads in every
+        # session. Build exactly that tree (the real projection with its
+        # translation switched off), then upgrade with the current code.
+        import project_init.scaffold as scaffold_module
+
+        target = tmp_path / "p"
+        with monkeypatch.context() as patched:
+            patched.setattr(scaffold_module, "_scope_projected_rules", lambda rules_dir: None)
+            _scaffold(target)
+        sources = sorted((target / ".agents" / "rules").glob("*.md"))
+        assert [s.name for s in sources] == ["hooks.md", "python.md"]
+        for source in sources:
+            stale = target / ".claude" / "rules" / source.name
+            assert stale.read_bytes() == source.read_bytes(), "fixture is not the old projection"
+
+        assert main(["upgrade", str(target), "--apply"]) == 0
+
+        for source in sources:
+            (globs_line,) = [
+                ln for ln in source.read_text().splitlines() if ln.startswith("globs:")
+            ]
+            globs = json.loads(globs_line.partition(":")[2])
+            projected = (target / ".claude" / "rules" / source.name).read_text()
+            front = projected.split("---\n")[1]
+            assert "globs:" not in front, f"{source.name} still scoped only by globs"
+            assert front.endswith("paths:\n" + "".join(f"  - {json.dumps(g)}\n" for g in globs))
+
     def test_in_progress_new_sibling_is_never_clobbered(self, tmp_path: Path):
         """A user-modified .new (manual merge in progress) survives re-apply
         — the fresh render goes to .new.1 instead (PR #160 review)."""
