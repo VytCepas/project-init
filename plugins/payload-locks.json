@@ -1,10 +1,10 @@
 {
   "project-init-lifecycle": {
-    "sha256": "94eacb9785616e14f810caa3b1b24c20e6867e1156df73d03068b132d63cf7e1",
-    "version": "0.2.5"
+    "sha256": "e3da567fef8451d8bc7d95627f057d7b87965345ed791ebc8c244b2ee377e722",
+    "version": "0.2.6"
   },
   "project-init-workflow": {
-    "sha256": "2e041b0721044363ea91d08ea73820e5954c7fd4855e20a5c65f22a3f8a57933",
-    "version": "0.9.19"
+    "sha256": "32cd6561b0601d27bc61f094977feff25a5c6b1965e7fbff77098f3559cc7984",
+    "version": "0.9.20"
   }
 }

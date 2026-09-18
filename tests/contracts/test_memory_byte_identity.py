@@ -188,6 +188,14 @@ commit no reviewer had seen. Deliberate content change, not move-drift. Only
 that one hash was re-pinned, in all four fixtures, after the re-pin refused to run
 until it had confirmed that key was the sole drifted one and no path was added or
 removed.
+
+Exception (#992): every scaffolded entry point gained a first-statement `--help`
+branch that prints its header and exits before doing any work — `--help` used to
+write CODE_MAP.md, install git hooks, run `uv sync`, and install packages. A
+deliberate content change, not move-drift. Only the `gen_code_map.py`,
+`install_hooks.sh` and `push_wiki.sh` hashes were re-pinned, in all four
+fixtures, by a re-pin that refused to write if any key outside the files this
+change edits had drifted.
 """
 
 from __future__ import annotations

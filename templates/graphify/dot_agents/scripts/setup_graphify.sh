@@ -8,6 +8,12 @@
 #   2. registers the project-scoped /graphify skill + PreToolUse hook
 #   3. installs the post-commit hook that incrementally rebuilds the graph
 
+case "${1-}" in
+-h | --help) # the header above is the help; nothing else runs (#992)
+  sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"
+  exit 0
+  ;;
+esac
 set -euo pipefail
 
 if ! command -v uv >/dev/null 2>&1; then
