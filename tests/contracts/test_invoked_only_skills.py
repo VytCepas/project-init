@@ -77,6 +77,15 @@ class TestFrontmatterReading:
         md.write_text("---\nname: x\ndisable-model-invocation: true\n", encoding="utf-8")
         assert not sync_plugin.invoked_only(md)
 
+    def test_the_key_nested_under_another_mapping_does_not_count(self, tmp_path: Path):
+        """Indented, the key belongs to its parent mapping, and Claude Code does
+        not read it as its own field (PR #1012 review)."""
+        md = tmp_path / "SKILL.md"
+        md.write_text(
+            "---\nname: x\nmetadata:\n  disable-model-invocation: true\n---\n", encoding="utf-8"
+        )
+        assert not sync_plugin.invoked_only(md)
+
     def test_add_command_is_not_invoked_only(self):
         """The ticket's comment named `add_command` as carrying the field. It
         does not: the key is in a fenced example in its body, showing a reader
@@ -134,6 +143,46 @@ class TestEmission:
         (source / "agents").mkdir()
         (source / sync_plugin.CODEX_POLICY_REL).write_text(
             "policy:\n  allow_implicit_invocation: true\n", encoding="utf-8"
+        )
+        with pytest.raises(SystemExit, match="allow_implicit_invocation"):
+            sync_plugin.emit_skill(source, tmp_path / "out" / "deploy")
+
+
+class TestAuthoredPolicyReading:
+    """The effective `policy.allow_implicit_invocation`, not a substring (PR #1012 review)."""
+
+    @pytest.mark.parametrize(
+        "policy",
+        [
+            "policy:\n  allow_implicit_invocation: false\n",
+            "# hidden until asked\npolicy:\n  # set by hand\n  allow_implicit_invocation: false  # yes\n",
+            "interface:\n  display_name: X\npolicy:\n    allow_implicit_invocation: false\n",
+        ],
+        ids=["plain", "comments", "after-another-block"],
+    )
+    def test_a_policy_that_disables_it_is_read_as_such(self, policy: str):
+        assert sync_plugin.disables_implicit_invocation(policy)
+
+    @pytest.mark.parametrize(
+        "policy",
+        [
+            "policy:\n  # allow_implicit_invocation: false\n  allow_implicit_invocation: true\n",
+            "policy:\n  allow_implicit_invocation: true  # allow_implicit_invocation: false\n",
+            "policy:\n  other:\n    allow_implicit_invocation: false\n",
+            "interface:\n  allow_implicit_invocation: false\npolicy:\n  display: x\n",
+            "allow_implicit_invocation: false\n",
+        ],
+        ids=["commented-out", "trailing-comment", "nested-deeper", "wrong-block", "top-level"],
+    )
+    def test_a_policy_that_does_not_disable_it_is_read_as_such(self, policy: str):
+        assert not sync_plugin.disables_implicit_invocation(policy)
+
+    def test_a_commented_out_false_above_a_live_true_is_refused(self, tmp_path: Path):
+        source = _skill(tmp_path / "src", "deploy", invoked_only=True)
+        (source / "agents").mkdir()
+        (source / sync_plugin.CODEX_POLICY_REL).write_text(
+            "policy:\n  # allow_implicit_invocation: false\n  allow_implicit_invocation: true\n",
+            encoding="utf-8",
         )
         with pytest.raises(SystemExit, match="allow_implicit_invocation"):
             sync_plugin.emit_skill(source, tmp_path / "out" / "deploy")

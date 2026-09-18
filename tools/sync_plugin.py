@@ -375,7 +375,10 @@ def invoked_only(skill_md: Path) -> bool:
 
     Only the frontmatter counts. `add_command` shows the key in a fenced example
     in its BODY, as a thing a reader may write, and that skill is not
-    invoked-only. An unterminated frontmatter block is not frontmatter.
+    invoked-only. An unterminated frontmatter block is not frontmatter. Only a
+    top-level key counts: the same key indented under another mapping (say
+    `metadata:`) is nested YAML, which Claude Code does not read as its field
+    (PR #1012 review).
     """
     lines = skill_md.read_text(encoding="utf-8").splitlines()
     if not lines or lines[0].strip() != "---":
@@ -386,8 +389,40 @@ def invoked_only(skill_md: Path) -> bool:
         return False
     for line in lines[1:end]:
         key, sep, value = line.partition(":")
-        if sep and key.strip() == INVOKED_ONLY_KEY:
+        if sep and key.rstrip() == INVOKED_ONLY_KEY:  # no lstrip: indented is nested
             return value.split("#", 1)[0].strip().lower() == "true"
+    return False
+
+
+def disables_implicit_invocation(policy: str) -> bool:
+    """Whether a Codex `agents/openai.yaml` sets ``policy.allow_implicit_invocation: false``.
+
+    Read as block YAML, strictly: a top-level `policy:` mapping whose direct
+    child is the key, with the value `false`. Comments are dropped first, so a
+    commented-out `false` above a live `true` does not count (PR #1012 review).
+    Any other shape reads as not disabling it, which makes the sync refuse and
+    name the file rather than guess what Codex will do.
+    """
+    in_policy = False
+    child_indent: int | None = None
+    for raw in policy.splitlines():
+        line = raw.split("#", 1)[0].rstrip()
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent == 0:
+            in_policy = line == "policy:"
+            child_indent = None
+            continue
+        if not in_policy:
+            continue
+        if child_indent is None:
+            child_indent = indent
+        if indent != child_indent:
+            continue
+        key, sep, value = line.strip().partition(":")
+        if sep and key == "allow_implicit_invocation":
+            return value.strip() == "false"
     return False
 
 
@@ -435,7 +470,7 @@ def _mark_invoked_only(source_md: Path, dest: Path, gate: str | None) -> bool:
         return False
     authored = source_md.parent / CODEX_POLICY_REL
     policy = authored.read_text(encoding="utf-8") if authored.is_file() else CODEX_POLICY
-    if "allow_implicit_invocation: false" not in policy:
+    if not disables_implicit_invocation(policy):
         raise SystemExit(
             f"{source_md.parent.name}: SKILL.md sets {INVOKED_ONLY_KEY}: true but its "
             f"{CODEX_POLICY_REL.as_posix()} does not set allow_implicit_invocation: "
