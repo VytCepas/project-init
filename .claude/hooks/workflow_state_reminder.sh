@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # workflow_state_reminder.sh — inject the lifecycle rules when a prompt
-# mentions GitHub workflow actions, plus the current DAG state if available.
+# mentions GitHub workflow actions.
 # UserPromptSubmit hook. Receives prompt JSON on stdin.
 #
 # Token-efficiency (PI-649, ADR-028): injected context persists in the
-# transcript and is re-sent every turn, so the static rules block is injected
-# ONCE per session (sentinel file keyed on the stdin session_id); later
-# triggers get only the dynamic DAG state. Fail-open: no session_id or an
-# unwritable tmp dir falls back to injecting the full block every time.
+# transcript and is re-sent every turn, so the rules block is injected ONCE
+# per session (sentinel file keyed on the stdin session_id); later triggers in
+# the same session inject nothing. Fail-open: no session_id or an unwritable
+# tmp dir falls back to injecting the full block every time.
+#
+# There is deliberately no per-prompt "DAG state" re-injection (PI-998): the
+# state it hashed was `dag_workflow.py nodes`, which prints the static GRAPH
+# constant, so the hash never changed and that branch never fired.
 
 set -euo pipefail
 
@@ -32,10 +36,6 @@ INPUT=$(cat)
 # Resolve the Python interpreter through the canonical helper (PI-361).
 PY="$(dirname "$0")/_py.sh"
 
-# Try to derive a current-state snapshot from dag_workflow.py.
-# Failures are non-fatal — the static rules are always injected.
-DAG_STATE=$("$PY" "$(dirname "$0")/dag_workflow.py" nodes 2>/dev/null || true)
-
 # The issue key is project-specific (start_issue.sh derives it from config.yaml's
 # project_key / the repo name), so the naming rules must NOT hardcode `PI`
 # (2026-07 review). Resolve the project config via $CLAUDE_PROJECT_DIR when set
@@ -55,7 +55,7 @@ PROJECT_KEY=$({ grep '^[[:space:]]*project_key:' "$_pi_config" 2>/dev/null || tr
   head -n1 | sed 's/#.*$//' | cut -d: -f2- | tr -d "[:space:]\"'" | tr '[:lower:]' '[:upper:]')
 [ -z "$PROJECT_KEY" ] && PROJECT_KEY="<KEY>"
 
-printf '%s' "$INPUT" | DAG_STATE="$DAG_STATE" PROJECT_KEY="$PROJECT_KEY" \
+printf '%s' "$INPUT" | PROJECT_KEY="$PROJECT_KEY" \
   PI_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}" "$PY" -c '
 import hashlib
 import json
@@ -85,18 +85,15 @@ trigger = re.search(
 if not trigger:
     sys.exit(0)
 
-dag_state = os.environ.get("DAG_STATE", "").strip()
 key = os.environ.get("PROJECT_KEY", "").strip() or "<KEY>"
 
-# Session-scoped dedup (ADR-028): the static rules are injected once per
-# session, and the dynamic DAG state is re-injected only when it CHANGED
-# since the last injection (the sentinel stores its hash). The sentinel is
-# keyed on the session_id from the hook payload plus a project-dir hash
-# (parallel sessions in different repos must not collide). Any failure here
-# falls back to first_time=True — the full block is safe, just token-costly.
+# Session-scoped dedup (ADR-028): the rules are injected once per session.
+# The sentinel is keyed on the session_id from the hook payload plus a
+# project-dir hash (parallel sessions in different repos must not collide);
+# its presence as a regular file is the whole signal, its content is never
+# read. Any failure here falls back to first_time=True — the full block is
+# safe, just token-costly.
 first_time = True
-state_changed = True
-cur_hash = hashlib.sha256(dag_state.encode()).hexdigest()[:16]
 session_id = re.sub(r"[^A-Za-z0-9_-]", "", str(data.get("session_id") or ""))[:64]
 if session_id:
     proj = hashlib.sha256(
@@ -106,50 +103,39 @@ if session_id:
         tempfile.gettempdir(), f"pi_wsr_{proj}_{session_id}"
     )
     try:
-        if os.path.exists(sentinel):
+        # Only a regular FILE marks the injection done: a directory or a link
+        # (dangling or not) at this path must not suppress it (fail-open), and
+        # O_EXCL creates the file without following a link planted there.
+        if os.path.isfile(sentinel) and not os.path.islink(sentinel):
             first_time = False
-            with open(sentinel) as fh:
-                state_changed = fh.read().strip() != cur_hash
-        if first_time or state_changed:
-            with open(sentinel, "w") as fh:
-                fh.write(cur_hash)
+        else:
+            os.close(os.open(sentinel, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
     except OSError:
         first_time = True
-        state_changed = True
 
-state_block = f"\nCurrent DAG nodes:\n{dag_state}\n" if dag_state else ""
-
-if first_time:
-    context = (
-        "GitHub workflow rules (the dag_workflow.py guard hook flags violations in-session; git hooks + CI are what bind):\n"
-        "\n"
-        "Lifecycle order (DAG):\n"
-        "  issue.created -> branch.created -> branch.pushed -> pr.opened\n"
-        "                                                  \\-> ci.green -+\n"
-        "                                                  \\-> review.approved -+-> pr.merged\n"
-        "\n"
-        "Use the wrapper scripts in .agents/scripts/ — the guard blocks the raw commands:\n"
-        "  create_issue.sh (not: gh issue create) | start_issue.sh / create_nojira_pr.sh (not: gh pr create)\n"
-        "  push_branch.sh (not: git push) | promote_review.sh (not: gh pr ready)\n"
-        "  monitor_pr.sh <pr> --merge (not: gh pr merge / gh api .../merge / gh pr checks --watch)\n"
-        "\n"
-        f"Naming: branch <type>/{key}-<n>-<kebab-slug> | "
-        f"PR title type({key}-N): description (no scope = no linked issue) | "
-        "body includes `Closes #N`\n"
-        "Details (review cycles, no-issue PRs, iterating before push): load the "
-        "github_workflow skill.\n"
-        f"{state_block}"
-    )
-elif state_block and state_changed:
-    context = (
-        "Lifecycle reminder (full rules were injected earlier this session; "
-        "load the github_workflow skill for details).\n"
-        f"{state_block}"
-    )
-else:
-    # Rules already shown and the DAG state is unchanged (or absent) —
-    # nothing new to say.
+if not first_time:
+    # Rules already injected this session — nothing new to say.
     sys.exit(0)
+
+context = (
+    "GitHub workflow rules (the dag_workflow.py guard hook flags violations in-session; git hooks + CI are what bind):\n"
+    "\n"
+    "Lifecycle order (DAG):\n"
+    "  issue.created -> branch.created -> branch.pushed -> pr.opened\n"
+    "                                                  \\-> ci.green -+\n"
+    "                                                  \\-> review.approved -+-> pr.merged\n"
+    "\n"
+    "Use the wrapper scripts in .agents/scripts/ — the guard blocks the raw commands:\n"
+    "  create_issue.sh (not: gh issue create) | start_issue.sh / create_nojira_pr.sh (not: gh pr create)\n"
+    "  push_branch.sh (not: git push) | promote_review.sh (not: gh pr ready)\n"
+    "  monitor_pr.sh <pr> --merge (not: gh pr merge / gh api .../merge / gh pr checks --watch)\n"
+    "\n"
+    f"Naming: branch <type>/{key}-<n>-<kebab-slug> | "
+    f"PR title type({key}-N): description (no scope = no linked issue) | "
+    "body includes `Closes #N`\n"
+    "Details (review cycles, no-issue PRs, iterating before push): load the "
+    "github_workflow skill.\n"
+)
 
 print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": context}}))
 '
