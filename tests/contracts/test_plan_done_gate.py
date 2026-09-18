@@ -47,6 +47,9 @@ def _render_plan(target: Path, preset: str, language: str = "python") -> list[st
 
 
 def _assert_opens_with_gate(lines: list[str], label: str) -> None:
+    # Checked first so a truncated or empty PLAN.md reports what is missing
+    # rather than dying on an IndexError below (Copilot review).
+    assert len(lines) >= 3, f"{label}: PLAN.md has {len(lines)} non-blank line(s): {lines!r}"
     assert lines[0] == "# Plan — gate-probe", f"{label}: PLAN.md lost its title: {lines[0]!r}"
     assert lines[1].startswith("Done when: "), (
         f"{label}: PLAN.md must open with its `Done when:` line, got {lines[1]!r}"
