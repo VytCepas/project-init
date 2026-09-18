@@ -50,7 +50,7 @@
     },
     "memory": {
       "type": "object",
-      "description": "The recall-ladder descriptor (#498, ADR-024). 'stack' is the source of truth and 'tier' is derived from it (#960): the allOf below pins each stack to its one tier, so a hand-edited tier that disagrees with its stack is invalid instead of silently changing which retrieval surfaces a reader gates on. A project that declined memory ('none') emits no memory block at all; at project_init_contract_version >= 1 a reader must read that absence as 'declined', and only a pre-contract (v0) config leaves it unknown.",
+      "description": "The recall-ladder descriptor (#498, ADR-024). 'stack' is the source of truth and 'tier' is derived from it (#960): the allOf below pins each stack to its one tier, so a hand-edited tier that disagrees with its stack is invalid instead of silently changing which retrieval surfaces a reader gates on. A project that declined memory ('none') emits no memory block at all; at project.project_init_contract_version >= 1 a reader must read that absence as 'declined', and only a pre-contract (v0) config leaves it unknown.",
       "properties": {
         "tier": { "type": "integer" },
         "stack": {
