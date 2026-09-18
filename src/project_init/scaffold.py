@@ -370,9 +370,10 @@ def memory_tier(memory_stack: str) -> str:
 
     The rung on the recall ladder a root orchestrator (ADR-025) reads to feature-
     detect a child's retrieval surfaces: ``auto``→0, ``obsidian-only``→1,
-    ``obsidian-graphify``→2, ``obsidian-graphify-rag``→3. ``none`` returns ``""``
-    (no descriptor — the config memory block is gated out). Single source for the
-    scaffold + the two upgrade emit paths so they never diverge (PI-189).
+    ``obsidian-graphify``→2, ``obsidian-graphify-rag``→3. ``none`` returns ``""``:
+    declining memory is not a rung on the ladder, so config.yaml declares it as
+    ``stack: none`` with no tier at all (#960). Single source for the scaffold +
+    the two upgrade emit paths so they never diverge (PI-189).
 
     Aliases are resolved first (#958). Before that, ``memory_tier("obsidian")``
     — a spelling the contract guarantees forever — returned ``""``, and the

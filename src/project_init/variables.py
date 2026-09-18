@@ -719,6 +719,9 @@ def _build_variables(
         "memory_stack": memory_stack,
         "memory_tier": memory_tier(memory_stack),
         "memory": "true" if has_memory else "",
+        # Inverse gate for the engine's else-less {{#if}} (like lifecycle_off):
+        # config.yaml DECLARES a declined memory as `stack: none` (#960).
+        "memory_off": "" if has_memory else "true",
         # GitHub lifecycle tier (#476): the recorded value + the gate flag, plus
         # the inverse flag for the engine's else-less {{#if}} blocks (e.g. the
         # pre-push main/master remediation reads differently with the lifecycle

@@ -12,10 +12,17 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from project_init.__main__ import ScaffoldInputs, _build_variables, _default_preset_index
 from project_init.scaffold import list_presets, load_preset, memory_layers, overlay_layers, scaffold
-from project_init.upgrade import _backfill_variables, _migrate_semantic_config
+from project_init.upgrade import (
+    _backfill_variables,
+    _migrate_semantic_config,
+    read_scaffold_record,
+    run_upgrade,
+    write_scaffold_record,
+)
 from tests.helpers import make_variables
 
 
@@ -173,9 +180,11 @@ class TestCoreScaffold:
         # the rest of docs/adr is still there
         assert (self.target / ".agents" / "docs" / "adr" / "adr-002-mcp-choices.md").is_file()
 
-    def test_config_has_no_memory_block(self):
+    def test_config_declares_memory_declined(self):
+        # #960: declined is DECLARED, not omitted — an absent block cannot be
+        # told apart from one that was never recorded. No tier, anchor or surface.
         cfg = (self.target / ".agents" / "config.yaml").read_text()
-        assert "memory:" not in cfg
+        assert yaml.safe_load(cfg)["memory"] == {"stack": "none"}
         assert "vault_path" not in cfg
         assert "mcps:" in cfg  # the block that followed the memory block survives
 
@@ -208,3 +217,32 @@ class TestCoreScaffold:
         cap = (self.target / ".agents" / "CAPABILITIES.md").read_text()
         assert ".agents/vault" not in cap
         assert "obsidian-only" not in cap and "obsidian-graphify" not in cap
+
+
+class TestDeclaredNoneReachesExistingProjects:
+    """#960: a `none` project scaffolded before the declaration gains it on upgrade.
+
+    Its config.yaml has no `memory:` block and its record has no `memory_off`
+    gate. Unless the upgrade adds both, the declaration only ever reaches fresh
+    scaffolds, and every existing declined project keeps reading as "unknown".
+    """
+
+    def test_upgrade_adds_the_declaration(self, tmp_path: Path):
+        target = tmp_path / "p"
+        preset = load_preset("core")
+        v = make_variables(memory_stack="none", project_init_version="0.0.1")
+        created = scaffold(target, preset, v, strict=True)
+        config = target / ".agents" / "config.yaml"
+        before = config.read_text()
+        block = re.search(r"(?ms)^memory:\n.*?(?=^mcps:)", before)
+        assert block, "control: a fresh none scaffold declares the block"
+        config.write_text(before.replace(block.group(0), ""))  # the pre-#960 render
+        pre_960 = {k: val for k, val in v.items() if k != "memory_off"}
+        write_scaffold_record(target, "core", pre_960, created)
+        (target / ".python-version").write_text("3.11\n")  # park the #847 pin proposal
+
+        assert run_upgrade(target, apply=True, accept_new=["all"]) == 0
+
+        assert yaml.safe_load(config.read_text())["memory"] == {"stack": "none"}
+        _, recorded, _, _ = read_scaffold_record(target)
+        assert recorded["memory_off"] == "true"

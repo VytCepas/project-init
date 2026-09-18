@@ -14,16 +14,24 @@ import pytest
 import yaml
 
 from project_init.__main__ import ScaffoldInputs, _build_variables
-from project_init.scaffold import _PROJECTION_EXCLUDE, CONTRACT_VERSION, load_preset, scaffold
+from project_init.scaffold import (
+    _MEMORY_STACK_ALIASES,
+    _PROJECTION_EXCLUDE,
+    CONTRACT_VERSION,
+    load_preset,
+    memory_tier,
+    scaffold,
+)
 from project_init.schema import (
     descriptor_schema_path,
     load_descriptor_schema,
     load_usage_event_schema,
     usage_event_schema_path,
 )
+from project_init.variables import _MEMORY_STACKS
 
 
-def _render_full(tmp_path: Path) -> dict:
+def _render_full(tmp_path: Path, memory: str = "obsidian-graphify-rag") -> dict:
     """Render a scaffold exercising every contract surface and return its config."""
     inputs = ScaffoldInputs(
         project_name="conformance-service",
@@ -38,7 +46,7 @@ def _render_full(tmp_path: Path) -> dict:
         agents=["claude"],
         no_plugin=False,
         profile="individual",
-        memory="obsidian-graphify-rag",
+        memory=memory,
         lifecycle="github",
         delivery="service",
         deploy="cloud-run",
@@ -280,3 +288,79 @@ class TestSchemaAccessor:
         pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
         force_include = pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]["force-include"]
         assert force_include.get("schemas") == "project_init/schemas"
+
+
+def _memory_descriptor(memory: dict) -> dict:
+    """The smallest descriptor the schema accepts, carrying *memory*."""
+    return {
+        "project": {"name": "p", "description": "d"},
+        "language": "python",
+        "delivery": "library",
+        "memory": memory,
+    }
+
+
+def _valid(descriptor: dict) -> bool:
+    return jsonschema.Draft7Validator(load_descriptor_schema()).is_valid(descriptor)
+
+
+_ALL_STACKS = (*_MEMORY_STACKS, *_MEMORY_STACK_ALIASES)
+_LADDER_STACKS = tuple(s for s in _ALL_STACKS if s != "none")
+
+
+class TestMemoryStackIsTheSourceOfTruth:
+    """#960: `tier` is derived from `stack`, and the schema says so.
+
+    The two were independent fields, so a one-character edit to `tier` changed
+    which retrieval surfaces a reader gated on while `stack` still named the
+    real profile, and nothing objected. #988 item 1 is the same gap one field
+    over: `stack` was an unconstrained string.
+    """
+
+    @pytest.mark.parametrize("stack", _MEMORY_STACKS)
+    def test_every_memory_profile_renders_a_valid_descriptor(self, tmp_path: Path, stack: str):
+        config = _render_full(tmp_path, memory=stack)
+        jsonschema.validate(instance=config, schema=load_descriptor_schema())
+        assert config["memory"]["stack"] == stack
+
+    def test_stack_enum_is_every_recognised_stack_and_alias(self):
+        # Derived, not copied: a stack the CLI accepts but the schema refuses (or
+        # the reverse) is the drift #988 item 1 measured.
+        schema = load_descriptor_schema()
+        enum = schema["properties"]["memory"]["properties"]["stack"]["enum"]
+        assert set(enum) == set(_ALL_STACKS)
+
+    @pytest.mark.parametrize("stack", _LADDER_STACKS)
+    @pytest.mark.parametrize("tier", range(4))
+    def test_schema_accepts_exactly_the_tier_the_scaffolder_derives(self, stack: str, tier: int):
+        # Behavioural, so the schema's allOf and memory_tier() are checked as one
+        # table without parsing either.
+        memory = {"tier": tier, "stack": stack, "memory_path": ".agents/memory"}
+        assert _valid(_memory_descriptor(memory)) is (tier == int(memory_tier(stack)))
+
+    def test_the_one_character_tier_edit_is_invalid(self, tmp_path: Path):
+        # The issue's reproduction: a tier-2 project with `tier` edited to 0 and
+        # `stack` left at obsidian-graphify.
+        config = _render_full(tmp_path, memory="obsidian-graphify")
+        assert _valid(config), "control: the unedited render must be valid"
+        config["memory"]["tier"] = 0
+        assert not _valid(config)
+
+    def test_declined_carries_no_tier_anchor_or_surface(self):
+        assert _valid(_memory_descriptor({"stack": "none"}))
+        for key, value in (
+            ("tier", 0),
+            ("memory_path", ".agents/memory"),
+            ("vault_path", ".agents/vault"),
+            ("graph_path", "graphify-out/graph.json"),
+            ("rag_endpoint", ""),
+        ):
+            assert not _valid(_memory_descriptor({"stack": "none", key: value})), key
+
+    def test_a_stack_the_ladder_does_not_know_is_invalid(self):
+        memory = {"tier": 2, "stack": "obsidian-graphfy", "memory_path": ".agents/memory"}
+        assert not _valid(_memory_descriptor(memory))
+
+    def test_a_memory_stack_still_requires_its_tier_and_anchor(self):
+        assert not _valid(_memory_descriptor({"stack": "auto", "memory_path": ".agents/memory"}))
+        assert not _valid(_memory_descriptor({"stack": "auto", "tier": 0}))

@@ -722,6 +722,7 @@ def _migrate_semantic_config(lines: list[str]) -> tuple[str, dict[str, str], dic
         "rag_wired": "",
         "rag_unwired": "true" if "rag" in stack else "",
         "memory": "" if stack == "none" else "true",
+        "memory_off": "true" if stack == "none" else "",
         "memory_tier": memory_tier(stack),
         # Lifecycle (#476): a pre-record config ALWAYS shipped the GitHub
         # lifecycle (it was force-bundled in base), so reconstruct it as ON —
@@ -830,6 +831,7 @@ def _backfill_variables(variables: dict[str, str]) -> dict[str, str]:
         # Memory gate (#466): "" only for the vault-free `none` stack. The
         # obsidian/graphify substring checks already yield "" for none.
         "memory": "" if stack == "none" else "true",
+        "memory_off": "true" if stack == "none" else "",
         "memory_tier": memory_tier(stack),
         "lifecycle_tier": ltier,
         "lifecycle": "" if ltier == "none" else "true",

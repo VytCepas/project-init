@@ -28,9 +28,26 @@ memory:
   rag_endpoint:                            # present at tier 3 (ADR-024 §4); empty until a tool is wired (#495)
 ```
 
-A vault-free `none` project ships **no** `memory:` block (its absence *is* the
-signal — there is no memory backend to introspect). **Contract versioning lives
-at key path `project.project_init_contract_version` (inside the always-present
+**`stack` is the source of truth; `tier` is derived from it (#960).** The two
+used to be independent fields, so a one-character edit to `tier` changed which
+surfaces a reader gated on while `stack` still named the real profile, and no
+reader objected. The schema now pins each stack to its one tier, so that edit
+is a validation error. Change memory with `project-init add memory <stack>`.
+
+A vault-free `none` project **declares** it (#960):
+
+```yaml
+memory:
+  stack: none      # no tier, no anchor, no retrieval surfaces
+```
+
+It used to ship no block at all, on the theory that absence was the signal. It
+was not one: a reader cannot tell "declined" from "never recorded", so a
+declined project read as `stack: unknown` at tier 0, the same as a real `auto`
+project. `project-init upgrade` adds the declaration to an existing `none`
+project, because it re-splices the `memory:` block from a fresh render.
+
+**Contract versioning lives at key path `project.project_init_contract_version` (inside the always-present
 `project:` block, deliberately NOT nested in `memory:`)**, precisely so it
 survives the `none` case; a child config that predates the field is **contract
 v0** by the reader's rule below.
@@ -39,7 +56,7 @@ v0** by the reader's rule below.
 
 | tier | stack | memory_path | vault_path | graph_path | rag_endpoint |
 |---|---|---|---|---|---|
-| — | none | (absent) | — | — | — |
+| — | none (declared, #960) | (absent) | — | — | — |
 | 0 | auto | `.agents/memory` | — | — | — |
 | 1 | obsidian-only | `.agents/memory` | `.agents/vault` | — | — |
 | 2 | obsidian-graphify | `.agents/memory` | `.agents/vault` | `graphify-out/graph.json` | — |
@@ -47,9 +64,14 @@ v0** by the reader's rule below.
 
 ## Reader rules (orchestrator-side, ADR-025)
 
-- **Feature-detect, don't assume.** Treat a missing `memory:` block as "no memory
-  backend," a missing `project_init_contract_version` as **contract v0**, and a
-  missing `rag_endpoint` (any tier < 3) as "no RAG surface." Never hard-require a
+- **The stack decides, not the tier.** Derive the tier from `stack` with the
+  table above. If a declared `tier` disagrees, read the stack's surfaces and
+  report the disagreement; never let the tier strip them (#960).
+- **Feature-detect, don't assume.** Treat `stack: none` as "memory declined"
+  and a missing `memory:` block as "nothing recorded"; read no surfaces for
+  either, but only the first is a decision. Treat a missing
+  `project_init_contract_version` as **contract v0**, and a missing
+  `rag_endpoint` (any tier < 3) as "no RAG surface." Never hard-require a
   tier-3 field on a lower-tier child.
 - **Degrade by tier.** `tier >= 3` and `rag_endpoint` set → query RAG; `>= 2` →
   query `graph_path` before grep; `>= 0` → grep `memory_path` (`MEMORY.md` first).
