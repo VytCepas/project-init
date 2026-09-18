@@ -32,7 +32,7 @@ memory:
 are stored side by side, so a one-character edit to `tier` used to change which
 surfaces a reader gated on while `stack` still named the real profile, and no
 reader objected. The schema now pins each stack to its one tier, so that edit
-is a validation error. Change memory with `project-init add memory <stack>`.
+is a validation error. Change memory with `project-init add memory <stack> --apply`.
 
 A vault-free `none` project ships **no** `memory:` block (its absence *is* the
 signal — there is no memory backend to introspect). **Contract versioning lives

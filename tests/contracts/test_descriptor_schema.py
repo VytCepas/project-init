@@ -306,7 +306,7 @@ def _valid(descriptor: dict) -> bool:
 
 # Every stack a memory block can carry: the recognised stacks and their permanent
 # aliases, minus `none`, which contract v2 expresses by having no block at all.
-_LADDER_STACKS = tuple(s for s in (*_MEMORY_STACKS, *_MEMORY_STACK_ALIASES) if s != "none")
+_LADDER_STACKS = tuple(s for s in (*_MEMORY_STACKS, *_MEMORY_STACK_ALIASES.keys()) if s != "none")
 
 
 class TestMemoryStackIsTheSourceOfTruth:
@@ -367,3 +367,12 @@ class TestMemoryStackIsTheSourceOfTruth:
     def test_a_memory_stack_still_requires_its_tier_and_anchor(self):
         assert not _valid(_memory_descriptor({"stack": "auto", "memory_path": ".agents/memory"}))
         assert not _valid(_memory_descriptor({"stack": "auto", "tier": 0}))
+
+    def test_the_rendered_advice_names_a_command_that_applies(self, tmp_path: Path):
+        # Copilot, PR #1010: `project-init add` is a dry run without --apply, so
+        # advice that omits it tells the reader a change happened when none did.
+        _render_full(tmp_path, memory="auto")
+        text = (tmp_path / ".agents" / "config.yaml").read_text(encoding="utf-8")
+        advice = [line for line in text.splitlines() if "project-init add memory" in line]
+        assert advice, "the tier comment no longer names the command"
+        assert all("--apply" in line for line in advice)
