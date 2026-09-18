@@ -345,6 +345,20 @@ def test_an_unrecognised_entry_shape_warns(tmp_path: Path, config_dir: Path) -> 
     assert _plugin_check(tmp_path).level == "WARN"
 
 
+def test_an_unrecognised_entry_inside_the_list_warns(tmp_path: Path, config_dir: Path) -> None:
+    """A future scope that keeps the list wrapper must not read as "installed
+    elsewhere" and send the user to reinstall a healthy plugin (PR #1008 review)."""
+    _scaffold(tmp_path)
+    entry = {"scope": "workspace", "root": str(tmp_path), "installPath": str(tmp_path)}
+    _registry(config_dir).parent.mkdir(parents=True)
+    _registry(config_dir).write_text(
+        json.dumps({"version": 3, "plugins": {WORKFLOW: [entry], LIFECYCLE: [entry]}})
+    )
+    check = _plugin_check(tmp_path)
+    assert check.level == "WARN", check
+    assert main(["doctor", str(tmp_path)]) == 0
+
+
 def test_a_definite_absence_outranks_an_unknown_shape(tmp_path: Path, config_dir: Path) -> None:
     _scaffold(tmp_path)
     _registry(config_dir).parent.mkdir(parents=True)

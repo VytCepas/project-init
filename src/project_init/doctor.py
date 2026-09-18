@@ -357,6 +357,11 @@ def _plugin_state(name: str, entries: Any, resolved_target: Path) -> _PluginStat
 
     applicable = [e for e in entries if _applies_to(e, resolved_target)]
     if not applicable:
+        # "Only for other projects" is a definite answer only when every entry
+        # is a shape we recognise; a new scope or field is "cannot tell"
+        # (PR #1008 review), not an instruction to reinstall a healthy plugin.
+        if not all(_recognised(e) for e in entries):
+            return _PluginState(name, "indeterminate", "unrecognised registry entry")
         return _PluginState(name, "not-installed", "installed only for other projects")
 
     reasons = [_payload_problem(entry) for entry in applicable]
@@ -367,6 +372,12 @@ def _plugin_state(name: str, entries: Any, resolved_target: Path) -> _PluginStat
                 name, "loadable", version=version if isinstance(version, str) else ""
             )
     return _PluginState(name, "payload-broken", reasons[0])
+
+
+def _recognised(entry: dict[str, Any]) -> bool:
+    """An entry this code knows how to place: it names a project, or is user-scope."""
+    project_path = entry.get("projectPath")
+    return (isinstance(project_path, str) and bool(project_path)) or entry.get("scope") == "user"
 
 
 def _applies_to(entry: dict[str, Any], resolved_target: Path) -> bool:
