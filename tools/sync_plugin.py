@@ -478,8 +478,9 @@ def _sync_agent_skills(trees: dict[str, Path] | None = None) -> list[str]:
     the base `plan` skill (PI-491), so it matches the CAPABILITIES inventory.
 
     Lifecycle skills are shipped gated on ``{{#if lifecycle}}`` (PI-537 #5) so a
-    `--lifecycle none` scaffold drops them from `.agents/skills` just as it does
-    from `.agents/skills`.
+    `--lifecycle none` scaffold drops them from `.agents/skills` and
+    `.junie/skills`, just as it leaves out the `lifecycle_fallback` overlay that
+    carries them on the Claude path.
 
     An invoked-only skill gets the Codex policy and a demotion record beside it
     (#973), and the returned lines say so, so the outcome is visible when the

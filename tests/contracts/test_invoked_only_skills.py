@@ -163,6 +163,20 @@ class TestGatedEmission:
         rendered = _rendered_bytes(template, {"lifecycle": "true"}, is_template=True)
         assert rendered is not None and b"{{" not in rendered
 
+    def test_an_authored_policy_ships_only_gated(self, tmp_path: Path):
+        """A gated skill's authored `agents/openai.yaml` must not also land
+        ungated beside the `.tmpl`: that copy would survive `--lifecycle none`
+        in an otherwise empty skill dir (PR #1012 review). The gated copy takes
+        top-level files only; this goes red if it ever copies subdirectories."""
+        source = _skill(tmp_path / "src", "ship", invoked_only=True)
+        (source / "agents").mkdir()
+        (source / sync_plugin.CODEX_POLICY_REL).write_text(
+            sync_plugin.CODEX_POLICY, encoding="utf-8"
+        )
+        dest = tmp_path / "out" / "ship"
+        sync_plugin.emit_skill(source, dest, gate="lifecycle")
+        assert sorted(p.name for p in (dest / "agents").iterdir()) == ["openai.yaml.tmpl"]
+
 
 def _fake_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point the sync at copies of the real skill sources; return the core root."""
