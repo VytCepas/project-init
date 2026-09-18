@@ -38,8 +38,8 @@ Source of truth = `.agents/config.yaml` `memory:` block (#498 / ADR-024);
 
 | Field | Always? | Meaning to the orchestrator |
 |---|---|---|
-| `tier` | yes (if memory) | 0–3 — selects the retrieval path (degrade-by-tier) |
-| `stack` | yes | `auto` / `obsidian-only` / `obsidian-graphify` / `obsidian-graphify-rag` |
+| `tier` | yes (if memory) | 0–3 — selects the retrieval path (degrade-by-tier); derived from `stack`, never independent (#960) |
+| `stack` | yes | `auto` / `obsidian-only` / `obsidian-graphify` / `obsidian-graphify-rag` — the source of truth |
 | `memory_path` | yes | `.agents/memory` — grep anchor; `MEMORY.md` is the index |
 | `vault_path` | tier ≥ 1 | `.agents/vault` — human notes |
 | `graph_path` | tier ≥ 2 | `graphify-out/graph.json` — code structure |
@@ -51,11 +51,12 @@ Source of truth = `.agents/config.yaml` `memory:` block (#498 / ADR-024);
 tier >= 3 and rag_endpoint set → query RAG, then confirm against anchors
 tier >= 2                       → query graph_path before grep
 tier >= 0                       → grep memory_path; MEMORY.md first
-no memory: block                → project opted out; skip retrieval
+no memory: block                → project opted out (when project.project_init_contract_version ≥ 1); skip retrieval
 ```
 
 A reader written against tier 0 keeps working at tier 3 (higher tiers only add
-surfaces). **Discovery = glob for `.agents/config.yaml`** — its presence is the
+surfaces). Read the tier off the stack: a tier that disagrees with its stack
+is a hand edit the schema rejects, and trusting it strips surfaces silently (#960). **Discovery = glob for `.agents/config.yaml`** — its presence is the
 registration breadcrumb; no daemon, no write-back.
 
 ## MVP (three read-only capabilities, then RAG)

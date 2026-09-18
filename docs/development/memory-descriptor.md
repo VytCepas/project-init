@@ -28,6 +28,12 @@ memory:
   rag_endpoint:                            # present at tier 3 (ADR-024 §4); empty until a tool is wired (#495)
 ```
 
+**`stack` is the source of truth; `tier` is derived from it (#960).** The two
+are stored side by side, so a one-character edit to `tier` used to change which
+surfaces a reader gated on while `stack` still named the real profile, and no
+reader objected. The schema now pins each stack to its one tier, so that edit
+is a validation error. Change memory with `project-init add memory <stack> --apply`.
+
 A vault-free `none` project ships **no** `memory:` block (its absence *is* the
 signal — there is no memory backend to introspect). **Contract versioning lives
 at key path `project.project_init_contract_version` (inside the always-present
@@ -47,6 +53,14 @@ v0** by the reader's rule below.
 
 ## Reader rules (orchestrator-side, ADR-025)
 
+- **The stack decides, not the tier.** Derive the tier from `stack` with the
+  table above. If a declared `tier` disagrees, read the stack's surfaces and
+  report the disagreement; never let the tier strip them (#960).
+- **Absence is a declaration only under the contract.** At
+  `project_init_contract_version` ≥ 1 a missing `memory:` block means the
+  project declined memory (`none`): report it as declined, not as unknown, or a
+  consumer asks the operator to build what the project turned down. A v0
+  config predates the rule, so there absence says nothing.
 - **Feature-detect, don't assume.** Treat a missing `memory:` block as "no memory
   backend," a missing `project_init_contract_version` as **contract v0**, and a
   missing `rag_endpoint` (any tier < 3) as "no RAG surface." Never hard-require a
