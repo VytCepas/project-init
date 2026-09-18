@@ -39,7 +39,7 @@ Principles:
 - **Memory is à-la-carte** — a superset ladder (ADR-024): flat agent-memory files (`--memory auto`), **plus** an Obsidian vault for humans (`obsidian`), **plus** Graphify for agents (`obsidian-graphify`), **plus** an opt-in tier-3 RAG *seam* for multi-project/monorepo scale (`obsidian-graphify-rag` — docs + a user-run setup stub, engine not bundled; #495), or **none at all** (`--memory none` / the vault-free `core` preset). When present, the vault and the agent index are separated on disk.
 - **The GitHub lifecycle is à-la-carte** — the issue → branch → PR → review → merge automation (DAG guard hooks, lifecycle scripts, board/validation workflows, issue/PR templates, lifecycle skills) ships by default but is declinable (`--lifecycle none`) for a forge-agnostic or minimalist scaffold. The forge-portable quality hooks (commit-msg, gitleaks, lint/format gate, prod-safety) stay either way (ADR-021).
 - **Low-token code map** — Python projects ship `.agents/scripts/gen_code_map.py`, a deterministic AST generator that writes `.agents/docs/CODE_MAP.md` (one line per module/class/function, from docstrings). Agents read it before grepping; in practice the map is ~3% of source size. Regenerate with `just code-map` (#496).
-- **Built-in working skills** — beyond the lifecycle, every scaffold ships on-demand `/command` skills: **`/diagram`** (draw and iterate architecture/code/idea diagrams as committed Mermaid source with live previews), **`/checkpoint`** (save a session handoff to a gitignored file, `/clear`, resume from ~500 tokens), **`/token_efficiency`** (token-frugal working habits), plus `add_hook`, `add_command`, `status`, `review`, and friends. Discover them via `/help` (plugin mode, the default) or `.agents/skills/INDEX.md` (in `--no-plugin` scaffolds, where the skill files are copied into the project).
+- **Built-in working skills** — beyond the lifecycle, every scaffold ships on-demand `/command` skills: **`/diagram`** (draw and iterate architecture/code/idea diagrams as committed Mermaid source with live previews), **`/checkpoint`** (save a session handoff to a gitignored file, `/clear`, resume from ~500 tokens), **`/token_efficiency`** (token-frugal working habits), plus `add_hook`, `add_command`, `status`, `review`, and friends. Discover them via `/help` (plugin mode, the default) or `.agents/skills/INDEX.md` (in `--no-plugin` scaffolds, where the skill files are copied into the project). In plugin mode `/help` lists them only once the plugin is **installed** for the project — `enabledPlugins` in `.claude/settings.json` declares it, it does not install it. Install with `claude plugin install project-init-workflow@project-init --scope project` (and `project-init-lifecycle@project-init` with the lifecycle), or `/plugin` in a session; `project-init doctor` tells you whether it is installed.
 - **Deterministic-first** — hooks and scripts are bash/python. LLM calls only where generative.
 - **Claude-first, portable core** — built and tested for Claude Code; other agents get instructions, not enforcement. See [Agent support tiers](#agent-support-tiers).
 - **`bun` and `uv` only** — no `npm`/`npx`/`pip`/`venv` anywhere in scaffolded projects.
@@ -338,10 +338,15 @@ project-init doctor /path/to/my-project   # or a specific project
 
 It checks that `.agents/config.yaml` carries a scaffold record, that
 `.claude/settings.json` is valid JSON referencing only scripts that exist and
-are executable, that the project-init plugin(s) are enabled (plugin mode) or the
-fallback hooks are present (`--no-plugin`), that the git hooks are installed
+are executable, that the project-init plugin(s) are declared, installed for this
+project and have their cached payload on disk (plugin mode) or the fallback
+hooks are present (`--no-plugin`), that the git hooks are installed
 (a warning, not a failure, before `git init`), and that a Python interpreter is
-resolvable for the hooks. Deterministic — no LLM, no network.
+resolvable for the hooks. Deterministic — no LLM, no network. The plugin check
+is the one read outside the project: Claude Code's install registry
+(`plugins/installed_plugins.json` under `$CLAUDE_CONFIG_DIR`, default `~/.claude`),
+of which it reports only the project-init entries. Where that registry cannot be
+read — a CI machine, another user — it WARNs; it never passes on the declaration alone.
 
 How it works: scaffolding records the preset, template variables, and a
 content-hash manifest in a `scaffold:` block at the end of

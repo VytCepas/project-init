@@ -13,6 +13,12 @@ output (verified by scaffolding into a temp dir), not the issue's original
 sketch: scaffolded hooks live under ``.agents/hooks/`` and are *referenced* from
 ``.claude/settings.json`` by ``$CLAUDE_PROJECT_DIR`` path — there is no
 ``.claude/hooks/`` directory in either plugin or ``--no-plugin`` mode.
+
+One check reads outside the project: the plugin check opens Claude Code's own
+install registry (``<config dir>/plugins/installed_plugins.json``, config dir =
+``$CLAUDE_CONFIG_DIR`` or ``~/.claude``). That is the only file it reads there,
+and only entries for the plugins this project requires are ever reported — the
+rest of that directory is the user's business, not doctor's (PI-991).
 """
 
 from __future__ import annotations
@@ -242,22 +248,190 @@ def check_referenced_scripts_executable(target: Path, settings: dict[str, Any]) 
     )
 
 
-def check_plugin_enablement(settings: dict[str, Any], variables: dict[str, str] | None) -> Check:
-    """Plugin-mode projects enable the project-init plugin(s) in settings.json.
+def claude_config_dir() -> Path:
+    """Claude Code's config directory: ``$CLAUDE_CONFIG_DIR`` if set, else ``~/.claude``.
 
-    Skipped for ``--no-plugin`` projects (whose guards come from the copied
-    fallback hooks, already covered by the reference checks). When the record is
-    unreadable we cannot tell the mode apart, so this is a soft skip rather than
-    a guess.
+    The same resolution rule as ``install.sh`` and ``tools/benchmark/harness.py``
+    (PI-877). Never hard-code a home path here: anyone who relocates their
+    config dir would have doctor inspect a registry Claude Code does not use,
+    and the check would report on the wrong machine state.
+    """
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    return Path(env).expanduser() if env else Path.home() / ".claude"
+
+
+def _read_install_registry(config_dir: Path) -> tuple[dict[str, Any] | None, str]:
+    """Load ``<config dir>/plugins/installed_plugins.json``.
+
+    Returns ``(plugins, reason)`` — the registry's ``plugins`` mapping, or
+    ``None`` and a human reason when it cannot be read.
+
+    ``None`` is deliberately **not** the same fact as an empty registry: a
+    missing or unparseable file means *we cannot tell whether anything is
+    installed*, and the caller must never collapse that into a PASS (PI-991).
+    Collapsing it is exactly how the old check stayed green — an answer derived
+    from nothing read as an answer.
+
+    This one file is the only thing doctor reads under the config dir, and only
+    the entries for the plugins this project requires are ever reported: a
+    health check must not turn into a disclosure of the user's other plugins or
+    of unrelated project paths.
+    """
+    path = config_dir / "plugins" / "installed_plugins.json"
+    if not path.is_file():
+        return None, f"no plugin install registry at {path}"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return None, f"cannot read {path}: {exc}"
+    if not isinstance(data, dict):
+        return None, f"{path} is not a JSON object"
+    plugins = data.get("plugins")
+    if not isinstance(plugins, dict):
+        return None, f"{path} has no 'plugins' object"
+    return plugins, ""
+
+
+def _same_dir(path_str: str, resolved_target: Path) -> bool:
+    """Whether a registry ``projectPath`` names *resolved_target*.
+
+    Both sides are resolved so a symlinked or non-normalised path (``/tmp`` →
+    ``/private/tmp`` on macOS) still matches. A path that cannot be resolved at
+    all is treated as "not this project" rather than raising — a hand-mangled
+    registry entry must not crash the health check.
+    """
+    try:
+        return Path(path_str).expanduser().resolve() == resolved_target
+    except (OSError, ValueError, RuntimeError):
+        return False
+
+
+#: How far a declared plugin gets. ``loadable`` is the only green one;
+#: ``indeterminate`` means the registry said something this code does not
+#: recognise, which is a "cannot tell", not a failure — see ``_plugin_state``.
+PluginTier = Literal["not-installed", "payload-broken", "loadable", "indeterminate"]
+
+
+@dataclass(frozen=True)
+class _PluginState:
+    """One required plugin's position on declared → installed → loadable.
+
+    Reached only for a plugin already known to be *declared*. ``installed``
+    means the harness's registry holds an entry that applies to this project;
+    ``loadable`` means that entry's cached payload is on disk with a readable
+    plugin manifest — as far as static inspection can honestly go, since only a
+    live session proves a load. *detail* says where it stopped.
+    """
+
+    name: str
+    tier: PluginTier
+    detail: str = ""
+    version: str = ""
+
+
+def _plugin_state(name: str, entries: Any, resolved_target: Path) -> _PluginState:
+    """Grade one declared plugin against its install-registry *entries*.
+
+    An entry applies to this project when it either names a ``projectPath``
+    that resolves to it, or is a ``scope: "user"`` entry with no
+    ``projectPath`` (a user-scope install is global). An entry recorded for a
+    *different* project does not apply — that is the measured failure mode this
+    check exists for (PI-991): both plugins were registered at a single
+    project-scope entry pointing at a directory that no longer existed, while
+    every repo that declared them enabled had no entry at all.
+
+    The registry's schema is **not** part of Claude Code's documented public
+    interface — it was read off a real installation, and it can change. So an
+    unrecognised shape returns ``indeterminate`` and the check WARNs, rather
+    than calling a healthy install broken. A guard that fires on ordinary work
+    gets switched off, and a switched-off guard protects nothing; the one thing
+    we do assert as a failure is the shape we *do* recognise saying the plugin
+    is not there.
+    """
+    if entries is None:
+        return _PluginState(name, "not-installed", "no install entry")
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
+        return _PluginState(name, "indeterminate", "unrecognised registry entry shape")
+    if not entries:
+        return _PluginState(name, "not-installed", "no install entry")
+
+    applicable = [e for e in entries if _applies_to(e, resolved_target)]
+    if not applicable:
+        # "Only for other projects" is a definite answer only when every entry
+        # is a shape we recognise; a new scope or field is "cannot tell"
+        # (PR #1008 review), not an instruction to reinstall a healthy plugin.
+        if not all(_recognised(e) for e in entries):
+            return _PluginState(name, "indeterminate", "unrecognised registry entry")
+        return _PluginState(name, "not-installed", "installed only for other projects")
+
+    reasons = [_payload_problem(entry) for entry in applicable]
+    for entry, problem in zip(applicable, reasons, strict=True):
+        if not problem:
+            version = entry.get("version")
+            return _PluginState(
+                name, "loadable", version=version if isinstance(version, str) else ""
+            )
+    return _PluginState(name, "payload-broken", reasons[0])
+
+
+def _recognised(entry: dict[str, Any]) -> bool:
+    """An entry this code knows how to place: it names a project, or is user-scope."""
+    project_path = entry.get("projectPath")
+    return (isinstance(project_path, str) and bool(project_path)) or entry.get("scope") == "user"
+
+
+def _applies_to(entry: dict[str, Any], resolved_target: Path) -> bool:
+    """A project entry for this project, or a user-scope entry (global)."""
+    project_path = entry.get("projectPath")
+    if isinstance(project_path, str) and project_path:
+        return _same_dir(project_path, resolved_target)
+    return entry.get("scope") == "user"
+
+
+def _payload_problem(entry: dict[str, Any]) -> str:
+    """Why an entry's cached payload cannot load, or ``""`` when it looks loadable."""
+    install_path = entry.get("installPath")
+    if not isinstance(install_path, str) or not install_path:
+        return "install entry records no installPath"
+    payload = Path(install_path).expanduser()
+    if not payload.is_dir():
+        return "cached payload directory is gone"
+    if not (payload / ".claude-plugin" / "plugin.json").is_file():
+        return "cached payload has no .claude-plugin/plugin.json"
+    return ""
+
+
+def check_plugin_enablement(
+    settings: dict[str, Any], variables: dict[str, str] | None, target: Path
+) -> Check:
+    """The project-init plugin(s) are declared, installed, and loadable.
+
+    Three distinct facts, and the reason this check exists (PI-991): it used to
+    read ``enabledPlugins`` alone and report ``PASS  plugin enabled``, which is
+    a statement about a *declaration in a file this repo wrote itself*. It could
+    not fail on the failure mode it appeared to test — a declared plugin that is
+    installed nowhere loads nothing, and the green light sat over a plugin layer
+    with no recorded use for two months.
+
+    So each PASS names which of the three it verified, and a registry it cannot
+    read is reported as "cannot tell" (WARN), never as PASS.
+
+    Skipped for ``--no-plugin`` projects (whose guards are copied into the
+    project and covered by the reference checks). When the scaffold record is
+    unreadable we cannot tell the modes apart, so that is a soft skip too.
     """
     if variables is None:
         return Check(
             "WARN",
-            "plugin enabled",
+            "plugin installed",
             "cannot determine plugin vs --no-plugin mode without a scaffold record",
         )
     if variables.get("no_plugin") or variables.get("plugin_mode") == "":
-        return Check("PASS", "plugin enabled", "project uses copied fallback hooks (--no-plugin)")
+        return Check(
+            "PASS",
+            "plugin installed",
+            "project uses copied fallback hooks (--no-plugin) — no plugin to install",
+        )
 
     enabled = settings.get("enabledPlugins")
     enabled = enabled if isinstance(enabled, dict) else {}
@@ -266,15 +440,73 @@ def check_plugin_enablement(settings: dict[str, Any], variables: dict[str, str] 
     # it when the project actually scaffolded the lifecycle overlay.
     if variables.get("lifecycle") and not variables.get("lifecycle_off"):
         required.append("project-init-lifecycle@project-init")
+
     off = [name for name in required if enabled.get(name) is not True]
     if off:
         return Check(
             "FAIL",
-            "plugin enabled",
-            f"plugin(s) not enabled in settings.json: {', '.join(off)}",
+            "plugin installed",
+            f"not declared: plugin(s) not enabled in settings.json: {', '.join(off)}",
             hint='set each to true under "enabledPlugins" in .claude/settings.json',
         )
-    return Check("PASS", "plugin enabled", f"{len(required)} project-init plugin(s) enabled")
+
+    config_dir = claude_config_dir()
+    registry, reason = _read_install_registry(config_dir)
+    if registry is None:
+        return Check(
+            "WARN",
+            "plugin installed",
+            f"declared only ({len(required)} plugin(s) enabled in settings.json); "
+            f"cannot tell whether installed — {reason}",
+            hint=(
+                "run doctor on the machine that runs Claude Code, or set "
+                "CLAUDE_CONFIG_DIR if your config dir is elsewhere"
+            ),
+        )
+
+    resolved_target = target.resolve()
+    states = [_plugin_state(name, registry.get(name), resolved_target) for name in required]
+
+    # A definite "not installed" outranks an "I cannot tell": enabling a plugin
+    # that is registered nowhere is the defect this check was built for, and it
+    # must go red even when a second plugin's entry is unreadable.
+    broken = [s for s in states if s.tier in ("not-installed", "payload-broken")]
+    if broken:
+        # Two different facts, named apart (PR #1008 review): absent from the
+        # registry, versus registered with a cached payload that cannot load.
+        parts = []
+        for tier, label in (
+            ("not-installed", "not installed for this project"),
+            ("payload-broken", "installed but not loadable"),
+        ):
+            hit = [f"{s.name} ({s.detail})" for s in broken if s.tier == tier]
+            if hit:
+                parts.append(f"{label}: {', '.join(hit)}")
+        return Check(
+            "FAIL",
+            "plugin installed",
+            f"declared in settings.json but {'; '.join(parts)}",
+            hint=(
+                f"`claude plugin install {broken[0].name} --scope project` (or "
+                f"`/plugin install {broken[0].name}` in a session here) — "
+                "enabledPlugins declares the plugin, it does not install it"
+            ),
+        )
+    unknown = [s for s in states if s.tier == "indeterminate"]
+    if unknown:
+        detail = ", ".join(f"{s.name} ({s.detail})" for s in unknown)
+        return Check(
+            "WARN",
+            "plugin installed",
+            f"declared; cannot tell whether installed — {detail}",
+            hint="check `claude plugin list` — doctor could not read the install registry's shape",
+        )
+    shown = ", ".join(f"{s.name}{f' v{s.version}' if s.version else ''}" for s in states)
+    return Check(
+        "PASS",
+        "plugin installed",
+        f"declared, installed and loadable (payload on disk): {shown}",
+    )
 
 
 def check_git_hooks(target: Path) -> Check:
@@ -347,7 +579,7 @@ def collect_checks(target: Path) -> list[Check]:
     if settings is not None:
         checks.append(check_referenced_scripts_exist(target, settings))
         checks.append(check_referenced_scripts_executable(target, settings))
-        checks.append(check_plugin_enablement(settings, variables))
+        checks.append(check_plugin_enablement(settings, variables, target))
     checks.append(check_git_hooks(target))
     checks.append(check_python_available())
     return checks
