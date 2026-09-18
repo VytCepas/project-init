@@ -217,6 +217,23 @@ class TestOneCommandEveryTree:
             "deploy is invoked-only" in n and ", ".join(_DEMOTED) in n for n in notices
         )
 
+    def test_an_invoked_only_plan_is_marked_too(self, tmp_path: Path, monkeypatch):
+        """`plan` is shipped by its own path (renamed from SKILL.md.tmpl), so it
+        needs its own check — the core/lifecycle loop never sees it."""
+        _fake_sources(tmp_path, monkeypatch)
+        base = tmp_path / "base"
+        (base / "skills" / "plan").mkdir(parents=True)
+        (base / "skills" / "plan" / "SKILL.md.tmpl").write_text(
+            "---\nname: plan\ndescription: p\ndisable-model-invocation: true\n---\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(sync_plugin, "TEMPLATE_CLAUDE", base)
+        trees = _trees(tmp_path / "out")
+        sync_plugin._sync_agent_skills(trees)
+        assert all(
+            (tree / "plan" / sync_plugin.INVOCATION_RECORD).is_file() for tree in trees.values()
+        )
+
     def test_the_lifecycle_gate_survives_generation(self, tmp_path: Path, monkeypatch):
         """Control: the per-surface adaptation the generator already makes (the
         lifecycle gate) must survive, or making the trees equal would have
