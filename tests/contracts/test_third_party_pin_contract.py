@@ -69,6 +69,24 @@ def test_no_contract_test_restates_a_managed_pin():
     )
 
 
+def test_router_hold_and_installer_refusal_name_the_same_boundary():
+    """#1005: two defences against a router that rewrites the user's Claude Code
+    settings — the manifest hold (no bump is ever proposed or applied) and the
+    installer's own refusal (a hand-edited pin is refused before installing).
+    They must agree on where 3.x starts, and the pin must sit below it."""
+    mod = _load_module()
+    ccr = mod.load_manifest()["ccr"]
+    assert ccr.get("hold_at"), "the ccr pin lost its hold; see #1005 before lifting it"
+    assert mod.held(ccr["pinned"], ccr) is None, "the pin itself is inside the held range"
+
+    installer = (
+        REPO_ROOT / "templates" / "multi_model" / "dot_agents" / "scripts" / "setup_models.sh"
+    ).read_text(encoding="utf-8")
+    major = ccr["hold_at"].split(".")[0]
+    assert f"CCR_FIRST_UNSUPPORTED_MAJOR={major}\n" in installer
+    assert "\nrequire_supported_ccr\n" in installer, "the refusal is defined but never called"
+
+
 def test_claude_code_is_installed_unpinned_by_design():
     """#689: not an oversight — the operator's own CLI, off the request path.
 

@@ -56,6 +56,70 @@ def test_check_no_update():
     assert rows[0]["update_available"] is False
 
 
+_HELD = {
+    "package": "@x/ccr",
+    "ecosystem": "npm",
+    "pinned": "2.0.0",
+    "hold_at": "3.0.0",
+    "hold_reason": "3.x rewrites the user's settings",
+}
+
+
+@pytest.mark.parametrize(
+    ("latest", "available", "is_held"),
+    [
+        ("3.0.0", False, True),  # the boundary itself is held
+        ("3.1.1", False, True),
+        ("2.9.9", True, False),  # below the hold, still an ordinary update
+    ],
+)
+def test_check_never_proposes_a_held_release(latest, available, is_held):
+    """#1005: the sweep re-proposed 3.x as a "vetted pin" four times, and each
+    merge moved the router further into the release line that rewrites the
+    user's Claude Code settings. A held release is reported, never proposed."""
+    rows = mod.check({"ccr": _HELD}, get_json=lambda url: {"dist-tags": {"latest": latest}})
+    assert rows[0]["update_available"] is available
+    assert ("held" in rows[0]) is is_held
+
+
+def test_a_held_latest_still_proposes_the_newest_release_below_the_hold():
+    """A hold must not freeze the pin (PR #1006 review): a safe patch on the old
+    line is still proposed while `latest` sits on the held one. Pre-releases and
+    the held line itself are never candidates."""
+    doc = {
+        "dist-tags": {"latest": "3.1.1"},
+        "versions": {v: {} for v in ("1.9.0", "2.0.0", "2.0.1", "2.0.2-beta.1", "3.0.0", "3.1.1")},
+    }
+    rows = mod.check({"ccr": _HELD}, get_json=lambda url: doc)
+    assert rows[0]["update_available"] is True
+    assert rows[0]["latest"] == "2.0.1"  # what `apply` will be asked for
+    assert rows[0]["held_latest"] == "3.1.1"
+
+    doc["versions"] = {v: {} for v in ("2.0.0", "3.1.1")}
+    rows = mod.check({"ccr": _HELD}, get_json=lambda url: doc)
+    assert rows[0]["update_available"] is False
+    assert rows[0]["latest"] == "2.0.0"
+
+
+def test_apply_refuses_a_held_release(tmp_path, monkeypatch):
+    """A hand-run `apply` cannot bypass the hold either, and writes nothing."""
+    (tmp_path / "tools").mkdir()
+    manifest = tmp_path / "tools" / "pinned_third_party.toml"
+    text = (
+        '[tools.ccr]\npackage = "@x/ccr"\nused_in = ["setup.sh"]\n'
+        'version_var = "CCR_VERSION"\npinned = "2.0.0"\nhold_at = "3.0.0"\n'
+    )
+    manifest.write_text(text, encoding="utf-8")
+    script = tmp_path / "setup.sh"
+    script.write_text('CCR_VERSION="2.0.0"\n', encoding="utf-8")
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+
+    with pytest.raises(ValueError, match="held"):
+        mod.apply("ccr", "3.1.0", manifest_path=manifest)
+    assert manifest.read_text(encoding="utf-8") == text
+    assert script.read_text(encoding="utf-8") == 'CCR_VERSION="2.0.0"\n'
+
+
 def test_check_survives_network_error():
     manifest = {"ccr": {"package": "@x/ccr", "ecosystem": "npm", "pinned": "2.0.0"}}
 

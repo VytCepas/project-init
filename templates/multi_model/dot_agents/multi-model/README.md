@@ -13,10 +13,11 @@ Those run below the model and stay identical whichever model you point at.
   cost defaults. This is the **seed** for the machine-global config at
   `~/.claude-code-router/config.json` (CCR is machine-level, not per-project).
 - `.env.example` — provider API-key slots. Copy to `.env` (gitignored) and fill in.
-- `../scripts/setup_models.sh` — one-time installer: installs CCR (pinned),
-  seeds the global config from `config.json` + your `.env`, optionally pulls local
-  Ollama models sized to your RAM, and wires your shell so plain `claude` routes
-  through CCR.
+- `../scripts/setup_models.sh` — one-time installer: installs CCR (pinned below
+  3.x), seeds the global config from `config.json` + your `.env`, optionally pulls
+  local Ollama models sized to your RAM, and wires your shell so plain `claude`
+  routes through CCR. It never starts the router and leaves your Claude Code
+  settings as it found them; `--help` changes nothing.
 - `../scripts/models.sh` — day-2 helper: `list` / `add` / `rm` models (Ollama +
   cloud) after setup, editing the global CCR config via `jq` (needs `jq`; warns
   below the ~7B tool-calling floor).

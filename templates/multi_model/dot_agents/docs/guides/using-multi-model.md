@@ -60,7 +60,15 @@ The installer (idempotent) installs [claude-code-router](https://github.com/musi
 at a **pinned** version (bun-preferred, npm fallback), seeds the machine-global
 config at `~/.claude-code-router/config.json` from this project's template + your
 `.env`, optionally pulls local Ollama models sized to your RAM, and can wire your
-shell so plain `claude` routes through CCR.
+shell so plain `claude` routes through CCR. `setup_models.sh --help` prints what it
+does and changes nothing.
+
+It never starts the router, and it leaves the `apiKeyHelper` and `env` entries of
+your Claude Code user settings exactly as it found them — if anything rewrites
+them while it runs, it puts them back and says so. The pin is held below CCR 3.x:
+every 3.x release carries code that rewrites those settings to point every Claude
+Code session on the machine at `127.0.0.1:3456`, and 3.x keeps its config in
+SQLite, which this installer does not seed.
 
 ### Daily use
 
