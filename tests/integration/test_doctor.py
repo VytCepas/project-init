@@ -79,19 +79,21 @@ def _install(
     *names: str,
     scope: str = "project",
     project_path: Path | None = None,
-    payload: bool = True,
-    manifest: bool = True,
+    payload: str = "loadable",
 ) -> None:
-    """Record *names* in the install registry the way Claude Code does (schema v2)."""
+    """Record *names* in the install registry the way Claude Code does (schema v2).
+
+    *payload*: ``loadable`` (dir + manifest), ``no-manifest``, or ``gone``.
+    """
     path = _registry(config_dir)
     data: dict[str, Any] = (
         json.loads(path.read_text()) if path.exists() else {"version": 2, "plugins": {}}
     )
     for name in names:
         install_path = config_dir / "plugins" / "cache" / name.replace("@", "/") / "1.0.0"
-        if payload:
+        if payload != "gone":
             install_path.mkdir(parents=True, exist_ok=True)
-            if manifest:
+            if payload == "loadable":
                 (install_path / ".claude-plugin").mkdir(exist_ok=True)
                 (install_path / ".claude-plugin" / "plugin.json").write_text("{}")
         entry: dict[str, Any] = {
@@ -270,7 +272,9 @@ def test_user_scope_install_counts_for_every_project(tmp_path: Path, config_dir:
 
 
 @pytest.mark.skipif(os.name == "nt", reason="symlinks need privileges on Windows")
-def test_project_path_is_compared_after_resolving_symlinks(tmp_path: Path, config_dir: Path) -> None:
+def test_project_path_is_compared_after_resolving_symlinks(
+    tmp_path: Path, config_dir: Path
+) -> None:
     """/tmp vs /private/tmp on macOS: the same project must match itself."""
     project = tmp_path / "p"
     _scaffold(project)
@@ -281,17 +285,17 @@ def test_project_path_is_compared_after_resolving_symlinks(tmp_path: Path, confi
 
 
 @pytest.mark.parametrize(
-    ("payload", "manifest", "reason"),
+    ("payload", "reason"),
     [
-        (False, False, "cached payload directory is gone"),
-        (True, False, "no .claude-plugin/plugin.json"),
+        ("gone", "cached payload directory is gone"),
+        ("no-manifest", "no .claude-plugin/plugin.json"),
     ],
 )
 def test_installed_but_not_loadable_fails(
-    tmp_path: Path, config_dir: Path, payload: bool, manifest: bool, reason: str
+    tmp_path: Path, config_dir: Path, payload: str, reason: str
 ) -> None:
     _scaffold(tmp_path)
-    _install(config_dir, tmp_path, WORKFLOW, LIFECYCLE, payload=payload, manifest=manifest)
+    _install(config_dir, tmp_path, WORKFLOW, LIFECYCLE, payload=payload)
     check = _plugin_check(tmp_path)
     assert check.level == "FAIL"
     assert reason in check.message
@@ -317,7 +321,7 @@ def test_lifecycle_plugin_is_required_only_with_the_lifecycle(
 def test_an_unreadable_registry_is_a_warning_never_a_pass(
     tmp_path: Path, config_dir: Path, registry: str | None
 ) -> None:
-    """"Cannot tell" must not collapse into PASS — that is how the old check lied."""
+    """ "Cannot tell" must not collapse into PASS — that is how the old check lied."""
     _scaffold(tmp_path)
     if registry is not None:
         _registry(config_dir).parent.mkdir(parents=True)

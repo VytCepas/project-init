@@ -76,7 +76,8 @@ Central rich styling for the interactive wizard.
 - `def check_settings_json` — ``.claude/settings.json`` exists and is valid JSON.
 - `def check_referenced_scripts_exist` — Every hook/statusline script settings.json points at is present on disk.
 - `def check_referenced_scripts_executable` — Referenced ``.sh`` hooks carry the executable bit.
-- `def check_plugin_enablement` — Plugin-mode projects enable the project-init plugin(s) in settings.json.
+- `def claude_config_dir` — Claude Code's config directory: ``$CLAUDE_CONFIG_DIR`` if set, else ``~/.claude``.
+- `def check_plugin_enablement` — The project-init plugin(s) are declared, installed, and loadable.
 - `def check_git_hooks` — Git hooks are installed when a ``.github/hooks/`` source ships them.
 - `def check_python_available` — A Python 3 interpreter is resolvable, mirroring ``_py.sh``.
 - `def collect_checks` — Run every check against *target* and return the results in report order.

@@ -355,35 +355,39 @@ def _plugin_state(name: str, entries: Any, resolved_target: Path) -> _PluginStat
     if not entries:
         return _PluginState(name, "not-installed", "no install entry")
 
-    applicable: list[dict[str, Any]] = []
-    for entry in entries:
-        project_path = entry.get("projectPath")
-        if isinstance(project_path, str) and project_path:
-            if _same_dir(project_path, resolved_target):
-                applicable.append(entry)
-        elif entry.get("scope") == "user":
-            applicable.append(entry)
+    applicable = [e for e in entries if _applies_to(e, resolved_target)]
     if not applicable:
         return _PluginState(name, "not-installed", "installed only for other projects")
 
-    reasons: list[str] = []
-    for entry in applicable:
-        install_path = entry.get("installPath")
-        if not isinstance(install_path, str) or not install_path:
-            reasons.append("install entry records no installPath")
-            continue
-        payload = Path(install_path).expanduser()
-        if not payload.is_dir():
-            reasons.append("cached payload directory is gone")
-            continue
-        if not (payload / ".claude-plugin" / "plugin.json").is_file():
-            reasons.append("cached payload has no .claude-plugin/plugin.json")
-            continue
-        version = entry.get("version")
-        return _PluginState(
-            name, "loadable", version=version if isinstance(version, str) else ""
-        )
+    reasons = [_payload_problem(entry) for entry in applicable]
+    for entry, problem in zip(applicable, reasons, strict=True):
+        if not problem:
+            version = entry.get("version")
+            return _PluginState(
+                name, "loadable", version=version if isinstance(version, str) else ""
+            )
     return _PluginState(name, "payload-broken", reasons[0])
+
+
+def _applies_to(entry: dict[str, Any], resolved_target: Path) -> bool:
+    """A project entry for this project, or a user-scope entry (global)."""
+    project_path = entry.get("projectPath")
+    if isinstance(project_path, str) and project_path:
+        return _same_dir(project_path, resolved_target)
+    return entry.get("scope") == "user"
+
+
+def _payload_problem(entry: dict[str, Any]) -> str:
+    """Why an entry's cached payload cannot load, or ``""`` when it looks loadable."""
+    install_path = entry.get("installPath")
+    if not isinstance(install_path, str) or not install_path:
+        return "install entry records no installPath"
+    payload = Path(install_path).expanduser()
+    if not payload.is_dir():
+        return "cached payload directory is gone"
+    if not (payload / ".claude-plugin" / "plugin.json").is_file():
+        return "cached payload has no .claude-plugin/plugin.json"
+    return ""
 
 
 def check_plugin_enablement(
