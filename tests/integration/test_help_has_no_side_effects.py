@@ -46,20 +46,25 @@ _REAL = (
 # still must not act when run directly.
 _SOURCED = {"_usage_log.sh", "gh_host.sh"}
 
-# Each of these did work on `--help` before #992; the sweep must keep covering
-# them, or a shrinking scaffold could quietly empty the test.
-_KNOWN_MUTATORS = {
-    "scripts/gen_code_map.py",
-    "scripts/install_hooks.sh",
-    "scripts/monitor_pr.sh",
-    "scripts/setup_graphify.sh",
-    "scripts/setup_models.sh",
-    "scripts/setup_rag.sh",
-    "hooks/session_setup.sh",
-    "hooks/post_edit_lint.sh",
-    "hooks/pre_commit_gate.sh",
-    "hooks/workflow_state_reminder.sh",
-}
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _template_scripts() -> set[str]:
+    """Every script any overlay can put under `.agents/`, read from templates/.
+
+    Derived rather than listed, so a new template script — or a conditional one
+    the fixture's flags do not render — fails the coverage check below instead
+    of silently escaping the sweep (PR #1007 review: three conditional entry
+    points did exactly that).
+    """
+    out = set()
+    for p in (REPO_ROOT / "templates").glob("*/dot_agents/**/*"):
+        # templates/<overlay>/dot_agents/<rest> renders to .agents/<rest>
+        _overlay, _dot_agents, *rest = p.relative_to(REPO_ROOT / "templates").parts
+        rendered = "/".join(rest).removesuffix(".tmpl")
+        if p.is_file() and rendered.endswith((".sh", ".py")):
+            out.add(rendered)
+    return out
 
 
 @pytest.fixture(scope="module")
@@ -85,6 +90,14 @@ def scaffolded(tmp_path_factory: pytest.TempPathFactory) -> Path:
             "--governance",
             "--observability",
             "--no-plugin",
+            # Conditional entry points: deploy scripts need a container deploy,
+            # the guard adapter needs a non-Claude agent surface.
+            "--delivery",
+            "service",
+            "--deploy",
+            "cloud-run",
+            "--agents",
+            "claude,codex,antigravity,amp,junie",
         ]
     )
     assert rc == 0
@@ -175,7 +188,8 @@ def test_help_on_every_scaffolded_script_does_no_work(scaffolded: Path, tmp_path
         if p.is_file() and p.suffix in (".sh", ".py")
     )
     covered = {p.relative_to(".agents").as_posix() for p in scripts}
-    assert not _KNOWN_MUTATORS - covered, f"sweep lost {_KNOWN_MUTATORS - covered}"
+    missed = _template_scripts() - covered
+    assert not missed, f"the fixture renders no copy of these, so nothing sweeps them: {missed}"
 
     failures = {}
     for i, rel in enumerate(scripts):

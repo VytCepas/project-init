@@ -9,9 +9,25 @@
 #
 # Tip: alias it for the bare `models …` form the docs use:
 #   alias models="$PWD/.agents/scripts/models.sh"
+usage() {
+  cat <<'EOF'
+models — day-2 model management for claude-code-router
+
+  models list                          configured providers/models + pulled Ollama models
+  models add ollama <model>[:tag]      ollama pull + register (warns if <7B)
+  models add <provider> <model>        register a cloud model (provider must exist)
+  models rm   ollama <model>           ollama rm + unregister
+  models rm   <provider> <model>       unregister from the config
+  models ui                            open CCR's web editor (ccr ui)
+
+  Switch live in Claude Code:  /model <provider>,<model>
+EOF
+}
 case "${1-}" in
--h | --help) # the header above is the help; nothing else runs (#992)
+-h | --help) # the header above plus the command usage; nothing else runs (#992)
   sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"
+  echo
+  usage
   exit 0
   ;;
 esac
@@ -37,21 +53,6 @@ ask() {
 
 have jq || die "jq is required. Install jq (https://jqlang.github.io/jq/) and re-run."
 [ -f "$CONFIG" ] || die "no CCR config at $CONFIG — run setup_models.sh first."
-
-usage() {
-  cat <<'EOF'
-models — day-2 model management for claude-code-router
-
-  models list                          configured providers/models + pulled Ollama models
-  models add ollama <model>[:tag]      ollama pull + register (warns if <7B)
-  models add <provider> <model>        register a cloud model (provider must exist)
-  models rm   ollama <model>           ollama rm + unregister
-  models rm   <provider> <model>       unregister from the config
-  models ui                            open CCR's web editor (ccr ui)
-
-  Switch live in Claude Code:  /model <provider>,<model>
-EOF
-}
 
 # Atomically rewrite the config with a jq program (temp file + mv), preserving
 # the file's permissions — it holds substituted API keys (setup_models.sh chmods
