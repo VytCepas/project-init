@@ -3,7 +3,12 @@
 # PreToolUse hook on Bash. Receives tool input JSON on stdin.
 # Auto-fixes what it can and re-stages; blocks only if errors remain.
 
-case "${1-}" in -h | --help) sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"; exit 0 ;; esac  # --help does no work (#992)
+case "${1-}" in
+-h | --help) # the header above is the help; nothing else runs (#992)
+  sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"
+  exit 0
+  ;;
+esac
 set -euo pipefail
 
 # Resolve the Python interpreter through the canonical helper (PI-361).

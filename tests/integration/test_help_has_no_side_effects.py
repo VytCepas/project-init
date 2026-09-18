@@ -175,7 +175,7 @@ def test_help_on_every_scaffolded_script_does_no_work(scaffolded: Path, tmp_path
         if p.is_file() and p.suffix in (".sh", ".py")
     )
     covered = {p.relative_to(".agents").as_posix() for p in scripts}
-    assert _KNOWN_MUTATORS <= covered, f"sweep lost {_KNOWN_MUTATORS - covered}"
+    assert not _KNOWN_MUTATORS - covered, f"sweep lost {_KNOWN_MUTATORS - covered}"
 
     failures = {}
     for i, rel in enumerate(scripts):

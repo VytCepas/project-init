@@ -3,7 +3,12 @@
 # usable — sync dependencies so tests and linters run instead of failing on
 # a missing venv. Fast on warm environments: a content stamp of the
 # dependency manifests short-circuits before any tool runs.
-case "${1-}" in -h | --help) sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"; exit 0 ;; esac  # --help does no work (#992)
+case "${1-}" in
+-h | --help) # the header above is the help; nothing else runs (#992)
+  sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"
+  exit 0
+  ;;
+esac
 set -uo pipefail # not -e: a failed bootstrap must never break the session
 
 ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
