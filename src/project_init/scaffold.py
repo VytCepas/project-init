@@ -1325,6 +1325,211 @@ def _clear_prior_projection(claude_dir: Path, agents_dir: Path) -> None:
                 path.unlink()
 
 
+# RULE SCOPING IS AUTHORED FOR CURSOR AND TRANSLATED FOR CLAUDE CODE (#997).
+#
+# `.agents/rules/` is the single source (#641), written in the frontmatter Cursor
+# reads: `globs:` says which files attach a rule, `alwaysApply:` overrides it.
+# Claude Code reads neither. It scopes a rule only by `paths:`, and a rule with no
+# `paths:` loads at session start and again after every compaction. So a verbatim
+# copy put every rule in every Claude session, whatever the session touched.
+# Measured with Claude Code 2.1.274: an `InstructionsLoaded` hook logged the
+# projected `python.md` with `load_reason: session_start` in a scaffold with no
+# Python source.
+#
+# The mapping follows Cursor's rule types. `alwaysApply: true` ignores globs, so
+# the rule projects unscoped; globs without it become `paths:`; no globs projects
+# unscoped, the only form Claude has for a rule that names no files. Cursor's
+# keys are dropped from the projection so a rule carries one scoping, not two.
+_FRONTMATTER_KEY = re.compile(r"([A-Za-z_][\w-]*)[ \t]*:(.*)")
+
+
+def _strip_yaml_comment(value: str) -> str:
+    """*value* stripped, without a trailing ``# comment`` outside quotes."""
+    quote = ""
+    i = 0
+    while i < len(value):
+        ch = value[i]
+        if quote:
+            if quote == '"' and ch == "\\":
+                i += 1  # the escaped character cannot close the quote
+            elif ch == quote:
+                quote = ""
+        elif ch in "\"'":
+            quote = ch
+        elif ch == "#" and (i == 0 or value[i - 1] in " \t"):
+            return value[:i].strip()
+        i += 1
+    return value.strip()
+
+
+def _split_items(value: str, *, quoted: bool) -> list[str] | None:
+    """Split *value* on commas outside ``{a,b}`` groups, and outside quotes if *quoted*.
+
+    ``None`` when a quote or a brace group is left open: a value that cannot be
+    split with confidence is not guessed at.
+    """
+    items: list[str] = []
+    start = depth = i = 0
+    quote = ""
+    while i < len(value):
+        ch = value[i]
+        if quote:
+            if quote == '"' and ch == "\\":
+                i += 1
+            elif ch == quote:
+                quote = ""
+        elif quoted and ch in "\"'":
+            quote = ch
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            items.append(value[start:i])
+            start = i + 1
+        i += 1
+    if quote or depth:
+        return None
+    items.append(value[start:])
+    return items
+
+
+def _unquote(item: str) -> str | None:
+    """The string a YAML scalar spells — double-quoted, single-quoted or plain."""
+    item = item.strip()
+    if item.startswith('"'):
+        try:
+            value = json.loads(item)
+        except json.JSONDecodeError:
+            return None
+        return value if isinstance(value, str) else None
+    if item.startswith("'"):
+        if len(item) < 2 or not item.endswith("'"):
+            return None
+        return item[1:-1].replace("''", "'")
+    return item
+
+
+def _parse_globs(inline: str, continuation: list[str]) -> list[str] | None:
+    """The patterns a ``globs:`` entry lists, or ``None`` when it cannot be read.
+
+    Three spellings are read: a flow list (``["a", "b"]``, what the templates
+    ship), a block list of ``- a`` lines, and the form Cursor documents, one
+    comma-separated string (``"a, b"``). A comma inside a brace group
+    (``*.{ts,tsx}``) never splits a pattern.
+    """
+    value = _strip_yaml_comment(inline)
+    lines = [entry for entry in map(_strip_yaml_comment, continuation) if entry]
+    items: list[str | None]
+    if not value:
+        if not all(entry.startswith("-") for entry in lines):
+            return None
+        items = [_unquote(entry[1:]) for entry in lines]
+    else:
+        # A flow list or a string may run on over several lines (`globs: [` and
+        # one pattern per line). YAML folds those lines into one value, so fold
+        # them here too. Reading the first line alone left a multi-line list
+        # untranslated and cut a multi-line string short (PR #1001 review).
+        value = " ".join([value, *lines])
+        if value.startswith("["):
+            raw = _split_items(value[1:-1], quoted=True) if value.endswith("]") else None
+            if raw is None:
+                return None
+            items = [_unquote(r) for r in raw]
+        else:
+            whole = _unquote(value)
+            raw = None if whole is None else _split_items(whole, quoted=False)
+            if raw is None:
+                return None
+            items = [r.strip() for r in raw]
+    if any(item is None for item in items):
+        return None
+    return [item for item in items if item]
+
+
+#: One frontmatter entry: its key, the text after the colon, and every line it spans.
+_FrontmatterEntry = tuple[str, str, list[str]]
+
+
+def _frontmatter_entries(front: list[str]) -> list[_FrontmatterEntry]:
+    """Group frontmatter lines by top-level key; indented lines join the key above."""
+    entries: list[_FrontmatterEntry] = []
+    for line in front:
+        key = None if line[:1].isspace() else _FRONTMATTER_KEY.fullmatch(line.rstrip("\r\n"))
+        if key:
+            entries.append((key.group(1), key.group(2), [line]))
+        elif entries:
+            entries[-1][2].append(line)
+        else:
+            entries.append(("", "", [line]))
+    return entries
+
+
+def _paths_frontmatter(entries: list[_FrontmatterEntry], newline: str) -> list[str] | None:
+    """The frontmatter lines Claude Code reads, or ``None`` if ``globs:`` is unreadable."""
+    globs: list[str] | None = None
+    always = False
+    for name, inline, block in entries:
+        if name == "globs":
+            globs = _parse_globs(inline, block[1:])
+        elif name == "alwaysApply":
+            always = _strip_yaml_comment(inline) in {"true", "True", "TRUE"}
+    if globs is None:
+        return None
+    kept: list[str] = []
+    for name, _, block in entries:
+        if name == "globs" and globs and not always:
+            kept.append(f"paths:{newline}")
+            kept.extend(f"  - {json.dumps(g, ensure_ascii=False)}{newline}" for g in globs)
+            globs = []  # a repeated key must not emit a second list
+        elif name not in ("globs", "alwaysApply"):
+            kept.extend(block)
+    return kept
+
+
+def _claude_rule_text(text: str) -> str:
+    """*text* with Cursor's rule scoping rewritten as Claude Code's ``paths:`` (#997).
+
+    Returned unchanged when there is nothing to translate (no frontmatter, no
+    ``globs:``, or a ``paths:`` already there) and when the ``globs:`` value cannot
+    be read. A rule left as authored loads unscoped, which is what it did before;
+    a guessed ``paths:`` could scope it to files that never match, which is worse.
+    Every other frontmatter key and the whole body are kept byte for byte.
+    """
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        return text
+    close = next((i for i in range(1, len(lines)) if lines[i].rstrip("\r\n") == "---"), None)
+    if close is None:
+        return text
+    entries = _frontmatter_entries(lines[1:close])
+    names = {name for name, _, _ in entries}
+    if "paths" in names or "globs" not in names:
+        return text
+    kept = _paths_frontmatter(entries, newline=lines[0][3:])
+    if kept is None:
+        return text
+    # A frontmatter left with no keys is dropped rather than emitted empty.
+    head = [lines[0], *kept, lines[close]] if kept else []
+    return "".join(head + lines[close + 1 :])
+
+
+def _scope_projected_rules(rules_dir: Path) -> None:
+    """Rewrite every staged ``rules/**/*.md`` into the scoping Claude Code reads."""
+    if not rules_dir.is_dir():
+        return
+    for rule in sorted(rules_dir.rglob("*.md")):
+        if not rule.is_file():
+            continue
+        try:
+            text = rule.read_bytes().decode("utf-8")
+        except UnicodeDecodeError:
+            continue  # not text this reader can scope; project it as authored
+        scoped = _claude_rule_text(text)
+        if scoped != text:
+            rule.write_bytes(scoped.encode("utf-8"))
+
+
 def _generate_claude_projection(
     target: Path,
     *,
@@ -1387,6 +1592,10 @@ def _generate_claude_projection(
     blobs (git mode 100644) and restore identically on every platform, so the
     projection never silently fails. Any stale symlink (or git-materialized
     symlink file) from an earlier version is detected and replaced here.
+
+    One surface is translated rather than copied: `rules/`. Its source scopes each
+    rule with Cursor's `globs:`, which Claude Code ignores, so the projected copy
+    carries the same patterns as `paths:` (#997, see `_claude_rule_text`).
     """
     agents_dir = target / ".agents"
     claude_dir = target / ".claude"
@@ -1449,6 +1658,9 @@ def _generate_claude_projection(
     staging = staging_parent / "render"
     try:
         shutil.copytree(agents_dir, staging, ignore=_ignore)
+        # Rules are the one surface projected in a different dialect (#997): the
+        # source keeps Cursor's `globs:`, the copy Claude reads gets `paths:`.
+        _scope_projected_rules(staging / "rules")
         projected = [f.relative_to(staging).as_posix() for f in staging.rglob("*") if f.is_file()]
         shutil.copytree(staging, claude_dir, dirs_exist_ok=True)
     finally:
