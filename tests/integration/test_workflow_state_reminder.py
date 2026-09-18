@@ -180,3 +180,6 @@ class TestSessionScopedInjection:
         sentinel.symlink_to(target)
         assert _STATIC_MARKER in _run_hook(self.hook, "merge it", "sess-odd", tmp_path)
         assert not target.exists(), "the sentinel write followed a planted link"
+
+        target.write_text("")  # the link now resolves to a regular file
+        assert _STATIC_MARKER in _run_hook(self.hook, "open pr", "sess-odd", tmp_path)

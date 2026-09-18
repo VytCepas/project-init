@@ -103,10 +103,10 @@ if session_id:
         tempfile.gettempdir(), f"pi_wsr_{proj}_{session_id}"
     )
     try:
-        # Only a regular FILE marks the injection done: a directory or a
-        # dangling link at this path must not suppress it (fail-open), and
+        # Only a regular FILE marks the injection done: a directory or a link
+        # (dangling or not) at this path must not suppress it (fail-open), and
         # O_EXCL creates the file without following a link planted there.
-        if os.path.isfile(sentinel):
+        if os.path.isfile(sentinel) and not os.path.islink(sentinel):
             first_time = False
         else:
             os.close(os.open(sentinel, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
