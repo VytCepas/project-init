@@ -19,7 +19,10 @@ hooks + lifecycle skills). Derived copies:
   Amp read .agents/skills, Junie reads .junie/skills — byte-identical copies of
   the full skill set (core + lifecycle; per ADR-020's graceful-degradation
   precedent the lifecycle skills stay on these surfaces and no-op when their
-  scripts are absent).
+  scripts are absent). A skill whose frontmatter sets
+  `disable-model-invocation: true` also gets Codex's equivalent
+  (`agents/openai.yaml`) and an `INVOCATION.md` recording the harnesses that
+  have no equivalent and so list it anyway (#973).
 
 Templated files (e.g. plan/SKILL.md.tmpl) are project-specific and stay
 scaffold-only.
@@ -51,8 +54,6 @@ CODEX_SKILLS = REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
 ANTIGRAVITY_SKILLS = REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills"
 AMP_SKILLS = REPO_ROOT / "templates" / "amp" / "dot_agents" / "skills"
 JUNIE_SKILLS = REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
-# Every payload root the sync (re)writes — snapshotted by `--check`.
-_AGENT_SKILL_DESTS = [CODEX_SKILLS, ANTIGRAVITY_SKILLS, AMP_SKILLS, JUNIE_SKILLS]
 
 # PI-881: pins each plugin's version to a hash of its shipped payload. Claude
 # Code caches a plugin by version, so a payload change that forgets to bump the
@@ -303,7 +304,206 @@ def _ship_gated_skill(src: Path, dest: Path, var: str) -> None:
             shutil.copy2(f, dest / f.name)
 
 
-def _sync_agent_skills() -> list[str]:
+# --- Invoked-only skills on the way out (#973) ---------------------------------
+#
+# `disable-model-invocation: true` keeps a skill out of the model's listing, so
+# it runs only when a person asks for it. It is Claude Code's field and is not
+# in the Agent Skills spec, so copying it verbatim into the other trees exports
+# a regression: each harness that ignores it lists the skill like any other, and
+# nothing in the diff shows that. The generator therefore decides per harness.
+#
+# The three `.agents/skills` layers (Codex, Amp, Antigravity) land on ONE
+# directory in a scaffold, so no per-harness choice can be made by including or
+# omitting a file there — whichever layer is selected, every harness reading the
+# directory sees the same skill. That rules out "refuse on the harnesses that
+# lack a control". What remains: emit the nearest equivalent where one exists
+# (Codex reads a sibling file the others ignore) and record the demotion
+# wherever none does, in the generated tree, next to the skill.
+
+#: Claude Code's frontmatter key for an invoked-only skill.
+INVOKED_ONLY_KEY = "disable-model-invocation"
+
+#: Codex's equivalent: a policy file beside SKILL.md. Verified with codex-cli
+#: 0.144.3: `codex debug prompt-input` (the model-visible input) lists a skill
+#: carrying only Claude's key, and drops one carrying this file; the same file
+#: with `true` keeps it listed.
+CODEX_POLICY_REL = Path("agents") / "openai.yaml"
+CODEX_POLICY = "policy:\n  allow_implicit_invocation: false\n"
+
+#: The record written beside every invoked-only skill in every generated tree.
+INVOCATION_RECORD = "INVOCATION.md"
+
+#: (harness, outcome, how — and how we know). One table feeds the record and the
+#: docs, so a harness that gains a control changes one row. Only Codex was run.
+HARNESS_INVOCATION: tuple[tuple[str, str, str], ...] = (
+    (
+        "Claude Code",
+        "honoured",
+        "reads `disable-model-invocation: true`, its own field, from `.claude/skills` "
+        "(the mirror of `.agents/skills`)",
+    ),
+    (
+        "Codex",
+        "honoured",
+        "reads the generated `agents/openai.yaml` (`policy.allow_implicit_invocation: "
+        "false`) and drops the skill from the model's listing; explicit `$skill` "
+        "invocation still works. Listing verified with codex-cli 0.144.3",
+    ),
+    (
+        "Amp",
+        "demoted: always listed",
+        "documents `name`, `description` and `mcpServers` and no per-skill invocation "
+        "control. Documentation only, not run",
+    ),
+    (
+        "Antigravity",
+        "demoted: always listed",
+        "documents `name` and `description` and no per-skill invocation control. "
+        "Documentation only, not run",
+    ),
+    (
+        "Junie",
+        "demoted: always listed",
+        "documents `name` and `description`; skills are switched on or off only all "
+        "together, with `/skills`. Documentation only, not run",
+    ),
+)
+
+
+def invoked_only(skill_md: Path) -> bool:
+    """Whether *skill_md*'s own frontmatter sets ``disable-model-invocation: true``.
+
+    Only the frontmatter counts. `add_command` shows the key in a fenced example
+    in its BODY, as a thing a reader may write, and that skill is not
+    invoked-only. An unterminated frontmatter block is not frontmatter. Only a
+    top-level key counts: the same key indented under another mapping (say
+    `metadata:`) is nested YAML, which Claude Code does not read as its field
+    (PR #1012 review).
+    """
+    lines = skill_md.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return False
+    try:
+        end = next(i for i, line in enumerate(lines[1:], 1) if line.strip() == "---")
+    except StopIteration:
+        return False
+    for line in lines[1:end]:
+        key, sep, value = line.partition(":")
+        if sep and key.rstrip() == INVOKED_ONLY_KEY:  # no lstrip: indented is nested
+            return value.split("#", 1)[0].strip().lower() == "true"
+    return False
+
+
+def disables_implicit_invocation(policy: str) -> bool:
+    """Whether a Codex `agents/openai.yaml` sets ``policy.allow_implicit_invocation: false``.
+
+    Read as block YAML, strictly: a top-level `policy:` mapping whose direct
+    child is the key, with the value `false`. Comments are dropped first, so a
+    commented-out `false` above a live `true` does not count (PR #1012 review).
+    Any other shape reads as not disabling it, which makes the sync refuse and
+    name the file rather than guess what Codex will do.
+    """
+    in_policy = False
+    child_indent: int | None = None
+    for raw in policy.splitlines():
+        line = raw.split("#", 1)[0].rstrip()
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent == 0:
+            in_policy = line == "policy:"
+            child_indent = None
+            continue
+        if not in_policy:
+            continue
+        if child_indent is None:
+            child_indent = indent
+        if indent != child_indent:
+            continue
+        key, sep, value = line.strip().partition(":")
+        if sep and key == "allow_implicit_invocation":
+            return value.strip() == "false"
+    return False
+
+
+def invocation_record(name: str) -> str:
+    """The generated note that says what each harness does with invoked-only *name*."""
+    rows = "\n".join(f"| {h} | {outcome} | {how} |" for h, outcome, how in HARNESS_INVOCATION)
+    return (
+        f"# `{name}` is invoked-only: what each harness does with that\n\n"
+        "Generated by project-init's skill sync (#973). Do not edit; edit the source\n"
+        "skill and re-sync.\n\n"
+        f"The source skill sets `{INVOKED_ONLY_KEY}: true`, a Claude Code field that\n"
+        "is not part of the Agent Skills spec. A harness without an equivalent lists\n"
+        "this skill to the model like any other, so the model may run it without being\n"
+        "asked. Those rows say `demoted`.\n\n"
+        "| Harness | Outcome | How, and how we know |\n"
+        "|---|---|---|\n"
+        f"{rows}\n"
+    )
+
+
+def _write_emitted(path: Path, text: str, gate: str | None) -> None:
+    """Write a generated file, gated like its skill (``.tmpl`` + ``{{#if gate}}``).
+
+    A gated skill vanishes from a scaffold with the concern off (PI-537 #5); its
+    policy and record must vanish with it rather than stand in an empty dir.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if gate:
+        path = path.with_name(path.name + ".tmpl")
+        text = f"{{{{#if {gate}}}}}{text}{{{{/if {gate}}}}}"
+    path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def _mark_invoked_only(source_md: Path, dest: Path, gate: str | None) -> bool:
+    """Emit the Codex policy and the record beside an invoked-only skill (#973).
+
+    Returns whether the skill is invoked-only. A source skill that ships its own
+    `agents/openai.yaml` keeps its content, but only if that file already disables
+    implicit invocation — silently overwriting an author's file, or silently
+    shipping one that contradicts the frontmatter, are both the outcome this
+    exists to stop. It is written here rather than trusted to the copy, because
+    the gated and `plan` copies take top-level files only.
+    """
+    if not invoked_only(source_md):
+        return False
+    authored = source_md.parent / CODEX_POLICY_REL
+    policy = authored.read_text(encoding="utf-8") if authored.is_file() else CODEX_POLICY
+    if not disables_implicit_invocation(policy):
+        raise SystemExit(
+            f"{source_md.parent.name}: SKILL.md sets {INVOKED_ONLY_KEY}: true but its "
+            f"{CODEX_POLICY_REL.as_posix()} does not set allow_implicit_invocation: "
+            "false, so Codex would list it. Make the two agree, then re-run (#973)."
+        )
+    _write_emitted(dest / CODEX_POLICY_REL, policy, gate)
+    _write_emitted(dest / INVOCATION_RECORD, invocation_record(source_md.parent.name), gate)
+    return True
+
+
+def emit_skill(skill_dir: Path, dest: Path, gate: str | None = None) -> bool:
+    """Emit one source skill into an agent tree at *dest*; return whether invoked-only.
+
+    *gate* wraps the skill in ``{{#if gate}}`` (lifecycle skills, PI-537 #5).
+    """
+    if gate:
+        _ship_gated_skill(skill_dir, dest, gate)
+    else:
+        shutil.copytree(skill_dir, dest)
+    return _mark_invoked_only(skill_dir / "SKILL.md", dest, gate)
+
+
+def agent_skill_trees() -> dict[str, Path]:
+    """The committed agent-skill trees `just sync-plugin` writes, by surface label."""
+    return {
+        "codex": CODEX_SKILLS,
+        "antigravity": ANTIGRAVITY_SKILLS,
+        "amp": AMP_SKILLS,
+        "junie": JUNIE_SKILLS,
+    }
+
+
+def _sync_agent_skills(trees: dict[str, Path] | None = None) -> list[str]:
     """Byte-identical SKILL.md trees per surface (Codex/Antigravity/Amp/Junie).
 
     Codex/Antigravity/Amp use `.agents/skills`; Junie uses `.junie/skills`. Each
@@ -313,27 +513,36 @@ def _sync_agent_skills() -> list[str]:
     the base `plan` skill (PI-491), so it matches the CAPABILITIES inventory.
 
     Lifecycle skills are shipped gated on ``{{#if lifecycle}}`` (PI-537 #5) so a
-    `--lifecycle none` scaffold drops them from `.agents/skills` just as it does
-    from `.agents/skills`.
+    `--lifecycle none` scaffold drops them from `.agents/skills` and
+    `.junie/skills`, just as it leaves out the `lifecycle_fallback` overlay that
+    carries them on the Claude path.
+
+    An invoked-only skill gets the Codex policy and a demotion record beside it
+    (#973), and the returned lines say so, so the outcome is visible when the
+    sync runs as well as in the tree. *trees* redirects the output (tests).
     """
     synced = []
     lifecycle_names = {d.name for d in lifecycle_skill_dirs()}
-    for label, dest in (
-        ("codex", CODEX_SKILLS),
-        ("antigravity", ANTIGRAVITY_SKILLS),
-        ("amp", AMP_SKILLS),
-        ("junie", JUNIE_SKILLS),
-    ):
+    demoted = ", ".join(h for h, outcome, _ in HARNESS_INVOCATION if outcome != "honoured")
+    plan_md = TEMPLATE_CLAUDE / "skills" / "plan" / "SKILL.md.tmpl"
+    for label, dest in (trees or agent_skill_trees()).items():
         if dest.exists():
             shutil.rmtree(dest)
+        marked: list[str] = []
         for skill_dir in all_skill_dirs():
-            if skill_dir.name in lifecycle_names:
-                _ship_gated_skill(skill_dir, dest / skill_dir.name, "lifecycle")
-            else:
-                shutil.copytree(skill_dir, dest / skill_dir.name)
+            gate = "lifecycle" if skill_dir.name in lifecycle_names else None
+            if emit_skill(skill_dir, dest / skill_dir.name, gate):
+                marked.append(skill_dir.name)
             synced.append(f"{label}:skills/{skill_dir.name}")
         _ship_base_plan(dest / "plan")
+        if _mark_invoked_only(plan_md, dest / "plan", None):
+            marked.append("plan")
         synced.append(f"{label}:skills/plan")
+        synced += [
+            f"{label}:skills/{name} is invoked-only: Codex policy emitted; "
+            f"demoted on {demoted} (see {INVOCATION_RECORD})"
+            for name in marked
+        ]
     return synced
 
 
@@ -365,7 +574,7 @@ def _check() -> int:
     snapshot so `--check` never mutates the tree. Exit 1 (listing drifted
     paths) when a template edit hasn't been re-synced (2026-07 review).
     """
-    roots = [WORKFLOW_PLUGIN, LIFECYCLE_PLUGIN, *_AGENT_SKILL_DESTS]
+    roots = [WORKFLOW_PLUGIN, LIFECYCLE_PLUGIN, *agent_skill_trees().values()]
     with tempfile.TemporaryDirectory(prefix="sync-check-") as d:
         snapshot = Path(d)
         for i, root in enumerate(roots):
