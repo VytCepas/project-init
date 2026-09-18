@@ -194,4 +194,7 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] in (["-h"], ["--help"]):  # --help does no work (#992)
+        print((__doc__ or "").strip())
+        sys.exit(0)
     sys.exit(main(sys.argv))

@@ -135,6 +135,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] in (["-h"], ["--help"]):  # --help does no work (#992)
+        print((__doc__ or "").strip())
+        sys.exit(0)
     try:
         sys.exit(main())
     except Exception:  # noqa: BLE001 — fail-open: never break the tool result

@@ -13,6 +13,7 @@
 # state it hashed was `dag_workflow.py nodes`, which prints the static GRAPH
 # constant, so the hash never changed and that branch never fired.
 
+case "${1-}" in -h | --help) sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"; exit 0 ;; esac  # --help does no work (#992)
 set -euo pipefail
 
 # Self-log this firing (dormant unless the observability overlay is installed;

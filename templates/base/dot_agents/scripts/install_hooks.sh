@@ -2,6 +2,7 @@
 # Install git hooks from .github/hooks/ to .git/hooks/
 # Run this once after cloning or when hooks are updated
 
+case "${1-}" in -h | --help) sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"; exit 0 ;; esac  # --help does no work (#992)
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
