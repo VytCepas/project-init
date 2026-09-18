@@ -115,6 +115,37 @@ and `AGENTS.md`/`CLAUDE.md`.
   config; cloud sandboxes honor only repo-committed files, and matcher-blind
   surfaces weaken in-editor guards — so git/CI stays the enforcement boundary.
 
+## Invoked-only skills (#973)
+
+`disable-model-invocation: true` keeps a skill out of the model's listing so
+it runs only when a person asks for it. It is a Claude Code field and not part
+of the Agent Skills spec, and `tools/sync_plugin.py` used to copy it verbatim
+into the Codex, Amp, Antigravity and Junie skill trees. Each of those harnesses
+ignores it, so the skill was listed to the model like any other and nothing in
+the diff showed that.
+
+The generator now decides per harness: it emits the nearest equivalent where
+one exists, and records the demotion beside the skill where none does. The
+option of refusing to emit is ruled out by the layout: the Codex, Amp and
+Antigravity layers all land on one `.agents/skills` directory, so leaving a
+file out of one layer cannot hide it from another.
+
+| Harness | Outcome | Mechanism | Confidence |
+|---|---|---|---|
+| Claude Code | honoured | reads its own `disable-model-invocation` from `.claude/skills` | the source format |
+| Codex | honoured | a generated `agents/openai.yaml` with `policy.allow_implicit_invocation: false`; explicit `$skill` still works | **run**: with codex-cli 0.144.3, `codex debug prompt-input` lists a skill that has only Claude's key and drops it once the file is added (`TestCodexLoader`, skipped where `codex` is not installed) |
+| Amp | demoted: always listed | none documented (frontmatter `name`, `description`, `mcpServers`) | docs only, not run |
+| Antigravity | demoted: always listed | none documented (`name`, `description`) | docs only, not run |
+| Junie | demoted: always listed | none per skill (`/skills` switches skills on or off all together) | docs only, not run |
+
+Each invoked-only skill gets an `INVOCATION.md` beside it with this table, and
+`just sync-plugin` prints a line per tree naming the demoted harnesses. The
+table lives once, in `HARNESS_INVOCATION`. When a harness gains a control, its
+row changes and the record becomes accurate without anything else being revisited.
+
+No shipped skill is invoked-only today. `add_command` shows the key only
+inside an example in its body, and the generator reads frontmatter alone.
+
 ## Rows to confirm by running the surface
 
 - Copilot agent mode: that a `Bash`-scoped guard really fires on all tools (matcher ignored).
