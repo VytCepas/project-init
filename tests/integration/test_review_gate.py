@@ -72,6 +72,11 @@ def test_monitor_pr_gates_on_reviews_and_unresolved_threads(tmp_target: Path):
 # printing a canned count, because a canned count would pass while the filter
 # that ties a review to the head was deleted.
 _GH_STUB = """#!/bin/bash
+# pipefail so a `jq` that rejects the monitor's own program fails this stub the
+# way real gh does (measured: `gh api … --jq '.user.login |'` exits 1). Without
+# it the `| sed` below would swallow the status and answer with an empty line,
+# which reads as "no author" instead of "your jq is broken" (Copilot on #1004).
+set -o pipefail
 jqprog=""; prev=""
 for a in "$@"; do [ "$prev" = "--jq" ] && jqprog="$a"; prev="$a"; done
 case "$*" in
@@ -91,7 +96,7 @@ case "$*" in
 # above did not take. Its own jq program runs over the fixture, so a lookup that
 # read a field REST does not carry comes back empty here too. `gh --jq` prints a
 # null as an empty line where `jq -r` prints "null", hence the sed.
-*"api repos/"*"/pulls/"*) jq -r "$jqprog" "$PI_TEST_PR_JSON" 2>/dev/null | sed 's/^null$//' ;;
+*"api repos/"*"/pulls/"*) jq -r "$jqprog" "$PI_TEST_PR_JSON" | sed 's/^null$//' ;;
 *"comments(first:100"*) jq -r "$jqprog" "$PI_TEST_COMMENTS_JSON" ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
 *"api graphql"*) echo "$PI_TEST_UNRESOLVED" ;;
