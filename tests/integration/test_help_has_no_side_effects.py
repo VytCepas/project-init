@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -108,15 +109,17 @@ def scaffolded(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 def _tree(root: Path) -> dict[str, object]:
+    """Content AND permission bits: a `chmod` is a side effect too (PR #1007 review)."""
     out: dict[str, object] = {}
     for p in root.rglob("*"):
         key = p.relative_to(root).as_posix()
+        mode = stat.S_IMODE(p.lstat().st_mode)
         if p.is_symlink():
             out[key] = ("link", os.readlink(p))
         elif p.is_file():
-            out[key] = p.read_bytes()
+            out[key] = (mode, p.read_bytes())
         else:
-            out[key] = "dir"
+            out[key] = ("dir", mode)
     return out
 
 
