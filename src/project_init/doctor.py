@@ -461,11 +461,20 @@ def check_plugin_enablement(
     # must go red even when a second plugin's entry is unreadable.
     broken = [s for s in states if s.tier in ("not-installed", "payload-broken")]
     if broken:
-        detail = ", ".join(f"{s.name} ({s.detail})" for s in broken)
+        # Two different facts, named apart (PR #1008 review): absent from the
+        # registry, versus registered with a cached payload that cannot load.
+        parts = []
+        for tier, label in (
+            ("not-installed", "not installed for this project"),
+            ("payload-broken", "installed but not loadable"),
+        ):
+            hit = [f"{s.name} ({s.detail})" for s in broken if s.tier == tier]
+            if hit:
+                parts.append(f"{label}: {', '.join(hit)}")
         return Check(
             "FAIL",
             "plugin installed",
-            f"declared in settings.json but not installed for this project: {detail}",
+            f"declared in settings.json but {'; '.join(parts)}",
             hint=(
                 f"`claude plugin install {broken[0].name} --scope project` (or "
                 f"`/plugin install {broken[0].name}` in a session here) — "

@@ -299,6 +299,9 @@ def test_installed_but_not_loadable_fails(
     check = _plugin_check(tmp_path)
     assert check.level == "FAIL"
     assert reason in check.message
+    # Registered but unloadable is a different fact from absent (PR #1008 review).
+    assert "installed but not loadable" in check.message
+    assert "not installed" not in check.message
 
 
 def test_lifecycle_plugin_is_required_only_with_the_lifecycle(
