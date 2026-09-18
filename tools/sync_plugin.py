@@ -364,8 +364,8 @@ HARNESS_INVOCATION: tuple[tuple[str, str, str], ...] = (
     (
         "Junie",
         "demoted: always listed",
-        "documents `name` and `description`; skills are switched on or off only all "
-        "together, with `/skills`. Documentation only, not run",
+        "documents `name` and `description`; its only switch, `/skills`, turns skills "
+        "on or off globally, never one at a time. Documentation only, not run",
     ),
 )
 
