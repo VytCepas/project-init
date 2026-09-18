@@ -90,9 +90,9 @@ key = os.environ.get("PROJECT_KEY", "").strip() or "<KEY>"
 # Session-scoped dedup (ADR-028): the rules are injected once per session.
 # The sentinel is keyed on the session_id from the hook payload plus a
 # project-dir hash (parallel sessions in different repos must not collide);
-# its presence is the whole signal, its content is never read. Any failure
-# here falls back to first_time=True — the full block is safe, just
-# token-costly.
+# its presence as a regular file is the whole signal, its content is never
+# read. Any failure here falls back to first_time=True — the full block is
+# safe, just token-costly.
 first_time = True
 session_id = re.sub(r"[^A-Za-z0-9_-]", "", str(data.get("session_id") or ""))[:64]
 if session_id:
@@ -103,11 +103,13 @@ if session_id:
         tempfile.gettempdir(), f"pi_wsr_{proj}_{session_id}"
     )
     try:
-        if os.path.exists(sentinel):
+        # Only a regular FILE marks the injection done: a directory or a
+        # dangling link at this path must not suppress it (fail-open), and
+        # O_EXCL creates the file without following a link planted there.
+        if os.path.isfile(sentinel):
             first_time = False
         else:
-            with open(sentinel, "w"):
-                pass
+            os.close(os.open(sentinel, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
     except OSError:
         first_time = True
 

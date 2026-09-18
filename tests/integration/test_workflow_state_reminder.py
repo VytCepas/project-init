@@ -165,3 +165,18 @@ class TestSessionScopedInjection:
         second = _run_hook(self.hook, "implement it", malicious, tmp_path)
         assert _STATIC_MARKER not in second
         assert second == ""
+
+    def test_only_a_regular_file_at_the_sentinel_path_suppresses(self, tmp_path: Path):
+        """Fail-open (ADR-028): a directory or a dangling link at the sentinel
+        path is not "already injected", and a planted link is never followed."""
+        _run_hook(self.hook, "implement it", "sess-odd", tmp_path)
+        (sentinel,) = tmp_path.glob("pi_wsr_*")
+        sentinel.unlink()
+        sentinel.mkdir()
+        assert _STATIC_MARKER in _run_hook(self.hook, "push the branch", "sess-odd", tmp_path)
+
+        sentinel.rmdir()
+        target = tmp_path / "planted-target"
+        sentinel.symlink_to(target)
+        assert _STATIC_MARKER in _run_hook(self.hook, "merge it", "sess-odd", tmp_path)
+        assert not target.exists(), "the sentinel write followed a planted link"
