@@ -134,7 +134,8 @@ snapshot_settings() {
 }
 
 # Prints one line: `unchanged`, `other` (the file changed, but not apiKeyHelper
-# or env), `reverted <keys>`, or `restored` (unparseable, so put back whole).
+# or env), `reverted <keys>`, or `restored` (deleted or unparseable, so the whole
+# snapshot was put back).
 restore_settings_file() { # <settings file> <snapshot, may not exist>
   "$PY" - "$1" "$2" <<'PY'
 import json, os, sys, tempfile
@@ -175,8 +176,14 @@ before_b, after_b = raw(snap), raw(path)
 if before_b == after_b:
     print("unchanged")
     sys.exit(0)
+if after_b is None:
+    # Deleted while this ran: nothing is left to merge into, so the whole
+    # snapshot goes back, never a file rebuilt from apiKeyHelper and env alone.
+    put(before_b)
+    print("restored")
+    sys.exit(0)
 before = obj(before_b) if before_b is not None else {}
-after = obj(after_b) if after_b is not None else {}
+after = obj(after_b)
 if before is None or after is None:
     put(before_b)
     print("restored")
@@ -225,7 +232,7 @@ guard_settings() {
     unchanged) ok "Claude Code settings untouched: $f" ;;
     other) info "Claude Code settings changed while this ran, but not apiKeyHelper or env — left as is: $f" ;;
     reverted\ *) warn "Claude Code settings: put back ${result#reverted } in $f — something rewrote them while this ran (claude-code-router 3.x does this on its first run; #1005)." ;;
-    restored) warn "Claude Code settings: $f changed while this ran and could not be read key by key, so it was put back exactly as it was (#1005)." ;;
+    restored) warn "Claude Code settings: $f was deleted or could not be read key by key after this ran, so it was put back exactly as it was (#1005)." ;;
     *) warn "Could not check $f: $result" ;;
     esac
     i=$((i + 1))

@@ -64,7 +64,9 @@ def _stub_bin(root: Path) -> Path:
         stub.write_text(
             "#!/bin/sh\n"
             f'printf "%s\\n" "{name} $*" >>"$STUB_LOG"\n'
-            'if [ -n "${REWRITE_TO:-}" ]; then\n'
+            'if [ "${REWRITE_TO:-}" = "-" ]; then\n'
+            '  rm -f "$REWRITE_TARGET"\n'
+            'elif [ -n "${REWRITE_TO:-}" ]; then\n'
             '  mkdir -p "$(dirname "$REWRITE_TARGET")"\n'
             '  cp "$REWRITE_TO" "$REWRITE_TARGET"\n'
             "fi\n"
@@ -200,6 +202,14 @@ def test_only_the_routing_keys_are_reverted(box: _Box):
     proc = box.run(REWRITE_TO=box.router_file({**_ROUTED, "model": "sonnet"}))
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert json.loads(box.settings.read_text()) == {**_ORIGINAL, "model": "sonnet"}
+
+
+def test_a_settings_file_deleted_during_the_run_comes_back_whole(box: _Box):
+    """Nothing is left to merge into, so the snapshot goes back byte for byte —
+    never a file rebuilt from apiKeyHelper and env alone (PR #1006 review)."""
+    proc = box.run(REWRITE_TO="-")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert box.settings.read_bytes() == box.original
 
 
 def test_a_settings_file_the_router_created_is_removed(box: _Box):
