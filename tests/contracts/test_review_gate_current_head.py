@@ -61,6 +61,11 @@ def _step_script(workflow: Path) -> str:
 
 
 _GH_STUB = """#!/usr/bin/env bash
+# pipefail so a `jq` that rejects the step's own program fails this stub the way
+# real gh does (measured: `gh api … --jq '.user.login |'` exits 1). Without it
+# the `| sed` below would swallow the status and hand the step an empty answer,
+# which reads as "no author" instead of "your jq is broken" (Copilot on #1004).
+set -o pipefail
 jqprog=""; prev=""
 for a in "$@"; do [ "$prev" = "--jq" ] && jqprog="$a"; prev="$a"; done
 case "$*" in
