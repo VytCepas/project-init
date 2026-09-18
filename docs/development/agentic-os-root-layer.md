@@ -51,7 +51,7 @@ Source of truth = `.agents/config.yaml` `memory:` block (#498 / ADR-024);
 tier >= 3 and rag_endpoint set → query RAG, then confirm against anchors
 tier >= 2                       → query graph_path before grep
 tier >= 0                       → grep memory_path; MEMORY.md first
-no memory: block (contract ≥ 1) → project opted out; skip retrieval
+no memory: block                → project opted out (when project.project_init_contract_version ≥ 1); skip retrieval
 ```
 
 A reader written against tier 0 keeps working at tier 3 (higher tiers only add
