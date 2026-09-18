@@ -233,6 +233,12 @@ baseline branch protection (require CI green, require PR review, block
 force-push) — unprotected default branches undermine the workflow
 enforcement everything else sets up.
 
+Every preset also ships a root `PLAN.md` that opens with the project's
+done-gate: a `Done when:` line stating the outcome that makes the project
+finished, and a `probed by:` line naming the check that proves it. Both start
+as TODOs for you to fill in; "is this finished?" is then answered by running the
+probe rather than by ticking a box.
+
 Your answers are recorded in `.agents/config.yaml`. On the **first** scaffold into a project that already has files, your existing files are never clobbered: when a generated file (e.g. a hand-written `CLAUDE.md`) would differ, the new render is written alongside as a `<file>.new` sibling for you to merge, and the run prints which files were preserved. On a **re-run** (config already present) it refreshes the files project-init manages and never overwrites your `memory/` or `vault/` notes — and a managed file you have **edited** since the last scaffold (detected via the recorded content hashes) is protected the same way: your file stays, the fresh render lands as a `<file>.new` sibling. With `--strict`, templates are rendered and validated in a temporary directory first, then the validated scaffold files are merged into the target; strict mode is not a whole-directory replacement.
 
 ### Remote and web agent sessions

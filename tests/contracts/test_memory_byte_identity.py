@@ -196,6 +196,12 @@ deliberate content change, not move-drift. Only the `gen_code_map.py`,
 `install_hooks.sh` and `push_wiki.sh` hashes were re-pinned, in all four
 fixtures, by a re-pin that refused to write if any key outside the files this
 change edits had drifted.
+
+Exception (#988): the scaffold intentionally ADDS a root `PLAN.md` that opens
+with the project's done-gate (`Done when:` / `probed by:`). A new file, not
+move-drift. Only the `PLAN.md` key was added, in all four fixtures, by a re-pin
+that refused to rewrite a fixture that did not round-trip byte-identically; this
+test then confirmed every other key still matched.
 """
 
 from __future__ import annotations

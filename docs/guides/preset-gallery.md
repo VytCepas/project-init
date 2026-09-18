@@ -115,6 +115,7 @@ This gallery shows what each preset actually scaffolds into your project directo
 ./AGENTS.md
 ./CLAUDE.md
 ./CONTRIBUTING.md
+./PLAN.md
 ./SECURITY.md
 ./docs/explanation/index.md
 ./docs/how-to/index.md
@@ -255,6 +256,7 @@ This gallery shows what each preset actually scaffolds into your project directo
 ./AGENTS.md
 ./CLAUDE.md
 ./CONTRIBUTING.md
+./PLAN.md
 ./SECURITY.md
 ./docs/explanation/index.md
 ./docs/how-to/index.md
@@ -429,6 +431,7 @@ This gallery shows what each preset actually scaffolds into your project directo
 ./AGENTS.md
 ./CLAUDE.md
 ./CONTRIBUTING.md
+./PLAN.md
 ./SECURITY.md
 ./docs/explanation/index.md
 ./docs/how-to/index.md
@@ -609,6 +612,7 @@ This gallery shows what each preset actually scaffolds into your project directo
 ./AGENTS.md
 ./CLAUDE.md
 ./CONTRIBUTING.md
+./PLAN.md
 ./SECURITY.md
 ./docs/explanation/index.md
 ./docs/how-to/index.md
@@ -809,6 +813,7 @@ This gallery shows what each preset actually scaffolds into your project directo
 ./AGENTS.md
 ./CLAUDE.md
 ./CONTRIBUTING.md
+./PLAN.md
 ./SECURITY.md
 ./docs/explanation/index.md
 ./docs/how-to/index.md
