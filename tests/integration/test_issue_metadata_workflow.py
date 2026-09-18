@@ -164,6 +164,55 @@ class TestIssueMetadataScaffold:
         assert 'status="Backlog"' in content
         assert 'status="Done"' in content
 
+    def test_spike_and_tech_debt_are_accepted_type_labels(self):
+        """Run the *shipped* type mapping and both jq type filters (upstreamed from
+        projects-orchestrator#250). A repo that files `spike` or `tech-debt` issues
+        had them rejected by issue-validation and skipped by the board's type
+        selector, and every repo that widened this locally showed as scaffold drift."""
+        import re
+        import textwrap
+
+        bash, jq = shutil.which("bash"), shutil.which("jq")
+        if bash is None or jq is None:
+            pytest.skip("bash and jq are needed to execute the shipped code")
+        wf = (self.target / ".github" / "workflows" / "issue-validation.yml").read_text()
+        start = wf.index("map_type_label() {")
+        end = wf.index("}", wf.index("esac", start)) + 1
+        mapping = textwrap.dedent(wf[start:end])
+        harness = (
+            "set -euo pipefail\n"
+            + mapping
+            + (
+                '\nfor v in spike debt tech-debt Tech-Debt feat bogus; do printf "%s|" "$(map_type_label "$v")"; done\n'
+            )
+        )
+        out = subprocess.run([bash, "-c", harness], capture_output=True, text=True, check=True)
+        assert out.stdout == "spike|tech-debt|tech-debt|tech-debt|feature||"
+
+        def jq_program(text: str, marker: str) -> str:
+            line = next(line for line in text.splitlines() if marker in line)
+            match = re.search(r"jq -[er]+ '([^']+)'", line)
+            assert match, line
+            return match.group(1)
+
+        accepts = jq_program(wf, "any(.[].name;")
+        board = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
+        selects = jq_program(board, "TYPE_LABEL=$(")
+        for label in ("spike", "tech-debt", "bug"):
+            labels = json.dumps([{"name": "P2-medium"}, {"name": label}])
+            ok = subprocess.run([jq, "-e", accepts], input=labels, capture_output=True, text=True)
+            assert ok.returncode == 0, f"issue-validation rejects the {label} label"
+            issue = json.dumps({"labels": [{"name": "P2-medium"}, {"name": label}]})
+            got = subprocess.run([jq, "-r", selects], input=issue, capture_output=True, text=True)
+            assert got.stdout.strip() == label, f"the board does not select {label}"
+        rejected = subprocess.run(
+            [jq, "-e", accepts],
+            input=json.dumps([{"name": "P2-medium"}]),
+            capture_output=True,
+            text=True,
+        )
+        assert rejected.returncode != 0, "control: a label set with no type must still fail"
+
     def test_board_automation_status_mapping_executes(self):
         """Run the *shipped* status-determination block for each issue action and
         assert the resulting (issue, status) pair — a text-only check would pass
