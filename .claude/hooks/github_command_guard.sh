@@ -6,6 +6,7 @@
 # live in dag_workflow.py next to this script. Adding a new banned command
 # means editing COMMAND_RULES there, not this file.
 
+case "${1-}" in -h | --help) sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"; exit 0 ;; esac  # --help does no work (#992)
 set -euo pipefail
 
 # No self-log here: this shim `exec`s the guard, so it can't see the outcome.

@@ -8,6 +8,7 @@
 #
 # Requires: gh and admin permission on the repository.
 
+case "${1-}" in -h | --help) sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"; exit 0 ;; esac  # --help does no work (#992)
 set -euo pipefail
 
 # This script hard-requires the GitHub CLI (PI-362).
