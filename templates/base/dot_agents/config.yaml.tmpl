@@ -65,13 +65,7 @@ delivery: {{delivery}}            # library | service | prototype — how this s
 {{/if obsidian}}{{#if graphify}}  graph_path: graphify-out/graph.json
 {{/if graphify}}{{#if rag}}  rag_endpoint:        # tier 3 (ADR-024 §4, ADR-026): set after running .agents/scripts/setup_rag.sh (cocoindex-code, keyless/on-device); empty = not wired yet
 {{/if rag}}
-{{/if memory}}{{#if memory_off}}memory:
-  # Memory declined (#960): no backend, so no tier, no anchor and no retrieval
-  # surfaces. Declared rather than omitted so a reader can tell "declined" from
-  # "never recorded"; `project-init add memory <stack>` turns it on.
-  stack: none
-
-{{/if memory_off}}mcps:
+{{/if memory}}mcps:
   installed: {{installed_mcps_yaml}}
 
 safety:

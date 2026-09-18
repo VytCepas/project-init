@@ -10,7 +10,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-import yaml
 
 from project_init.concerns import apply_concern
 from project_init.scaffold import load_preset, overlay_layers, scaffold
@@ -357,7 +356,6 @@ class TestMemoryVisibleDescriptor:
         rc = apply_concern(target, "memory", enable=False, value=None, apply=True)
         assert rc == 0
         cfg = _config(target)
-        # The tier-2 block is replaced by the declaration, not merely deleted (#960).
-        assert yaml.safe_load(cfg)["memory"] == {"stack": "none"}, "stale memory: block"
+        assert "\nmemory:\n" not in cfg, "stale memory: block left in visible config"
         assert "tier:" not in cfg
         assert '"memory_stack": "none"' in cfg

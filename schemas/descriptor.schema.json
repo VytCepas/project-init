@@ -50,28 +50,21 @@
     },
     "memory": {
       "type": "object",
-      "description": "The recall-ladder descriptor (#498, ADR-024). 'stack' is the source of truth and 'tier' is derived from it (#960): the allOf below pins each stack to its one tier, so a hand-edited tier that disagrees with its stack is invalid instead of silently changing which retrieval surfaces a reader gates on. 'stack: none' declares memory explicitly declined and carries no tier, anchor or surface; a reader must tell it apart from an absent block, which only says that nothing was recorded.",
+      "description": "The recall-ladder descriptor (#498, ADR-024). 'stack' is the source of truth and 'tier' is derived from it (#960): the allOf below pins each stack to its one tier, so a hand-edited tier that disagrees with its stack is invalid instead of silently changing which retrieval surfaces a reader gates on. A project that declined memory ('none') emits no memory block at all; at project_init_contract_version >= 1 a reader must read that absence as 'declined', and only a pre-contract (v0) config leaves it unknown.",
       "properties": {
         "tier": { "type": "integer" },
         "stack": {
           "type": "string",
-          "enum": ["none", "auto", "obsidian-only", "obsidian", "obsidian-graphify", "obsidian-graphify-rag"],
-          "description": "The memory profile. 'obsidian' is the permanent legacy alias of 'obsidian-only' (#466)."
+          "enum": ["auto", "obsidian-only", "obsidian", "obsidian-graphify", "obsidian-graphify-rag"],
+          "description": "The memory profile. 'obsidian' is the permanent legacy alias of 'obsidian-only' (#466). 'none' never appears here: a declined project has no memory block."
         },
         "memory_path": { "type": "string" },
         "vault_path": { "type": "string" },
         "graph_path": { "type": "string" },
         "rag_endpoint": { "type": ["string", "null"] }
       },
-      "required": ["stack"],
+      "required": ["tier", "stack", "memory_path"],
       "allOf": [
-        {
-          "if": { "properties": { "stack": { "const": "none" } }, "required": ["stack"] },
-          "then": {
-            "properties": { "tier": false, "memory_path": false, "vault_path": false, "graph_path": false, "rag_endpoint": false }
-          },
-          "else": { "required": ["tier", "memory_path"] }
-        },
         {
           "if": { "properties": { "stack": { "const": "auto" } }, "required": ["stack"] },
           "then": { "properties": { "tier": { "const": 0 } } }

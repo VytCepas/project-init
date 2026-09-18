@@ -11,8 +11,6 @@ import json
 import re
 from pathlib import Path
 
-import yaml
-
 from project_init.__main__ import main
 from project_init.upgrade import _CONFIG_REL, _RECORD_MARKER
 
@@ -48,8 +46,7 @@ class TestMemoryPrecedence:
         _scaffold(target, "--preset", "obsidian-only", "--memory", "none")
         assert not _has_vault(target)
         assert not (target / ".agents" / "memory").exists()
-        config = yaml.safe_load((target / ".agents" / "config.yaml").read_text())
-        assert config["memory"] == {"stack": "none"}  # declared, not absent (#960)
+        assert "memory:" not in (target / ".agents" / "config.yaml").read_text()
 
     def test_flag_obsidian_overrides_core_preset(self, tmp_path: Path):
         target = tmp_path / "p"

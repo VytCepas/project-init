@@ -11,7 +11,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-import yaml
 
 from project_init.__main__ import main
 from project_init.scaffold import load_preset, memory_tier
@@ -89,12 +88,10 @@ class TestConfigDescriptor:
         assert ("vault_path: .agents/vault" in block) is has_vault
         assert ("graph_path: graphify-out/graph.json" in block) is has_graph
 
-    def test_none_declares_itself(self, tmp_path):
-        # #960: `stack: none`, and nothing a reader could gate a surface on.
+    def test_none_has_no_descriptor(self, tmp_path):
         target = tmp_path / "p"
         _scaffold(target, "core")
-        config = yaml.safe_load((target / ".agents" / "config.yaml").read_text())
-        assert config["memory"] == {"stack": "none"}
+        assert "\nmemory:" not in (target / ".agents" / "config.yaml").read_text()
 
     def test_anchor_path_invariant_across_tiers(self, tmp_path):
         """memory_path is the same on every tier that has memory (ADR-024 anchor)."""
@@ -188,7 +185,7 @@ class TestContractVersion:
         _scaffold(target, "core")
         text = (target / ".agents" / "config.yaml").read_text()
         assert "project_init_contract_version: 2" in text
-        assert "tier:" not in text  # declined has no rung (#960)
+        assert "\nmemory:" not in text  # still no memory block
 
     def test_present_for_memory_project(self, tmp_path):
         target = tmp_path / "p"

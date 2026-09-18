@@ -304,8 +304,9 @@ def _valid(descriptor: dict) -> bool:
     return jsonschema.Draft7Validator(load_descriptor_schema()).is_valid(descriptor)
 
 
-_ALL_STACKS = (*_MEMORY_STACKS, *_MEMORY_STACK_ALIASES)
-_LADDER_STACKS = tuple(s for s in _ALL_STACKS if s != "none")
+# Every stack a memory block can carry: the recognised stacks and their permanent
+# aliases, minus `none`, which contract v2 expresses by having no block at all.
+_LADDER_STACKS = tuple(s for s in (*_MEMORY_STACKS, *_MEMORY_STACK_ALIASES) if s != "none")
 
 
 class TestMemoryStackIsTheSourceOfTruth:
@@ -314,21 +315,27 @@ class TestMemoryStackIsTheSourceOfTruth:
     The two were independent fields, so a one-character edit to `tier` changed
     which retrieval surfaces a reader gated on while `stack` still named the
     real profile, and nothing objected. #988 item 1 is the same gap one field
-    over: `stack` was an unconstrained string.
+    over: `stack` was an unconstrained string. Contract v2 is kept: nothing the
+    scaffolder emits changes shape, and a declined project still has no block.
     """
 
     @pytest.mark.parametrize("stack", _MEMORY_STACKS)
     def test_every_memory_profile_renders_a_valid_descriptor(self, tmp_path: Path, stack: str):
         config = _render_full(tmp_path, memory=stack)
         jsonschema.validate(instance=config, schema=load_descriptor_schema())
-        assert config["memory"]["stack"] == stack
+        if stack == "none":
+            # v2 expresses declined by absence; a v2 reader may assume a present
+            # block carries tier + memory_path (Codex review, PR #1010).
+            assert "memory" not in config
+        else:
+            assert config["memory"]["stack"] == stack
 
     def test_stack_enum_is_every_recognised_stack_and_alias(self):
         # Derived, not copied: a stack the CLI accepts but the schema refuses (or
         # the reverse) is the drift #988 item 1 measured.
         schema = load_descriptor_schema()
         enum = schema["properties"]["memory"]["properties"]["stack"]["enum"]
-        assert set(enum) == set(_ALL_STACKS)
+        assert set(enum) == set(_LADDER_STACKS)
 
     @pytest.mark.parametrize("stack", _LADDER_STACKS)
     @pytest.mark.parametrize("tier", range(4))
@@ -346,16 +353,12 @@ class TestMemoryStackIsTheSourceOfTruth:
         config["memory"]["tier"] = 0
         assert not _valid(config)
 
-    def test_declined_carries_no_tier_anchor_or_surface(self):
-        assert _valid(_memory_descriptor({"stack": "none"}))
-        for key, value in (
-            ("tier", 0),
-            ("memory_path", ".agents/memory"),
-            ("vault_path", ".agents/vault"),
-            ("graph_path", "graphify-out/graph.json"),
-            ("rag_endpoint", ""),
-        ):
-            assert not _valid(_memory_descriptor({"stack": "none", key: value})), key
+    def test_none_is_expressed_by_absence_never_as_a_stack(self):
+        memory = {"tier": 0, "stack": "none", "memory_path": ".agents/memory"}
+        assert not _valid(_memory_descriptor(memory))
+        declined = _memory_descriptor({})
+        del declined["memory"]
+        assert _valid(declined)
 
     def test_a_stack_the_ladder_does_not_know_is_invalid(self):
         memory = {"tier": 2, "stack": "obsidian-graphfy", "memory_path": ".agents/memory"}

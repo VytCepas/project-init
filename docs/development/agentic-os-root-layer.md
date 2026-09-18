@@ -39,8 +39,8 @@ Source of truth = `.agents/config.yaml` `memory:` block (#498 / ADR-024);
 | Field | Always? | Meaning to the orchestrator |
 |---|---|---|
 | `tier` | yes (if memory) | 0–3 — selects the retrieval path (degrade-by-tier); derived from `stack`, never independent (#960) |
-| `stack` | yes | `none` / `auto` / `obsidian-only` / `obsidian-graphify` / `obsidian-graphify-rag` — the source of truth |
-| `memory_path` | yes (if memory) | `.agents/memory` — grep anchor; `MEMORY.md` is the index |
+| `stack` | yes | `auto` / `obsidian-only` / `obsidian-graphify` / `obsidian-graphify-rag` — the source of truth |
+| `memory_path` | yes | `.agents/memory` — grep anchor; `MEMORY.md` is the index |
 | `vault_path` | tier ≥ 1 | `.agents/vault` — human notes |
 | `graph_path` | tier ≥ 2 | `graphify-out/graph.json` — code structure |
 | `rag_endpoint` | tier 3 | per-project RAG engine, or empty (seam only — #495/#505) |
@@ -51,8 +51,7 @@ Source of truth = `.agents/config.yaml` `memory:` block (#498 / ADR-024);
 tier >= 3 and rag_endpoint set → query RAG, then confirm against anchors
 tier >= 2                       → query graph_path before grep
 tier >= 0                       → grep memory_path; MEMORY.md first
-stack: none                     → project opted out; skip retrieval
-no memory: block                → nothing recorded; skip retrieval
+no memory: block (contract ≥ 1) → project opted out; skip retrieval
 ```
 
 A reader written against tier 0 keeps working at tier 3 (higher tiers only add

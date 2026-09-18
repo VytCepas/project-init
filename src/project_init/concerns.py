@@ -60,7 +60,6 @@ def _set_memory(v: dict[str, str], stack: str) -> None:
         )
     v["memory_stack"] = stack
     v["memory"] = "" if stack == "none" else "true"
-    v["memory_off"] = "true" if stack == "none" else ""
     v["obsidian"] = "true" if "obsidian" in stack else ""
     v["graphify"] = "true" if "graphify" in stack else ""
     v["rag"] = "true" if "rag" in stack else ""

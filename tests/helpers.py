@@ -138,8 +138,6 @@ def make_variables(**overrides: str) -> dict[str, str]:
         defaults["graphify"] = "true" if stack == "obsidian-graphify" else ""
     if "memory" not in overrides:
         defaults["memory"] = "" if stack == "none" else "true"
-    if "memory_off" not in overrides:
-        defaults["memory_off"] = "true" if stack == "none" else ""
     if "memory_tier" not in overrides:
         from project_init.scaffold import memory_tier
 
