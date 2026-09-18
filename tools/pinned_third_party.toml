@@ -10,7 +10,14 @@
 [tools.ccr]
 package = "@musistudio/claude-code-router"
 ecosystem = "npm"
-pinned = "3.1.0"
+pinned = "2.0.0"
+# Releases at or above `hold_at` are never proposed and `apply` refuses them.
+# Every 3.x release ships code that rewrites the user's Claude Code settings
+# (apiKeyHelper + *_BASE_URL -> 127.0.0.1:3456; 3.1.0 measured doing it on first
+# run), and 3.x keeps its config in SQLite, which setup_models.sh does not speak.
+# Lift this only together with the #870 rework, never as a version bump.
+hold_at = "3.0.0"
+hold_reason = "3.x rewrites the user's Claude Code settings and needs the #870 rework (#1005)"
 # The shell variable carrying this version in each used_in file (kept in lockstep
 # with `pinned` by `check_third_party_updates.py apply`).
 version_var = "CCR_VERSION"

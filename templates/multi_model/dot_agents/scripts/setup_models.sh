@@ -11,6 +11,42 @@
 # is user-run, in your project, exactly like the graphify setup script.
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: .agents/scripts/setup_models.sh [--help]
+
+One-time installer for the multi-model (CCR) overlay. With no arguments it:
+  1. installs @musistudio/claude-code-router at the pinned version (bun or npm)
+  2. installs Claude Code if it is missing
+  3. creates .agents/multi-model/.env from the example if it is missing
+  4. seeds ~/.claude-code-router/config.json (backs up an existing one, asks first)
+  5. offers to pull a local Ollama model (asks first)
+  6. offers to wire `eval "$(ccr activate)"` into your shell rc (asks first)
+
+It never starts the router, and it leaves the apiKeyHelper and env entries of
+your Claude Code user settings exactly as it found them.
+
+Options:
+  -h, --help   print this help and exit without changing anything
+EOF
+}
+
+# Arguments are parsed before anything else runs (#1005): `--help` used to fall
+# through to the whole installer, which installed and then executed the router.
+for arg in "$@"; do
+  case "$arg" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    usage >&2
+    printf 'setup_models.sh: unknown argument: %s\n' "$arg" >&2
+    exit 2
+    ;;
+  esac
+done
+
 # --- external packages --------------------------------------------------------
 # CCR sits on the scaffolded project's request path, so its version is *pinned
 # and vetted* (ADR-016 §5; bumped via upgrade-as-PR by
@@ -20,8 +56,17 @@ set -euo pipefail
 # not something this scaffold puts in the request path, and freezing it would
 # hold every scaffolded project behind a bump PR on a fast-moving tool. It is
 # installed at upstream latest and is absent from the manifest by design.
+#
+# The pin is held below 3.0.0 (#1005, #870). Every 3.x release ships code that
+# rewrites the user's Claude Code settings (an apiKeyHelper plus env *_BASE_URL
+# keys pointing at 127.0.0.1:3456), and 3.1.0 was measured doing it on its first
+# run. Claude Code reloads those settings live, so every running session on the
+# machine then sends its requests to a router that is not listening. 3.x also
+# moved its config to SQLite, which seed_config() below does not speak. 2.0.0 is
+# the last release with neither, and require_supported_ccr() refuses the rest.
 CCR_PKG="@musistudio/claude-code-router"
-CCR_VERSION="3.1.0"
+CCR_VERSION="2.0.0"
+CCR_FIRST_UNSUPPORTED_MAJOR=3
 CLAUDE_PKG="@anthropic-ai/claude-code"
 
 # --- paths --------------------------------------------------------------------
@@ -56,6 +101,137 @@ ask() { # ask "prompt" -> 0 if yes; auto-no when non-interactive
 }
 
 [ -f "$TEMPLATE_CONFIG" ] || die "missing $TEMPLATE_CONFIG — run from a scaffolded project"
+
+# --- 0. refuse a router that takes over Claude Code (#1005) -------------------
+# A second line behind the pin: a hand-edited CCR_VERSION of 3.x or later is
+# refused before anything is installed, until the #870 rework lands.
+require_supported_ccr() {
+  local major="${CCR_VERSION%%.*}"
+  [[ "$major" =~ ^[0-9]+$ ]] || die "CCR_VERSION '$CCR_VERSION' is not a version number."
+  if [ "$major" -ge "$CCR_FIRST_UNSUPPORTED_MAJOR" ]; then
+    die "claude-code-router $CCR_VERSION is not supported: ${CCR_FIRST_UNSUPPORTED_MAJOR}.x rewrites your Claude Code settings on its first run and keeps its config in SQLite (project-init #1005, #870). Nothing was installed."
+  fi
+}
+
+# --- Claude Code settings guard (#1005) --------------------------------------
+# This script has no business in the user's Claude Code settings. Each user-scope
+# settings file is snapshotted before anything runs; on exit, however the script
+# ends, any apiKeyHelper or env entry that changed while it ran is put back, and
+# the script says what it found either way.
+CLAUDE_SETTINGS_FILES=("$HOME/.claude/settings.json")
+if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ "${CLAUDE_CONFIG_DIR%/}/settings.json" != "$HOME/.claude/settings.json" ]; then
+  CLAUDE_SETTINGS_FILES+=("${CLAUDE_CONFIG_DIR%/}/settings.json")
+fi
+SNAP_DIR=""
+
+snapshot_settings() {
+  SNAP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/setup_models.XXXXXX")"
+  local i=0 f
+  for f in "${CLAUDE_SETTINGS_FILES[@]}"; do
+    if [ -f "$f" ]; then cp -p "$f" "$SNAP_DIR/$i"; fi
+    i=$((i + 1))
+  done
+}
+
+# Prints one line: `unchanged`, `other` (the file changed, but not apiKeyHelper
+# or env), `reverted <keys>`, or `restored` (unparseable, so put back whole).
+restore_settings_file() { # <settings file> <snapshot, may not exist>
+  "$PY" - "$1" "$2" <<'PY'
+import json, os, sys, tempfile
+
+path, snap = sys.argv[1], sys.argv[2]
+
+
+def raw(p):
+    try:
+        with open(p, "rb") as fh:
+            return fh.read()
+    except FileNotFoundError:
+        return None
+
+
+def obj(b):
+    try:
+        v = json.loads(b)
+    except (TypeError, ValueError):
+        return None
+    return v if isinstance(v, dict) else None
+
+
+def put(data):
+    if data is None:
+        if os.path.exists(path):
+            os.remove(path)
+        return
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".")
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(data)
+    if os.path.exists(snap):
+        os.chmod(tmp, os.stat(snap).st_mode & 0o7777)
+    os.replace(tmp, path)
+
+
+before_b, after_b = raw(snap), raw(path)
+if before_b == after_b:
+    print("unchanged")
+    sys.exit(0)
+before = obj(before_b) if before_b is not None else {}
+after = obj(after_b) if after_b is not None else {}
+if before is None or after is None:
+    put(before_b)
+    print("restored")
+    sys.exit(0)
+
+fixed, keys = dict(after), []
+for key in ("apiKeyHelper", "env"):
+    if before.get(key, ...) == after.get(key, ...):
+        continue
+    if key == "env" and isinstance(before.get("env", {}), dict) and isinstance(after.get("env", {}), dict):
+        b_env, a_env = before.get("env", {}), after.get("env", {})
+        keys += [f"env.{k}" for k in sorted(set(b_env) | set(a_env)) if b_env.get(k, ...) != a_env.get(k, ...)]
+    else:
+        keys.append(key)
+    if key in before:
+        fixed[key] = before[key]
+    else:
+        fixed.pop(key, None)
+if not keys:
+    print("other")
+    sys.exit(0)
+if fixed == before:
+    put(before_b)
+else:
+    put((json.dumps(fixed, indent=2) + "\n").encode("utf-8"))
+print("reverted " + " ".join(keys))
+PY
+}
+
+guard_settings() {
+  [ -n "$SNAP_DIR" ] || return 0
+  local i=0 f result
+  for f in "${CLAUDE_SETTINGS_FILES[@]}"; do
+    if ! result="$(restore_settings_file "$f" "$SNAP_DIR/$i" 2>&1)"; then
+      # No usable Python: fall back to a byte comparison, and put the whole file
+      # back if it moved at all — the conservative answer when keys cannot be read.
+      if [ -f "$SNAP_DIR/$i" ]; then
+        if cmp -s "$SNAP_DIR/$i" "$f"; then result="unchanged"; else cp -p "$SNAP_DIR/$i" "$f" && result="restored"; fi
+      elif [ -f "$f" ]; then
+        rm -f "$f" && result="restored"
+      else
+        result="unchanged"
+      fi
+    fi
+    case "$result" in
+    unchanged) ok "Claude Code settings untouched: $f" ;;
+    other) info "Claude Code settings changed while this ran, but not apiKeyHelper or env — left as is: $f" ;;
+    reverted\ *) warn "Claude Code settings: put back ${result#reverted } in $f — something rewrote them while this ran (claude-code-router 3.x does this on its first run; #1005)." ;;
+    restored) warn "Claude Code settings: $f changed while this ran and could not be read key by key, so it was put back exactly as it was (#1005)." ;;
+    *) warn "Could not check $f: $result" ;;
+    esac
+    i=$((i + 1))
+  done
+  rm -rf "$SNAP_DIR"
+}
 
 # --- 1. install CCR (bun-preferred, npm fallback; pinned) ---------------------
 install_ccr() {
@@ -232,9 +408,12 @@ wire_shell() {
 }
 
 # --- 7. verify + cheat sheet --------------------------------------------------
+# Deliberately never executes `ccr`, not even `ccr -v` (#1005): running the
+# router is the step that rewrites Claude Code's settings in 3.x, and starting
+# it is the user's call.
 finish() {
   echo
-  if have ccr; then ccr -v 2>/dev/null || true; fi
+  ok "claude-code-router $CCR_VERSION is installed and has not been started."
   cat <<'EOF'
 
 Done. Multi-model switching is set up.
@@ -258,6 +437,9 @@ Edit providers/keys in ~/.claude-code-router/config.json (or .agents/multi-model
 EOF
 }
 
+require_supported_ccr
+snapshot_settings
+trap guard_settings EXIT
 install_ccr
 ensure_claude
 ensure_env

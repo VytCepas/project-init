@@ -69,6 +69,20 @@ def is_newer(candidate: str, pinned: str) -> bool:
     return _version_key(candidate) > _version_key(pinned)
 
 
+def held(candidate: str, tool: dict) -> str | None:
+    """The manifest's ``hold_reason`` when ``candidate`` is at or above ``hold_at``.
+
+    A hold is how the manifest says "newer exists, and we are not taking it":
+    the pin is not stale, the next version is known-bad for us (#1005). Without
+    it the weekly sweep re-proposes the same unsafe bump forever, and one tired
+    merge undoes the fix.
+    """
+    hold_at = tool.get("hold_at")
+    if not hold_at or _version_key(candidate) < _version_key(hold_at):
+        return None
+    return tool.get("hold_reason") or f"held below {hold_at}"
+
+
 def _http_get_json(url: str) -> dict:
     req = urllib.request.Request(url, headers={"Accept": _NPM_ACCEPT})
     with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310 (https registry)
@@ -94,7 +108,10 @@ def check(manifest: dict, *, get_json=_http_get_json) -> list[dict]:
         try:
             latest = fetch_latest(tool, get_json=get_json)
             row["latest"] = latest
-            row["update_available"] = is_newer(latest, tool["pinned"])
+            hold = held(latest, tool)
+            if hold:
+                row["held"] = hold
+            row["update_available"] = is_newer(latest, tool["pinned"]) and not hold
         except Exception as exc:  # noqa: BLE001 — report, don't crash the sweep
             row["error"] = f"{type(exc).__name__}: {exc}"
             row["update_available"] = False
@@ -141,6 +158,9 @@ def apply(tool_id: str, version: str, *, manifest_path: Path = MANIFEST) -> list
     if tool_id not in manifest:
         raise KeyError(f"unknown tool: {tool_id!r}")
     tool = manifest[tool_id]
+    hold = held(version, tool)
+    if hold:
+        raise ValueError(f"{tool_id} {version} is held: {hold}")
 
     # Compute and validate EVERY replacement before writing anything, so a
     # missing version_var fails fast and never leaves a half-applied lockstep
@@ -186,6 +206,8 @@ def main(argv: list[str] | None = None) -> int:
             for r in rows:
                 if r.get("error"):
                     print(f"  {r['tool']}: ERROR {r['error']}")
+                elif r.get("held"):
+                    print(f"  {r['tool']}: {r['pinned']} (latest {r['latest']} HELD: {r['held']})")
                 elif r["update_available"]:
                     print(f"  {r['tool']}: {r['pinned']} → {r['latest']}  UPDATE AVAILABLE")
                 else:
