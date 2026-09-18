@@ -178,6 +178,16 @@ reviewed — a formal review by its REST `commit_id`, a comment-form Codex revie
 its "Reviewed commit:" line. A review used to count for ever, so every push after
 one went green on commits nobody had reviewed. Deliberate content change, not
 move-drift. Only that one hash was re-pinned, in all four fixtures.
+
+Exception (PI-1003): the same workflow now drops the PR AUTHOR's own reviews from
+that count, on both legs — formal reviews and the connector's comment-form ones.
+GitHub records a reply to a review thread as a formal COMMENTED review by the
+replier on the head it was written against, so an author following the review
+protocol — push, answer every comment, resolve — turned the check green on a
+commit no reviewer had seen. Deliberate content change, not move-drift. Only
+that one hash was re-pinned, in all four fixtures, after the re-pin refused to run
+until it had confirmed that key was the sole drifted one and no path was added or
+removed.
 """
 
 from __future__ import annotations

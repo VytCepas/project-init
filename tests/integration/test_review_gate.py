@@ -87,6 +87,11 @@ case "$*" in
   fi
   ;;
 *"/pulls/"*"/reviews"*) jq -r "$jqprog" "$PI_TEST_REVIEWS_JSON" ;;
+# The PR object the author is read from — whatever `repos/.../pulls/N` the arm
+# above did not take. Its own jq program runs over the fixture, so a lookup that
+# read a field REST does not carry comes back empty here too. `gh --jq` prints a
+# null as an empty line where `jq -r` prints "null", hence the sed.
+*"api repos/"*"/pulls/"*) jq -r "$jqprog" "$PI_TEST_PR_JSON" 2>/dev/null | sed 's/^null$//' ;;
 *"comments(first:100"*) jq -r "$jqprog" "$PI_TEST_COMMENTS_JSON" ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
 *"api graphql"*) echo "$PI_TEST_UNRESOLVED" ;;
@@ -110,10 +115,22 @@ exec {real_git} "$@"
 _HEAD = "a" * 40
 _OLDER = "b" * 40
 
+# REST spells a bot's login with the `[bot]` suffix, and the author filter
+# compares REST against REST — a fixture that dropped it would hide a lookup
+# that had drifted to GraphQL's spelling.
+_AUTHOR = "pr-author"
+_REVIEWER = "copilot-pull-request-reviewer[bot]"
 
-def _formal_review(sha: str) -> dict[str, object]:
+
+def _formal_review(sha: str, login: str = _REVIEWER) -> dict[str, object]:
     """A formal review, as REST `pulls/{n}/reviews` lists it."""
-    return {"id": 1, "commit_id": sha, "state": "COMMENTED"}
+    return {"id": 1, "commit_id": sha, "state": "COMMENTED", "user": {"login": login}}
+
+
+def _author_reply(sha: str) -> dict[str, object]:
+    """The author's reply to a review thread: REST records it as a formal
+    COMMENTED review, empty body, on the head it was written against (PI-1003)."""
+    return {"id": 2, "commit_id": sha, "state": "COMMENTED", "body": "", "user": {"login": _AUTHOR}}
 
 
 def _codex_comment_review(sha: str) -> dict[str, object]:
@@ -122,13 +139,14 @@ def _codex_comment_review(sha: str) -> dict[str, object]:
     return {"author": {"login": "chatgpt-codex-connector"}, "body": body}
 
 
-def _run_monitor(
+def _run_monitor(  # noqa: PLR0913 — one keyword argument per answer the stub gh serves
     tmp_target: Path,
     tmp_path: Path,
     *,
     reviews: list[dict[str, object]],
     unresolved: str,
     decision_late: str = "",
+    pr: dict[str, object] | None = None,
 ):
     """`reviews` mixes both shapes; each is served to the query that would see it."""
     import json
@@ -145,13 +163,18 @@ def _run_monitor(
     (stub / "sleep").chmod(0o755)
     formal = [r for r in reviews if "commit_id" in r]
     (tmp_path / "reviews.json").write_text(json.dumps(formal))
-    nodes = [r for r in reviews if "body" in r]
+    nodes = [r for r in reviews if "author" in r]
     comments = {"data": {"repository": {"pullRequest": {"comments": {"nodes": nodes}}}}}
     (tmp_path / "comments.json").write_text(json.dumps(comments))
+    # REST `pulls/{n}`: the PR object the monitor reads the author from.
+    (tmp_path / "pr.json").write_text(
+        json.dumps(pr if pr is not None else {"number": 1, "user": {"login": _AUTHOR}})
+    )
     env = os.environ.copy()
     env["PATH"] = f"{stub}:{env['PATH']}"
     env["PI_TEST_SHA"] = _HEAD
     env["PI_TEST_REVIEWS_JSON"] = str(tmp_path / "reviews.json")
+    env["PI_TEST_PR_JSON"] = str(tmp_path / "pr.json")
     env["PI_TEST_COMMENTS_JSON"] = str(tmp_path / "comments.json")
     env["PI_TEST_UNRESOLVED"] = unresolved
     env["PI_TEST_DECISION_LATE"] = decision_late
@@ -237,6 +260,66 @@ def test_a_comment_form_codex_review_of_an_older_commit_does_not(tmp_target: Pat
         tmp_path,
         reviews=[_codex_comment_review(_OLDER)],
         unresolved="0",
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "Merged" not in result.stdout
+
+
+# ── PI-1003: the author's own reply is not the review the monitor waits for ──
+# GitHub records a reply to a review thread as a formal COMMENTED review by the
+# replier on the head it was written against. `--merge` must keep waiting, or it
+# merges a commit whose only "review" the author wrote (#1003).
+
+
+def test_the_authors_own_thread_reply_does_not_satisfy_the_monitor(
+    tmp_target: Path, tmp_path: Path
+):
+    result = _run_monitor(tmp_target, tmp_path, reviews=[_author_reply(_HEAD)], unresolved="0")
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "Merged" not in result.stdout
+    assert "no review of the head commit has landed" in result.stdout
+
+
+def test_a_reviewer_of_the_head_beside_the_authors_reply_merges(tmp_target: Path, tmp_path: Path):
+    """The control: only the author's own review is dropped, not the reviewer's."""
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        reviews=[_author_reply(_HEAD), _formal_review(_HEAD)],
+        unresolved="0",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Merged PR #1" in result.stdout
+
+
+def test_the_connectors_comment_review_of_its_own_pr_does_not_satisfy_the_monitor(
+    tmp_target: Path, tmp_path: Path
+):
+    """Raised in review on #1004: the comment leg had the same hole as the formal
+    one. REST names a connector-authored PR's author `chatgpt-codex-connector[bot]`
+    while GraphQL spells the commenter bare, so the monitor trims `[bot]` before
+    comparing — a comparison that skipped the trim would never match and the hole
+    would stay open."""
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        reviews=[_codex_comment_review(_HEAD)],
+        unresolved="0",
+        pr={"number": 1, "user": {"login": "chatgpt-codex-connector[bot]"}},
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "Merged" not in result.stdout
+
+
+def test_an_unreadable_author_leaves_the_monitor_waiting(tmp_target: Path, tmp_path: Path):
+    """Fail closed, and the same way the workflow does: an author the API did not
+    name counts no formal review, rather than counting every one of them."""
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        reviews=[_formal_review(_HEAD)],
+        unresolved="0",
+        pr={"number": 1, "user": None},
     )
     assert result.returncode == 2, result.stdout + result.stderr
     assert "Merged" not in result.stdout

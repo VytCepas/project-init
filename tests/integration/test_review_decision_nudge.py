@@ -33,9 +33,10 @@ _SCRIPTS = Path(".agents") / "scripts"
 # creates PI_TEST_COMMENTED, after which it reports pass. That is the real
 # causal chain — the comment is what re-runs the workflow.
 #
-# The reviews endpoint answers with one line, standing in for `gh --jq` having
-# found one review of the head. That filter is not this file's subject; it is run
-# for real, over fixture JSON, in test_review_gate.py (PI-981).
+# The reviews endpoint answers with one line — the login of one reviewer of the
+# head, which is what the monitor counts once the PR author's own reviews are
+# dropped (PI-1003). Those filters are not this file's subject; they are run for
+# real, over fixture JSON, in test_review_gate.py (PI-981, PI-1003).
 _GH_STUB = """#!/bin/bash
 case "$*" in
 *"--json headRefName"*) echo "feature false" ;;
@@ -54,7 +55,8 @@ case "$*" in
   fi
   ;;
 *"--json reviewDecision"*) echo "" ;;
-*"/pulls/"*"/reviews"*) echo "1" ;;
+*"/pulls/"*"/reviews"*) echo "copilot-pull-request-reviewer[bot]" ;;
+*"api repos/"*"/pulls/"*) echo "pr-author" ;;
 *"comments(first:100"*) : ;;
 *"--json nameWithOwner"*) echo "o/r" ;;
 *"api graphql"*) echo "0" ;;
