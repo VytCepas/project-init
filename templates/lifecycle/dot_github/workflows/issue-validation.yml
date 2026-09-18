@@ -46,7 +46,10 @@ jobs:
 
           # Map a body "Type" value (either the create_issue.sh type keyword —
           # feat/fix/chore/docs/test — or the label name itself) to the canonical
-          # type label.
+          # type label. spike and debt/tech-debt are LABEL-only types: a spike
+          # does not branch and tech-debt branches as fix/ or chore/, so the
+          # keyword alphabet (create_issue.sh, start_issue.sh, branch names) does
+          # not carry them.
           map_type_label() {
             case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
             feat | feature) echo "feature" ;;
@@ -54,6 +57,8 @@ jobs:
             chore) echo "chore" ;;
             docs | documentation) echo "documentation" ;;
             test) echo "test" ;;
+            spike) echo "spike" ;;
+            debt | tech-debt) echo "tech-debt" ;;
             *) echo "" ;;
             esac
           }
@@ -81,7 +86,7 @@ jobs:
           # it (this job already has issues: write). Only fall back to flagging
           # "type label" as missing when the body carries no recognizable type.
           has_type_label() {
-            if printf '%s\n' "$LABELS_JSON" | jq -e 'any(.[].name; . == "feature" or . == "bug" or . == "chore" or . == "documentation" or . == "test")' >/dev/null; then
+            if printf '%s\n' "$LABELS_JSON" | jq -e 'any(.[].name; . == "feature" or . == "bug" or . == "chore" or . == "documentation" or . == "test" or . == "tech-debt" or . == "spike")' >/dev/null; then
               return
             fi
             local body_type label
