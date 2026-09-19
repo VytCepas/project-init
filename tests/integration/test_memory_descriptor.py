@@ -286,6 +286,28 @@ class TestUpgradeRefreshesVisiblePluginVersion:
         # One value in two places: the record's copy agrees.
         assert f'"project_init_plugin_version": "{__plugin_version__}"' in config.read_text()
 
+    def test_a_same_named_key_outside_the_project_block_is_untouched(self, tmp_path, capsys):
+        # PR #1019 review: an unscoped first match would hit this key, leave the
+        # real field stale, and overwrite user-owned data.
+        from project_init import __plugin_version__
+
+        target = tmp_path / "p"
+        _scaffold(target, "core")
+        config = target / ".agents" / "config.yaml"
+        head, sep, tail = config.read_text().partition("# --- scaffold record")
+        head = head.replace(
+            f"project_init_plugin_version: {__plugin_version__}",
+            "project_init_plugin_version: 0.1.0",
+        )
+        head = "notes:\n  project_init_plugin_version: mine\n" + head
+        config.write_text(head + sep + tail)
+        capsys.readouterr()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        head = self._head(config)
+        assert "  project_init_plugin_version: mine\n" in head
+        block = head.split("\nproject:\n", 1)[1]
+        assert f"project_init_plugin_version: {__plugin_version__}" in block
+
     def test_upgrade_leaves_other_visible_fields_alone(self, tmp_path, capsys):
         # The control: the rewrite is keyed on this one field. A hand-edited
         # neighbouring value must survive, as it always has.

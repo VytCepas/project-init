@@ -1391,21 +1391,24 @@ def _refresh_plugin_version_line(text: str, variables: dict[str, str]) -> str:
     ``_ensure_visible_project_fields`` only ADDS a missing line and never touches
     one that exists, so the visible plugin version was written once at scaffold
     time and then frozen, while the scaffold record's ``variables`` copy advanced
-    on every upgrade. Measured 2026-09-19 on seven scaffolded repos: six held
-    two different values (visible 0.1.0 to 0.8.5, recorded 0.9.15 to 0.9.16),
-    and the seventh had never been upgraded (projects-orchestrator#212). This
-    makes the value a tool-managed line, like ``project_init_version``, so the
-    two copies are written from one value.
+    on every upgrade (projects-orchestrator#212). This makes the value a
+    tool-managed line, like ``project_init_version``, so the two copies are
+    written from one value.
 
-    Only the human section is touched, and only the value: the trailing comment
-    survives, and the record's single-line JSON cannot match a line that
-    starts with the key anyway.
+    Scoped to the ``project:`` block, the same span ``_project_field_lines``
+    reads, so a same-named key elsewhere in a hand-edited config is neither
+    rewritten nor allowed to shadow the real one. Only the value changes: the
+    trailing comment survives.
     """
     value = variables.get("project_init_plugin_version")
     if not value:
         return text
     head, sep, tail = text.partition(_RECORD_MARKER)
-    head = _PLUGIN_VERSION_LINE_RE.sub(lambda m: f"{m.group(1)}{value}", head, count=1)
+    block = re.search(r"(?ms)^project:\n(.*?)(?=^\S)", head)
+    if not block:
+        return text
+    body = _PLUGIN_VERSION_LINE_RE.sub(lambda m: f"{m.group(1)}{value}", block.group(1), count=1)
+    head = head[: block.start(1)] + body + head[block.end(1) :]
     return head + sep + tail
 
 
