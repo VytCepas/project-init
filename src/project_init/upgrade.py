@@ -75,6 +75,11 @@ _CONFIG_REL = Path(".agents/config.yaml")
 # which shipped in v1.0.1. Scaffolds from v1.0.0 and earlier still keep it there.
 _LEGACY_CONFIG_REL = Path(".claude/config.yaml")
 _VERSION_LINE_RE = re.compile(r"^(\s*project_init_version:\s*).*$", re.MULTILINE)
+# The value only: the rendered line carries a trailing `# plugin payload version`
+# comment, which a `.*$` match would delete.
+_PLUGIN_VERSION_LINE_RE = re.compile(
+    r"^(\s*project_init_plugin_version:[ \t]*)[^\s#]*", re.MULTILINE
+)
 # A never-clobber sibling: `<file>.new` or `<file>.new.N` (see scaffold._new_sibling).
 _SIBLING_RE = re.compile(r"\.new(\.\d+)?$")
 
@@ -1192,6 +1197,12 @@ def _mirror_mode(src: Path, dest: Path) -> None:
 _PROJECT_FIELD_RE = re.compile(r"^(\s+)([A-Za-z_]\w*):")
 
 
+# The `project:` block of a config's human section: from its header to the next
+# top-level key, or to the end when `project:` is the last key there. Shared, so
+# the field reader and the plugin-version refresh always read the same span.
+_PROJECT_BLOCK_RE = re.compile(r"(?ms)^project:\n(.*?)(?=^\S|\Z)")
+
+
 def _project_field_lines(head: str) -> dict[str, str]:
     """Map each top-level `project:` field key to its full source line, in order.
 
@@ -1199,7 +1210,7 @@ def _project_field_lines(head: str) -> dict[str, str]:
     the `project:` block is scanned, so top-level keys like `language:` — and the
     record's own JSON below — are ignored.
     """
-    block = re.search(r"(?ms)^project:\n(.*?)(?=^\S)", head)
+    block = _PROJECT_BLOCK_RE.search(head)
     if not block:
         return {}
     fields: dict[str, str] = {}
@@ -1380,6 +1391,33 @@ def _ensure_context_key(text: str) -> str:
     return head + sep + tail
 
 
+def _refresh_plugin_version_line(text: str, variables: dict[str, str]) -> str:
+    """Rewrite the visible ``project_init_plugin_version`` to the recorded value.
+
+    ``_ensure_visible_project_fields`` only ADDS a missing line and never touches
+    one that exists, so the visible plugin version was written once at scaffold
+    time and then frozen, while the scaffold record's ``variables`` copy advanced
+    on every upgrade (projects-orchestrator#212). This makes the value a
+    tool-managed line, like ``project_init_version``, so the two copies are
+    written from one value.
+
+    Scoped to the ``project:`` block, the same span ``_project_field_lines``
+    reads, so a same-named key elsewhere in a hand-edited config is neither
+    rewritten nor allowed to shadow the real one. Only the value changes: the
+    trailing comment survives.
+    """
+    value = variables.get("project_init_plugin_version")
+    if not value:
+        return text
+    head, sep, tail = text.partition(_RECORD_MARKER)
+    block = _PROJECT_BLOCK_RE.search(head)
+    if not block:
+        return text
+    body = _PLUGIN_VERSION_LINE_RE.sub(lambda m: f"{m.group(1)}{value}", block.group(1), count=1)
+    head = head[: block.start(1)] + body + head[block.end(1) :]
+    return head + sep + tail
+
+
 def _ensure_visible_project_fields(text: str, staging: Path) -> str:
     """Surface every `project:` field a fresh scaffold renders (#259, #498, PI-880).
 
@@ -1463,6 +1501,7 @@ def apply_drift(
     if config_path.exists():
         text = config_path.read_text(encoding="utf-8")
         text = _VERSION_LINE_RE.sub(rf"\g<1>{variables['project_init_version']}", text, count=1)
+        text = _refresh_plugin_version_line(text, variables)
         text = _ensure_visible_project_fields(text, staging)
         text = _ensure_context_key(text)
         text = _ensure_ci_block(text)
