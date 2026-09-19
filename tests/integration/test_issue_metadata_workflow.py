@@ -245,6 +245,76 @@ class TestIssueMetadataScaffold:
         assert run("issues", "closed", "5") == "5|Done"
         assert run("issues", "labeled", "5") == "5|metadata"
 
+    def test_board_sync_is_loud_when_a_configured_board_is_unreachable(self, tmp_path: Path):
+        """Run the *shipped* sync step against a stubbed `gh`, up to the point it
+        has resolved the project.
+
+        The step used to log "Skipping project sync: project not found or
+        PROJECT_TOKEN lacks access" and pass, so a board that had stopped syncing
+        read the same as one that synced. That happened on a scaffolded repo whose
+        token had stopped reaching its board.
+
+        Three arms, all needed: no token is a notice and a pass (no board was set
+        up, and every scaffold writes a default board number, so the token is the
+        signal); a token with no reachable project fails; a reachable project
+        carries on.
+        """
+        import yaml
+
+        bash = shutil.which("bash")
+        if bash is None or shutil.which("jq") is None:
+            pytest.skip("bash and jq are needed to run the step")
+        wf = yaml.safe_load(
+            (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
+        )
+        step = next(
+            s
+            for s in wf["jobs"]["board-sync"]["steps"]
+            if s.get("name") == "Sync project item fields"
+        )
+        assert step["env"]["HAS_PROJECT_TOKEN"] == "${{ secrets.PROJECT_TOKEN != '' }}"
+        script = step["run"]
+        cut = script.index("ITEM_ID=$(")
+        harness = script[:cut] + 'echo "REACHED project $PROJECT_ID"\n'
+
+        stub_dir = tmp_path / "bin"
+        stub_dir.mkdir()
+        calls = tmp_path / "gh-calls"
+        gh = stub_dir / "gh"
+        gh.write_text(
+            f'#!/bin/sh\necho called >> "{calls}"\ncat "$GH_STUB_OUT"\nexit "$GH_STUB_RC"\n'
+        )
+        gh.chmod(0o755)
+
+        def run(has_token: str, gh_out: str, gh_rc: int) -> subprocess.CompletedProcess[str]:
+            out = tmp_path / "gh-out"
+            out.write_text(gh_out)
+            env = {
+                **os.environ,
+                "PATH": f"{stub_dir}{os.pathsep}{os.environ['PATH']}",
+                "HAS_PROJECT_TOKEN": has_token,
+                "GH_STUB_OUT": str(out),
+                "GH_STUB_RC": str(gh_rc),
+                "OWNER": "someone",
+                "PROJECT_NUMBER": "7",
+                "ISSUE_NUM": "5",
+                "TARGET_STATUS": "Backlog",
+            }
+            return subprocess.run([bash, "-c", harness], capture_output=True, text=True, env=env)
+
+        no_token = run("false", "", 1)
+        assert no_token.returncode == 0
+        assert "::notice title=Board sync skipped::" in no_token.stdout
+        assert not calls.exists(), "with no token the step must not call the API"
+
+        unreachable = run("true", '{"data":{"user":null},"errors":[{"type":"NOT_FOUND"}]}', 1)
+        assert unreachable.returncode == 1, unreachable.stdout + unreachable.stderr
+        assert "::error title=Board sync failed::GitHub Project #7" in unreachable.stdout
+
+        reachable = run("true", '{"data":{"user":{"projectV2":{"id":"PVT_1"}}}}', 0)
+        assert reachable.returncode == 0, reachable.stdout + reachable.stderr
+        assert "REACHED project PVT_1" in reachable.stdout
+
     def test_board_backfill_script_created(self):
         """The one-time backfill script ships with the lifecycle overlay, is
         executable, paginates past the 100-item board cap, and only touches
