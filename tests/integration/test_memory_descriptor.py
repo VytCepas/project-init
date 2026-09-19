@@ -308,6 +308,20 @@ class TestUpgradeRefreshesVisiblePluginVersion:
         block = head.split("\nproject:\n", 1)[1]
         assert f"project_init_plugin_version: {__plugin_version__}" in block
 
+    def test_the_refresh_finds_a_project_block_that_is_the_last_key(self):
+        # PR #1019 review: with no top-level key after `project:`, the block
+        # search found nothing and the refresh silently did nothing.
+        from project_init.upgrade import _refresh_plugin_version_line
+
+        text = (
+            "language: python\n"
+            "project:\n"
+            "  name: a\n"
+            "  project_init_plugin_version: 0.1.0  # plugin payload version (ADR-010)\n"
+        )
+        out = _refresh_plugin_version_line(text, {"project_init_plugin_version": "9.9.9"})
+        assert "  project_init_plugin_version: 9.9.9  # plugin payload version (ADR-010)\n" in out
+
     def test_upgrade_leaves_other_visible_fields_alone(self, tmp_path, capsys):
         # The control: the rewrite is keyed on this one field. A hand-edited
         # neighbouring value must survive, as it always has.

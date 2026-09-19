@@ -1197,6 +1197,12 @@ def _mirror_mode(src: Path, dest: Path) -> None:
 _PROJECT_FIELD_RE = re.compile(r"^(\s+)([A-Za-z_]\w*):")
 
 
+# The `project:` block of a config's human section: from its header to the next
+# top-level key, or to the end when `project:` is the last key there. Shared, so
+# the field reader and the plugin-version refresh always read the same span.
+_PROJECT_BLOCK_RE = re.compile(r"(?ms)^project:\n(.*?)(?=^\S|\Z)")
+
+
 def _project_field_lines(head: str) -> dict[str, str]:
     """Map each top-level `project:` field key to its full source line, in order.
 
@@ -1204,7 +1210,7 @@ def _project_field_lines(head: str) -> dict[str, str]:
     the `project:` block is scanned, so top-level keys like `language:` — and the
     record's own JSON below — are ignored.
     """
-    block = re.search(r"(?ms)^project:\n(.*?)(?=^\S)", head)
+    block = _PROJECT_BLOCK_RE.search(head)
     if not block:
         return {}
     fields: dict[str, str] = {}
@@ -1404,7 +1410,7 @@ def _refresh_plugin_version_line(text: str, variables: dict[str, str]) -> str:
     if not value:
         return text
     head, sep, tail = text.partition(_RECORD_MARKER)
-    block = re.search(r"(?ms)^project:\n(.*?)(?=^\S)", head)
+    block = _PROJECT_BLOCK_RE.search(head)
     if not block:
         return text
     body = _PLUGIN_VERSION_LINE_RE.sub(lambda m: f"{m.group(1)}{value}", block.group(1), count=1)
