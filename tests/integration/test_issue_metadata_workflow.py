@@ -266,7 +266,9 @@ class TestIssueMetadataScaffold:
             (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
         )
         step = next(
-            s for s in wf["jobs"]["board-sync"]["steps"] if s.get("name") == "Sync project item fields"
+            s
+            for s in wf["jobs"]["board-sync"]["steps"]
+            if s.get("name") == "Sync project item fields"
         )
         assert step["env"]["HAS_PROJECT_TOKEN"] == "${{ secrets.PROJECT_TOKEN != '' }}"
         script = step["run"]
@@ -277,7 +279,9 @@ class TestIssueMetadataScaffold:
         stub_dir.mkdir()
         calls = tmp_path / "gh-calls"
         gh = stub_dir / "gh"
-        gh.write_text(f'#!/bin/sh\necho called >> "{calls}"\ncat "$GH_STUB_OUT"\nexit "$GH_STUB_RC"\n')
+        gh.write_text(
+            f'#!/bin/sh\necho called >> "{calls}"\ncat "$GH_STUB_OUT"\nexit "$GH_STUB_RC"\n'
+        )
         gh.chmod(0o755)
 
         def run(has_token: str, gh_out: str, gh_rc: int) -> subprocess.CompletedProcess[str]:
