@@ -251,7 +251,9 @@ class TestIssueMetadataScaffold:
 
         The step used to log "Skipping project sync: project not found or
         PROJECT_TOKEN lacks access" and pass, so a board that had stopped syncing
-        read the same as one that synced (VytCepas/projects-orchestrator#254).
+        read the same as one that synced. That happened on a scaffolded repo whose
+        token had stopped reaching its board.
+
         Three arms, all needed: no token is a notice and a pass (no board was set
         up, and every scaffold writes a default board number, so the token is the
         signal); a token with no reachable project fails; a reachable project
