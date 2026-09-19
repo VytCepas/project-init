@@ -252,3 +252,50 @@ class TestContractVersion:
         # The visible project: block (above the record marker) now carries it.
         head = config.read_text().partition("# --- scaffold record")[0]
         assert "project_init_contract_version: 2" in head
+
+
+class TestUpgradeRefreshesVisiblePluginVersion:
+    """projects-orchestrator#212: the visible `project_init_plugin_version` was
+    written once and frozen, because upgrade only ADDS visible fields, while the
+    scaffold record's copy advanced on every upgrade."""
+
+    @staticmethod
+    def _head(config: Path) -> str:
+        return config.read_text().partition("# --- scaffold record")[0]
+
+    def test_upgrade_rewrites_a_stale_visible_plugin_version(self, tmp_path, capsys):
+        from project_init import __plugin_version__
+
+        target = tmp_path / "p"
+        _scaffold(target, "core")
+        config = target / ".agents" / "config.yaml"
+        head, sep, tail = config.read_text().partition("# --- scaffold record")
+        stale = head.replace(
+            f"project_init_plugin_version: {__plugin_version__}",
+            "project_init_plugin_version: 0.1.0",
+        )
+        assert stale != head, "fixture did not find the visible line"
+        config.write_text(stale + sep + tail)
+        capsys.readouterr()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        head = self._head(config)
+        line = next(ln for ln in head.splitlines() if "project_init_plugin_version:" in ln)
+        assert line.split("#")[0].split(":", 1)[1].strip() == __plugin_version__
+        # The value only: the explanatory comment survives.
+        assert "# plugin payload version (ADR-010)" in line
+        # One value in two places: the record's copy agrees.
+        assert f'"project_init_plugin_version": "{__plugin_version__}"' in config.read_text()
+
+    def test_upgrade_leaves_other_visible_fields_alone(self, tmp_path, capsys):
+        # The control: the rewrite is keyed on this one field. A hand-edited
+        # neighbouring value must survive, as it always has.
+        target = tmp_path / "p"
+        _scaffold(target, "core")
+        config = target / ".agents" / "config.yaml"
+        head, sep, tail = config.read_text().partition("# --- scaffold record")
+        edited = head.replace('description: "d"', 'description: "hand edited"')
+        assert edited != head, "fixture did not find the description line"
+        config.write_text(edited + sep + tail)
+        capsys.readouterr()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert 'description: "hand edited"' in self._head(config)

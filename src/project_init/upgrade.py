@@ -75,6 +75,11 @@ _CONFIG_REL = Path(".agents/config.yaml")
 # which shipped in v1.0.1. Scaffolds from v1.0.0 and earlier still keep it there.
 _LEGACY_CONFIG_REL = Path(".claude/config.yaml")
 _VERSION_LINE_RE = re.compile(r"^(\s*project_init_version:\s*).*$", re.MULTILINE)
+# The value only: the rendered line carries a trailing `# plugin payload version`
+# comment, which a `.*$` match would delete.
+_PLUGIN_VERSION_LINE_RE = re.compile(
+    r"^(\s*project_init_plugin_version:[ \t]*)[^\s#]*", re.MULTILINE
+)
 # A never-clobber sibling: `<file>.new` or `<file>.new.N` (see scaffold._new_sibling).
 _SIBLING_RE = re.compile(r"\.new(\.\d+)?$")
 
@@ -1380,6 +1385,30 @@ def _ensure_context_key(text: str) -> str:
     return head + sep + tail
 
 
+def _refresh_plugin_version_line(text: str, variables: dict[str, str]) -> str:
+    """Rewrite the visible ``project_init_plugin_version`` to the recorded value.
+
+    ``_ensure_visible_project_fields`` only ADDS a missing line and never touches
+    one that exists, so the visible plugin version was written once at scaffold
+    time and then frozen, while the scaffold record's ``variables`` copy advanced
+    on every upgrade. Measured 2026-09-19 on seven scaffolded repos: six held
+    two different values (visible 0.1.0 to 0.8.5, recorded 0.9.15 to 0.9.16),
+    and the seventh had never been upgraded (projects-orchestrator#212). This
+    makes the value a tool-managed line, like ``project_init_version``, so the
+    two copies are written from one value.
+
+    Only the human section is touched, and only the value: the trailing comment
+    survives, and the record's single-line JSON cannot match a line that
+    starts with the key anyway.
+    """
+    value = variables.get("project_init_plugin_version")
+    if not value:
+        return text
+    head, sep, tail = text.partition(_RECORD_MARKER)
+    head = _PLUGIN_VERSION_LINE_RE.sub(lambda m: f"{m.group(1)}{value}", head, count=1)
+    return head + sep + tail
+
+
 def _ensure_visible_project_fields(text: str, staging: Path) -> str:
     """Surface every `project:` field a fresh scaffold renders (#259, #498, PI-880).
 
@@ -1463,6 +1492,7 @@ def apply_drift(
     if config_path.exists():
         text = config_path.read_text(encoding="utf-8")
         text = _VERSION_LINE_RE.sub(rf"\g<1>{variables['project_init_version']}", text, count=1)
+        text = _refresh_plugin_version_line(text, variables)
         text = _ensure_visible_project_fields(text, staging)
         text = _ensure_context_key(text)
         text = _ensure_ci_block(text)
