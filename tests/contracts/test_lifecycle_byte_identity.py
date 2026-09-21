@@ -279,7 +279,7 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
-    # PI-1021: CLAUDE.md now IMPORTS AGENTS.md with a bare `@AGENTS.md` line
+    # PR #1027 (no issue): CLAUDE.md now IMPORTS AGENTS.md with a bare `@AGENTS.md` line
     # instead of linking to it in prose. Claude Code expands only `@path`, so
     # the link form left the canonical instructions unread while CLAUDE.md went
     # on shadowing the native AGENTS.md path — measured across six scaffolded
