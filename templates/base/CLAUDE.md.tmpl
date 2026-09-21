@@ -2,19 +2,15 @@
 
 @AGENTS.md
 
-The bare line above is an IMPORT, and it has to stay bare. Claude Code expands
-`@path` and nothing else — a markdown link to the same file is inert prose, so
-the canonical instructions stay unread while this file goes on shadowing the
-native `AGENTS.md` path Claude Code would otherwise have used. That is what this
-template shipped until 2026-09-21, and the cost was measured: across six
-scaffolded repositories, 45,720 bytes of canonical instructions never reached a
-single session. Wrapping the import in backticks or a fenced block disables it
-the same way.
+That bare line is an IMPORT and has to stay bare. Claude Code expands `@path`
+and nothing else, so a markdown link to the same file loads nothing — and this
+file existing at all stops Claude reading `AGENTS.md` natively. Backticks or a
+code fence disable the import the same way.
 
-`AGENTS.md` is the Linux Foundation standard file most coding agents read
-natively, and it is the source of truth for workflow, conventions, memory, tools
-and branch naming. Its "Claude Code specifics" section applies to this session.
-Anything Claude-only belongs below the import, never inside `AGENTS.md`.
+`AGENTS.md` is the source of truth: workflow, conventions, memory, tools, branch
+naming, and the Claude-only details in its `## Claude Code specifics` section.
+Claude-specific content belongs there, not here — only what `AGENTS.md` cannot
+carry, like the compaction directives below, lives in this file.
 
 ## Compact Instructions
 
