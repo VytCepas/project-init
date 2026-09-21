@@ -261,6 +261,14 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #   • token_efficiency skill (PI-647) — new default-on skill with token-frugal
 #     working habits; INDEX/AGENTS.md/justfile rows already excluded above
 _ADDED_SINCE_BASELINE = {
+    # PR #1027 (no issue): CLAUDE.md now IMPORTS AGENTS.md with a bare `@AGENTS.md` line
+    # instead of linking to it in prose. Claude Code expands only `@path`, so
+    # the link form left the canonical instructions unread while CLAUDE.md went
+    # on shadowing the native AGENTS.md path — measured across six scaffolded
+    # repositories, 45,720 bytes that never reached a session. A rendered-bytes
+    # change in the entrypoint, not the memory/lifecycle move this contract
+    # guards; the import itself is asserted by test_claude_md_imports_agents_md.
+    "CLAUDE.md",
     # PI-893: the secrets guide documents the new read guard — both halves of
     # it, and why neither covers the other. (settings.json and prod_guard.py
     # also changed for PI-893 and are already listed further down.)

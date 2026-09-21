@@ -218,15 +218,50 @@ class TestScaffoldedAgentConventions:
         assert "Verify the premise before you plan against it" in agents
         assert "A test that cannot fail is worse than no test" in agents
 
-    def test_claude_md_still_redirects_to_agents_md(self, tmp_path: Path):
-        """The redirect sentence, not just the substring `AGENTS.md`.
+    def test_claude_md_imports_agents_md(self, tmp_path: Path):
+        """A bare `@AGENTS.md` import, which is the only form that LOADS.
 
-        A mere mention would pass while CLAUDE.md stopped being an entrypoint —
-        the conventions would then live in a file nothing points at (PR #730
-        review).
+        This assertion used to require the sentence "Canonical agent
+        instructions live in [AGENTS.md](AGENTS.md)". PR #730's review worried
+        that a mere mention of the filename would pass while CLAUDE.md stopped
+        being an entrypoint — the right worry, guarded the wrong way. The
+        sentence it settled on is a markdown LINK, and Claude Code expands only
+        `@path` imports. So the guard asserted prose that reads like a
+        redirect and performs none: measured 2026-09-21, six scaffolded
+        repositories carried 45,720 bytes of canonical instructions that never
+        reached a session, and this test was green for every one of them.
+
+        The mechanism is now what is asserted. A backticked or fenced
+        `@AGENTS.md` does not import, so the line must be bare and outside any
+        fence, and this test tracks fence state rather than substring-matching.
         """
         target = tmp_path / "proj"
         scaffold(target, fallback_preset(), fallback_variables())
         claude = (target / "CLAUDE.md").read_text(encoding="utf-8")
-        assert "Canonical agent instructions live in [AGENTS.md](AGENTS.md)" in claude
+
+        fenced = False
+        imports = False
+        for line in claude.splitlines():
+            if line.lstrip().startswith("```"):
+                fenced = not fenced
+                continue
+            # EXACT, not `.strip()`. Review on #1027 asked for this and gave a
+            # reason that does not hold: leading characters do not break an
+            # import, and Claude Code's own documented example imports from
+            # inside a list item (`- git workflow @docs/git-instructions.md`).
+            # The real hazard is narrower and the strict form covers it anyway —
+            # four leading spaces make the line an indented code block, and the
+            # documentation says import parsing skips code spans and FENCED
+            # blocks without saying what it does with indented ones. Undocumented
+            # is not the same as safe, and this template promises a bare line, so
+            # the assertion is that promise rather than a guess about the parser.
+            if not fenced and line == "@AGENTS.md":
+                imports = True
+        assert imports, (
+            "CLAUDE.md must carry a bare `@AGENTS.md` import line outside any code fence"
+        )
+
+        # The inert form must not come back: a link alongside the import would
+        # read as a second, working redirect to anyone editing this template.
+        assert "[AGENTS.md](AGENTS.md)" not in claude
         assert "source of truth" in claude
