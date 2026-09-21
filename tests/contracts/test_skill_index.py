@@ -245,7 +245,17 @@ class TestScaffoldedAgentConventions:
             if line.lstrip().startswith("```"):
                 fenced = not fenced
                 continue
-            if not fenced and line.strip() == "@AGENTS.md":
+            # EXACT, not `.strip()`. Review on #1027 asked for this and gave a
+            # reason that does not hold: leading characters do not break an
+            # import, and Claude Code's own documented example imports from
+            # inside a list item (`- git workflow @docs/git-instructions.md`).
+            # The real hazard is narrower and the strict form covers it anyway —
+            # four leading spaces make the line an indented code block, and the
+            # documentation says import parsing skips code spans and FENCED
+            # blocks without saying what it does with indented ones. Undocumented
+            # is not the same as safe, and this template promises a bare line, so
+            # the assertion is that promise rather than a guess about the parser.
+            if not fenced and line == "@AGENTS.md":
                 imports = True
         assert imports, (
             "CLAUDE.md must carry a bare `@AGENTS.md` import line outside any code fence"
