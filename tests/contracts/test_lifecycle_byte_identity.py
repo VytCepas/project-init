@@ -279,6 +279,14 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
+    # PI-1021: CLAUDE.md now IMPORTS AGENTS.md with a bare `@AGENTS.md` line
+    # instead of linking to it in prose. Claude Code expands only `@path`, so
+    # the link form left the canonical instructions unread while CLAUDE.md went
+    # on shadowing the native AGENTS.md path — measured across six scaffolded
+    # repositories, 45,720 bytes that never reached a session. A rendered-bytes
+    # change in the entrypoint, not the memory/lifecycle move this contract
+    # guards; the import itself is asserted by test_claude_md_imports_agents_md.
+    "CLAUDE.md",
     # PI-893: the secrets guide documents the new read guard — both halves of
     # it, and why neither covers the other. (settings.json and prod_guard.py
     # also changed for PI-893 and are already listed further down.)
