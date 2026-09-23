@@ -258,8 +258,9 @@ def _no_port_root(monkeypatch: pytest.MonkeyPatch) -> None:
     and an unset PORT_ROOT defaults to `$HOME/port`. Left to the developer's
     shell, every allowlist verdict in this file would depend on their profile,
     so each test starts from a root that cannot be an ancestor of anything it
-    builds — the shared marker-fixture runner does the same. TestPortRootStopCondition overrides or
-    deletes it per case.
+    builds — the shared marker-fixture runner does the same.
+
+    TestPortRootStopCondition overrides or deletes it per case.
     """
     monkeypatch.setenv("PORT_ROOT", "/nonexistent/.no-port-root")
 
@@ -955,7 +956,7 @@ def _write_marker(directory: Path) -> None:
     (directory / ".agents" / "config.yaml").write_text(_PERMISSIVE)
 
 
-def _load_guard():
+def _load_guard() -> types.ModuleType:
     """The hook as a module, for the resolution cases no subprocess can reach
     (HOME unset, a non-POSIX host) — the same way the shared fixture runner
     drives it."""
