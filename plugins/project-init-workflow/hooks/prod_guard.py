@@ -1473,6 +1473,55 @@ def _declares_ambient(config: Path) -> bool:
     return bool(_CONTEXT_AMBIENT_RE.search(text))
 
 
+def _port_root() -> Path | None:
+    """The workspace root the governed repos live under, or None.
+
+    The marker contract's PORT_ROOT rule, re-implemented here rather than
+    shared — the ambient layer's own walker is POSIX shell and cannot import
+    Python, so the two are pinned by the contract's shared marker fixtures
+    (M33-M37), not by common code::
+
+        PORT_ROOT = $PORT_ROOT if set and non-empty, otherwise $HOME/port
+
+    EMPTY IS UNSET. ``PORT_ROOT=`` is someone clearing the variable, never
+    someone naming the root the empty string — and here the wrong reading is
+    worse than inert: ``Path("")`` is ``.``, which would put the stop at this
+    process's cwd and hide a real repo's own config from the walk.
+
+    HOME UNSET (or empty) ⇒ NO ROOT. ``$HOME/port`` would then spell ``/port``,
+    a guess about the machine, and a walk that stops at a guessed path
+    un-governs whatever lives there. ``os.environ`` is read rather than
+    ``Path.home()`` for exactly this: ``Path.home()`` falls back to the password
+    database when HOME is unset and would invent the default the contract says
+    not to.
+
+    THE DEFAULT IS PER OS. Only the POSIX one is decided and the Windows one
+    is still open, so off POSIX an exported PORT_ROOT counts but nothing is
+    defaulted.
+
+    Trailing slashes need no code: pathlib drops them at construction, so
+    ``~/port/`` and ``~/port`` are one Path before the equality test. Resolved
+    for the same reason ``start`` is — the stop compares physical paths, and a
+    symlinked spelling of the root must not walk past it. A root that does not
+    exist keeps its spelling, which is correct rather than merely tolerable: a
+    directory that is not there is no ancestor of any cwd.
+
+    Read at CALL time, never cached at import: the shared fixture runner loads
+    this module once and sets the environment per case.
+    """
+    exported = os.environ.get("PORT_ROOT") or ""
+    if exported:
+        root = Path(exported)
+    else:
+        home = os.environ.get("HOME") or ""
+        if not home or os.name != "posix":
+            return None
+        root = Path(home) / "port"
+    with contextlib.suppress(OSError, RuntimeError):
+        root = root.resolve()
+    return root
+
+
 def _find_config(start: Path) -> Path | None:
     """Walk up from *start* to the project's .agents/config.yaml, if any.
 
@@ -1508,6 +1557,17 @@ def _find_config(start: Path) -> Path | None:
     attack: project-init run once in the wrong cwd scaffolds one there. Paths
     outside $HOME are untouched and still walk to ``/``. Resolved first, because
     the stop is an equality test and ``~/.`` names the same directory as ``~``.
+
+    ``PORT_ROOT`` (the marker contract; ``_port_root``) — the walk ALSO stops
+    before the workspace root the repos live under. Same hazard one level down,
+    and a likelier one: the operator is told to create that directory and to
+    put root instruction files in it, and one ``.agents/config.yaml`` there
+    would supply ``safety.allow`` to every repo beneath it. Two stops, not one
+    replacing the other: the root defaults UNDER $HOME, so the $HOME stop still
+    decides every path outside the workspace. And an UNSET PORT_ROOT is not an
+    opt-out: the variable is routinely left unset, so a stop that held only for
+    an exported value would be off exactly where it is needed. The default is
+    stopped at just as an exported value is.
     """
     # RuntimeError as well as OSError, and the difference is measurable rather
     # than defensive (PR #927 review): `Path.resolve()` raises RuntimeError on a
@@ -1524,8 +1584,11 @@ def _find_config(start: Path) -> Path | None:
         home: Path | None = Path.home().resolve()
     except (RuntimeError, OSError):
         home = None  # no home to stop before; inventing one would be a guess
+    port_root = _port_root()
     for candidate in (start, *start.parents):
-        if candidate == home:
+        # BEFORE examining either root, not at it: a session whose cwd IS the
+        # root resolves exactly like one beneath it (M30, M36).
+        if candidate in (home, port_root):
             break
         agents = candidate / ".agents"
         config = agents / "config.yaml"

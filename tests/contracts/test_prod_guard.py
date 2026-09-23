@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 import re
 import subprocess
+import types
 from pathlib import Path
 
 import pytest
@@ -245,6 +248,20 @@ def _payload(command: str, mode: str = "default", cwd: Path | None = None) -> di
         "permission_mode": mode,
         "cwd": str(cwd) if cwd else ".",
     }
+
+
+@pytest.fixture(autouse=True)
+def _no_port_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the PORT_ROOT stop's ABSENCE for every case that does not set it.
+
+    The config walk stops before PORT_ROOT (the shared workspace-root rule),
+    and an unset PORT_ROOT defaults to `$HOME/port`. Left to the developer's
+    shell, every allowlist verdict in this file would depend on their profile,
+    so each test starts from a root that cannot be an ancestor of anything it
+    builds — the shared marker-fixture runner does the same. TestPortRootStopCondition overrides or
+    deletes it per case.
+    """
+    monkeypatch.setenv("PORT_ROOT", "/nonexistent/.no-port-root")
 
 
 # ── #965: writing ABOUT a destructive verb is not running it ────────────────
@@ -929,6 +946,173 @@ class TestHomeStopCondition:
         monkeypatch.setenv("HOME", str(home))
         assert _flagged(home)
         assert _flagged(Path(str(home) + "/."))
+
+
+def _write_marker(directory: Path) -> None:
+    """A permissive `.agents/config.yaml` in *directory* — an allow-everything
+    marker, so whether the walk READ it is visible as flagged vs not."""
+    (directory / ".agents").mkdir(parents=True)
+    (directory / ".agents" / "config.yaml").write_text(_PERMISSIVE)
+
+
+def _load_guard():
+    """The hook as a module, for the resolution cases no subprocess can reach
+    (HOME unset, a non-POSIX host) — the same way the shared fixture runner
+    drives it."""
+    spec = importlib.util.spec_from_file_location("prod_guard_port_root", _HOOK)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+class TestPortRootStopCondition:
+    """M33-M37 — the walk also stops before PORT_ROOT.
+
+    The governed repos moved from `$HOME/<repo>` to `$PORT_ROOT/<repo>`, and
+    PORT_ROOT defaults to `$HOME/port`. One `.agents/config.yaml` at that root
+    would supply `safety.allow` to every repo beneath it: M14's hazard one level
+    down, and a likelier one, because the operator is told to create the
+    directory and to put root instruction files in it. The M-ids are the
+    shared marker fixtures the governance floor's own walker is tested
+    against; `home` is the case root in every one of them, so it is here too.
+    The cases without an id pin the clauses of the shared workspace-root rule
+    that the fixtures do not.
+    """
+
+    def test_a_marker_at_port_root_supplies_nothing(self, tmp_path: Path, monkeypatch):
+        """M33: the marker at the root is never examined."""
+        _write_marker(tmp_path / "port")
+        work = tmp_path / "port" / "thing"
+        work.mkdir()
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("PORT_ROOT", str(tmp_path / "port"))
+        assert _flagged(work), "a marker at PORT_ROOT switched the deny table off workspace-wide"
+
+    def test_the_stop_does_not_swallow_repos_under_port_root(self, tmp_path: Path, monkeypatch):
+        """M34: after the move EVERY governed repo sits one level under the
+        root, so a stop that over-fired would un-govern the whole installed
+        base while reading as a security fix."""
+        repo = tmp_path / "port" / "thing"
+        _write_marker(repo)
+        work = repo / "src"
+        work.mkdir()
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("PORT_ROOT", str(tmp_path / "port"))
+        assert not _flagged(work), "a real repo under PORT_ROOT lost its allowlist"
+
+    def test_a_port_root_that_is_not_an_ancestor_changes_nothing(self, tmp_path: Path, monkeypatch):
+        """M35: the stop is a property of the path being walked, not a global
+        mode — a repo outside the workspace still resolves as before."""
+        _write_marker(tmp_path / "elsewhere")
+        work = tmp_path / "elsewhere" / "src"
+        work.mkdir()
+        (tmp_path / "port").mkdir()
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("PORT_ROOT", str(tmp_path / "port"))
+        assert not _flagged(work), "a PORT_ROOT off to the side ended an unrelated walk"
+
+    def test_the_boundary_is_before_port_root_not_at_it(self, tmp_path: Path, monkeypatch):
+        """M36: a cross-repo session started IN the workspace root resolves
+        like one beneath it, even with the marker in that same directory — and
+        the spelling `<root>/.` must not walk past a stop that compares paths."""
+        root = tmp_path / "port"
+        _write_marker(root)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("PORT_ROOT", str(root))
+        assert _flagged(root)
+        assert _flagged(Path(str(root) + "/."))
+
+    def test_an_unset_port_root_stops_at_the_default(self, tmp_path: Path, monkeypatch):
+        """M37: UNSET IS NOT AN OPT-OUT. PORT_ROOT was measured unset on the
+        box the stop was built for, so a stop that held only for an exported
+        value would be off exactly there. `$HOME/port` is stopped
+        at like any exported root."""
+        _write_marker(tmp_path / "port")
+        work = tmp_path / "port" / "thing"
+        work.mkdir()
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("PORT_ROOT", raising=False)
+        assert _flagged(work), "the $HOME/port default was not stopped at"
+
+    def test_an_empty_port_root_is_unset(self, tmp_path: Path, monkeypatch):
+        """`PORT_ROOT=` is someone clearing the variable, so the default
+        applies. The hook process runs from a directory unrelated to the walk:
+        read as a path, the empty value is `Path("")` — `.` — and would put the
+        stop THERE instead of at the default, which only a separate process
+        cwd can tell apart."""
+        _write_marker(tmp_path / "port")
+        work = tmp_path / "port" / "thing"
+        work.mkdir()
+        elsewhere = tmp_path / "proc"
+        elsewhere.mkdir()
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("PORT_ROOT", "")
+        payload = _payload(_DESTRUCTIVE, "bypassPermissions", work)
+        assert _run_hook(payload, elsewhere) is not None, "empty PORT_ROOT skipped the default"
+
+    def test_an_empty_port_root_is_never_the_current_directory(self, tmp_path: Path, monkeypatch):
+        """The over-firing half of the same clause: were the empty value read
+        as `.`, a real repo run from its own root would stop before its own
+        marker and lose its allowlist."""
+        repo = tmp_path / "repo"
+        _write_marker(repo)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("PORT_ROOT", "")
+        assert not _flagged(repo), "an empty PORT_ROOT became the cwd and hid the repo's config"
+
+    @pytest.mark.parametrize("suffix", ["/", "//"])
+    def test_trailing_slashes_name_the_same_root(self, tmp_path: Path, monkeypatch, suffix: str):
+        """`~/port/` and `~/port` are one directory spelled two ways, and the
+        stop is an equality test — two spellings must not give two verdicts."""
+        _write_marker(tmp_path / "port")
+        work = tmp_path / "port" / "thing"
+        work.mkdir()
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("PORT_ROOT", str(tmp_path / "port") + suffix)
+        assert _flagged(work), f"PORT_ROOT spelled with {suffix!r} walked past the root"
+
+    def test_a_symlinked_spelling_of_the_root_still_stops(self, tmp_path: Path, monkeypatch):
+        """The stop compares PHYSICAL paths, on both sides: a root exported
+        through a link, and a cwd reached through one — comparing spellings
+        is how a path stop gets walked past."""
+        root = tmp_path / "port"
+        _write_marker(root)
+        (root / "thing").mkdir()
+        link = tmp_path / "port-link"
+        link.symlink_to(root, target_is_directory=True)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("PORT_ROOT", str(link))
+        assert _flagged(root / "thing"), "a root exported through a symlink was not stopped at"
+        monkeypatch.setenv("PORT_ROOT", str(root))
+        assert _flagged(link / "thing"), "a cwd reached through a symlink walked past the root"
+
+    def test_home_unset_means_no_root(self, monkeypatch):
+        """HOME unset (or empty) and PORT_ROOT unset ⇒ NO root. `$HOME/port`
+        would spell `/port`, and `Path.home()` would fall back to the password
+        database — either one a guess, and a stop at a guessed path un-governs
+        whatever lives there. The shared fixtures document this arm and do not
+        pin it; no subprocess can plant a marker at `/port`, so it is pinned on
+        the resolver directly."""
+        mod = _load_guard()
+        monkeypatch.delenv("PORT_ROOT", raising=False)
+        monkeypatch.delenv("HOME", raising=False)
+        assert mod._port_root() is None
+        monkeypatch.setenv("HOME", "")
+        assert mod._port_root() is None
+
+    def test_no_default_is_guessed_off_posix(self, tmp_path: Path, monkeypatch):
+        """The default is per OS and only the POSIX one is decided (Windows is
+        still open upstream). Off POSIX an exported PORT_ROOT still counts;
+        nothing is defaulted. `os` is swapped on the module only — patching the
+        real `os.name` would change pathlib's behaviour for the whole process."""
+        mod = _load_guard()
+        monkeypatch.setattr(mod, "os", types.SimpleNamespace(name="nt", environ=os.environ))
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("PORT_ROOT", raising=False)
+        assert mod._port_root() is None, "a Windows default was guessed"
+        monkeypatch.setenv("PORT_ROOT", str(tmp_path / "port"))
+        assert mod._port_root() == (tmp_path / "port").resolve()
 
 
 # ── PI-893: secret-file exposure ────────────────────────────────────────────
