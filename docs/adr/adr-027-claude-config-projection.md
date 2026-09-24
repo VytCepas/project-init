@@ -174,3 +174,37 @@ no longer the identity. `upgrade --apply` re-runs the projection, so existing
 scaffolds pick it up there. After the change the same hook logged no rule at
 session start, and logged `python.md` with `load_reason: path_glob_match` when
 the session read a `.py` file.
+
+## Update (PI-1026): the small projection is intentional, and it loads only in a session started in the repo
+
+In the default (plugin) scaffold `.claude/` is a small fraction of `.agents/`.
+That is by design, not a gap in the projection. The skills and hook wiring
+Claude Code needs arrive through the two project-scoped plugins, not through
+`.claude/`. So the projection carries settings, subagents, rules and only the
+skills no plugin ships. Measured on 2026-09-24 with a `core` scaffold
+(`--language none --no-egress --no-renovate`):
+
+| Mode | files in `.agents/` | files in `.claude/` | skills in `.claude/` | skills in plugins | hook wirings |
+|---|---|---|---|---|---|
+| plugin (default) | 42 | 9 | 1 (`plan`) | 18 (13 workflow + 5 lifecycle) | 9 via `hooks/hooks.json` (6 + 3), none in `settings.json` |
+| `--no-plugin` | 69 | 28 | 19 | none | all in `.claude/settings.json` |
+
+18 plugin skills plus `plan` accounts for all 19. To re-derive, scaffold both
+modes into a temp directory and run
+`find <dir>/.agents -type f | wc -l`, `find <dir>/.claude -type f | wc -l` and
+`find plugins/*/skills -name SKILL.md | wc -l`.
+
+**Both routes share one condition.** `.claude/settings.json` (and with it
+`enabledPlugins`) is project configuration. It loads only when the session
+starts in this repository. The plugins are enabled at project scope and nowhere
+else, so they are not an independent path. The scaffolder's closing line and a
+"How Claude Code loads this project" section in the scaffolded `CLAUDE.md` now
+say so. They also name `.claude/`, not `.agents/`, as what Claude Code reads, and
+name a user-scope plugin install as the way to have the skills and hooks in every
+session. The section sits in `CLAUDE.md` rather than `AGENTS.md` because the facts
+concern Claude Code alone, and `AGENTS.md` is read by every agent and held under a
+word budget (`test_agents_md_stays_under_word_budget`). Other surfaces
+still read `.agents/` (Antigravity; Codex for skills), so the statement is scoped
+to Claude Code rather than swapping one blanket claim for another. Before #1026
+the closing line said Claude Code "picks up CLAUDE.md and .agents/ automatically",
+which is the pre-ADR claim this ADR measured as false.
