@@ -99,6 +99,13 @@ def test_real_drift_shows_changed_line(tmp_path: Path, capsys) -> None:
     original = claude_md.read_text()
     marker = "ZZZ_UNIQUE_DRIFT_MARKER_545"
     claude_md.write_text(original.replace("\n", f" {marker}\n", 1))
+    # With its base recorded, a local-only edit is (correctly) not diffed at all
+    # (#1033); drop the base so the report diffs local vs render.
+    from project_init.upgrade import read_base, write_base
+
+    base = read_base(tmp_path)
+    base.pop("CLAUDE.md")
+    write_base(tmp_path, base)
 
     run_upgrade(tmp_path, apply=False)
     out = _strip(capsys.readouterr().out)

@@ -268,7 +268,9 @@ class TestConfigPreserveList:
         _scaffold(target)
         (target / "justfile").write_text("user owns this\n")
         assert main(["upgrade", str(target)]) == 0
-        assert "No drift" not in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert "No drift" not in out
+        assert "local edits only" in out  # template unchanged since base (#1033)
 
     def test_glob_pattern_preserves(self, tmp_path: Path, capsys):
         target = tmp_path / "p"
@@ -1208,3 +1210,140 @@ class TestMigrationNotes:
         out = capsys.readouterr().out
         assert "Upgrade notes" in out
         assert "action required" in out.lower()
+
+
+def _pop_base(target: Path, rel: str) -> None:
+    """Drop *rel*'s recorded merge base — a pre-#240 or hand-lost sidecar entry."""
+    from project_init.upgrade import read_base, write_base
+
+    base = read_base(target)
+    base.pop(rel, None)
+    write_base(target, base)
+
+
+def _customise_without_base(target: Path) -> tuple[Path, bytes, str]:
+    """A locally edited justfile with no recorded base; returns (path, local, render)."""
+    justfile = target / "justfile"
+    render = justfile.read_text()
+    local = ("# USER-LOCAL-LINE\n" + render).encode()
+    justfile.write_bytes(local)
+    _pop_base(target, "justfile")
+    return justfile, local, render
+
+
+class TestAdoptBase:
+    """#1033: a customised file with no (or a stale) base re-conflicts forever
+    unless the current render can be recorded as its base, file untouched."""
+
+    def test_missing_base_conflict_recurs_and_names_the_fix(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        justfile, local, _ = _customise_without_base(target)
+
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        out = capsys.readouterr().out
+        assert (target / "justfile.new").exists()
+        assert "no merge base" in out
+        assert "--adopt-base justfile" in out
+        # Without adoption it recurs on every apply.
+        (target / "justfile.new").unlink()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert (target / "justfile.new").exists()
+        assert justfile.read_bytes() == local
+
+    def test_adopt_base_records_render_and_stops_the_new_sibling(self, tmp_path: Path, capsys):
+        from project_init.upgrade import read_base
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        justfile, local, render = _customise_without_base(target)
+
+        assert main(["upgrade", str(target), "--adopt-base", "justfile"]) == 0
+        assert justfile.read_bytes() == local, "adopt-base must not touch the file"
+        assert read_base(target)["justfile"] == render
+
+        capsys.readouterr()
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        out = capsys.readouterr().out
+        assert not (target / "justfile.new").exists()
+        assert justfile.read_bytes() == local
+        assert "local edits only" in out
+
+    def test_later_template_change_three_way_merges_after_adopt(self, tmp_path: Path, monkeypatch):
+        import project_init.upgrade as up
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        justfile, _, render = _customise_without_base(target)
+        assert main(["upgrade", str(target), "--adopt-base", "justfile"]) == 0
+
+        # A later template release appends a line to the justfile render.
+        real_render = up._render_staging
+
+        def newer_template(preset_name, variables, staging, detect_root=None):
+            rendered = real_render(preset_name, variables, staging, detect_root=detect_root)
+            with (staging / "justfile").open("a", encoding="utf-8") as fh:
+                fh.write("# TEMPLATE-ADDED-LINE\n")
+            return rendered
+
+        monkeypatch.setattr(up, "_render_staging", newer_template)
+        assert main(["upgrade", str(target), "--apply"]) == 0
+        assert not (target / "justfile.new").exists()
+        assert justfile.read_text() == "# USER-LOCAL-LINE\n" + render + "# TEMPLATE-ADDED-LINE\n"
+
+    def test_adopt_base_refuses_unmanaged_paths_atomically(self, tmp_path: Path, capsys):
+        from project_init.upgrade import read_base
+
+        target = tmp_path / "p"
+        _scaffold(target)
+        _customise_without_base(target)
+        before = read_base(target)
+
+        rc = main(["upgrade", str(target), "--adopt-base", "justfile", "not-a-template-file"])
+        assert rc == 1
+        assert "not-a-template-file" in capsys.readouterr().err
+        assert read_base(target) == before, "a refused batch must record nothing"
+
+        assert main(["upgrade", str(target), "--adopt-base", ".agents/config.yaml"]) == 1
+
+    def test_adopt_base_cannot_combine_with_apply(self, tmp_path: Path):
+        target = tmp_path / "p"
+        _scaffold(target)
+        with pytest.raises(SystemExit):
+            main(["upgrade", str(target), "--apply", "--adopt-base", "justfile"])
+
+
+class TestPreviewSeparatesTemplateFromLocal:
+    """#1033: the preview diffs base→render, not local→render, so a merge that
+    keeps local lines is never shown as deleting them."""
+
+    def test_local_edit_only_shows_no_diff(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        (target / "justfile").write_text("# my local recipes\n")  # base == render
+
+        assert main(["upgrade", str(target)]) == 0
+        out = capsys.readouterr().out
+        assert "drift: justfile" not in out
+        assert "template change" not in out
+        assert "local edits only" in out
+        assert "justfile" in out
+
+    def test_template_change_shows_base_to_render_delta(self, tmp_path: Path, capsys):
+        target = tmp_path / "p"
+        _scaffold(target)
+        justfile = target / "justfile"
+        live = justfile.read_text()
+        lines = live.splitlines(keepends=True)
+        # base = an older render missing its last non-blank line (upstream added it).
+        idx = max(i for i, line in enumerate(lines) if line.strip())
+        older = "".join(lines[:idx] + lines[idx + 1 :])
+        _set_base(target, "justfile", older)
+        justfile.write_text("# USER-ADDED-LINE\n" + older)
+
+        assert main(["upgrade", str(target)]) == 0
+        out = capsys.readouterr().out
+        assert "template change since base: justfile" in out
+        assert "base/justfile" in out
+        assert "-# USER-ADDED-LINE" not in out, "local lines must not look deleted"
+        assert "+" + lines[idx].rstrip("\n") in out
