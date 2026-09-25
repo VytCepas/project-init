@@ -780,29 +780,77 @@ _SEARCH_EXEC_FLAGS: dict[str, frozenset[str]] = {
 _SEARCH_ABBREVIATES = frozenset({"ag", "ack"})
 
 
+#: Heads that run a later word as a command. Their own option grammars are NOT
+#: modelled (`env -C DIR`, `sudo -u USER`, `timeout 5`): every tool name after
+#: one is checked instead, so an option argument spelling a tool name cannot
+#: hide the real one (PR #1037 review).
+_RUNS_A_COMMAND = frozenset(
+    {
+        *_COMMAND_PREFIXES,
+        "env",
+        "exec",
+        "nice",
+        "nohup",
+        "time",
+        "sudo",
+        "doas",
+        "timeout",
+        "xargs",
+        "stdbuf",
+        "setsid",
+        "ionice",
+        "chrt",
+        "taskset",
+        "caffeinate",
+        "unbuffer",
+        "watch",
+    }
+)
+
+
+def _tool_flag(tool: str, words: list[str]) -> str | None:
+    """The exec-capable flag *tool* was given in *words*, or None."""
+    for word in words:
+        if word == "--":
+            return None  # what follows is a pattern or a path
+        if word.startswith("---") and "config" in _SEARCH_EXEC_FLAGS[tool]:
+            return f"{tool} ---"  # ugrep's short spelling of --config
+        if word.startswith("--"):
+            name = word[2:].partition("=")[0]
+            for flag in _SEARCH_EXEC_FLAGS[tool]:
+                if name == flag or (
+                    tool in _SEARCH_ABBREVIATES and len(name) > 1 and flag.startswith(name)
+                ):
+                    return f"{tool} --{flag}"
+    return None
+
+
 def _search_runs_program(command: str) -> str | None:
-    """The search tool in *command* that was given a program to run, or None."""
+    """The search tool in *command* that was given a program to run, or None.
+
+    Only the word in command position counts, so `echo rg --pre x` runs no
+    search tool. Past a wrapper, every tool name is a candidate.
+    """
     for statement in _statements(command):
-        tool, options_ended = "", False
-        for word in statement[_verb_index(statement) :]:
+        leaves: list[list[str]] = [[]]
+        for word in statement:
             if _is_pipe(word):
-                tool, options_ended = "", False
-            elif options_ended:
+                leaves.append([])
+            else:
+                leaves[-1].append(word)
+        for leaf in leaves:
+            at = _verb_index(leaf)
+            if at >= len(leaf):
                 continue
-            elif not tool:
-                name = word.rsplit("/", 1)[-1]
-                tool = name if name in _SEARCH_EXEC_FLAGS else ""
-            elif word == "--":
-                options_ended = True  # what follows is a pattern or a path
-            elif word.startswith("---") and "config" in _SEARCH_EXEC_FLAGS[tool]:
-                return f"{tool} ---"  # ugrep's short spelling of --config
-            elif word.startswith("--"):
-                name = word[2:].partition("=")[0]
-                for flag in _SEARCH_EXEC_FLAGS[tool]:
-                    if name == flag or (
-                        tool in _SEARCH_ABBREVIATES and len(name) > 1 and flag.startswith(name)
-                    ):
-                        return f"{tool} --{flag}"
+            names = [word.rsplit("/", 1)[-1] for word in leaf]
+            starts = [at]
+            if names[at] in _RUNS_A_COMMAND:
+                starts = range(at + 1, len(leaf))
+            for k in starts:
+                if names[k] in _SEARCH_EXEC_FLAGS:
+                    found = _tool_flag(names[k], leaf[k + 1 :])
+                    if found:
+                        return found
     return None
 
 

@@ -229,6 +229,10 @@ SAFE = [
     # #1035: `--` ends the options, so `--pre` here is the search pattern.
     "rg -- --pre docs/",
     "rg --no-pre needle docs/",
+    # PR #1037 review: a tool name that is only an ARGUMENT runs nothing.
+    "echo rg --pre terraform x",
+    "printf %s rg --pre terraform x",
+    "git log --grep rg --pre",
 ]
 
 
@@ -424,6 +428,13 @@ PROSE_EVASION = [
     "grep --view='terraform destroy' -Q x .",
     "grep --config=evil.ugrep needle .",
     "env rg --pre terraform needle destroy",
+    # PR #1037 review: a wrapper's option argument that spells a tool name
+    # must not hide the tool that actually runs (`env -C DIR` takes a dir).
+    "env -C ag rg --pre terraform needle destroy",
+    "sudo -u rg rg --pre terraform needle destroy",
+    "timeout 5 rg --pre terraform needle destroy",
+    "FOO=1 command rg --pre terraform needle destroy",
+    "cat list | xargs -I{} rg --pre terraform needle {}",
     # #1035 review: a name rebinding the lexer did not know. Each RAN a PATH
     # `echo` (or a trap) with a harmless payload in bash/zsh before listing.
     'PATH=./bin:$PATH; export PATH; enable -n echo; echo "terraform destroy"',
