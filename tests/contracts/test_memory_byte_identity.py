@@ -202,6 +202,13 @@ with the project's done-gate (`Done when:` / `probed by:`). A new file, not
 move-drift. Only the `PLAN.md` key was added, in all four fixtures, by a re-pin
 that refused to rewrite a fixture that did not round-trip byte-identically; this
 test then confirmed every other key still matched.
+
+Exception (#1036): the same workflow now counts only ACTIVE submitted review
+states (APPROVED, CHANGES_REQUESTED, COMMENTED). A dismissed review stays in the
+REST list as DISMISSED and the workflow re-runs on dismissal, so excluding only
+PENDING kept a revoked review as "the review of the head". Deliberate content
+change, not move-drift. Only that one hash was re-pinned, in all four fixtures,
+after this suite named it as the sole drifted key with no path added or removed.
 """
 
 from __future__ import annotations
