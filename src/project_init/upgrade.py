@@ -2173,7 +2173,8 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
     """Entry point for the upgrade subcommand; returns a process exit code.
 
     *adopt* (``--adopt-base``) records the current render of those paths as
-    their merge base and exits without comparing or writing any project file.
+    their merge base in ``.agents/.upgrade-base.json`` and exits; the adopted
+    files themselves are not compared or written.
 
     *no_plugin* switches the project to the fallback mode on this run:
     the re-render carries copied hooks/skills and local settings wiring,
