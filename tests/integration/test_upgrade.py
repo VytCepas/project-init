@@ -1347,3 +1347,17 @@ class TestPreviewSeparatesTemplateFromLocal:
         assert "base/justfile" in out
         assert "-# USER-ADDED-LINE" not in out, "local lines must not look deleted"
         assert "+" + lines[idx].rstrip("\n") in out
+
+    def test_undecodable_conflict_with_base_is_not_titled_as_template_change(
+        self, tmp_path: Path, capsys
+    ):
+        """A based conflict whose local file is not UTF-8 falls back to a
+        current→render diff, so its title must not claim a base→render delta."""
+        target = tmp_path / "p"
+        _scaffold(target)
+        (target / "justfile").write_bytes(b"\xff\xfe not utf-8 \x80\n")  # base kept
+
+        assert main(["upgrade", str(target)]) == 0
+        out = capsys.readouterr().out
+        assert "template change since base: justfile" not in out
+        assert "drift: justfile" in out

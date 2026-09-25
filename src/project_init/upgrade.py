@@ -1678,8 +1678,9 @@ def _print_diffs(console: Console, report: DriftReport) -> None:
     for rel in report.changed + report.merged + report.conflicts:
         diff = report.diffs.get(rel)
         if diff:
-            # merged / based conflicts carry the base -> render delta (#1033).
-            based = rel in report.merged or (rel in report.conflicts and rel not in report.no_base)
+            # Title from the diff itself: an undecodable based conflict still
+            # carries a current -> render diff (#1033, PR #1041 review).
+            based = diff.startswith(f"--- base/{rel}")
             title = "template change since base" if based else "drift"
             console.print(f"\n[bold]--- {title}: {rel} ---[/bold]")
             console.print(_colorize_diff(diff))
