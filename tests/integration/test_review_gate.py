@@ -17,6 +17,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
 
@@ -127,9 +129,9 @@ _AUTHOR = "pr-author"
 _REVIEWER = "copilot-pull-request-reviewer[bot]"
 
 
-def _formal_review(sha: str, login: str = _REVIEWER) -> dict[str, object]:
+def _formal_review(sha: str, login: str = _REVIEWER, state: str = "COMMENTED") -> dict[str, object]:
     """A formal review, as REST `pulls/{n}/reviews` lists it."""
-    return {"id": 1, "commit_id": sha, "state": "COMMENTED", "user": {"login": login}}
+    return {"id": 1, "commit_id": sha, "state": state, "user": {"login": login}}
 
 
 def _author_reply(sha: str) -> dict[str, object]:
@@ -328,3 +330,45 @@ def test_an_unreadable_author_leaves_the_monitor_waiting(tmp_target: Path, tmp_p
     )
     assert result.returncode == 2, result.stdout + result.stderr
     assert "Merged" not in result.stdout
+
+
+# ── #1036: a dismissed review is not the review the monitor waits for ──
+
+
+def test_a_dismissed_review_of_the_head_does_not_satisfy_the_monitor(
+    tmp_target: Path, tmp_path: Path
+):
+    result = _run_monitor(
+        tmp_target, tmp_path, reviews=[_formal_review(_HEAD, state="DISMISSED")], unresolved="0"
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "Merged" not in result.stdout
+    assert "no review of the head commit has landed" in result.stdout
+
+
+@pytest.mark.parametrize("state", ["APPROVED", "COMMENTED"])
+def test_an_active_review_of_the_head_satisfies_the_monitor(
+    tmp_target: Path, tmp_path: Path, state: str
+):
+    """The control for the test above: only DISMISSED (and PENDING) drop out."""
+    result = _run_monitor(
+        tmp_target, tmp_path, reviews=[_formal_review(_HEAD, state=state)], unresolved="0"
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Merged PR #1" in result.stdout
+
+
+def test_a_changes_requested_review_of_the_head_counts_as_review_activity(
+    tmp_target: Path, tmp_path: Path
+):
+    """It counts as a review, so the monitor reaches the decision block and blocks there."""
+    result = _run_monitor(
+        tmp_target,
+        tmp_path,
+        reviews=[_formal_review(_HEAD, state="CHANGES_REQUESTED")],
+        unresolved="0",
+        decision_late="CHANGES_REQUESTED",
+    )
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "no review of the head commit has landed" not in result.stdout
+    assert "Review/decision failed" in result.stdout
