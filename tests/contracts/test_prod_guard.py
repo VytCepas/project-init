@@ -226,6 +226,9 @@ SAFE = [
     "curl https://tagmanager.googleapis.com/tagmanager/v2/accounts/1/containers/2/versions/3",
     # `--schema` is not `--source`: a column addition is not an ACL swap.
     "bq update --schema schema.json my-proj:analytics.t",
+    # #1035: `--` ends the options, so `--pre` here is the search pattern.
+    "rg -- --pre docs/",
+    "rg --no-pre needle docs/",
 ]
 
 
@@ -299,6 +302,15 @@ PROSE = [
     # must not cost what follows them its exemption.
     '[ -f notes.md ] && grep -c "terraform destroy" notes.md',
     '[[ -f notes.md ]] && grep -c "terraform destroy" notes.md',
+    # #1035 controls: an ordinary search, or a flag that runs nothing, keeps
+    # its exemption once exec-capable flags are refused.
+    "rg 'terraform destroy' docs/",
+    "grep -r 'kubectl delete' .",
+    "ag 'terraform destroy' docs/",
+    "rg --pretty --pre-glob '*.pdf' 'terraform destroy' docs/",
+    "grep --no-config -rn 'terraform destroy' docs/",
+    'git commit -m "terraform destroy"',
+    'echo "terraform destroy"',
 ]
 
 # ── #965 fail-open guard. THIS IS THE IMPORTANT LIST. ───────────────────────
@@ -395,6 +407,29 @@ PROSE_EVASION = [
     'printf -v c "terraform destroy"; sh -c "$c"',
     'bash -c -m "terraform destroy"',
     './echo "terraform destroy"',
+    # #1035: a search tool that RUNS a program. `rg --pre CMD` runs `CMD PATH`,
+    # so the first two run `terraform destroy` when a file named `destroy`
+    # exists; ag/ack `--pager` and ugrep's `--filter`/`--pager`/`--view` run
+    # their value. `--config`/`--ackrc` load a file that can set any of them.
+    "rg --pre terraform needle 'destroy'",
+    "rg --pre=terraform needle destroy",
+    "rg '--pre' terraform needle destroy",
+    "rg --hostname-bin=terraform needle .",
+    "ag --pager='terraform destroy' x",
+    "ag --pag='terraform destroy' x",
+    "ack --pager='terraform destroy' x",
+    "ack --ackrc=evil.ackrc x",
+    "grep --filter='*:terraform %' needle destroy",
+    "grep --pager='terraform destroy' x .",
+    "grep --view='terraform destroy' -Q x .",
+    "grep --config=evil.ugrep needle .",
+    "env rg --pre terraform needle destroy",
+    # #1035 review: a name rebinding the lexer did not know. Each RAN a PATH
+    # `echo` (or a trap) with a harmless payload in bash/zsh before listing.
+    'PATH=./bin:$PATH; export PATH; enable -n echo; echo "terraform destroy"',
+    'disable echo; echo "terraform destroy"',
+    'autoload -Uz echo; echo "terraform destroy"',
+    'trap \'x=${BASH_COMMAND#echo }; eval "sh -c $x"\' DEBUG; echo "terraform destroy"',
 ]
 
 
