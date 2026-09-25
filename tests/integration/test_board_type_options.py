@@ -167,7 +167,7 @@ def _updates(calls: list[dict]) -> list[dict]:
 def test_a_new_board_gets_every_type_the_board_automation_maps(target: Path, tmp_path: Path):
     proc, calls = _run_setup(target, tmp_path, project=_project())
     assert proc.returncode == 0, proc.stderr
-    create = next(c["query"] for c in calls if c["query"] and 'name: "Type"' in c["query"])
+    create = next(c["query"] for c in calls if c["query"] and 'name: "Work type"' in c["query"])
     created = re.findall(r'\{ name: "([^"]+)",\s+color: ([A-Z]+)', create)
     assert sorted(n for n, _ in created) == sorted(_board_type_labels(target)), create
     colors = [c for _, c in created]
@@ -176,7 +176,7 @@ def test_a_new_board_gets_every_type_the_board_automation_maps(target: Path, tmp
 
 def test_the_manual_setup_hint_lists_every_type(target: Path, tmp_path: Path):
     proc, _ = _run_setup(target, tmp_path, project={"data": {"user": None}})
-    hint = next(line for line in proc.stderr.splitlines() if "• Type" in line)
+    hint = next(line for line in proc.stderr.splitlines() if "• Work type" in line)
     listed = hint.split("options:", 1)[1].strip().split(", ")
     assert sorted(listed) == sorted(_board_type_labels(target)), hint
 
@@ -267,3 +267,103 @@ def test_board_automation_warns_when_a_label_has_no_board_option(target: Path, t
     assert "::warning" in missing and "Type=spike" in missing, missing
     assert "MUTATED" not in missing
     assert run("bug").strip() == "MUTATED", "control: a known option is still set"
+
+
+# --- #1034: GitHub reserves "Type"; the board field is named something else ---
+
+# Names a custom Projects field cannot take: "Type" (refused live with "Name cannot
+# have a reserved value", #1034) plus the built-in fields every board carries, as
+# listed by the GraphQL `projectV2.fields` query on a user board.
+_RESERVED_FIELD_NAMES = {
+    "type",
+    "issue type",
+    "title",
+    "assignees",
+    "status",
+    "labels",
+    "linked pull requests",
+    "milestone",
+    "repository",
+    "reviewers",
+    "parent issue",
+    "sub-issues progress",
+    "created",
+    "updated",
+    "closed",
+    "tracks",
+    "tracked by",
+}
+
+
+def _type_field_name(path: Path) -> str:
+    """The first TYPE_FIELD assignment — the name a new board's field gets."""
+    m = re.search(r'^\s*TYPE_FIELD="([^"$]+)"\s*$', path.read_text(), re.M)
+    assert m, path
+    return m.group(1)
+
+
+def test_both_templates_use_one_non_reserved_type_field_name(target: Path):
+    setup = _type_field_name(target / ".agents" / "scripts" / "setup_github.sh")
+    workflow = _type_field_name(target / ".github" / "workflows" / "board-automation.yml")
+    assert setup == workflow, (setup, workflow)
+    assert setup.strip().lower() not in _RESERVED_FIELD_NAMES, setup
+
+
+def test_an_existing_work_type_field_is_synced_not_recreated(target: Path, tmp_path: Path):
+    proc, calls = _run_setup(
+        target, tmp_path, project=_project("Work type", "Type"), field=_type_field(_LEGACY)
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert not [
+        c
+        for c in calls
+        if c["query"] and "createProjectV2Field" in c["query"] and "Work type" in c["query"]
+    ]
+    assert "Added to 'Work type': spike tech-debt" in proc.stdout
+
+
+def test_a_legacy_type_field_is_reused_not_duplicated(target: Path, tmp_path: Path):
+    proc, calls = _run_setup(target, tmp_path, project=_project("Type"), field=_type_field(_LEGACY))
+    assert proc.returncode == 0, proc.stderr
+    creates = [c["query"] for c in calls if c["query"] and "createProjectV2Field" in c["query"]]
+    assert not [q for q in creates if "Work type" in q or 'name: "Type"' in q], creates
+    assert "Added to 'Type': spike tech-debt" in proc.stdout
+
+
+def _sync_type(target: Path, tmp_path: Path, field_names: list[str]) -> str:
+    """Run the workflow's type-field resolution + update; return the field id it sets."""
+    wf = yaml.safe_load((target / ".github" / "workflows" / "board-automation.yml").read_text())
+    script = next(
+        s["run"]
+        for s in wf["jobs"]["board-sync"]["steps"]
+        if s.get("name") == "Sync project item fields"
+    )
+    start = script.index("update_single_select() {")
+    fn = textwrap.dedent(script[start : script.index('if [ "$TARGET_STATUS"', start)])
+    resolve = script.index('TYPE_FIELD="')
+    fn += textwrap.dedent(script[resolve : script.index('echo "Synced issue', resolve)])
+    nodes = [
+        {"id": f"F_{n}", "name": n, "options": [{"id": "O1", "name": "bug"}]} for n in field_names
+    ]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    (bin_dir / "gh").write_text(
+        '#!/bin/sh\nfor a; do case "$a" in field=*) echo "$a";; esac; done\n'
+    )
+    (bin_dir / "gh").chmod(0o755)
+    project = json.dumps({"fields": {"nodes": nodes}})
+    harness = (
+        f"set -euo pipefail\nPROJECT_ID=P\nITEM_ID=I\nTYPE_LABEL=bug\nPROJECT='{project}'\n{fn}\n"
+    )
+    env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"}
+    return subprocess.run(
+        ["bash", "-c", harness], capture_output=True, text=True, check=True, env=env
+    ).stdout.strip()
+
+
+def test_board_automation_writes_the_work_type_field(target: Path, tmp_path: Path):
+    assert _sync_type(target, tmp_path, ["Work type", "Type"]) == "field=F_Work type"
+
+
+def test_board_automation_still_writes_a_legacy_type_field(target: Path, tmp_path: Path):
+    assert _sync_type(target, tmp_path, ["Type"]) == "field=F_Type"
