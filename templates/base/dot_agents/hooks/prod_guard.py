@@ -737,7 +737,7 @@ def _prose_spans(command: str) -> list[tuple[int, int]]:
                 # through the variable, and no verb was left anywhere to see.
                 continue
             regions = [region for word in simple.words[1:] for region in word.quoted]
-        elif head == "git" and _is_git_grep(simple):
+        elif _is_git_grep(simple):  # past `VAR=…` prefixes too
             # #1039: `git grep <pattern>` searches its argument like `grep`, so a
             # quoted pattern naming a destructive verb is prose, not the verb —
             # `git grep 'terraform destroy'` asked before this. `git grep` never
@@ -950,9 +950,27 @@ def _config_env_runs_program(command: str) -> str | None:
             rf"\b(?:export|declare|typeset|local|readonly)\b[^;&|\n]*(?<![A-Za-z0-9_]){var}\b",
             command,
         )
-        if set_here and re.search(rf"(?<![A-Za-z0-9_.-]){tool}(?![A-Za-z0-9_.-])", command):
+        named = re.search(rf"(?<![A-Za-z0-9_.-]){tool}(?![A-Za-z0-9_.-])", command)
+        if named and (set_here or _inherited_config_runs(var, tool)):
             return var
     return None
+
+
+def _inherited_config_runs(var: str, tool: str) -> bool:
+    """*var* came in with the session and its config file holds an exec flag.
+
+    The file is read, so a benign inherited config does not make every search ask;
+    an unreadable one fails closed. Both tools take one argument per line.
+    """
+    path = os.environ.get(var)
+    if not path:
+        return False
+    try:
+        lines = Path(path).expanduser().read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return True
+    args = [line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")]
+    return _tool_flag(tool, args) is not None
 
 
 # ── #1039: PS4 command substitution runs under xtrace ────────────────────────
@@ -1335,7 +1353,7 @@ def _takes_message(leaf: list[str], verb_at: int) -> bool:
 # the reader set, the exposure-safe set and the message carve-out alike.
 # Skipping the prefixes cannot open a bypass: the assignment TOKENS stay in the
 # list, so `FOO=<dotenv> cat x` still matches _SECRET_PATH on the value.
-_ASSIGN_PREFIX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_ASSIGN_PREFIX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=")  # `+=`, `a[i]=` (#1039)
 
 
 def _verb_index(leaf: list[str]) -> int:
