@@ -869,6 +869,16 @@ class TestInheritedConfigPI1039:
         verdict = self._verdict(tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", None, "rg needle")
         assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
 
+    def test_special_file_fails_closed_without_hanging(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("RIPGREP_CONFIG_PATH", "/dev/zero")
+        verdict = _run_hook(_payload("rg needle", "bypassPermissions", tmp_path), tmp_path)
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_oversized_config_fails_closed(self, tmp_path: Path, monkeypatch):
+        body = "--smart-case\n" * 10_000
+        verdict = self._verdict(tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", body, "rg needle")
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
     def test_benign_inherited_config_stays_allowed(self, tmp_path: Path, monkeypatch):
         body = "# house style\n--smart-case\n--hidden\n"
         assert (

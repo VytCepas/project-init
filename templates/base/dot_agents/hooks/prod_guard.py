@@ -956,6 +956,9 @@ def _config_env_runs_program(command: str) -> str | None:
     return None
 
 
+_CONFIG_READ_LIMIT = 64 * 1024
+
+
 def _inherited_config_runs(var: str, tool: str) -> bool:
     """*var* came in with the session and its config file holds an exec flag.
 
@@ -965,10 +968,17 @@ def _inherited_config_runs(var: str, tool: str) -> bool:
     path = os.environ.get(var)
     if not path:
         return False
+    cfg = Path(path).expanduser()
     try:
-        lines = Path(path).expanduser().read_text(encoding="utf-8", errors="replace").splitlines()
+        if not cfg.is_file():  # a FIFO or /dev/zero would hang every command
+            return True
+        with cfg.open("rb") as handle:
+            text = handle.read(_CONFIG_READ_LIMIT + 1)
     except OSError:
         return True
+    if len(text) > _CONFIG_READ_LIMIT:
+        return True
+    lines = text.decode("utf-8", errors="replace").splitlines()
     args = [line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")]
     return _tool_flag(tool, args) is not None
 
