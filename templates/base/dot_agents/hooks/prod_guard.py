@@ -877,7 +877,7 @@ def _search_runs_program(command: str) -> str | None:
 # name it abbreviates. Refusing the flag models nothing, as with the search
 # tools above.
 _GIT_GREP_PAGER_LONG = "open-files-in-pager"
-_GIT_GREP_SHORT_PAGER = re.compile(r"-[A-Za-z]*O")
+_GIT_GREP_SHORT_PAGER = re.compile(r"-[A-Za-z0-9]*O")  # `-1O` too: -NUM is context
 
 
 def _is_git_grep(simple: _Simple) -> bool:
@@ -927,6 +927,8 @@ def _git_grep_runs_pager(after_git: list[str]) -> str | None:
             name = word[2:].partition("=")[0]
             if len(name) >= 2 and _GIT_GREP_PAGER_LONG.startswith(name):
                 return "git grep --open-files-in-pager"
+            if len(name) >= 5 and "textconv".startswith(name):  # runs the diff driver's filter
+                return "git grep --textconv"
         elif word.startswith("-") and _GIT_GREP_SHORT_PAGER.match(word):
             return "git grep -O"
     return None
@@ -956,9 +958,10 @@ def _config_env_runs_program(command: str) -> str | None:
 # ── #1039: PS4 command substitution runs under xtrace ────────────────────────
 # With tracing on, the shell expands PS4 before every command, so a `$(…)` in PS4
 # runs each time: `PS4='$(id)'; set -x; echo hi` runs `id` (reproduced in bash and
-# zsh). Presence-based like the config check above: a PS4 value that can run a
-# program, beside tracing enabled anywhere in the command, asks — order ignored.
-_PS4_VALUE = re.compile(r"""(?<![A-Za-z0-9_])PS4\+?=('[^']*'|"(?:\\.|[^"\\])*"|[^\s;&|]*)""")
+# zsh). Four review rounds found new ways to set PS4 (`+=`, `PS4[0]=`, inside
+# `bash -c`), so nothing is parsed: PS4 named anywhere, tracing enabled anywhere,
+# and anything in the command able to run a program — together they ask.
+_PS4_NAMED = re.compile(r"(?<![A-Za-z0-9_])PS4(?![A-Za-z0-9_])")
 _XTRACE_ON = re.compile(
     r"(?i)\bx_?trace\b|\bset\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*x|"
     r"(?<![A-Za-z0-9_])(?:ba|z|k|da)?sh\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*x"
@@ -972,16 +975,15 @@ _PLAIN_PARAM = re.compile(
 
 
 def _trace_runs_program(command: str) -> str | None:
-    """A PS4 able to run a program beside xtrace enabled, or None.
+    """PS4 named beside xtrace and a construct able to run a program, or None.
 
-    Read from the raw string, not tokens, so a `bash -c '…'` body and a line
-    that does not tokenise are still seen.
+    Read from the raw string, so `bash -c '…'` bodies and lines that do not
+    tokenise are seen as well.
     """
-    for match in _PS4_VALUE.finditer(command):
-        rest = _PLAIN_PARAM.sub("", match.group(1))
-        if ("$" in rest or "`" in rest) and _XTRACE_ON.search(command):
-            return "PS4 with set -x"
-    return None
+    if not (_PS4_NAMED.search(command) and _XTRACE_ON.search(command)):
+        return None
+    rest = _PLAIN_PARAM.sub("", command)
+    return "PS4 with set -x" if "$" in rest or "`" in rest else None
 
 
 # ── Secret-file exposure (PI-893) ───────────────────────────────────────────
