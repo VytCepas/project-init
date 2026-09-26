@@ -766,6 +766,9 @@ RUNS_A_PROGRAM_1039 = [
     ("export RIPGREP_CONFIG_PATH=/x && rg needle", "RIPGREP_CONFIG_PATH"),
     ("RIPGREP_CONFIG_PATH=/x command rg needle", "RIPGREP_CONFIG_PATH"),  # past a wrapper
     ("ACKRC=/x ack needle", "ACKRC"),
+    ("env RIPGREP_CONFIG_PATH=/x rg needle", "RIPGREP_CONFIG_PATH"),  # after `env`
+    ("env -i ACKRC=/x ack needle", "ACKRC"),
+    ("RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),  # reaches rg if exported
     # PS4 command substitution with `set -x` (bash) / xtrace (zsh).
     ("PS4='$(id)'; set -x; echo hi", "PS4 with set -x"),
     ("set -x; PS4='$(whoami)'; echo hi", "PS4 with set -x"),
@@ -783,6 +786,8 @@ CONTROLS_1039 = [
     "git grep -o needle",  # lower-case only-matching runs nothing
     "rg needle docs/",
     "FOO=1 rg needle docs/",  # an unrelated inline assignment
+    "RIPGREP_CONFIG_PATH=/x echo hi; rg needle",  # the prefix scopes to echo only
+    "env ACKRC=/x echo hi; ack needle",
     "set -x",
     "set -x; echo hi",
     "PS4='+ '; set -x; echo hi",  # a PS4 with no substitution

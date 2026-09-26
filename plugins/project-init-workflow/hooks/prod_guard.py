@@ -901,13 +901,13 @@ def _is_git_grep(simple: _Simple) -> bool:
     return i < len(words) and words[i].text == "grep"
 
 
-def _git_grep_runs_pager(after_git: str | list[str]) -> str | None:
+def _git_grep_runs_pager(after_git: list[str]) -> str | None:
     """The `git grep -O`/`--open-files-in-pager` flag in *after_git*, or None.
 
     *after_git* is the word list following the `git` command word (its own
     global options, the `grep` subcommand, then grep's arguments).
     """
-    words = after_git if isinstance(after_git, list) else list(after_git)
+    words = after_git
     i = 0
     while i < len(words):
         word = words[i]
@@ -946,20 +946,18 @@ _CONFIG_ENV: dict[str, str] = {"RIPGREP_CONFIG_PATH": "rg", "ACKRC": "ack"}
 
 
 def _config_env_runs_program(command: str) -> str | None:
-    """A search tool run with its exec-capable config-path env var set, or None."""
+    """A search tool run with its exec-capable config-path env var set, or None.
+
+    `export VAR=…` and a bare `VAR=…` statement reach every later tool; a
+    `VAR=… cmd` prefix, including one after `env`, reaches only its own command.
+    """
     statements = _statements(command)
-    active: set[str] = set()
+    exported: set[str] = set()
     for statement in statements:
-        idx = 0
-        while idx < len(statement) and _ASSIGN_PREFIX.match(statement[idx]):
-            active.add(statement[idx].partition("=")[0])
-            idx += 1
         if statement and statement[0] == "export":
-            for word in statement[1:]:
-                active.add(word.partition("=")[0])
-    owners = {_CONFIG_ENV[var]: var for var in active if var in _CONFIG_ENV}
-    if not owners:
-        return None
+            exported.update(word.partition("=")[0] for word in statement[1:])
+        elif statement and all(_ASSIGN_PREFIX.match(word) for word in statement):
+            exported.update(word.partition("=")[0] for word in statement)
     for statement in statements:
         leaves: list[list[str]] = [[]]
         for word in statement:
@@ -976,8 +974,10 @@ def _config_env_runs_program(command: str) -> str | None:
             if names[at] in _RUNS_A_COMMAND:
                 starts = range(at + 1, len(leaf))
             for k in starts:
-                if names[k] in owners:
-                    return owners[names[k]]
+                inline = {w.partition("=")[0] for w in leaf[:k] if _ASSIGN_PREFIX.match(w)}
+                for var in sorted(exported | inline):
+                    if _CONFIG_ENV.get(var) == names[k]:
+                        return var
     return None
 
 
