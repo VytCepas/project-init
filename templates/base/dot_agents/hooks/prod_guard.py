@@ -737,6 +737,14 @@ def _prose_spans(command: str) -> list[tuple[int, int]]:
                 # through the variable, and no verb was left anywhere to see.
                 continue
             regions = [region for word in simple.words[1:] for region in word.quoted]
+        elif _is_git_grep(simple):  # past `VAR=…` prefixes too
+            # #1039: `git grep <pattern>` searches its argument like `grep`, so a
+            # quoted pattern naming a destructive verb is prose, not the verb —
+            # `git grep 'terraform destroy'` asked before this. `git grep` never
+            # executes a quoted argument, so blanking them all is safe; the one
+            # exec path, `-O`/`--open-files-in-pager`, is caught by
+            # `_git_grep_runs_pager` whether its value is blanked or not.
+            regions = [region for word in simple.words[1:] for region in word.quoted]
         else:
             regions = _message_regions(simple)
         spans.extend(
@@ -851,7 +859,159 @@ def _search_runs_program(command: str) -> str | None:
                     found = _tool_flag(names[k], leaf[k + 1 :])
                     if found:
                         return found
+                if names[k] == "git":
+                    found = _git_grep_runs_pager(leaf[k + 1 :])
+                    if found:
+                        return found
     return None
+
+
+# ── #1039: `git grep` opens its hits in a program ───────────────────────────
+# `git grep -O<pager>` / `--open-files-in-pager[=<pager>]` runs <pager> FILE for
+# every match, so `git grep -O'terraform destroy' needle` runs `terraform
+# destroy`; the pager value is not a quoted PATTERN, so blanking never touched
+# it, and no deny rule saw the verb. All four spellings ran a `touch` payload:
+# `-O'…'`, the clustered `-iO'…'`, `--open-files-in-pager='…'`, and git's
+# unambiguous long-option abbreviation `--op='…'`. Short `-o` (only-matching)
+# is lowercase and inert; the flag we key on is the UPPER-case `O` and the long
+# name it abbreviates. Refusing the flag models nothing, as with the search
+# tools above.
+_GIT_GREP_PAGER_LONG = "open-files-in-pager"
+_GIT_GREP_SHORT_PAGER = re.compile(r"-[A-Za-z0-9]*O")  # `-1O` too: -NUM is context
+
+
+def _is_git_grep(simple: _Simple) -> bool:
+    """True when *simple* is a `git grep …` invocation (past global options)."""
+    words = simple.words
+    i = 0
+    while i < len(words) and _ASSIGN_PREFIX.match(words[i].text):
+        i += 1
+    if i >= len(words) or _head(words[i]) != "git":
+        return False
+    i += 1
+    while i < len(words):
+        text = words[i].text
+        if text in _VCS_GLOBAL_ARG_FLAGS:
+            i += 2
+            continue
+        if text.startswith("-"):
+            i += 1
+            continue
+        break
+    return i < len(words) and words[i].text == "grep"
+
+
+def _git_grep_runs_pager(after_git: list[str]) -> str | None:
+    """The `git grep -O`/`--open-files-in-pager` flag in *after_git*, or None.
+
+    *after_git* is the word list following the `git` command word (its own
+    global options, the `grep` subcommand, then grep's arguments).
+    """
+    words = after_git
+    i = 0
+    while i < len(words):
+        word = words[i]
+        if word in _VCS_GLOBAL_ARG_FLAGS:  # `git -C DIR grep …`, `git -c k=v grep …`
+            i += 2
+            continue
+        if word.startswith("-"):  # `--git-dir=…` and other attached globals
+            i += 1
+            continue
+        break
+    if i >= len(words) or words[i] != "grep":
+        return None
+    for word in words[i + 1 :]:
+        if word == "--":  # what follows is a pattern or a path, not a flag
+            break
+        if word.startswith("--"):
+            name = word[2:].partition("=")[0]
+            if len(name) >= 2 and _GIT_GREP_PAGER_LONG.startswith(name):
+                return "git grep --open-files-in-pager"
+            if len(name) >= 5 and "textconv".startswith(name):  # runs the diff driver's filter
+                return "git grep --textconv"
+        elif word.startswith("-") and _GIT_GREP_SHORT_PAGER.match(word):
+            return "git grep -O"
+    return None
+
+
+# ── #1039: exec flags injected through a config file named in the environment ─
+# `RIPGREP_CONFIG_PATH=cfg rg` runs `--pre=CMD` from cfg; `ACKRC=cfg ack` runs its
+# `--pager`. Three review rounds each found another way to set the var (after
+# `env`, `+=`, `VAR=… export`, `declare -x`, inside `bash -c '…'`), so this is
+# presence-based, not a shell model: the var SET anywhere in the command beside
+# its tool named anywhere asks. Order is ignored on purpose — fail closed.
+_CONFIG_ENV: dict[str, str] = {"RIPGREP_CONFIG_PATH": "rg", "ACKRC": "ack"}
+
+
+def _config_env_runs_program(command: str) -> str | None:
+    """A config-path env var set beside the search tool that reads it, or None."""
+    for var, tool in _CONFIG_ENV.items():
+        set_here = re.search(rf"(?<![A-Za-z0-9_]){var}\+?=", command) or re.search(
+            rf"\b(?:export|declare|typeset|local|readonly)\b[^;&|\n]*(?<![A-Za-z0-9_]){var}\b",
+            command,
+        )
+        named = re.search(rf"(?<![A-Za-z0-9_.-]){tool}(?![A-Za-z0-9_.-])", command)
+        if named and (set_here or _inherited_config_runs(var, tool)):
+            return var
+    return None
+
+
+_CONFIG_READ_LIMIT = 64 * 1024
+
+
+def _inherited_config_runs(var: str, tool: str) -> bool:
+    """*var* came in with the session and its config file holds an exec flag.
+
+    The file is read, so a benign inherited config does not make every search ask;
+    an unreadable one fails closed. Both tools take one argument per line.
+    """
+    path = os.environ.get(var)
+    if not path:
+        return False
+    cfg = Path(path).expanduser()
+    try:
+        if not cfg.is_file():  # a FIFO or /dev/zero would hang every command
+            return True
+        with cfg.open("rb") as handle:
+            text = handle.read(_CONFIG_READ_LIMIT + 1)
+    except OSError:
+        return True
+    if len(text) > _CONFIG_READ_LIMIT:
+        return True
+    lines = text.decode("utf-8", errors="replace").splitlines()
+    args = [line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")]
+    return _tool_flag(tool, args) is not None
+
+
+# ── #1039: PS4 command substitution runs under xtrace ────────────────────────
+# With tracing on, the shell expands PS4 before every command, so a `$(…)` in PS4
+# runs each time: `PS4='$(id)'; set -x; echo hi` runs `id` (reproduced in bash and
+# zsh). Four review rounds found new ways to set PS4 (`+=`, `PS4[0]=`, inside
+# `bash -c`), so nothing is parsed: PS4 named anywhere, tracing enabled anywhere,
+# and anything in the command able to run a program — together they ask.
+_PS4_NAMED = re.compile(r"(?<![A-Za-z0-9_])PS4(?![A-Za-z0-9_])")
+_XTRACE_ON = re.compile(
+    r"(?i)\bx_?trace\b|\bset\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*x|"
+    r"(?<![A-Za-z0-9_])(?:ba|z|k|da)?sh\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*x"
+)
+# `$NAME` / `${NAME}` / `${NAME:-word}` read a variable and run nothing; any other
+# `$` or backtick (`$(…)`, `$((a[$(…)]))`, `${!ref}`, `${a[…]}`) may run a program.
+_PLAIN_PARAM = re.compile(
+    r"\$\{[A-Za-z_][A-Za-z0-9_]*(?:[:#%/^,]?[-=?+]?[A-Za-z0-9_ .:/+-]*)?\}"
+    r"|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9#?$!*@-]"
+)
+
+
+def _trace_runs_program(command: str) -> str | None:
+    """PS4 named beside xtrace and a construct able to run a program, or None.
+
+    Read from the raw string, so `bash -c '…'` bodies and lines that do not
+    tokenise are seen as well.
+    """
+    if not (_PS4_NAMED.search(command) and _XTRACE_ON.search(command)):
+        return None
+    rest = _PLAIN_PARAM.sub("", command)
+    return "PS4 with set -x" if "$" in rest or "`" in rest else None
 
 
 # ── Secret-file exposure (PI-893) ───────────────────────────────────────────
@@ -1203,7 +1363,7 @@ def _takes_message(leaf: list[str], verb_at: int) -> bool:
 # the reader set, the exposure-safe set and the message carve-out alike.
 # Skipping the prefixes cannot open a bypass: the assignment TOKENS stay in the
 # list, so `FOO=<dotenv> cat x` still matches _SECRET_PATH on the value.
-_ASSIGN_PREFIX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_ASSIGN_PREFIX = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]]*\])?\+?=")  # `+=`, `a[i]=` (#1039)
 
 
 def _verb_index(leaf: list[str]) -> int:
@@ -1906,12 +2066,22 @@ def evaluate(
                 permission_mode,
                 problems,
             )
-    runner = _search_runs_program(command)
+    runner = _search_runs_program(command) or _config_env_runs_program(command)
     if runner is not None:
         return _verdict(
             f"prod_guard: '{runner}' makes a search tool run another program, "
             "which no deny rule can inspect. Run that program directly so it is "
             "checked, add a matching regex to safety.allow in .agents/config.yaml, "
+            "or run the command yourself.",
+            permission_mode,
+            problems,
+        )
+    tracer = _trace_runs_program(command)
+    if tracer is not None:
+        return _verdict(
+            f"prod_guard: '{tracer}' runs a PS4 command substitution on every "
+            "traced command, which no deny rule can inspect. Drop the substitution "
+            "from PS4, add a matching regex to safety.allow in .agents/config.yaml, "
             "or run the command yourself.",
             permission_mode,
             problems,

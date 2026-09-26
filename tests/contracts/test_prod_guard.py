@@ -747,6 +747,145 @@ class TestVerdicts:
         assert verdict is not None, "a scalar allow must not disable the guard"
 
 
+# ── #1039: exec paths #1035 left open — each reproduced with a `touch`/`echo`
+# payload before it was written down (see PR). git grep opens hits in a program,
+# a config file named in the environment injects the exec flags refused in
+# #1035, and PS4 command substitution runs under `set -x`.
+RUNS_A_PROGRAM_1039 = [
+    # `git grep -O<pager>` / `--open-files-in-pager` runs <pager> FILE.
+    ("git grep -O'terraform destroy' needle", "git grep -O"),
+    ("git grep -iO'terraform destroy' needle", "git grep -O"),
+    ("git grep -O needle", "git grep -O"),  # bare -O still launches the pager
+    ("git grep --open-files-in-pager='terraform destroy' needle", "git grep --open-files-in-pager"),
+    ("git grep --op='terraform destroy' needle", "git grep --open-files-in-pager"),  # git abbrev
+    ("git -C /repo grep -Ovim needle", "git grep -O"),  # a global option before grep
+    ("git grep -1O./pager needle", "git grep -O"),  # -NUM context clustered with -O
+    ("git grep --textconv needle", "git grep --textconv"),
+    ("git grep --textc needle", "git grep --textconv"),  # git abbrev
+    ("FOO+=bar git grep -O./pager needle", "git grep -O"),  # append prefix
+    # Exec flags from a config file whose path is in the environment — set inline
+    # on the tool's own command, or exported earlier in the same statement.
+    ("RIPGREP_CONFIG_PATH=/x rg needle", "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_CONFIG_PATH=/x && rg needle", "RIPGREP_CONFIG_PATH"),
+    ("RIPGREP_CONFIG_PATH=/x command rg needle", "RIPGREP_CONFIG_PATH"),  # past a wrapper
+    ("ACKRC=/x ack needle", "ACKRC"),
+    ("env RIPGREP_CONFIG_PATH=/x rg needle", "RIPGREP_CONFIG_PATH"),  # after `env`
+    ("env -i ACKRC=/x ack needle", "ACKRC"),
+    ("RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),  # reaches rg if exported
+    ("RIPGREP_CONFIG_PATH=/x export RIPGREP_CONFIG_PATH; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("bash -c 'RIPGREP_CONFIG_PATH=/x rg needle'", "RIPGREP_CONFIG_PATH"),
+    ("RIPGREP_CONFIG_PATH+=/x rg needle", "RIPGREP_CONFIG_PATH"),
+    ("declare -x RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("typeset -x ACKRC=/x; ack needle", "ACKRC"),
+    ("RIPGREP_CONFIG_PATH=/x /usr/bin/rg needle", "RIPGREP_CONFIG_PATH"),
+    # Presence-based on purpose (three review rounds of new spellings): these do
+    # not reach rg, but order is not modelled, so they ask too — fail closed.
+    ("RIPGREP_CONFIG_PATH=/x echo hi; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("rg needle; export RIPGREP_CONFIG_PATH=/x", "RIPGREP_CONFIG_PATH"),
+    # PS4 command substitution with `set -x` (bash) / xtrace (zsh).
+    ("PS4='$(id)'; set -x; echo hi", "PS4 with set -x"),
+    ("set -x; PS4='$(whoami)'; echo hi", "PS4 with set -x"),
+    ("PS4='[$(id)]'; set -o xtrace; ls", "PS4 with set -x"),
+    ("set -ex; PS4='$(id)'; echo hi", "PS4 with set -x"),
+    ("setopt xtrace; PS4='$(id)'; echo hi", "PS4 with set -x"),
+    ("PS4+='$(id)'; set -x; echo hi", "PS4 with set -x"),  # append assignment
+    ("PS4[0]='$(id)'; set -x; :", "PS4 with set -x"),  # array-element spelling
+    ("printf -v PS4 '$(id)'; set -x; :", "PS4 with set -x"),  # set without `=`
+    ("bash -c \"PS4='\\$(id)'; set -x; echo hi\"", "PS4 with set -x"),  # inside a -c body
+    ("set -x; PS4='$(id)'; echo 'unbalanced", "PS4 with set -x"),  # does not tokenise
+    ("PS4='$((a[$(id)]))'; set -x; :", "PS4 with set -x"),
+    ("PS4='${!ref}'; set -x; :", "PS4 with set -x"),
+]
+
+# The ordinary work that MUST stay allowed once the exec paths above are refused.
+# `git grep 'terraform destroy'` asked before this — the pattern was not treated
+# as searched text the way a bare `grep` pattern is (#1039).
+CONTROLS_1039 = [
+    "git grep 'terraform destroy'",
+    "git grep -i 'kubectl delete' src/",
+    "git grep -o needle",  # lower-case only-matching runs nothing
+    "rg needle docs/",
+    "FOO=1 rg needle docs/",  # an unrelated inline assignment
+    "PS4='+ ${BASH_SOURCE}:${LINENO}: '; set -x; echo hi",  # parameter expansion only
+    "set +x; echo hi",
+    "git grep --text needle",  # -a, not textconv
+    "git grep --no-textconv needle",
+    "GIT_OPTIONAL_LOCKS=0 git grep 'terraform destroy'",  # prose past a prefix
+    "rg RIPGREP_CONFIG_PATH src/",  # searching for the name does not set it
+    "ssh -X host; PS4='$(id)'",  # -X is ssh's, not a shell's xtrace
+    "set -x",
+    "set -x; echo hi",
+    "PS4='+ '; set -x; echo hi",  # a PS4 with no substitution
+    "PS4='$(id)'; echo hi",  # a substitution but no tracing
+    'echo "terraform destroy"',
+]
+
+
+class TestExecPathsPI1039:
+    """#1039 — search/shell features that run a program a deny rule cannot see."""
+
+    @pytest.mark.parametrize(("command", "label"), RUNS_A_PROGRAM_1039)
+    def test_asks_in_interactive(self, tmp_path: Path, command: str, label: str):
+        verdict = _run_hook(_payload(command, "default", tmp_path), tmp_path)
+        assert verdict is not None, f"not flagged: {command}"
+        hso = verdict["hookSpecificOutput"]
+        assert hso["permissionDecision"] == "ask"
+        assert f"'{label}'" in hso["permissionDecisionReason"], hso["permissionDecisionReason"]
+
+    @pytest.mark.parametrize(("command", "label"), RUNS_A_PROGRAM_1039)
+    def test_blocks_in_autonomous(self, tmp_path: Path, command: str, label: str):
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    @pytest.mark.parametrize("command", CONTROLS_1039)
+    def test_controls_stay_allowed(self, tmp_path: Path, command: str):
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+
+
+class TestInheritedConfigPI1039:
+    """#1039 — a config-path var the session inherited, read from the hook's env."""
+
+    def _verdict(self, tmp_path: Path, monkeypatch, var: str, body: str | None, command: str):
+        if body is None:
+            monkeypatch.setenv(var, str(tmp_path / "missing.conf"))
+        else:
+            cfg = tmp_path / "search.conf"
+            cfg.write_text(body, encoding="utf-8")
+            monkeypatch.setenv(var, str(cfg))
+        return _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+
+    def test_inherited_rg_config_with_pre_is_denied(self, tmp_path: Path, monkeypatch):
+        verdict = self._verdict(
+            tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", "--pre=./x\n", "rg needle"
+        )
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_inherited_ackrc_with_pager_is_denied(self, tmp_path: Path, monkeypatch):
+        verdict = self._verdict(tmp_path, monkeypatch, "ACKRC", "--pager=./x\n", "ack needle")
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_unreadable_inherited_config_fails_closed(self, tmp_path: Path, monkeypatch):
+        verdict = self._verdict(tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", None, "rg needle")
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_special_file_fails_closed_without_hanging(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("RIPGREP_CONFIG_PATH", "/dev/zero")
+        verdict = _run_hook(_payload("rg needle", "bypassPermissions", tmp_path), tmp_path)
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_oversized_config_fails_closed(self, tmp_path: Path, monkeypatch):
+        body = "--smart-case\n" * 10_000
+        verdict = self._verdict(tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", body, "rg needle")
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_benign_inherited_config_stays_allowed(self, tmp_path: Path, monkeypatch):
+        body = "# house style\n--smart-case\n--hidden\n"
+        assert (
+            self._verdict(tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", body, "rg needle") is None
+        )
+
+
 class TestWiring:
     def test_fallback_settings_wire_the_guard(self, tmp_path: Path):
         """Default scaffolds get the guard from the plugin; --no-plugin
