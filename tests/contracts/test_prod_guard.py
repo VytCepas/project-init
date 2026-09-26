@@ -770,6 +770,15 @@ RUNS_A_PROGRAM_1039 = [
     ("env -i ACKRC=/x ack needle", "ACKRC"),
     ("RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),  # reaches rg if exported
     ("RIPGREP_CONFIG_PATH=/x export RIPGREP_CONFIG_PATH; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("bash -c 'RIPGREP_CONFIG_PATH=/x rg needle'", "RIPGREP_CONFIG_PATH"),
+    ("RIPGREP_CONFIG_PATH+=/x rg needle", "RIPGREP_CONFIG_PATH"),
+    ("declare -x RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("typeset -x ACKRC=/x; ack needle", "ACKRC"),
+    ("RIPGREP_CONFIG_PATH=/x /usr/bin/rg needle", "RIPGREP_CONFIG_PATH"),
+    # Presence-based on purpose (three review rounds of new spellings): these do
+    # not reach rg, but order is not modelled, so they ask too — fail closed.
+    ("RIPGREP_CONFIG_PATH=/x echo hi; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("rg needle; export RIPGREP_CONFIG_PATH=/x", "RIPGREP_CONFIG_PATH"),
     # PS4 command substitution with `set -x` (bash) / xtrace (zsh).
     ("PS4='$(id)'; set -x; echo hi", "PS4 with set -x"),
     ("set -x; PS4='$(whoami)'; echo hi", "PS4 with set -x"),
@@ -777,6 +786,8 @@ RUNS_A_PROGRAM_1039 = [
     ("set -ex; PS4='$(id)'; echo hi", "PS4 with set -x"),
     ("setopt xtrace; PS4='$(id)'; echo hi", "PS4 with set -x"),
     ("PS4+='$(id)'; set -x; echo hi", "PS4 with set -x"),  # append assignment
+    ("bash -c \"PS4='\\$(id)'; set -x; echo hi\"", "PS4 with set -x"),  # inside a -c body
+    ("set -x; PS4='$(id)'; echo 'unbalanced", "PS4 with set -x"),  # does not tokenise
     ("PS4='$((a[$(id)]))'; set -x; :", "PS4 with set -x"),
     ("PS4='${!ref}'; set -x; :", "PS4 with set -x"),
 ]
@@ -790,11 +801,10 @@ CONTROLS_1039 = [
     "git grep -o needle",  # lower-case only-matching runs nothing
     "rg needle docs/",
     "FOO=1 rg needle docs/",  # an unrelated inline assignment
-    "RIPGREP_CONFIG_PATH=/x echo hi; rg needle",  # the prefix scopes to echo only
-    "env ACKRC=/x echo hi; ack needle",
-    "rg needle; export RIPGREP_CONFIG_PATH=/x",  # the export comes after rg
-    "export RIPGREP_CONFIG_PATH=/x; unset RIPGREP_CONFIG_PATH; rg needle",
     "PS4='+ ${BASH_SOURCE}:${LINENO}: '; set -x; echo hi",  # parameter expansion only
+    "set +x; echo hi",
+    "rg RIPGREP_CONFIG_PATH src/",  # searching for the name does not set it
+    "ssh -X host; PS4='$(id)'",  # -X is ssh's, not a shell's xtrace
     "set -x",
     "set -x; echo hi",
     "PS4='+ '; set -x; echo hi",  # a PS4 with no substitution

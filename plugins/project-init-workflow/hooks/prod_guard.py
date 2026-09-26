@@ -933,120 +933,55 @@ def _git_grep_runs_pager(after_git: list[str]) -> str | None:
 
 
 # ── #1039: exec flags injected through a config file named in the environment ─
-# A search tool reads a config file whose path comes from an env var, and that
-# file can carry the very exec flags refused above: `RIPGREP_CONFIG_PATH=cfg rg
-# needle` runs `--pre=CMD` from cfg, `ACKRC=cfg ack needle` runs its `--pager`.
-# The path is set inline on the tool's own command, or exported earlier in the
-# same statement — both make the flag invisible in the command string, so the
-# presence of the var beside its tool is what asks. `ACKRC` running its pager and
-# `--pre` running a program were both reproduced; rg's own `--pre` was proven in
-# #1035. `rg --no-config` / `ack --noenv` are not modelled as escapes: an escape
-# the guard cannot verify is a fail-open, so the var beside the tool always asks.
+# `RIPGREP_CONFIG_PATH=cfg rg` runs `--pre=CMD` from cfg; `ACKRC=cfg ack` runs its
+# `--pager`. Three review rounds each found another way to set the var (after
+# `env`, `+=`, `VAR=… export`, `declare -x`, inside `bash -c '…'`), so this is
+# presence-based, not a shell model: the var SET anywhere in the command beside
+# its tool named anywhere asks. Order is ignored on purpose — fail closed.
 _CONFIG_ENV: dict[str, str] = {"RIPGREP_CONFIG_PATH": "rg", "ACKRC": "ack"}
 
 
 def _config_env_runs_program(command: str) -> str | None:
-    """A search tool run with its exec-capable config-path env var set, or None.
-
-    `export VAR=…`, `VAR=… export VAR` and a bare `VAR=…` reach every LATER tool
-    until `unset`; a `VAR=… cmd` prefix, including one after `env`, reaches only
-    its own command.
-    """
-    exported: set[str] = set()
-    for statement in _statements(command):
-        at = 0  # not _verb_index, which answers 0 for an all-assignment statement
-        while at < len(statement) and _ASSIGN_PREFIX.match(statement[at]):
-            at += 1
-        prefix = {w.partition("=")[0] for w in statement[:at]}
-        verb = statement[at] if at < len(statement) else ""
-        if at >= len(statement):  # bare `VAR=…`: reaches the tool if VAR is exported already
-            exported |= prefix
-            continue
-        if verb == "export":  # `export VAR=…`, and `VAR=… export VAR`
-            exported |= prefix | {w.partition("=")[0] for w in statement[at + 1 :]}
-            continue
-        if verb == "unset":
-            exported -= set(statement[at + 1 :])
-            continue
-        leaves: list[list[str]] = [[]]
-        for word in statement:
-            if _is_pipe(word):
-                leaves.append([])
-            else:
-                leaves[-1].append(word)
-        for leaf in leaves:
-            at = _verb_index(leaf)
-            if at >= len(leaf):
-                continue
-            names = [word.rsplit("/", 1)[-1] for word in leaf]
-            starts: range | list[int] = [at]
-            if names[at] in _RUNS_A_COMMAND:
-                starts = range(at + 1, len(leaf))
-            for k in starts:
-                inline = {w.partition("=")[0] for w in leaf[:k] if _ASSIGN_PREFIX.match(w)}
-                for var in sorted(exported | inline):
-                    if _CONFIG_ENV.get(var) == names[k]:
-                        return var
+    """A config-path env var set beside the search tool that reads it, or None."""
+    for var, tool in _CONFIG_ENV.items():
+        set_here = re.search(rf"(?<![A-Za-z0-9_]){var}\+?=", command) or re.search(
+            rf"\b(?:export|declare|typeset|local|readonly)\b[^;&|\n]*(?<![A-Za-z0-9_]){var}\b",
+            command,
+        )
+        if set_here and re.search(rf"(?<![A-Za-z0-9_.-]){tool}(?![A-Za-z0-9_.-])", command):
+            return var
     return None
 
 
-# ── #1039: PS4 command substitution runs under `set -x` ──────────────────────
-# With tracing on, the shell expands PS4 before every command, so a `$(…)` in
-# PS4 runs each time: `PS4='$(id)'; set -x; echo hi` runs `id`. Reproduced with
-# a `touch` payload in bash (`set -x` and `set -o xtrace`) and zsh (`setopt
-# xtrace` / `X_TRACE`, promptsubst on). Both halves are required, so `set -x`
-# alone and a PS4 with no substitution are untouched — neither runs anything.
-_XTRACE_SHORT = re.compile(r"-[A-Za-z]*x[A-Za-z]*")
-_PS4_ASSIGN = re.compile(r"^PS4\+?=")
-# `$NAME` / `${NAME}` / `${NAME:-word}` read a variable and run nothing; anything
-# else carrying `$` or a backtick (`$(…)`, `$((a[$(…)]))`, `${!ref}`, `${a[…]}`)
-# is treated as able to run a program.
+# ── #1039: PS4 command substitution runs under xtrace ────────────────────────
+# With tracing on, the shell expands PS4 before every command, so a `$(…)` in PS4
+# runs each time: `PS4='$(id)'; set -x; echo hi` runs `id` (reproduced in bash and
+# zsh). Presence-based like the config check above: a PS4 value that can run a
+# program, beside tracing enabled anywhere in the command, asks — order ignored.
+_PS4_VALUE = re.compile(r"""(?<![A-Za-z0-9_])PS4\+?=('[^']*'|"(?:\\.|[^"\\])*"|[^\s;&|]*)""")
+_XTRACE_ON = re.compile(
+    r"(?i)\bx_?trace\b|\bset\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*x|"
+    r"(?<![A-Za-z0-9_])(?:ba|z|k|da)?sh\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*x"
+)
+# `$NAME` / `${NAME}` / `${NAME:-word}` read a variable and run nothing; any other
+# `$` or backtick (`$(…)`, `$((a[$(…)]))`, `${!ref}`, `${a[…]}`) may run a program.
 _PLAIN_PARAM = re.compile(
-    r"\$\{[A-Za-z_][A-Za-z0-9_]*(?:[:#%/^,]?[-=?+]?[A-Za-z0-9_ .:/+-]*)?\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9#?$!*@-]"
+    r"\$\{[A-Za-z_][A-Za-z0-9_]*(?:[:#%/^,]?[-=?+]?[A-Za-z0-9_ .:/+-]*)?\}"
+    r"|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9#?$!*@-]"
 )
 
 
-def _ps4_runs_program(value: str) -> bool:
-    rest = _PLAIN_PARAM.sub("", value)
-    return "$" in rest or "`" in rest
-
-
 def _trace_runs_program(command: str) -> str | None:
-    """`PS4` carrying a substitution together with `set -x`/xtrace, or None.
+    """A PS4 able to run a program beside xtrace enabled, or None.
 
-    Tokenised directly, not through `_statements`, because that blanks the very
-    `$(…)` this looks for. Both halves must be present, so `set -x` on its own —
-    and a PS4 with no substitution — stay untouched, neither running anything.
+    Read from the raw string, not tokens, so a `bash -c '…'` body and a line
+    that does not tokenise are still seen.
     """
-    tokens = _tokenize(command)
-    if tokens is None:
-        tokens = command.split()
-    has_ps4 = xtrace = False
-    i = 0
-    while i < len(tokens):
-        word = tokens[i]
-        if _PS4_ASSIGN.match(word):
-            if _ps4_runs_program(word.partition("=")[2]):
-                has_ps4 = True
-        elif word == "set":
-            j = i + 1
-            while j < len(tokens) and tokens[j] not in _BREAK_TOKENS:
-                if tokens[j] == "-o":
-                    if j + 1 < len(tokens) and tokens[j + 1] == "xtrace":
-                        xtrace = True
-                    j += 2
-                    continue
-                if tokens[j].startswith("-") and _XTRACE_SHORT.fullmatch(tokens[j]):
-                    xtrace = True
-                j += 1
-        elif word == "setopt":
-            j = i + 1
-            while j < len(tokens) and tokens[j] not in _BREAK_TOKENS:
-                if tokens[j].lower().replace("_", "") == "xtrace":
-                    xtrace = True
-                j += 1
-        i += 1
-    return "PS4 with set -x" if has_ps4 and xtrace else None
+    for match in _PS4_VALUE.finditer(command):
+        rest = _PLAIN_PARAM.sub("", match.group(1))
+        if ("$" in rest or "`" in rest) and _XTRACE_ON.search(command):
+            return "PS4 with set -x"
+    return None
 
 
 # ── Secret-file exposure (PI-893) ───────────────────────────────────────────
