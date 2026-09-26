@@ -948,17 +948,26 @@ _CONFIG_ENV: dict[str, str] = {"RIPGREP_CONFIG_PATH": "rg", "ACKRC": "ack"}
 def _config_env_runs_program(command: str) -> str | None:
     """A search tool run with its exec-capable config-path env var set, or None.
 
-    `export VAR=…` and a bare `VAR=…` statement reach every later tool; a
-    `VAR=… cmd` prefix, including one after `env`, reaches only its own command.
+    `export VAR=…`, `VAR=… export VAR` and a bare `VAR=…` reach every LATER tool
+    until `unset`; a `VAR=… cmd` prefix, including one after `env`, reaches only
+    its own command.
     """
-    statements = _statements(command)
     exported: set[str] = set()
-    for statement in statements:
-        if statement and statement[0] == "export":
-            exported.update(word.partition("=")[0] for word in statement[1:])
-        elif statement and all(_ASSIGN_PREFIX.match(word) for word in statement):
-            exported.update(word.partition("=")[0] for word in statement)
-    for statement in statements:
+    for statement in _statements(command):
+        at = 0  # not _verb_index, which answers 0 for an all-assignment statement
+        while at < len(statement) and _ASSIGN_PREFIX.match(statement[at]):
+            at += 1
+        prefix = {w.partition("=")[0] for w in statement[:at]}
+        verb = statement[at] if at < len(statement) else ""
+        if at >= len(statement):  # bare `VAR=…`: reaches the tool if VAR is exported already
+            exported |= prefix
+            continue
+        if verb == "export":  # `export VAR=…`, and `VAR=… export VAR`
+            exported |= prefix | {w.partition("=")[0] for w in statement[at + 1 :]}
+            continue
+        if verb == "unset":
+            exported -= set(statement[at + 1 :])
+            continue
         leaves: list[list[str]] = [[]]
         for word in statement:
             if _is_pipe(word):
@@ -988,6 +997,18 @@ def _config_env_runs_program(command: str) -> str | None:
 # xtrace` / `X_TRACE`, promptsubst on). Both halves are required, so `set -x`
 # alone and a PS4 with no substitution are untouched — neither runs anything.
 _XTRACE_SHORT = re.compile(r"-[A-Za-z]*x[A-Za-z]*")
+_PS4_ASSIGN = re.compile(r"^PS4\+?=")
+# `$NAME` / `${NAME}` / `${NAME:-word}` read a variable and run nothing; anything
+# else carrying `$` or a backtick (`$(…)`, `$((a[$(…)]))`, `${!ref}`, `${a[…]}`)
+# is treated as able to run a program.
+_PLAIN_PARAM = re.compile(
+    r"\$\{[A-Za-z_][A-Za-z0-9_]*(?:[:#%/^,]?[-=?+]?[A-Za-z0-9_ .:/+-]*)?\}|\$[A-Za-z_][A-Za-z0-9_]*|\$[0-9#?$!*@-]"
+)
+
+
+def _ps4_runs_program(value: str) -> bool:
+    rest = _PLAIN_PARAM.sub("", value)
+    return "$" in rest or "`" in rest
 
 
 def _trace_runs_program(command: str) -> str | None:
@@ -1004,9 +1025,8 @@ def _trace_runs_program(command: str) -> str | None:
     i = 0
     while i < len(tokens):
         word = tokens[i]
-        if _ASSIGN_PREFIX.match(word):
-            var, _, value = word.partition("=")
-            if var == "PS4" and _HAS_SUBSTITUTION.search(value):
+        if _PS4_ASSIGN.match(word):
+            if _ps4_runs_program(word.partition("=")[2]):
                 has_ps4 = True
         elif word == "set":
             j = i + 1

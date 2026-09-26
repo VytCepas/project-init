@@ -769,12 +769,16 @@ RUNS_A_PROGRAM_1039 = [
     ("env RIPGREP_CONFIG_PATH=/x rg needle", "RIPGREP_CONFIG_PATH"),  # after `env`
     ("env -i ACKRC=/x ack needle", "ACKRC"),
     ("RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),  # reaches rg if exported
+    ("RIPGREP_CONFIG_PATH=/x export RIPGREP_CONFIG_PATH; rg needle", "RIPGREP_CONFIG_PATH"),
     # PS4 command substitution with `set -x` (bash) / xtrace (zsh).
     ("PS4='$(id)'; set -x; echo hi", "PS4 with set -x"),
     ("set -x; PS4='$(whoami)'; echo hi", "PS4 with set -x"),
     ("PS4='[$(id)]'; set -o xtrace; ls", "PS4 with set -x"),
     ("set -ex; PS4='$(id)'; echo hi", "PS4 with set -x"),
     ("setopt xtrace; PS4='$(id)'; echo hi", "PS4 with set -x"),
+    ("PS4+='$(id)'; set -x; echo hi", "PS4 with set -x"),  # append assignment
+    ("PS4='$((a[$(id)]))'; set -x; :", "PS4 with set -x"),
+    ("PS4='${!ref}'; set -x; :", "PS4 with set -x"),
 ]
 
 # The ordinary work that MUST stay allowed once the exec paths above are refused.
@@ -788,6 +792,9 @@ CONTROLS_1039 = [
     "FOO=1 rg needle docs/",  # an unrelated inline assignment
     "RIPGREP_CONFIG_PATH=/x echo hi; rg needle",  # the prefix scopes to echo only
     "env ACKRC=/x echo hi; ack needle",
+    "rg needle; export RIPGREP_CONFIG_PATH=/x",  # the export comes after rg
+    "export RIPGREP_CONFIG_PATH=/x; unset RIPGREP_CONFIG_PATH; rg needle",
+    "PS4='+ ${BASH_SOURCE}:${LINENO}: '; set -x; echo hi",  # parameter expansion only
     "set -x",
     "set -x; echo hi",
     "PS4='+ '; set -x; echo hi",  # a PS4 with no substitution
