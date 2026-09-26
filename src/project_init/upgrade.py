@@ -19,7 +19,12 @@ compared against the project:
   in place (``merged``); a genuine overlap stays a ``conflict`` and the
   conflict-marked merge is written as a ``.new`` sibling — local edits are
   never overwritten silently. Without a recorded base (pre-#240) it falls back
-  to dropping the raw new render as a ``.new`` sibling.
+  to dropping the raw new render as a ``.new`` sibling, and says so:
+  ``upgrade --adopt-base <path>`` records the current render as that file's base
+  without touching it (#1033), so the next apply keeps the local content and
+  later template changes 3-way merge.
+- edited locally, but the render equals its base -> local edit only (the
+  template has not changed it since the base; apply leaves it alone, no diff)
 - in the old manifest, not re-rendered   -> removed (reported only; upgrade
   never deletes)
 
@@ -272,6 +277,10 @@ class DriftReport:
     changed: list[Path] = field(default_factory=list)
     conflicts: list[Path] = field(default_factory=list)
     merged: list[Path] = field(default_factory=list)  # user+upstream, 3-way auto-merged (#240)
+    # Edited locally while the render still equals the recorded base: the template
+    # has nothing new for them, so apply leaves them alone (#1033). Not drift.
+    local_only: list[Path] = field(default_factory=list)
+    no_base: list[Path] = field(default_factory=list)  # conflicts with no recorded base (#1033)
     skipped: list[Path] = field(default_factory=list)  # left drifted by interactive apply (#245)
     # Skipped 'changed' files (unedited old render): their recorded hash must be
     # carried into the new manifest so they stay a clean 'changed' next upgrade,
@@ -1023,7 +1032,7 @@ def read_recorded_manifest(target: Path) -> dict[str, str]:
     return (parsed[2] or {}) if parsed else {}
 
 
-def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:
+def _unified_diff(rel: Path, old: bytes, new: bytes, old_label: str = "current") -> str:
     try:
         old_lines = old.decode("utf-8").splitlines(keepends=True)
         new_lines = new.decode("utf-8").splitlines(keepends=True)
@@ -1031,7 +1040,7 @@ def _unified_diff(rel: Path, old: bytes, new: bytes) -> str:
         return f"(binary file {rel} differs)\n"
     return "".join(
         difflib.unified_diff(
-            old_lines, new_lines, fromfile=f"current/{rel}", tofile=f"upgrade/{rel}"
+            old_lines, new_lines, fromfile=f"{old_label}/{rel}", tofile=f"upgrade/{rel}"
         )
     )
 
@@ -1109,7 +1118,17 @@ def _classify_conflict(
     ours, theirs = _decode(current), _decode(new_bytes)
     if base_text is None or ours is None or theirs is None:
         report.conflicts.append(rel)
+        if base_text is None and theirs is not None:
+            report.no_base.append(rel)
+        report.diffs[rel] = _unified_diff(rel, current, new_bytes)
         return
+    if base_text == theirs:
+        # Template side unchanged since the base: the merge is `ours` verbatim.
+        report.local_only.append(rel)
+        return
+    # Preview the template's own delta (base -> render), not local -> render,
+    # which shows every local line as deleted even when the merge keeps it.
+    report.diffs[rel] = _unified_diff(rel, base_text.encode("utf-8"), new_bytes, "base")
     merged, clean = _three_way_merge(base_text, ours, theirs)
     report.merge_results[rel] = merged
     (report.merged if clean else report.conflicts).append(rel)
@@ -1147,13 +1166,12 @@ def compute_drift(
         current = dest.read_bytes()
         if current == new_bytes:
             continue
-        diff = _unified_diff(rel, current, new_bytes)
         recorded = manifest.get(rel.as_posix())
         if recorded is not None and _hash_bytes(current) == recorded:
             report.changed.append(rel)
+            report.diffs[rel] = _unified_diff(rel, current, new_bytes)
         else:
             _classify_conflict(report, rel, base, current, new_bytes)
-        report.diffs[rel] = diff
 
     for rel_str in sorted(manifest):
         rel = Path(rel_str)
@@ -1553,7 +1571,22 @@ def _print_clean_or_all_skipped(console: Console, report: DriftReport) -> None:
         for rel in report.skipped:
             console.print(f"  {rel}")
         return
+    if report.local_only:
+        console.print("[green]No template drift[/green] — only local edits, listed below.")
+        return
     console.print("[green]No drift — project matches the current templates.[/green]")
+
+
+def _print_local_only(console: Console, report: DriftReport) -> None:
+    """List files edited locally whose template side has not changed (#1033)."""
+    if not report.local_only:
+        return
+    console.print(
+        f"\n[bold]local edits only[/bold] ({len(report.local_only)}) — template unchanged "
+        "since the recorded base; --apply leaves them alone:"
+    )
+    for rel in report.local_only:
+        console.print(f"  {rel}")
 
 
 def _print_migration_notes(prev: str | None, current: str | None) -> None:
@@ -1603,6 +1636,7 @@ def _print_report(report: DriftReport, applied: bool) -> None:
         )
     if not report.has_drift:
         _print_clean_or_all_skipped(console, report)
+        _print_local_only(console, report)
         return
 
     sections = (
@@ -1632,14 +1666,34 @@ def _print_report(report: DriftReport, applied: bool) -> None:
         for rel in paths:
             console.print(f"  {rel}")
 
-    for rel in report.changed + report.merged + report.conflicts:
-        diff = report.diffs.get(rel)
-        if diff:
-            console.print(f"\n[bold]--- drift: {rel} ---[/bold]")
-            console.print(_colorize_diff(diff))
+    _print_local_only(console, report)
+    _print_diffs(console, report)
 
     if not applied:
         console.print("\nRun [bold]project-init upgrade --apply[/bold] to apply.")
+
+
+def _print_diffs(console: Console, report: DriftReport) -> None:
+    """Per-file diffs, then the adopt-base fix for conflicts with no base (#1033)."""
+    for rel in report.changed + report.merged + report.conflicts:
+        diff = report.diffs.get(rel)
+        if diff:
+            # Title from the diff itself: an undecodable based conflict still
+            # carries a current -> render diff (#1033, PR #1041 review).
+            based = diff.startswith(f"--- base/{rel}")
+            title = "template change since base" if based else "drift"
+            console.print(f"\n[bold]--- {title}: {rel} ---[/bold]")
+            console.print(_colorize_diff(diff))
+
+    if report.no_base:
+        console.print(
+            f"\n[yellow]{len(report.no_base)} conflict(s) have no merge base recorded[/yellow]"
+            " — the only diff available is local vs render, and without a base every"
+            " --apply writes a .new again. If the local content is what you want to keep,"
+            " record the current render as its base (the file is not touched):"
+        )
+        for rel in report.no_base:
+            console.print(f"  project-init upgrade --adopt-base {rel}", markup=False)
 
 
 # --- Opt-in consent for new additions (#249) -------------------------------
@@ -2036,6 +2090,76 @@ def _show_interactive_diff(console: Console, report: DriftReport, rel: Path) -> 
         console.print("    [dim](no textual diff available)[/dim]")
 
 
+def _adoption_target(target: Path, raw: str) -> Path:
+    """*raw* as a target-relative path; absolute paths must lie inside *target*."""
+    path = Path(raw)
+    if path.is_absolute():
+        try:
+            return path.resolve().relative_to(target.resolve())
+        except ValueError:
+            return path
+    return Path(path.as_posix().removeprefix("./"))
+
+
+def _adoptable_render(
+    target: Path, staging: Path, rel: Path, rendered_set: set[str], preserve_globs: list[str]
+) -> tuple[str | None, str]:
+    """``(render text, "")`` when *rel* can take a merge base, else ``(None, reason)``."""
+    if rel.is_absolute() or rel.as_posix() not in rendered_set:
+        return None, "not a file the templates render for this project"
+    if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
+        return None, "not upgrade-managed (config or preserved), nothing to adopt"
+    if not (target / rel).is_file():
+        return None, "missing locally — `upgrade --apply` restores it"
+    text = _decode((staging / rel).read_bytes())
+    if text is None:
+        return None, "binary render, which has no text merge base"
+    return text, ""
+
+
+def adopt_base(
+    target: Path, staging: Path, rendered: list[Path], paths: list[str], *, legacy_layout: bool
+) -> int:
+    """Record the current render of each path as its merge base; files untouched (#1033).
+
+    The supported form of the "write the render, --apply, restore" workaround:
+    afterwards the local content counts as ``ours`` against an up-to-date base,
+    so the next apply leaves it alone and later template changes 3-way merge.
+    All-or-nothing: one unadoptable path records nothing. Returns an exit code.
+    """
+    if legacy_layout:
+        sys.stderr.write(
+            "error: --adopt-base needs the current .agents/ layout; run "
+            "`project-init upgrade --apply` once to migrate, then adopt.\n"
+        )
+        return 1
+    rendered_set = {rel.as_posix() for rel in rendered}
+    preserve_globs = read_preserve_globs(target)
+    base = read_base(target)
+    errors: list[str] = []
+    adopted: list[Path] = []
+    for raw in paths:
+        rel = _adoption_target(target, raw)
+        text, why = _adoptable_render(target, staging, rel, rendered_set, preserve_globs)
+        if text is None:
+            errors.append(f"{raw}: {why}")
+        else:
+            base[rel.as_posix()] = text
+            adopted.append(rel)
+    if errors:
+        for err in errors:
+            sys.stderr.write(f"error: --adopt-base {err}\n")
+        sys.stderr.write("error: no merge base recorded (all-or-nothing).\n")
+        return 1
+    write_base(target, base)
+    for rel in adopted:
+        print(f"adopted base: {rel} (file unchanged; local edits now merge against it)")
+        stale = target / f"{rel.as_posix()}.new"
+        if stale.exists():
+            print(f"  note: {stale.relative_to(target)} is left over from an earlier conflict")
+    return 0
+
+
 def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
     target: Path,
     *,
@@ -2044,8 +2168,13 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
     accept_new: list[str] | None = None,
     decline_new: list[str] | None = None,
     interactive: bool = False,
+    adopt: list[str] | None = None,
 ) -> int:
     """Entry point for the upgrade subcommand; returns a process exit code.
+
+    *adopt* (``--adopt-base``) records the current render of those paths as
+    their merge base in ``.agents/.upgrade-base.json`` and exits; the adopted
+    files themselves are not compared or written.
 
     *no_plugin* switches the project to the fallback mode on this run:
     the re-render carries copied hooks/skills and local settings wiring,
@@ -2057,8 +2186,6 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
     The clean-tree guard and post-apply undo hint (#242) live in the CLI layer
     (_upgrade_main), not here, so programmatic callers manage their own safety.
     """
-    import sys
-
     # Read BEFORE anything moves — the migration is what makes it stop being true,
     # and _migrate_legacy_tree must not run on a current project (there .claude/ is
     # a generated mirror of .agents/, not user content).
@@ -2102,6 +2229,8 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
         except Exception as e:  # noqa: BLE001 — any render failure is fatal here
             sys.stderr.write(f"error: re-render failed: {e}\n")
             return 1
+        if adopt:
+            return adopt_base(target, staging, rendered, adopt, legacy_layout=legacy_layout)
 
         report = compute_drift(target, staging, rendered, manifest, read_base(target))
         report.migrated = migrated

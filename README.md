@@ -316,7 +316,23 @@ The report classifies every template-owned file:
 | changed | drifted, but you never edited it | updates it |
 | merged | drifted **and** locally edited, but the edits don't overlap | 3-way auto-merges both in place — no `.new` sibling |
 | conflict | drifted **and** locally edited with overlapping changes | keeps your file; writes the conflict-marked merge as a `<file>.new` sibling — your edit is never overwritten |
+| local edits only | locally edited, but the template has not changed it since the recorded base | nothing — listed without a diff |
 | removed | no longer rendered by current templates | nothing (reported only; upgrade never deletes) |
+
+For merged and conflicting files the preview diffs the **template's own
+change** (recorded base → new render), not your file against the render — so a
+merge that keeps your lines never shows them as deleted.
+
+**A conflict with no merge base.** A customised file whose base was never
+recorded (or is stale) has nothing to merge against, so every `--apply` writes
+its `.new` again; the report says so and names the fix. If your local content is
+what you want to keep, record the current render as its base — the file itself
+is not touched:
+
+```bash
+project-init upgrade --adopt-base pyproject.toml .gitignore   # paths relative to the project
+project-init upgrade --apply                                   # no .new; later template changes 3-way merge
+```
 
 **Migration notes.** Alongside the file drift, upgrade prints the curated
 changelog/migration notes for the version span it crosses (recorded → target),

@@ -118,6 +118,20 @@ def _upgrade_main(argv: list[str]) -> int:
         ),
     )
     p.add_argument(
+        "--adopt-base",
+        action="extend",
+        nargs="+",
+        default=[],
+        metavar="PATH",
+        help=(
+            "Record the current render of PATH (relative to the project) as its "
+            "3-way merge base without touching the file (#1033). Use it on a "
+            "customised file that conflicts on every --apply for lack of a base: "
+            "the local content is kept and later template changes merge into it. "
+            "Cannot be combined with --apply."
+        ),
+    )
+    p.add_argument(
         "--force",
         "--allow-dirty",
         action="store_true",
@@ -130,6 +144,8 @@ def _upgrade_main(argv: list[str]) -> int:
     )
     args = p.parse_args(argv)
     target = Path(args.target).resolve()
+    if args.adopt_base and (args.apply or args.interactive):
+        p.error("--adopt-base records merge bases only; run --apply separately afterwards")
 
     # -i/--interactive is meaningless without --apply (the per-file chooser only
     # runs while applying). Silently ignoring it left users thinking they were
@@ -162,6 +178,7 @@ def _upgrade_main(argv: list[str]) -> int:
         accept_new=args.accept_new,
         decline_new=args.decline_new,
         interactive=args.interactive,
+        adopt=args.adopt_base,
     )
     if args.apply and rc == 0:
         _print_undo_hint(git_status, target)
