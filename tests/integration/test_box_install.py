@@ -42,7 +42,7 @@ def _git(cwd: Path, *args: str) -> str:
 class Box:
     """A temp checkout with the tool, a bare origin, a stub uv, and a tool dir."""
 
-    def __init__(self, tmp: Path, git_env: dict[str, str]):
+    def __init__(self, tmp: Path, git_env: dict[str, str], object_format: str = "sha1"):
         self.tmp = tmp
         self.repo = tmp / "repo"
         self.tools = tmp / "uv-tools"
@@ -67,14 +67,17 @@ class Box:
             "src/project_init/__init__.py": "__version__ = '0'\n",
             "src/project_init/cli.py": "def main():\n    return 0\n",
             "templates/base/dot_agents/hooks/prod_guard.py": "# is_symlink\n",
+            "templates/base/hook.sh": "#!/usr/bin/env bash\necho hi\n",
+            ".gitattributes": (_REPO_ROOT / ".gitattributes").read_text(),
             "schemas/s.json": "{}\n",
             "README.md": "not shipped\n",
         }
         for rel, text in files.items():
             (self.repo / rel).parent.mkdir(parents=True, exist_ok=True)
             (self.repo / rel).write_text(text)
-        _git(tmp, "init", "-q", "--bare", "-b", "main", "origin.git")
-        _git(self.repo, "init", "-q", "-b", "main")
+        fmt = f"--object-format={object_format}"
+        _git(tmp, "init", "-q", "--bare", "-b", "main", fmt, "origin.git")
+        _git(self.repo, "init", "-q", "-b", "main", fmt)
         _git(self.repo, "add", "-A")
         _git(self.repo, "commit", "-q", "-m", "init")
         _git(self.repo, "remote", "add", "origin", str(tmp / "origin.git"))
@@ -121,8 +124,7 @@ class Box:
         return self.env_dir / "lib" / "python3.13" / "site-packages" / "project_init"
 
 
-@pytest.fixture
-def box(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Box:
+def _make_box(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, object_format: str) -> Box:
     # Hermetic git: no global hooks, signing or identity leak into the temp repos.
     gitconfig = tmp_path / "gitconfig"
     gitconfig.write_text(
@@ -135,7 +137,12 @@ def box(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Box:
     }
     for key, value in git_env.items():
         monkeypatch.setenv(key, value)
-    return Box(tmp_path, git_env)
+    return Box(tmp_path, git_env, object_format)
+
+
+@pytest.fixture
+def box(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Box:
+    return _make_box(tmp_path, monkeypatch, "sha1")
 
 
 def _no_install(box: Box) -> None:
@@ -252,7 +259,7 @@ def test_check_passes_on_a_matching_install(box: Box):
     box.install_layout()
     result = box.run("--check")
     assert result.returncode == 0, result.stderr
-    assert "(4 files)" in result.stdout
+    assert "(5 files)" in result.stdout
     _no_install(box)
 
 
@@ -267,6 +274,32 @@ def test_check_names_a_modified_installed_file(box: Box):
     ) in result.stderr
     assert result.stderr.count("    - ") == 1, result.stderr
     _no_install(box)
+
+
+def test_check_catches_crlf_that_git_attributes_would_normalise(box: Box):
+    # The repo's `*.sh text eol=lf` would make hash-object's filters turn this
+    # CRLF copy back into the committed blob; the installed bytes must be hashed as is.
+    pkg = box.install_layout()
+    hook = pkg / "templates" / "base" / "hook.sh"
+    hook.write_bytes(hook.read_bytes().replace(b"\n", b"\r\n"))
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert "modified: project_init/templates/base/hook.sh" in result.stderr
+
+
+def test_check_passes_in_a_sha256_repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    # Blob ids come from the repo's own object format, never a hard-coded hash.
+    probe = subprocess.run(
+        ["git", "init", "-q", "--object-format=sha256", str(tmp_path / "probe")],
+        capture_output=True,
+    )
+    if probe.returncode != 0:
+        pytest.skip("this git cannot create a SHA-256 repository")
+    box = _make_box(tmp_path, monkeypatch, "sha256")
+    box.install_layout()
+    result = box.run("--check")
+    assert result.returncode == 0, result.stderr
+    assert "(5 files)" in result.stdout
 
 
 def test_check_names_missing_and_extra_files(box: Box):
@@ -345,7 +378,7 @@ def test_check_against_a_real_uv_tool_install(box: Box):
     run = [sys.executable, str(box.repo / "tools" / "box_install.py"), "--check"]
     ok = subprocess.run(run, capture_output=True, text=True, env=real)
     assert ok.returncode == 0, ok.stdout + ok.stderr
-    assert "(4 files)" in ok.stdout
+    assert "(5 files)" in ok.stdout
     guard = next(
         box.tools.glob(
             "project-init/lib/python3*/site-packages/project_init/templates/base/dot_agents/hooks/prod_guard.py"
