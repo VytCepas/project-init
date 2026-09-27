@@ -145,7 +145,7 @@ def _no_install(box: Box) -> None:
 # ── dry run ──────────────────────────────────────────────────────────────────
 
 
-def test_dry_run_prints_the_plan_and_installs_nothing(box: Box):
+def test_dry_run_on_clean_synced_main_prints_the_plan_and_exits_0(box: Box):
     result = box.run()
     assert result.returncode == 0, result.stdout + result.stderr
     head = _git(box.repo, "rev-parse", "HEAD")
@@ -160,11 +160,36 @@ def test_dry_run_prints_the_plan_and_installs_nothing(box: Box):
     assert not box.env_dir.exists()
 
 
-def test_dry_run_shows_what_apply_would_refuse(box: Box):
+def test_dry_run_exits_1_when_apply_would_refuse(box: Box):
     _git(box.repo, "switch", "-q", "-c", "feat/x")
     result = box.run()
-    assert result.returncode == 0
+    assert result.returncode == 1
     assert "--apply would refuse" in result.stdout and "not main" in result.stdout
+    _no_install(box)
+
+
+def test_dry_run_exits_0_when_the_session_is_the_only_reason(box: Box):
+    # deploy checks for a session itself, and dry runs are expected inside one.
+    result = box.run(CLAUDECODE="1")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "--apply would refuse" in result.stdout
+    assert "inside a Claude Code session" in result.stdout
+    _no_install(box)
+
+
+def test_dry_run_exits_1_when_a_session_comes_with_another_reason(box: Box):
+    _git(box.repo, "switch", "-q", "-c", "feat/x")
+    result = box.run(CLAUDECODE="1")
+    assert result.returncode == 1
+    assert "inside a Claude Code session" in result.stdout and "not main" in result.stdout
+
+
+def test_dirty_listing_keeps_the_porcelain_status_column(box: Box):
+    (box.repo / "README.md").write_text("edited\n")
+    result = box.run("--apply")
+    assert result.returncode == 1
+    # ` M README.md`, not `M README.md`: the first line keeps its leading space.
+    assert "unreviewed:\n       M README.md" in result.stderr, result.stderr
     _no_install(box)
 
 
