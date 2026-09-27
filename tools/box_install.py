@@ -8,10 +8,11 @@ reason is a Claude Code session. ``just install --apply`` runs ``uv tool install
 ``just install --check`` compares the installed package files with HEAD and
 exits 1 on drift, naming each file.
 
-The layout is uv's own. ``uv tool dir`` holds one env per tool,
-``<env>/uv-receipt.toml`` records the source and entrypoints, and the package
-sits in ``<env>/lib/python3.X/site-packages``. The tree-to-wheel mapping is read
-from pyproject's hatch config, never restated here.
+The layout is uv's own. ``uv tool dir`` holds one env per tool, and
+``<env>/uv-receipt.toml`` records the source and entrypoints. Where the env keeps
+its packages and scripts is asked of the env's own interpreter, so no platform
+layout is assumed. The tree-to-wheel mapping and the metadata a build must carry
+are read from pyproject, never restated here.
 
 Exit codes: 0 ok, 1 refused, failed or drifted, 2 usage. Stdlib only.
 """
