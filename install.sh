@@ -101,16 +101,43 @@ resolve_ref() {
 
 # Fail closed unless <commit-ish> ships a prod_guard that refuses a symlinked
 # .agents marker. Runs before checkout, so a refused ref never moves the clone
-# an existing /project-init already scaffolds from (PI-1045).
+# an existing /project-init already scaffolds from (PI-1045). Sets VERIFIED.
 verify_guard() {
   local content
   content="$(git -C "$INSTALL_DIR" show "$1:$GUARD_FILE" 2>/dev/null)" ||
     die "cannot read $GUARD_FILE at $2, so its symlink refusal cannot be checked — refusing to install"
   case "$content" in
-  *is_symlink*) return 0 ;;
+  *is_symlink*) VERIFIED="$(git -C "$INSTALL_DIR" rev-parse "$1^{commit}")" && return 0 ;;
   esac
   die "$2 ships a prod_guard.py without the symlink refusal (PI-903), so /project-init would scaffold a guard that a planted .agents symlink can switch off. Refusing to install it.
   Fix: re-run with PROJECT_INIT_REF=main, or with PROJECT_INIT_REF=vX.Y.Z naming a release newer than v1.2.2."
+}
+
+KEPT="Nothing was reset or discarded: the clone may hold work you want. Inspect it, move it aside (or set PROJECT_INIT_HOME), then re-run."
+
+refuse_dirty() {
+  local dirty
+  dirty="$(git -C "$INSTALL_DIR" status --porcelain)"
+  [ -z "$dirty" ] || die "$INSTALL_DIR has uncommitted changes, so /project-init would scaffold unverified files:
+$dirty
+  $KEPT"
+}
+
+# The tree /project-init scaffolds from must be the verified commit, clean, and
+# carry the refusal on disk: pull --ff-only keeps local commits and edits, and
+# skip-worktree hides an edit from status (PI-1045 review).
+verify_checkout() {
+  local head
+  head="$(git -C "$INSTALL_DIR" rev-parse HEAD)"
+  [ "$head" = "$VERIFIED" ] ||
+    die "$INSTALL_DIR is at $head, not the verified $ref_label ($VERIFIED): it holds commits that were not checked. See: git -C $INSTALL_DIR log $VERIFIED..HEAD
+  $KEPT"
+  refuse_dirty
+  case "$(cat "$INSTALL_DIR/$GUARD_FILE" 2>/dev/null)" in
+  *is_symlink*) ;;
+  *) die "$INSTALL_DIR/$GUARD_FILE on disk has no symlink refusal, though git reports the tree clean (a skip-worktree or assume-unchanged edit?).
+  $KEPT" ;;
+  esac
 }
 
 # 3. repo
@@ -127,6 +154,7 @@ ensure_repo() {
       git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL"
     fi
     git -C "$INSTALL_DIR" fetch --tags --force origin
+    refuse_dirty
   else
     say "cloning $REPO_URL ($ref_label) -> $INSTALL_DIR"
     mkdir -p "$(dirname "$INSTALL_DIR")"
@@ -159,6 +187,7 @@ ensure_repo() {
       git -C "$INSTALL_DIR" pull --ff-only origin "$REF"
     fi
   fi
+  verify_checkout
   say "installed: $(git -C "$INSTALL_DIR" describe --tags --always)"
 }
 
