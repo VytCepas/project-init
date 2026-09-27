@@ -113,6 +113,14 @@ code-map:
     uv run python .agents/scripts/gen_code_map.py
     uv run python tools/sync_claude_dir.py
 
+# Install this checkout as the machine's `project-init` uv tool (PI-1046). A dry
+# run by default. --apply installs from a clean main in sync with origin/main;
+# --check diffs the installed build against HEAD. Logic: tools/box_install.py.
+[doc("install this checkout as a uv tool: dry run by default, --apply, --check (PI-1046)")]
+[positional-arguments]
+install *ARGS:
+    uv run python tools/box_install.py "$@"
+
 # advisory: show drift between personal ~/.claude/skills copies and their
 # template source (PI-681). Not a gate — the personal dir is outside VCS.
 [doc("show drift between personal ~/.claude/skills copies and their template source (advisory)")]
