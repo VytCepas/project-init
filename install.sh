@@ -29,6 +29,9 @@ COMMANDS_DIR="$CLAUDE_CONFIG_DIR_RESOLVED/commands"
 # clone URL; the REST API base is derived from its host, or set it explicitly
 # with PROJECT_INIT_API_BASE (e.g. https://ghes.example.com/api/v3).
 REQUESTED_REF="${PROJECT_INIT_REF:-}"
+# The guard every scaffold copies. A ref whose copy lacks the symlink refusal
+# (PI-903, #904; v1.2.2 and older) is refused before checkout (PI-1045).
+GUARD_FILE="templates/base/dot_agents/hooks/prod_guard.py"
 
 say() { printf '\033[1;36m[project-init]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[project-init]\033[0m %s\n' "$*" >&2; }
@@ -96,6 +99,20 @@ resolve_ref() {
   fi
 }
 
+# Fail closed unless <commit-ish> ships a prod_guard that refuses a symlinked
+# .agents marker. Runs before checkout, so a refused ref never moves the clone
+# an existing /project-init already scaffolds from (PI-1045).
+verify_guard() {
+  local content
+  content="$(git -C "$INSTALL_DIR" show "$1:$GUARD_FILE" 2>/dev/null)" ||
+    die "cannot read $GUARD_FILE at $2, so its symlink refusal cannot be checked — refusing to install"
+  case "$content" in
+  *is_symlink*) return 0 ;;
+  esac
+  die "$2 ships a prod_guard.py without the symlink refusal (PI-903), so /project-init would scaffold a guard that a planted .agents symlink can switch off. Refusing to install it.
+  Fix: re-run with PROJECT_INIT_REF=main, or with PROJECT_INIT_REF=vX.Y.Z naming a release newer than v1.2.2."
+}
+
 # 3. repo
 ensure_repo() {
   REF="$(resolve_ref)"
@@ -123,6 +140,7 @@ ensure_repo() {
     default_branch="$(git -C "$INSTALL_DIR" symbolic-ref --quiet --short \
       refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
     [ -n "$default_branch" ] || default_branch="main"
+    verify_guard "origin/$default_branch" "the default branch ($default_branch)"
     git -C "$INSTALL_DIR" checkout -q "$default_branch"
     git -C "$INSTALL_DIR" pull --ff-only origin "$default_branch"
   else
@@ -130,6 +148,12 @@ ensure_repo() {
     # a tag lands detached (immutable, no pull), while a branch pin should
     # fast-forward to its latest tip. symbolic-ref -q HEAD succeeds only when
     # on a branch, so it distinguishes the two without guessing.
+    # A branch is verified at origin/<ref>, the tip the pull below lands on.
+    if git -C "$INSTALL_DIR" rev-parse -q --verify "refs/remotes/origin/$REF" >/dev/null 2>&1; then
+      verify_guard "origin/$REF" "ref '$REF'"
+    else
+      verify_guard "$REF" "ref '$REF'"
+    fi
     git -C "$INSTALL_DIR" checkout -q "$REF"
     if git -C "$INSTALL_DIR" symbolic-ref -q HEAD >/dev/null 2>&1; then
       git -C "$INSTALL_DIR" pull --ff-only origin "$REF"
