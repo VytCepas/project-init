@@ -172,11 +172,28 @@ def test_release_with_refusal_installs(boot: Bootstrap):
     assert boot.cmd.is_file()
 
 
-def test_existing_clean_clone_updates(boot: Bootstrap):
+def test_existing_stale_clone_updates_to_the_verified_tip(boot: Bootstrap):
+    """The branch is verified at origin/<ref>, the tip the pull lands on, not the stale local one."""
     boot.existing_clone()
+    (boot.upstream / "README.md").write_text("newer\n")
+    _git(boot.upstream, "add", "-A")
+    _git(boot.upstream, "commit", "-q", "-m", "newer")
     result = boot.run(PROJECT_INIT_REF="main")
     assert result.returncode == 0, result.stdout + result.stderr
+    assert _git(boot.install, "rev-parse", "HEAD") == _git(boot.upstream, "rev-parse", "HEAD")
     assert boot.cmd.is_file()
+
+
+def test_local_commit_that_keeps_the_refusal_is_still_refused(boot: Bootstrap):
+    """HEAD must be the verified origin commit: unreviewed local work is not installed either."""
+    boot.existing_clone()
+    (boot.install / "README.md").write_text("local\n")
+    _git(boot.install, "add", "-A")
+    _git(boot.install, "commit", "-q", "-m", "local, guard intact")
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "not the verified" in result.stderr
+    assert not boot.cmd.exists()
 
 
 # ── PI-1045 review: verify what will actually be used, not only origin/<ref> ──

@@ -528,7 +528,7 @@ def test_check_skips_the_venv_uv_run_puts_first_on_path(box: Box):
     venv = box.tmp / "dev-venv"
     subprocess.run([uv, "venv", "-q", "--python", sys.executable, str(venv)], check=True)
     own = venv / "bin"
-    (own / "project-init").write_text("#!/bin/sh\n")
+    (own / "project-init").write_text("#!/bin/sh\necho the repo's own dev entrypoint\n")
     (own / "project-init").chmod(0o755)
     box.install_layout()
     result = subprocess.run(
