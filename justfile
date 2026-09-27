@@ -116,10 +116,11 @@ code-map:
 # Install this checkout as the machine's `project-init` uv tool (PI-1046). A dry
 # run by default. --apply installs from a clean main in sync with origin/main;
 # --check diffs the installed build against HEAD. Logic: tools/box_install.py.
+# --no-python-downloads: `uv run` would otherwise fetch the .python-version interpreter.
 [doc("install this checkout as a uv tool: dry run by default, --apply, --check (PI-1046)")]
 [positional-arguments]
 install *ARGS:
-    uv run python tools/box_install.py "$@"
+    uv run --no-python-downloads python tools/box_install.py "$@"
 
 # advisory: show drift between personal ~/.claude/skills copies and their
 # template source (PI-681). Not a gate — the personal dir is outside VCS.

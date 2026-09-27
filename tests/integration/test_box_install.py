@@ -2,13 +2,17 @@
 
 Each test copies the tool into a throwaway git repo with a bare `origin`, so the
 branch, dirty-tree and sync gates run against real git. `uv` is a PATH stub that
-answers `uv tool dir` with a temp dir and logs every call, so nothing touches the
-real uv tool dir. The smoke test at the end runs the real uv into a temp dir,
-which is what proves the layout `--check` reads is uv's own.
+answers `uv tool dir` with a temp dir, `uv python find` with the layout's own
+interpreter, and logs every call, so nothing touches the real uv tool dir. That
+interpreter is a stub that reports its purelib and scripts dirs, which is what
+lets a test lay out a Windows env on any OS. The test at the end runs the real
+uv into a temp dir, which proves the layout and metadata `--check` reads are
+uv's and hatchling's own.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -28,9 +32,51 @@ printf '%s\n' "$*" >> "$STUB_UV_LOG"
 case "$1 $2" in
   "tool dir") if [ "${3:-}" = --bin ]; then echo "$STUB_BIN_DIR"; else echo "$STUB_TOOL_DIR"; fi ;;
   "tool install") [ -z "${STUB_LAYOUT:-}" ] || cp -R "$STUB_LAYOUT/." "$STUB_TOOL_DIR/project-init/" ;;
+  "python find") cat "${@: -1}/.stub-python" 2>/dev/null || exit 2 ;;
 esac
 exit 0
 """
+
+# Spellings the build backend normalises: names, spacing, quotes, specifier
+# order, markers inside extras. The real-uv test proves hatchling agrees.
+_PYPROJECT = """\
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "project-init"
+version = "0.0.1"
+requires-python = ">=3.11"
+dependencies = ["tomli >= 2 ; python_version < '3.11'"]
+
+[project.optional-dependencies]
+Docs_Extra = ["mkdocs-material>=9.7.6", "colorama; sys_platform == \\"win32\\"", "Foo_Bar[X] >=1, <2"]
+
+[project.scripts]
+project-init = "project_init.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/project_init"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"templates" = "project_init/templates"
+"schemas" = "project_init/schemas"
+"""
+
+# What hatchling writes for _PYPROJECT (measured by the real-uv test).
+_METADATA = """\
+Metadata-Version: 2.4
+Name: project-init
+Version: 0.0.1
+Requires-Python: >=3.11
+Requires-Dist: tomli>=2; python_version < '3.11'
+Provides-Extra: docs-extra
+Requires-Dist: colorama; (sys_platform == 'win32') and extra == 'docs-extra'
+Requires-Dist: foo-bar[x]<2,>=1; extra == 'docs-extra'
+Requires-Dist: mkdocs-material>=9.7.6; extra == 'docs-extra'
+"""
+_ENTRY_POINTS = "[console_scripts]\nproject-init = project_init.cli:main\n"
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -54,15 +100,16 @@ class Box:
             d.mkdir()
         (stub_dir / "uv").write_text(_UV_STUB)
         (stub_dir / "uv").chmod(0o755)
+        # The tool bin dir precedes the inherited PATH, as ~/.local/bin does on a box.
         self.env = {
             **git_env,
-            "PATH": f"{stub_dir}{os.pathsep}{os.environ['PATH']}",
+            "PATH": os.pathsep.join([str(stub_dir), str(self.bin), os.environ["PATH"]]),
             "STUB_UV_LOG": str(self.uv_log),
             "STUB_TOOL_DIR": str(self.tools),
             "STUB_BIN_DIR": str(self.bin),
         }
         files = {
-            "pyproject.toml": (_REPO_ROOT / "pyproject.toml").read_text(),
+            "pyproject.toml": _PYPROJECT,
             "tools/box_install.py": _TOOL.read_text(),
             "src/project_init/__init__.py": "__version__ = '0'\n",
             "src/project_init/cli.py": "def main():\n    return 0\n",
@@ -95,9 +142,16 @@ class Box:
     def uv_calls(self) -> list[str]:
         return self.uv_log.read_text().splitlines() if self.uv_log.exists() else []
 
-    def build_layout(self, dest: Path) -> None:
-        """Lay out what `uv tool install` produces for this repo's HEAD, as uv does."""
-        site = dest / "lib" / "python3.13" / "site-packages"
+    def build_layout(self, dest: Path, *, at: Path | None = None, windows: bool = False) -> Path:
+        """Lay out what `uv tool install` produces for this repo's HEAD, in *dest*.
+
+        *at* is where the env will finally live (its interpreter reports paths
+        there); *windows* uses `Lib/site-packages` and `Scripts`, as a Windows venv does.
+        """
+        at = at or dest
+        site_rel = Path("Lib/site-packages") if windows else Path("lib/python3.13/site-packages")
+        scripts_rel = Path("Scripts") if windows else Path("bin")
+        site, scripts = dest / site_rel, dest / scripts_rel
         mapping = {"src/project_init/": "project_init/", "templates/": "project_init/templates/"}
         mapping["schemas/"] = "project_init/schemas/"
         for rel in _git(self.repo, "ls-files").splitlines():
@@ -108,8 +162,18 @@ class Box:
                     shutil.copyfile(self.repo / rel, out)
         (site / "project_init" / "__pycache__").mkdir()
         (site / "project_init" / "__pycache__" / "cli.cpython-313.pyc").write_bytes(b"\0")
-        (dest / "bin").mkdir(parents=True)
-        (dest / "bin" / "project-init").write_text("#!/bin/sh\n")
+        dist = site / "project_init-0.0.1.dist-info"
+        dist.mkdir()
+        (dist / "METADATA").write_text(_METADATA)
+        (dist / "entry_points.txt").write_text(_ENTRY_POINTS)
+        scripts.mkdir(parents=True)
+        (scripts / "project-init").write_text("#!/bin/sh\n")
+        (scripts / "project-init").chmod(0o755)
+        python = scripts / ("python.exe" if windows else "python")
+        paths = {"purelib": str(at / site_rel), "scripts": str(at / scripts_rel)}
+        python.write_text(f"#!/bin/sh\nprintf '%s\\n' '{json.dumps(paths)}'\n")
+        python.chmod(0o755)
+        (dest / ".stub-python").write_text(str(at / python.relative_to(dest)))
         (dest / "uv-receipt.toml").write_text(
             "[tool]\n"
             f'requirements = [{{ name = "project-init", directory = "{self.repo.resolve()}" }}]\n'
@@ -117,11 +181,19 @@ class Box:
             f'    {{ name = "project-init", install-path = "{self.bin / "project-init"}", '
             'from = "project-init" },\n]\n'
         )
+        return scripts_rel
 
-    def install_layout(self) -> Path:
-        self.build_layout(self.env_dir)
-        (self.bin / "project-init").symlink_to(self.env_dir / "bin" / "project-init")
-        return self.env_dir / "lib" / "python3.13" / "site-packages" / "project_init"
+    def install_layout(self, *, windows: bool = False) -> Path:
+        scripts_rel = self.build_layout(self.env_dir, windows=windows)
+        (self.bin / "project-init").symlink_to(self.env_dir / scripts_rel / "project-init")
+        site = "Lib/site-packages" if windows else "lib/python3.13/site-packages"
+        return self.env_dir / site / "project_init"
+
+    def commit_pyproject(self, old: str, new: str) -> None:
+        path = self.repo / "pyproject.toml"
+        assert old in path.read_text()
+        path.write_text(path.read_text().replace(old, new))
+        _git(self.repo, "commit", "-q", "-am", "pyproject only")
 
 
 def _make_box(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, object_format: str) -> Box:
@@ -243,7 +315,7 @@ def test_apply_refuses_inside_a_claude_session(box: Box):
 
 def test_apply_from_clean_synced_main_installs_then_verifies(box: Box):
     layout = box.tmp / "layout"
-    box.build_layout(layout)
+    box.build_layout(layout, at=box.env_dir)
     (box.bin / "project-init").symlink_to(box.env_dir / "bin" / "project-init")
     box.env_dir.mkdir()
     result = box.run("--apply", STUB_LAYOUT=str(layout))
@@ -361,7 +433,7 @@ def test_check_against_a_real_uv_tool_install(box: Box):
     real = {
         **box.env,
         "UV_CACHE_DIR": cache,
-        "PATH": f"{Path(uv).parent}{os.pathsep}{os.environ['PATH']}",
+        "PATH": os.pathsep.join([str(box.bin), str(Path(uv).parent), os.environ["PATH"]]),
         "UV_TOOL_DIR": str(box.tools),
         "UV_TOOL_BIN_DIR": str(box.bin),
         "UV_PYTHON": sys.executable,
@@ -379,6 +451,11 @@ def test_check_against_a_real_uv_tool_install(box: Box):
     ok = subprocess.run(run, capture_output=True, text=True, env=real)
     assert ok.returncode == 0, ok.stdout + ok.stderr
     assert "(5 files)" in ok.stdout
+    # The metadata the stub layouts carry is what hatchling really writes.
+    fields = ("Name:", "Version:", "Requires-Python:", "Provides-Extra:", "Requires-Dist:")
+    real_meta = next(box.tools.glob("project-init/lib/python3*/site-packages/*.dist-info/METADATA"))
+    real_lines = {ln for ln in real_meta.read_text().splitlines() if ln.startswith(fields)}
+    assert real_lines == {ln for ln in _METADATA.splitlines() if ln.startswith(fields)}
     guard = next(
         box.tools.glob(
             "project-init/lib/python3*/site-packages/project_init/templates/base/dot_agents/hooks/prod_guard.py"
@@ -388,3 +465,97 @@ def test_check_against_a_real_uv_tool_install(box: Box):
     bad = subprocess.run(run, capture_output=True, text=True, env=real)
     assert bad.returncode == 1
     assert "modified: project_init/templates/base/dot_agents/hooks/prod_guard.py" in bad.stderr
+
+
+# ── review round (#1047): metadata, platform paths, PATH, recipe ─────────────
+
+
+def test_check_flags_a_dependency_change_in_pyproject_only(box: Box):
+    box.install_layout()
+    box.commit_pyproject('dependencies = ["tomli', 'dependencies = ["rich>=13.7", "tomli')
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert "metadata: dependency rich>=13.7 is in pyproject, not installed" in result.stderr
+    assert result.stderr.count("metadata:") == 1, result.stderr
+
+
+def test_check_flags_a_scripts_change_in_pyproject_only(box: Box):
+    box.install_layout()
+    box.commit_pyproject('"project_init.cli:main"', '"project_init.cli:run"')
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert (
+        "metadata: console script project-init = project_init.cli:run is in pyproject, not installed"
+    ) in result.stderr
+    assert (
+        "metadata: console script project-init = project_init.cli:main is installed, not in pyproject"
+    ) in result.stderr
+
+
+def test_check_flags_a_version_change_in_pyproject_only(box: Box):
+    box.install_layout()
+    box.commit_pyproject('version = "0.0.1"', 'version = "0.0.2"')
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert "metadata: Version installed 0.0.1, pyproject says 0.0.2" in result.stderr
+    assert result.stderr.count("metadata:") == 1, result.stderr
+
+
+def test_check_reads_a_windows_layout_from_the_env_interpreter(box: Box):
+    # `Lib/site-packages` and `Scripts`: the env's interpreter says where, not a guess.
+    box.install_layout(windows=True)
+    result = box.run("--check")
+    assert result.returncode == 0, result.stderr
+    assert "(5 files)" in result.stdout
+
+
+def test_check_names_a_shadowing_executable_on_path(box: Box):
+    box.install_layout()
+    shadow = box.tmp / "shadow"
+    shadow.mkdir()
+    (shadow / "project-init").write_text("#!/bin/sh\necho a stale copy\n")
+    (shadow / "project-init").chmod(0o755)
+    result = box.run("--check", PATH=f"{shadow}{os.pathsep}{box.env['PATH']}")
+    assert result.returncode == 1
+    assert f"PATH: project-init runs {shadow / 'project-init'}, which shadows" in result.stderr
+
+
+@pytest.mark.skipif(find_uv() is None, reason="uv not available")
+def test_check_skips_the_venv_uv_run_puts_first_on_path(box: Box):
+    """`just install` runs under `uv run`, which prepends the repo's own venv to PATH."""
+    uv = find_uv()
+    assert uv
+    venv = box.tmp / "dev-venv"
+    subprocess.run([uv, "venv", "-q", "--python", sys.executable, str(venv)], check=True)
+    own = venv / "bin"
+    (own / "project-init").write_text("#!/bin/sh\n")
+    (own / "project-init").chmod(0o755)
+    box.install_layout()
+    result = subprocess.run(
+        [str(own / "python"), str(box.repo / "tools" / "box_install.py"), "--check"],
+        capture_output=True,
+        text=True,
+        env={**box.env, "PATH": f"{own}{os.pathsep}{box.env['PATH']}"},
+        cwd=box.tmp,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.skipif(shutil.which("just") is None, reason="just not installed")
+def test_recipe_never_downloads_a_python(tmp_path: Path):
+    """`uv run` honours .python-version and would fetch a missing interpreter."""
+    stub = tmp_path / "bin"
+    stub.mkdir()
+    (stub / "uv").write_text('#!/usr/bin/env bash\nprintf \'%s\\n\' "$*" >> "$UV_LOG"\n')
+    (stub / "uv").chmod(0o755)
+    log = tmp_path / "uv.log"
+    env = {**os.environ, "PATH": f"{stub}{os.pathsep}{os.environ['PATH']}", "UV_LOG": str(log)}
+    env.pop("XDG_RUNTIME_DIR", None)
+    subprocess.run(
+        ["just", "--justfile", str(_REPO_ROOT / "justfile"), "install", "--check"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+    assert log.read_text().split()[:2] == ["run", "--no-python-downloads"], log.read_text()
