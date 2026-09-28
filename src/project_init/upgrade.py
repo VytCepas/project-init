@@ -1716,6 +1716,11 @@ _ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
     # claude-core and removed; PR #860 review)
     (("docs",), "docs", "Project documentation site"),
     ((".python-version",), "python-pin", "Python version pin (#847: single-source floor)"),
+    (
+        ("conftest.py",),
+        "test-contract",
+        "Test contract: hermetic HOME fixture + summary line (PI-1044)",
+    ),
 )
 
 
