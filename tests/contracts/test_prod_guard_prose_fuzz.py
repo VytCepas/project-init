@@ -141,6 +141,20 @@ SHAPES: list[tuple[str, str, str]] = [
     # line's quoted text here rather than running it.
     ("comment_then_quote", 'echo # "\necho "; {P}; echo "', "inert"),
     ("message_then_comment", 'git commit -m "{P}" # see the runbook', "inert"),
+    # #1043: git grep's own pattern is prose behind a wrapper that only execs it;
+    # git's config, its PATH, `env -S` and a quoted `printf '-v'` are not. The
+    # PATH shape executes with a planted ./git, as `relative_echo` does.
+    ("command_git_grep", "command git grep '{P}'", "inert"),
+    ("env_git_grep", "env -i git grep '{P}'", "inert"),
+    ("git_c_fsmonitor", "git -c core.fsmonitor='{P}' grep needle", "executes"),
+    (
+        "git_env_fsmonitor",
+        "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.fsmonitor GIT_CONFIG_VALUE_0='{P}' git grep x",
+        "executes",
+    ),
+    ("env_split_string", "env -S'bash -c \"eval \\$3\" x' git grep '{P}'", "executes"),
+    ("path_git_grep", "PATH=.:$PATH git grep '{P}'", "executes"),
+    ("printf_quoted_v", "printf '-v' c '{P}'; bash -c \"$c\"", "executes"),
 ]
 
 #: One representative destructive command per DENY_RULES entry. Quote characters

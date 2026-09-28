@@ -886,6 +886,120 @@ class TestInheritedConfigPI1039:
         )
 
 
+# ── #1043: a name split by quoting is still the name ────────────────────────
+# bash and zsh rejoin adjacent quoted pieces into one word, so each of these sets
+# the watched name (each printed its value back under that name in both shells).
+# The raw-text checks never saw the name contiguous.
+RUNS_A_PROGRAM_1043 = [
+    ("export RIPGREP_'CONFIG_PATH'=cfg; rg needle", "RIPGREP_CONFIG_PATH"),  # as filed
+    ("printf -v P'S'4 '$(id)'; set -x; :", "PS4 with set -x"),  # as filed
+    ('export "RIPGREP_"CONFIG_PATH=cfg; rg needle', "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_$'CONFIG_PATH'=cfg; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_CONFIG_PAT$'\\x48'=cfg; rg needle", "RIPGREP_CONFIG_PATH"),  # $'…' escape
+    ("export RIPGREP_CONFIG_\\PATH=cfg; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_CONFIG_\\\nPATH=cfg; rg needle", "RIPGREP_CONFIG_PATH"),  # continuation
+    ("env RIPGREP_'CONFIG_PATH'=cfg rg needle", "RIPGREP_CONFIG_PATH"),
+    ("declare -x A'CKRC'=cfg; ack needle", "ACKRC"),
+    ("export RIPGREP_CONFIG_PATH=cfg; r'g' needle", "RIPGREP_CONFIG_PATH"),  # the tool, split
+    ("export P'S'4='$(id)'; set -x; :", "PS4 with set -x"),
+    ("PS4='$(id)'; set \"-x\"; :", "PS4 with set -x"),  # the switch, split
+    ("PS4='$(id)'; set -o x'trace'; :", "PS4 with set -x"),
+]
+
+# The same gap in the deny table: a quoted verb is the verb. All allowed on main.
+QUOTE_SPLIT_VERBS_1043 = [
+    'terraform "destroy" -auto-approve',
+    "terraform 'destroy'",
+    "t'erraform' destroy",
+    "kubectl de'lete' namespace prod",
+    'gh repo "delete" o/r',
+    "docker system 'prune'",
+    "bash -c terraform' 'destroy",
+    "bash -c terraform\\ destroy",
+    "bash -c terraform$'\\x20'destroy",
+    # A quoted `-v` still assigns, so printf's text is not prose (ran in bash, zsh).
+    "printf '-v' c 'terraform destroy'; bash -c \"$c\"",
+    # Only git grep's OWN arguments are prose. core.fsmonitor from `-c` or the
+    # environment ran its value, and PATH picks which `git` runs — a planted
+    # ./git ran the pattern. Each measured with a touch payload.
+    "git -c core.fsmonitor='terraform destroy' grep needle",
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.fsmonitor"
+    " GIT_CONFIG_VALUE_0='terraform destroy' git grep needle",
+    "PATH=.:$PATH git grep 'terraform destroy'",
+]
+
+# P2: git grep behind an exec-transparent wrapper searches exactly as it does bare.
+WRAPPED_GIT_GREP_1043 = [
+    "command git grep 'terraform destroy'",
+    "builtin git grep 'terraform destroy'",
+    "env git grep 'terraform destroy'",
+    "env -i git grep 'terraform destroy'",
+    "env GIT_PAGER=cat git grep -n 'kubectl delete' src/",
+    "nice git grep 'terraform destroy'",
+    "time git grep 'terraform destroy'",
+    "time -p git grep 'DROP DATABASE'",
+    "nohup git grep 'terraform destroy'",
+    "command -p git grep 'terraform destroy'",
+    "/usr/bin/env git grep 'terraform destroy'",
+    "time env -i git grep 'terraform destroy'",  # wrappers chain
+]
+
+# Wrapper options that change what runs keep the prompt; both ran the pattern.
+WRAPPER_STILL_FLAGGED_1043 = [
+    "env -S'bash -c \"eval \\$3\" x' git grep 'terraform destroy'",
+    "env PATH=.:$PATH git grep 'terraform destroy'",
+]
+
+# No false positives: prose and search patterns that QUOTE the spellings above
+# name nothing that runs. The last two asked before #1043 as well.
+CONTROLS_1043 = [
+    "git commit -m \"fix: catch export RIPGREP_'CONFIG_PATH'=cfg; rg needle\"",
+    "git grep -n \"RIPGREP_'CONFIG_PATH'=cfg; rg\" tests/",
+    "git commit -m \"docs: never run terraform 'destroy'\"",
+    "grep -rn 'terraform \"destroy\"' docs/",
+    "echo \"printf -v P'S'4 then set -x\"",
+    "rg 'RIPGREP_CONFIG_PATH' src/",
+    "kubectl get pods -o 'jsonpath={.items[*].metadata.name}'",
+    'echo "it\'s fine"; rg needle',
+    "terraform plan -destroy -out 'plan.out'",
+    "rg -n 'export RIPGREP_CONFIG_PATH' docs/",
+    'git commit -m "fix: RIPGREP_CONFIG_PATH=cfg made rg run --pre"',
+]
+
+
+class TestQuoteSplitPI1043:
+    """#1043 — quote-split names, and git grep behind a wrapper."""
+
+    @pytest.mark.parametrize(("command", "label"), RUNS_A_PROGRAM_1043)
+    def test_split_name_is_the_name(self, tmp_path: Path, command: str, label: str):
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict is not None, f"not flagged: {command!r}"
+        hso = verdict["hookSpecificOutput"]
+        assert hso["permissionDecision"] == "deny"
+        assert f"'{label}'" in hso["permissionDecisionReason"], hso["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("command", QUOTE_SPLIT_VERBS_1043)
+    def test_split_verb_is_the_verb(self, tmp_path: Path, command: str):
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict is not None, f"FAIL-OPEN: {command!r}"
+        hso = verdict["hookSpecificOutput"]
+        assert hso["permissionDecision"] == "deny"
+        assert "is a destructive operation" in hso["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("command", WRAPPED_GIT_GREP_1043)
+    def test_wrapped_git_grep_pattern_is_prose(self, tmp_path: Path, command: str):
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+
+    @pytest.mark.parametrize("command", WRAPPER_STILL_FLAGGED_1043)
+    def test_wrapper_that_changes_the_command_is_not_peeled(self, tmp_path: Path, command: str):
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict is not None, f"FAIL-OPEN: {command!r}"
+
+    @pytest.mark.parametrize("command", CONTROLS_1043)
+    def test_controls_stay_allowed(self, tmp_path: Path, command: str):
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+
+
 class TestWiring:
     def test_fallback_settings_wire_the_guard(self, tmp_path: Path):
         """Default scaffolds get the guard from the plugin; --no-plugin
