@@ -124,7 +124,7 @@ $dirty
 }
 
 # The tree /project-init scaffolds from must be the verified commit, clean, and
-# carry the refusal on disk: pull --ff-only keeps local commits and edits, and
+# carry the refusal on disk: a fast-forward keeps local commits and edits, and
 # skip-worktree hides an edit from status (PI-1045 review).
 verify_checkout() {
   local head
@@ -170,13 +170,15 @@ ensure_repo() {
     [ -n "$default_branch" ] || default_branch="main"
     verify_guard "origin/$default_branch" "the default branch ($default_branch)"
     git -C "$INSTALL_DIR" checkout -q "$default_branch"
-    git -C "$INSTALL_DIR" pull --ff-only origin "$default_branch"
+    # Fast-forward to the verified object, never pull: a second fetch could
+    # land past VERIFIED on a commit nobody checked (PI-1045 review).
+    git -C "$INSTALL_DIR" merge -q --ff-only "$VERIFIED"
   else
     # An explicit PROJECT_INIT_REF — a literal branch OR tag. Check it out;
-    # a tag lands detached (immutable, no pull), while a branch pin should
-    # fast-forward to its latest tip. symbolic-ref -q HEAD succeeds only when
-    # on a branch, so it distinguishes the two without guessing.
-    # A branch is verified at origin/<ref>, the tip the pull below lands on.
+    # a tag lands detached (immutable), while a branch pin fast-forwards to
+    # the fetched tip. symbolic-ref -q HEAD succeeds only when on a branch,
+    # so it distinguishes the two without guessing.
+    # A branch is verified at origin/<ref>, the tip the fast-forward lands on.
     if git -C "$INSTALL_DIR" rev-parse -q --verify "refs/remotes/origin/$REF" >/dev/null 2>&1; then
       verify_guard "origin/$REF" "ref '$REF'"
     else
@@ -184,7 +186,7 @@ ensure_repo() {
     fi
     git -C "$INSTALL_DIR" checkout -q "$REF"
     if git -C "$INSTALL_DIR" symbolic-ref -q HEAD >/dev/null 2>&1; then
-      git -C "$INSTALL_DIR" pull --ff-only origin "$REF"
+      git -C "$INSTALL_DIR" merge -q --ff-only "$VERIFIED"
     fi
   fi
   verify_checkout

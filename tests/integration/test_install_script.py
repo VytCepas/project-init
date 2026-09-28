@@ -1,9 +1,10 @@
 """PI-195: execution coverage for install.sh (the curl|bash bootstrap).
 
 It runs install.sh for real against a local upstream repo with real git, so
-clone, fetch, checkout and pull behave as they do for a user. Only `uv` (a
+clone, fetch, checkout and fast-forward behave as they do for a user. Only `uv` (a
 no-op) and `curl` (the latest-release query) are stubbed, and HOME is a temp
-dir, so there is no network and nothing outside tmp is written.
+dir, so there is no network and nothing outside tmp is written. The race test
+wraps git in a shim that commits upstream mid-run, then execs the real git.
 
 PI-1045: install.sh refuses a ref whose prod_guard lacks the symlink refusal,
 and after checkout it refuses a clone whose working tree is not that verified
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -48,12 +50,14 @@ class Bootstrap:
         self.install = tmp / "install"
         self.upstream = tmp / "upstream"
         self.cmd = self.home / ".claude" / "commands" / "project-init.md"
-        bindir = tmp / "bin"
+        self.bindir = bindir = tmp / "bin"
         for d in (self.home, bindir, self.upstream):
             d.mkdir()
         stubs = {
             "uv": "#!/usr/bin/env bash\nexit 0\n",
-            "curl": '#!/usr/bin/env bash\nprintf \'{"tag_name": "v1.2.2"}\\n\'\n',
+            # STUB_NO_RELEASE=1: no release published, so install.sh takes the default branch.
+            "curl": '#!/usr/bin/env bash\n[ -z "${STUB_NO_RELEASE:-}" ] || exit 22\n'
+            'printf \'{"tag_name": "v1.2.2"}\\n\'\n',
         }
         for name, body in stubs.items():
             (bindir / name).write_text(body)
@@ -86,6 +90,33 @@ class Bootstrap:
     def existing_clone(self) -> Path:
         _git(self.tmp, "clone", "-q", str(self.upstream), str(self.install))
         return self.install / _GUARD
+
+    def commit_upstream(self, path: str, text: str, message: str) -> str:
+        (self.upstream / path).write_text(text)
+        _git(self.upstream, "add", "-A")
+        _git(self.upstream, "commit", "-q", "-m", message)
+        return _git(self.upstream, "rev-parse", "HEAD")
+
+    def race_guard_removal_at_checkout(self) -> None:
+        """Upstream drops the refusal between install.sh's check and its update step.
+
+        A `git` shim on install.sh's PATH commits it on the first `checkout`,
+        which runs after verify_guard and before the clone is moved.
+        """
+        unguarded = self.tmp / "unguarded.py"
+        unguarded.write_text(_guard_without_refusal())
+        real_git = shutil.which("git")
+        assert real_git
+        shim = self.bindir / "git"
+        shim.write_text(
+            "#!/usr/bin/env bash\n"
+            f'case " $* " in *" checkout "*) if [ ! -e "{self.tmp}/raced" ]; then\n'
+            f'  : >"{self.tmp}/raced"; cp "{unguarded}" "{self.upstream / _GUARD}"\n'
+            f'  "{real_git}" -C "{self.upstream}" commit -qam "race: drop the refusal"\n'
+            "fi ;; esac\n"
+            f'exec "{real_git}" "$@"\n'
+        )
+        shim.chmod(0o755)
 
 
 @pytest.fixture
@@ -173,7 +204,7 @@ def test_release_with_refusal_installs(boot: Bootstrap):
 
 
 def test_existing_stale_clone_updates_to_the_verified_tip(boot: Bootstrap):
-    """The branch is verified at origin/<ref>, the tip the pull lands on, not the stale local one."""
+    """The branch is verified at origin/<ref>, the tip the fast-forward lands on, not the stale local one."""
     boot.existing_clone()
     (boot.upstream / "README.md").write_text("newer\n")
     _git(boot.upstream, "add", "-A")
@@ -200,7 +231,7 @@ def test_local_commit_that_keeps_the_refusal_is_still_refused(boot: Bootstrap):
 
 
 def test_local_commit_removing_the_refusal_is_refused(boot: Bootstrap):
-    """`pull --ff-only` keeps a local commit, so origin/main passing proves nothing about HEAD."""
+    """A fast-forward keeps a local commit, so origin/main passing proves nothing about HEAD."""
     guard = boot.existing_clone()
     guard.write_text(_guard_without_refusal())
     _git(boot.install, "commit", "-q", "-am", "local: drop the refusal")
@@ -232,4 +263,58 @@ def test_edit_hidden_by_skip_worktree_is_refused(boot: Bootstrap):
     result = boot.run(PROJECT_INIT_REF="main")
     assert result.returncode == 1, result.stdout + result.stderr
     assert "on disk" in result.stderr and "Nothing was reset" in result.stderr
+    assert not boot.cmd.exists()
+
+
+# ── PI-1045 review: the update lands on the verified commit, never a later fetch ──
+
+# (env, the ref label install.sh logs): proves which of the two paths ran.
+_BRANCH_PATHS = pytest.mark.parametrize(
+    ("ref_env", "label"),
+    [({"PROJECT_INIT_REF": "main"}, "main"), ({"STUB_NO_RELEASE": "1"}, "<default branch>")],
+    ids=["explicit-branch", "default-branch"],
+)
+
+
+@_BRANCH_PATHS
+def test_upstream_commit_landing_after_the_check_is_never_checked_out(
+    boot: Bootstrap, ref_env: dict[str, str], label: str
+):
+    """A second fetch after verify_guard would move the clone past VERIFIED.
+
+    The existing /project-init runs `uvx --from` the clone, so the clone moving
+    to an unchecked commit is the harm, even when the run then exits 1.
+    """
+    boot.existing_clone()
+    verified = boot.commit_upstream("README.md", "newer\n", "newer, guard intact")
+    boot.race_guard_removal_at_checkout()
+    result = boot.run(**ref_env)
+    assert f"(ref: {label})" in result.stdout, result.stdout + result.stderr
+    raced = _git(boot.upstream, "rev-parse", "HEAD")
+    assert raced != verified, "the shim must have committed upstream during the run"
+    assert "is_symlink" not in _git(boot.upstream, "show", f"{raced}:{_GUARD}")
+    head = _git(boot.install, "rev-parse", "HEAD")
+    assert head != raced, "the clone moved to an upstream commit that was never verified"
+    assert head == verified, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "is_symlink" in (boot.install / _GUARD).read_text()
+    assert boot.cmd.is_file()
+
+
+@_BRANCH_PATHS
+def test_diverged_local_branch_is_refused_and_kept(
+    boot: Bootstrap, ref_env: dict[str, str], label: str
+):
+    """Landing on VERIFIED is a fast-forward only: a diverged branch stops, nothing is reset."""
+    boot.existing_clone()
+    (boot.install / "README.md").write_text("local\n")
+    _git(boot.install, "add", "-A")
+    _git(boot.install, "commit", "-q", "-m", "local work")
+    local = _git(boot.install, "rev-parse", "HEAD")
+    boot.commit_upstream("OTHER.md", "upstream\n", "upstream work")
+    result = boot.run(**ref_env)
+    assert f"(ref: {label})" in result.stdout, result.stdout + result.stderr
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert _git(boot.install, "rev-parse", "HEAD") == local, "the local commit must survive"
+    assert (boot.install / "README.md").read_text() == "local\n"
     assert not boot.cmd.exists()
