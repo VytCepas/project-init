@@ -975,8 +975,9 @@ def _git_grep_runs_pager(after_git: list[str]) -> str | None:
 # The shell joins adjacent quoted pieces, so `RIPGREP_'CONFIG_PATH'=…` sets the var
 # and `terraform "destroy"` runs the verb; no text check saw either. One mechanism
 # instead of a regex per spelling: every check also reads the command after quote
-# removal. A matching VIEW, never a parse — it only adds matches, so its rough edges
-# cost a prompt, never a verdict.
+# removal. A matching VIEW, never a parse — it only adds matches, so a rough edge
+# can flag a harmless command (ask, or deny in an autonomous mode such as
+# bypassPermissions) but never clears one the raw text flags.
 _ANSI_C_QUOTED = re.compile(r"\$'((?:[^'\\]|\\.)*)'", re.DOTALL)
 _ANSI_C_ESCAPE = re.compile(
     r"\\(?:x([0-9A-Fa-f]{1,2})|u([0-9A-Fa-f]{1,4})|U([0-9A-Fa-f]{1,8})|([0-7]{1,3})|c(.)|(.))",
