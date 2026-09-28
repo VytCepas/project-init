@@ -57,6 +57,99 @@ def test_toolchain_caches_stay_real():
     assert Path(os.environ["UV_CACHE_DIR"]).is_relative_to(Path(os.environ["REAL_HOME"]))
 """
 
+# Each read happens before any function-scoped fixture: at import, at collection,
+# in a broader-scoped fixture. ntpath.expanduser is Path.home() on Windows.
+_PLANTED_EARLY_CONFTEST = """\
+import ntpath
+from pathlib import Path
+
+import pytest
+
+AT_CONFTEST_IMPORT = (Path.home(), ntpath.expanduser("~"))
+
+
+@pytest.fixture(scope="session")
+def session_home():
+    return Path.home(), ntpath.expanduser("~")
+
+
+@pytest.fixture(scope="session")
+def conftest_import_home():
+    return AT_CONFTEST_IMPORT
+"""
+
+_PLANTED_EARLY = """\
+import ntpath
+import os
+from pathlib import Path
+
+import pytest
+
+AT_COLLECTION = (Path.home(), ntpath.expanduser("~"))
+
+
+@pytest.fixture(scope="module")
+def module_home():
+    return Path.home(), ntpath.expanduser("~")
+
+
+def _real(*homes):
+    real = Path(os.environ["REAL_HOME"])
+    return [str(home) for home in homes if Path(home).is_relative_to(real)]
+
+
+def test_a_module_level_read_at_collection():
+    assert _real(*AT_COLLECTION) == []
+
+
+def test_a_read_at_tests_conftest_import(conftest_import_home):
+    assert _real(*conftest_import_home) == []
+
+
+def test_a_session_fixture_read(session_home):
+    assert _real(*session_home) == []
+
+
+def test_a_module_fixture_read(module_home):
+    assert _real(*module_home) == []
+
+
+def test_each_test_still_gets_a_home_of_its_own(session_home):
+    assert Path.home() != session_home[0]
+"""
+
+_PLANTED_WINDOWS = """\
+import ntpath
+import os
+from pathlib import Path
+
+
+def _is_real(path):
+    assert path != "~", "nothing to expand from: the variable is unset"
+    return Path(path).is_relative_to(Path(os.environ["REAL_HOME"]))
+
+
+def test_userprofile_is_redirected():
+    assert not _is_real(ntpath.expanduser("~"))
+
+
+def test_homedrive_homepath_are_redirected(monkeypatch):
+    monkeypatch.delenv("USERPROFILE")
+    assert not _is_real(ntpath.expanduser("~"))
+"""
+
+_PLANTED_IMPORTS_CONFTEST = """\
+import json
+
+import pytest
+from conftest import helper
+
+
+def test_helper():
+    assert helper() == json.loads("1")
+    assert pytest
+"""
+
 _PLANTED_MIXED = """\
 import pytest
 
@@ -111,8 +204,12 @@ def _pytest(target: Path, tmp: Path, *args: str) -> subprocess.CompletedProcess[
         for k, v in os.environ.items()
         if not k.startswith(("XDG_", "PYTEST_")) and k not in _CONTRACT_VARS
     }
+    drive = Path(real_home).drive
     env |= {
         "HOME": str(real_home),
+        "USERPROFILE": str(real_home),
+        "HOMEDRIVE": drive,
+        "HOMEPATH": str(real_home)[len(drive) :],
         "REAL_HOME": str(real_home),
         "TMPDIR": str(real_tmp),
         "REAL_TMPDIR": str(real_tmp),
@@ -146,6 +243,39 @@ class TestHermeticScaffold:
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
 
+    @pytest.mark.parametrize("workers", [(), ("-n", "2")], ids=["serial", "xdist"])
+    def test_home_is_moved_before_collection_and_broader_fixtures(
+        self, tmp_path: Path, workers: tuple[str, ...]
+    ) -> None:
+        """PR #1056 review: a function-scoped fixture alone runs after collection
+        imports and after session- and module-scoped fixtures."""
+        if workers:
+            pytest.importorskip("xdist")
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "conftest.py", _PLANTED_EARLY_CONFTEST)
+        _plant(target, "test_early.py", _PLANTED_EARLY)
+        _plant(target, "test_home.py", _PLANTED_HOME)
+        result = _pytest(target, tmp_path, *workers)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 7, 0), result.stdout
+
+    def test_windows_home_variables_are_redirected(self, tmp_path: Path) -> None:
+        """PR #1056 review: Path.home() on Windows reads USERPROFILE, then
+        HOMEDRIVE + HOMEPATH, and never HOME."""
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_windows.py", _PLANTED_WINDOWS)
+        result = _pytest(target, tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
+
+    def test_the_session_home_is_removed_after_the_run(self, tmp_path: Path) -> None:
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_ok.py", "def test_ok():\n    assert True\n")
+        result = _pytest(target, tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+        left = [p.name for p in (tmp_path / "real-tmp").iterdir()]
+        assert [name for name in left if not name.startswith("pytest-of-")] == [], left
+
     def test_the_fixture_is_in_a_root_conftest_the_upgrade_owns(self, tmp_path: Path) -> None:
         target = _python_scaffold(tmp_path / "p")
         assert (target / "conftest.py").is_file()
@@ -160,6 +290,25 @@ class TestHermeticScaffold:
             make_variables(language=language, python="", **{language: "true"}),
         )
         assert not (target / "conftest.py").exists()
+
+
+class TestScaffoldLint:
+    def test_the_root_conftest_does_not_reorder_a_conftest_import(self, tmp_path: Path) -> None:
+        """PO-316 CI: with a root conftest.py, ruff resolved ``conftest`` to it and
+        called it first-party, so every test importing a helper from
+        tests/conftest.py failed I001 in a repo that upgraded into the contract."""
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "conftest.py", "def helper():\n    return 1\n")
+        _plant(target, "test_imports.py", _PLANTED_IMPORTS_CONFTEST)
+        result = subprocess.run(
+            [sys.executable, "-m", "ruff", "check", "--no-cache", "."],
+            cwd=target,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
 
 
 class TestSummaryLine:
