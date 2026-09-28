@@ -122,6 +122,7 @@ class Box:
         for rel, text in files.items():
             (self.repo / rel).parent.mkdir(parents=True, exist_ok=True)
             (self.repo / rel).write_text(text)
+        (self.repo / "templates/base/hook.sh").chmod(0o755)  # a 100755 blob, as a hook is
         fmt = f"--object-format={object_format}"
         _git(tmp, "init", "-q", "--bare", "-b", "main", fmt, "origin.git")
         _git(self.repo, "init", "-q", "-b", "main", fmt)
@@ -159,13 +160,17 @@ class Box:
                 if rel.startswith(src):
                     out = site / (dst + rel[len(src) :])
                     out.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(self.repo / rel, out)
+                    shutil.copy(self.repo / rel, out)  # with its mode, as uv installs it
         (site / "project_init" / "__pycache__").mkdir()
         (site / "project_init" / "__pycache__" / "cli.cpython-313.pyc").write_bytes(b"\0")
         dist = site / "project_init-0.0.1.dist-info"
         dist.mkdir()
         (dist / "METADATA").write_text(_METADATA)
         (dist / "entry_points.txt").write_text(_ENTRY_POINTS)
+        # uv's RECORD: every installed file relative to site-packages, the script outside it.
+        owned = sorted(p.relative_to(site).as_posix() for p in site.rglob("*") if p.is_file())
+        rows = [*owned, f"{dist.name}/RECORD", f"../../../{scripts_rel.as_posix()}/project-init"]
+        (dist / "RECORD").write_text("".join(f"{row},,\n" for row in rows))
         scripts.mkdir(parents=True)
         (scripts / "project-init").write_text("#!/bin/sh\n")
         (scripts / "project-init").chmod(0o755)
@@ -456,6 +461,10 @@ def test_check_against_a_real_uv_tool_install(box: Box):
     real_meta = next(box.tools.glob("project-init/lib/python3*/site-packages/*.dist-info/METADATA"))
     real_lines = {ln for ln in real_meta.read_text().splitlines() if ln.startswith(fields)}
     assert real_lines == {ln for ln in _METADATA.splitlines() if ln.startswith(fields)}
+    # uv keeps a 100755 blob executable and writes a RECORD, as the stub layouts do.
+    site = real_meta.parent.parent
+    assert os.access(site / "project_init/templates/base/hook.sh", os.X_OK)
+    assert "project_init/templates/base/hook.sh," in (real_meta.parent / "RECORD").read_text()
     guard = next(
         box.tools.glob(
             "project-init/lib/python3*/site-packages/project_init/templates/base/dot_agents/hooks/prod_guard.py"
@@ -520,25 +529,119 @@ def test_check_names_a_shadowing_executable_on_path(box: Box):
     assert f"PATH: project-init runs {shadow / 'project-init'}, which shadows" in result.stderr
 
 
-@pytest.mark.skipif(find_uv() is None, reason="uv not available")
-def test_check_skips_the_venv_uv_run_puts_first_on_path(box: Box):
-    """`just install` runs under `uv run`, which prepends the repo's own venv to PATH."""
+def _venv_with_the_tool(box: Box, venv: Path) -> Path:
     uv = find_uv()
     assert uv
-    venv = box.tmp / "dev-venv"
     subprocess.run([uv, "venv", "-q", "--python", sys.executable, str(venv)], check=True)
     own = venv / "bin"
-    (own / "project-init").write_text("#!/bin/sh\necho the repo's own dev entrypoint\n")
+    (own / "project-init").write_text("#!/bin/sh\necho a dev entrypoint\n")
     (own / "project-init").chmod(0o755)
-    box.install_layout()
-    result = subprocess.run(
-        [str(own / "python"), str(box.repo / "tools" / "box_install.py"), "--check"],
+    return own
+
+
+def _uv_run_check(box: Box, cwd: Path, *, nested: bool = False, **env: str):
+    """`--check` the way the recipe runs it: under the real `uv run --no-project`."""
+    uv = find_uv()
+    assert uv
+    run = [uv, "run", "--no-python-downloads", "--no-project", "--python", ">=3.11"]
+    return subprocess.run(
+        [
+            *run,
+            *(run if nested else []),
+            "python",
+            str(box.repo / "tools/box_install.py"),
+            "--check",
+        ],
         capture_output=True,
         text=True,
-        env={**box.env, "PATH": f"{own}{os.pathsep}{box.env['PATH']}"},
-        cwd=box.tmp,
+        env={**box.env, **env},
+        cwd=cwd,
+        timeout=120,
     )
+
+
+@pytest.mark.skipif(find_uv() is None, reason="uv not available")
+@pytest.mark.parametrize("nested", [False, True], ids=["uv-run", "uv-run-in-uv-run"])
+def test_check_skips_the_venv_uv_run_puts_first_on_path(box: Box, nested: bool):
+    """`uv run` finds the cwd's .venv, never activated, and prepends its scripts dir to PATH."""
+    work = box.tmp / "work"
+    _venv_with_the_tool(box, work / ".venv")
+    box.install_layout()
+    result = _uv_run_check(box, work, nested=nested)
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.skipif(find_uv() is None, reason="uv not available")
+def test_check_names_the_tool_in_a_venv_the_caller_activated(box: Box):
+    """An activated venv was first on the shell's PATH before `uv run` prepended it again."""
+    active = _venv_with_the_tool(box, box.tmp / "active")
+    box.install_layout()
+    path = f"{active}{os.pathsep}{box.env['PATH']}"
+    result = _uv_run_check(box, box.tmp, VIRTUAL_ENV=str(active.parent), PATH=path)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert f"PATH: project-init runs {active / 'project-init'}, which shadows" in result.stderr
+
+
+# ── review round 3 (#1047): executable bits, files a past build owned ─────────
+
+
+@pytest.mark.parametrize(
+    ("rel", "mode", "want"),
+    [
+        ("templates/base/hook.sh", 0o644, "installed 644, tree 100755"),
+        ("src/project_init/cli.py", 0o755, "installed 755, tree 100644"),
+    ],
+    ids=["exec-bit-dropped", "exec-bit-added"],
+)
+def test_check_flags_an_installed_file_whose_exec_bit_differs(
+    box: Box, rel: str, mode: int, want: str
+):
+    """The scaffolder copies a template's exec bit, so a blob match alone is not a match."""
+    pkg = box.install_layout()
+    installed = pkg / rel.replace("src/project_init/", "")
+    installed.chmod(mode)
+    result = box.run("--check")
+    assert result.returncode == 1, result.stdout
+    dest = installed.relative_to(pkg.parent).as_posix()
+    assert result.stderr.count("    - ") == 1, result.stderr
+    assert f"mode: {dest} {want} (tree: {rel})" in result.stderr
+
+
+def test_check_flags_an_exec_bit_only_head_changed(box: Box):
+    box.install_layout()
+    _git(box.repo, "update-index", "--chmod=-x", "templates/base/hook.sh")
+    _git(box.repo, "commit", "-q", "-m", "hook.sh is not executable")
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert (
+        "mode: project_init/templates/base/hook.sh installed 755, tree 100644"
+        " (tree: templates/base/hook.sh)"
+    ) in result.stderr
+
+
+def test_check_scans_what_the_installed_record_owns(box: Box):
+    """A build from before HEAD dropped a mapping left files HEAD's layout never visits."""
+    pkg = box.install_layout()
+    site = pkg.parent
+    (site / "retired_pkg").mkdir()
+    (site / "retired_pkg" / "old.py").write_text("stale\n")
+    (site / "retired.py").write_text("stale\n")
+    record = site / "project_init-0.0.1.dist-info" / "RECORD"
+    record.write_text(record.read_text() + "retired_pkg/old.py,,\nretired.py,,\n")
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert "not in tree: retired_pkg/old.py" in result.stderr
+    assert "not in tree: retired.py" in result.stderr
+    assert result.stderr.count("    - ") == 2, result.stderr
+
+
+def test_check_flags_an_install_without_a_record(box: Box):
+    """No RECORD, no list of what the build installed: that is drift, not a pass."""
+    pkg = box.install_layout()
+    (pkg.parent / "project_init-0.0.1.dist-info" / "RECORD").unlink()
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert "record: project_init-0.0.1.dist-info has no RECORD" in result.stderr
 
 
 @pytest.mark.skipif(shutil.which("just") is None, reason="just not installed")

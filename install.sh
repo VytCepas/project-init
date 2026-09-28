@@ -108,6 +108,16 @@ resolve_ref() {
 has_symlink_refusal() {
   awk '
     function indent(s) { match(s, /^ */); return RLENGTH }
+    # Cut at the first # outside a quoted string: a quote in a comment is comment text.
+    function uncomment(s, i, c, q) {
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (q != "") { if (c == "\\") i++; else if (c == q) q = "" }
+        else if (c == "\"" || c == "\047") q = c
+        else if (c == "#") return substr(s, 1, i - 1)
+      }
+      return s
+    }
     { sub(/\r$/, "") }
     {
       rest = $0; skip = (open != "")
@@ -124,10 +134,9 @@ has_symlink_refusal() {
         else { open = "\047\047\047"; rest = substr(rest, b + 3) }
       }
       if (skip) next
-      code = $0
+      code = uncomment($0)
       sub(/[ \t]+$/, "", code)
-      if (code ~ /^[ \t]*(#|$)/) next
-      sub(/[ \t]+#[^"\047]*$/, "", code)
+      if (code ~ /^[ \t]*$/) next
       k = indent(code); code = substr(code, k + 1)
       while (depth && ind[depth] >= k) depth--
       if (k == 0 && code !~ /^\)/) fn = (code ~ /^def _find_config\(/) ? "_find_config" : ""
@@ -173,9 +182,10 @@ $dirty
 
 # The tree /project-init scaffolds from must be the verified commit, clean, and
 # carry the refusal on disk: a fast-forward keeps local commits and edits, and
-# skip-worktree hides an edit from status (PI-1045 review).
+# skip-worktree hides an edit from status (PI-1045 review). uvx builds every
+# file, so any flag that hides one from status refuses (#1047 review, round 3).
 verify_checkout() {
-  local head
+  local head hidden
   head="$(git -C "$INSTALL_DIR" rev-parse HEAD)"
   [ "$head" = "$VERIFIED" ] ||
     die "$INSTALL_DIR is at $head, not the verified $ref_label ($VERIFIED): it holds commits that were not checked. See: git -C $INSTALL_DIR log $VERIFIED..HEAD
@@ -183,6 +193,13 @@ verify_checkout() {
   refuse_dirty
   has_symlink_refusal 2>/dev/null <"$INSTALL_DIR/$GUARD_FILE" ||
     die "$INSTALL_DIR/$GUARD_FILE on disk has no symlink refusal, though git reports the tree clean (a skip-worktree or assume-unchanged edit?).
+  $KEPT"
+  # ls-files -v tags a plain entry H; S is skip-worktree, lower case assume-unchanged.
+  hidden="$(git -C "$INSTALL_DIR" ls-files -v | awk '$1 != "H"')" ||
+    die "cannot list the files in $INSTALL_DIR, so none can be checked.
+  $KEPT"
+  [ -z "$hidden" ] || die "$INSTALL_DIR has files git status does not check (skip-worktree or assume-unchanged), so /project-init would scaffold unverified files:
+$hidden
   $KEPT"
 }
 

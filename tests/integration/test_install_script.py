@@ -389,11 +389,28 @@ def _guard_where(variant: str) -> str:
     if variant == "never-called":
         assert real.count("config = _find_config(root)") == 1
         return real.replace("config = _find_config(root)", "config = None")
+    if variant == "trailing-comment":
+        # The old check, with the refusal kept only as comments on its lines.
+        return real.replace(
+            _REFUSAL,
+            "        if agents.exists() or config.exists():"
+            '  # if agents.is_symlink() or config.is_symlink(): "PI-903"\n'
+            "            continue  # continue\n",
+        )
     raise AssertionError(variant)
 
 
 _NOT_THE_REFUSAL = pytest.mark.parametrize(
-    "variant", ["comment", "docstring", "dead-branch", "dead-loop", "unused-helper", "never-called"]
+    "variant",
+    [
+        "comment",
+        "trailing-comment",
+        "docstring",
+        "dead-branch",
+        "dead-loop",
+        "unused-helper",
+        "never-called",
+    ],
 )
 
 
@@ -435,11 +452,50 @@ def test_refusal_with_comments_around_it_is_still_the_refusal(boot: Bootstrap):
     assert boot.cmd.is_file()
 
 
+def test_refusal_whose_comments_hold_quotes_is_still_the_refusal(boot: Bootstrap):
+    """A quote in a trailing comment is comment text, not the start of a string (#1047)."""
+    quoted = (
+        '        agents = candidate / ".agents"  # it\'s the marker\n'
+        '        config = agents / "config.yaml"  # "config"\n'
+        '        if agents.is_symlink() or config.is_symlink():  # see "PI-903"\n'
+        "            continue#don't follow a planted link\n"
+    )
+    boot.commit_upstream(_GUARD, _guard_with_refusal().replace(_MARKER + _REFUSAL, quoted), "q")
+    _git(boot.upstream, "tag", "v1.4.0")
+    result = boot.run(PROJECT_INIT_REF="v1.4.0")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert boot.cmd.is_file()
+
+
 def test_on_disk_guard_with_crlf_line_endings_keeps_its_refusal(boot: Bootstrap):
     """A Windows clone (core.autocrlf) writes the guard CRLF; that is still the refusal."""
     guard = boot.existing_clone()
-    _git(boot.install, "update-index", "--skip-worktree", _GUARD)
-    guard.write_bytes(guard.read_bytes().replace(b"\n", b"\r\n"))
+    _git(boot.install, "config", "core.autocrlf", "true")
+    guard.unlink()
+    _git(boot.install, "checkout", "--", _GUARD)
+    assert b"\r\n" in guard.read_bytes()
+    assert _git(boot.install, "status", "--porcelain") == ""
     result = boot.run(PROJECT_INIT_REF="main")
     assert result.returncode == 0, result.stdout + result.stderr
     assert boot.cmd.is_file()
+
+
+# ── PR #1047 review, round 3: git status skips flagged files, so flags refuse ──
+
+
+@pytest.mark.parametrize("flag", ["--skip-worktree", "--assume-unchanged"])
+def test_hidden_edit_to_any_shipped_file_is_refused(boot: Bootstrap, flag: str):
+    """`uvx --from` builds every file, so an edit hidden outside the guard refuses too."""
+    scaffold = "src/project_init/scaffold.py"
+    (boot.upstream / scaffold).parent.mkdir(parents=True)
+    boot.commit_upstream(scaffold, "def scaffold():\n    refuse_symlinks()\n", "scaffold")
+    boot.existing_clone()
+    _git(boot.install, "update-index", flag, scaffold)
+    edited = "def scaffold():\n    pass\n"
+    (boot.install / scaffold).write_text(edited)
+    assert _git(boot.install, "status", "--porcelain") == ""
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert scaffold in result.stderr and "Nothing was reset" in result.stderr, result.stderr
+    assert (boot.install / scaffold).read_text() == edited, "the edit must survive"
+    assert not boot.cmd.exists()
