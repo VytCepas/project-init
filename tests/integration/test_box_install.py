@@ -302,6 +302,39 @@ def test_apply_refuses_a_dirty_tree(box: Box):
     _no_install(box)
 
 
+# ls-files -v label -> the update-index flags that set it. Set one call per flag:
+# update-index applies only one of the two when both are given in one call.
+_HIDING = {
+    "skip-worktree": ("--skip-worktree",),
+    "assume-unchanged": ("--assume-unchanged",),
+    "skip-worktree, assume-unchanged": ("--skip-worktree", "--assume-unchanged"),
+}
+
+
+@pytest.mark.parametrize("label", sorted(_HIDING))
+def test_apply_refuses_an_edit_git_status_skips(box: Box, label: str):
+    """status reads clean, yet uv would build and install the edited bytes (#1047 review)."""
+    for flag in _HIDING[label]:
+        _git(box.repo, "update-index", flag, "templates/base/hook.sh")
+    (box.repo / "templates/base/hook.sh").write_text("#!/usr/bin/env bash\necho unreviewed\n")
+    assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
+    shown = f"one call per flag:\n      {label}: templates/base/hook.sh"
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "files git status skips would be installed unreviewed" in result.stderr
+    assert shown in result.stderr, result.stderr
+    _no_install(box)
+    dry = box.run()
+    assert dry.returncode == 1
+    assert "--apply would refuse" in dry.stdout and shown in dry.stdout, dry.stdout
+    # The commands the refusal names clear the flags, and status then sees the edit.
+    for flag in _HIDING[label]:
+        _git(box.repo, "update-index", f"--no-{flag[2:]}", "--", "templates/base/hook.sh")
+    after = box.run("--apply")
+    assert "git status skips" not in after.stderr and "M templates/base/hook.sh" in after.stderr
+    _no_install(box)
+
+
 def test_apply_refuses_when_not_in_sync_with_origin(box: Box):
     (box.repo / "README.md").write_text("local only\n")
     _git(box.repo, "commit", "-q", "-am", "unpushed")
@@ -642,6 +675,43 @@ def test_check_flags_an_install_without_a_record(box: Box):
     result = box.run("--check")
     assert result.returncode == 1
     assert "record: project_init-0.0.1.dist-info has no RECORD" in result.stderr
+
+
+_DIST = "project_init-0.0.1.dist-info"
+_UNCOMPARED = ", so the installed metadata is not compared"
+
+
+@pytest.mark.parametrize(
+    ("name", "damage", "line"),
+    [
+        ("METADATA", None, f"{_DIST}/METADATA cannot be read (No such file or directory)"),
+        ("METADATA", b"\xff\xfe", f"{_DIST}/METADATA cannot be read (not UTF-8)"),
+        ("entry_points.txt", b"\xff", f"{_DIST}/entry_points.txt cannot be read (not UTF-8)"),
+        ("RECORD", b"\xff", f"{_DIST}/RECORD cannot be read (not UTF-8)"),
+    ],
+    ids=["no-metadata", "binary-metadata", "binary-entry-points", "binary-record"],
+)
+def test_check_reports_an_unreadable_dist_info_file_and_carries_on(
+    box: Box, name: str, damage: bytes | None, line: str
+):
+    """A missing or unreadable dist-info file is one drift line, never a traceback (po#318)."""
+    pkg = box.install_layout()
+    path = pkg.parent / _DIST / name
+    if damage is None:
+        path.unlink()
+    else:
+        path.write_bytes(damage)
+    (pkg / "cli.py").write_text("tampered\n")  # a later comparison must still run
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr, result.stderr
+    items = [row[6:] for row in result.stderr.splitlines() if row.startswith("    - ")]
+    first = (
+        f"record: {line}, so what it installed is unknown"
+        if name == "RECORD"
+        else f"metadata: {line}{_UNCOMPARED}"
+    )
+    assert items == [first, "modified: project_init/cli.py (tree: src/project_init/cli.py)"]
 
 
 @pytest.mark.skipif(shutil.which("just") is None, reason="just not installed")
