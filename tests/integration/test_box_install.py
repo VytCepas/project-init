@@ -559,3 +559,102 @@ def test_recipe_never_downloads_a_python(tmp_path: Path):
         check=True,
     )
     assert log.read_text().split()[:2] == ["run", "--no-python-downloads"], log.read_text()
+
+
+@pytest.mark.skipif(shutil.which("just") is None, reason="just not installed")
+def test_recipe_asks_uv_for_a_python_with_tomllib(tmp_path: Path):
+    """Outside the project env no requires-python applies, so the recipe states the script's floor."""
+    stub = tmp_path / "bin"
+    stub.mkdir()
+    (stub / "uv").write_text('#!/usr/bin/env bash\nprintf \'%s\\n\' "$*" >> "$UV_LOG"\n')
+    (stub / "uv").chmod(0o755)
+    log = tmp_path / "uv.log"
+    env = {**os.environ, "PATH": f"{stub}{os.pathsep}{os.environ['PATH']}", "UV_LOG": str(log)}
+    subprocess.run(
+        ["just", "--justfile", str(_REPO_ROOT / "justfile"), "install", "--check"],
+        capture_output=True,
+        env=env,
+        check=True,
+    )
+    argv = log.read_text().split()
+    assert "--python" in argv, argv
+    assert argv[argv.index("--python") + 1] == ">=3.11", argv
+
+
+# ── review round 2 (#1047): read-only recipe, CRLF checkouts ─────────────────
+
+
+@pytest.mark.skipif(shutil.which("just") is None or find_uv() is None, reason="just or uv missing")
+@pytest.mark.parametrize(
+    ("args", "ran"),
+    [((), "DRY RUN, nothing written"), (("--check",), "not installed:")],
+    ids=["dry-run", "check"],
+)
+def test_recipe_creates_no_venv_and_needs_no_network(box: Box, args: tuple[str, ...], ran: str):
+    """A fresh checkout, offline, with an empty uv cache: `uv run` must not sync the project."""
+    uv = find_uv()
+    assert uv
+    env = {
+        **box.env,
+        "PATH": os.pathsep.join([str(Path(uv).parent), str(Path(sys.executable).parent)])
+        + os.pathsep
+        + os.environ["PATH"],
+        "UV_OFFLINE": "1",
+        "UV_CACHE_DIR": str(box.tmp / "empty-uv-cache"),
+        "UV_TOOL_DIR": str(box.tools),
+        "UV_TOOL_BIN_DIR": str(box.bin),
+    }
+    justfile = ["just", "--justfile", str(_REPO_ROOT / "justfile")]
+    result = subprocess.run(
+        [*justfile, "--working-directory", str(box.repo), "install", *args],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+    )
+    assert not (box.repo / ".venv").exists(), result.stdout + result.stderr
+    assert ran in result.stdout + result.stderr, result.stdout + result.stderr
+
+
+def _autocrlf_checkout(box: Box) -> None:
+    """Git for Windows' defaults: `* text=auto` committed, core.autocrlf=true, a fresh checkout."""
+    attributes = box.repo / ".gitattributes"
+    attributes.write_text("* text=auto\n" + attributes.read_text())
+    _git(box.repo, "commit", "-q", "-am", "text=auto")
+    _git(box.repo, "config", "core.autocrlf", "true")
+    for rel in _git(box.repo, "ls-files").splitlines():
+        (box.repo / rel).unlink()
+    _git(box.repo, "checkout", "--", ".")
+    assert b"\r\n" in (box.repo / "src" / "project_init" / "cli.py").read_bytes()
+    assert b"\r\n" not in (box.repo / "templates" / "base" / "hook.sh").read_bytes()
+
+
+def test_check_passes_an_install_built_from_a_crlf_checkout(box: Box):
+    # The wheel copies the working tree, so it is CRLF where the blobs are LF.
+    _autocrlf_checkout(box)
+    box.install_layout()
+    result = box.run("--check")
+    assert result.returncode == 0, result.stderr
+    assert "(5 files)" in result.stdout
+
+
+def test_check_still_catches_crlf_in_an_eol_lf_file_under_autocrlf(box: Box):
+    # A checkout writes `*.sh text eol=lf` as LF even here, so CRLF is not its form.
+    _autocrlf_checkout(box)
+    pkg = box.install_layout()
+    hook = pkg / "templates" / "base" / "hook.sh"
+    hook.write_bytes(hook.read_bytes().replace(b"\n", b"\r\n"))
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert "modified: project_init/templates/base/hook.sh" in result.stderr
+    assert result.stderr.count("    - ") == 1, result.stderr
+
+
+def test_check_still_catches_an_edit_under_autocrlf(box: Box):
+    _autocrlf_checkout(box)
+    pkg = box.install_layout()
+    (pkg / "cli.py").write_bytes(b"def main():\r\n    return 1\r\n")
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert "modified: project_init/cli.py (tree: src/project_init/cli.py)" in result.stderr
+    assert result.stderr.count("    - ") == 1, result.stderr

@@ -99,6 +99,54 @@ resolve_ref() {
   fi
 }
 
+# Exit 0 when the prod_guard.py on stdin carries PI-903's refusal as live code:
+# `if agents.is_symlink() or config.is_symlink(): continue`, right after the
+# marker it tests, directly in _find_config's walk loop, with _find_config
+# called. Comments and triple-quoted strings are skipped, so the word alone, a
+# dead branch or an unused helper do not pass (PI-1045 review). Static on
+# purpose: nothing from an unverified ref runs.
+has_symlink_refusal() {
+  awk '
+    function indent(s) { match(s, /^ */); return RLENGTH }
+    { sub(/\r$/, "") }
+    {
+      rest = $0; skip = (open != "")
+      while (1) {
+        if (open != "") {
+          p = index(rest, open)
+          if (!p) break
+          rest = substr(rest, p + 3); open = ""; continue
+        }
+        a = index(rest, "\"\"\""); b = index(rest, "\047\047\047")
+        if (!a && !b) break
+        skip = 1
+        if (a && (!b || a < b)) { open = "\"\"\""; rest = substr(rest, a + 3) }
+        else { open = "\047\047\047"; rest = substr(rest, b + 3) }
+      }
+      if (skip) next
+      code = $0
+      sub(/[ \t]+$/, "", code)
+      if (code ~ /^[ \t]*(#|$)/) next
+      sub(/[ \t]+#[^"\047]*$/, "", code)
+      k = indent(code); code = substr(code, k + 1)
+      while (depth && ind[depth] >= k) depth--
+      if (k == 0 && code !~ /^\)/) fn = (code ~ /^def _find_config\(/) ? "_find_config" : ""
+      if (code ~ /_find_config\(/ && code !~ /^def /) called = 1
+      if (cand && code == "continue" && k > cand) found = 1
+      cand = 0
+      if (code == "if agents.is_symlink() or config.is_symlink():" && k == k1 && k == k2 &&
+        c1 == "config = agents / \"config.yaml\"" && c2 ~ /^agents = [A-Za-z_][A-Za-z0-9_]* \/ "\.agents"$/ &&
+        depth >= 2 && ind[depth - 1] == 0 && fn == "_find_config") {
+        v = c2; sub(/^agents = /, "", v); sub(/ \/.*/, "", v)
+        if (index(txt[depth], "for " v " in ") == 1) cand = k
+      }
+      if (code ~ /:$/) { depth++; ind[depth] = k; txt[depth] = code }
+      c2 = c1; k2 = k1; c1 = code; k1 = k
+    }
+    END { exit !(found && called) }
+  '
+}
+
 # Fail closed unless <commit-ish> ships a prod_guard that refuses a symlinked
 # .agents marker. Runs before checkout, so a refused ref never moves the clone
 # an existing /project-init already scaffolds from (PI-1045). Sets VERIFIED.
@@ -106,9 +154,9 @@ verify_guard() {
   local content
   content="$(git -C "$INSTALL_DIR" show "$1:$GUARD_FILE" 2>/dev/null)" ||
     die "cannot read $GUARD_FILE at $2, so its symlink refusal cannot be checked — refusing to install"
-  case "$content" in
-  *is_symlink*) VERIFIED="$(git -C "$INSTALL_DIR" rev-parse "$1^{commit}")" && return 0 ;;
-  esac
+  if printf '%s\n' "$content" | has_symlink_refusal; then
+    VERIFIED="$(git -C "$INSTALL_DIR" rev-parse "$1^{commit}")" && return 0
+  fi
   die "$2 ships a prod_guard.py without the symlink refusal (PI-903), so /project-init would scaffold a guard that a planted .agents symlink can switch off. Refusing to install it.
   Fix: re-run with PROJECT_INIT_REF=main, or with PROJECT_INIT_REF=vX.Y.Z naming a release newer than v1.2.2."
 }
@@ -133,11 +181,22 @@ verify_checkout() {
     die "$INSTALL_DIR is at $head, not the verified $ref_label ($VERIFIED): it holds commits that were not checked. See: git -C $INSTALL_DIR log $VERIFIED..HEAD
   $KEPT"
   refuse_dirty
-  case "$(cat "$INSTALL_DIR/$GUARD_FILE" 2>/dev/null)" in
-  *is_symlink*) ;;
-  *) die "$INSTALL_DIR/$GUARD_FILE on disk has no symlink refusal, though git reports the tree clean (a skip-worktree or assume-unchanged edit?).
-  $KEPT" ;;
-  esac
+  has_symlink_refusal 2>/dev/null <"$INSTALL_DIR/$GUARD_FILE" ||
+    die "$INSTALL_DIR/$GUARD_FILE on disk has no symlink refusal, though git reports the tree clean (a skip-worktree or assume-unchanged edit?).
+  $KEPT"
+}
+
+# A git step that refuses (a diverged branch, a stale lock) stops with the
+# reason and $KEPT, never raw git output under set -e (PI-1045 review).
+git_step() {
+  local why="$1"
+  shift
+  git -C "$INSTALL_DIR" "$@" || die "$why
+  $KEPT"
+}
+
+ff_refused() {
+  printf '%s' "cannot fast-forward $INSTALL_DIR to the verified $ref_label ($VERIFIED): its branch holds commits that are not on it. See: git -C $INSTALL_DIR log $VERIFIED..HEAD"
 }
 
 # 3. repo
@@ -169,10 +228,11 @@ ensure_repo() {
       refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
     [ -n "$default_branch" ] || default_branch="main"
     verify_guard "origin/$default_branch" "the default branch ($default_branch)"
-    git -C "$INSTALL_DIR" checkout -q "$default_branch"
+    git_step "cannot check out the default branch ($default_branch) in $INSTALL_DIR." \
+      checkout -q "$default_branch"
     # Fast-forward to the verified object, never pull: a second fetch could
     # land past VERIFIED on a commit nobody checked (PI-1045 review).
-    git -C "$INSTALL_DIR" merge -q --ff-only "$VERIFIED"
+    git_step "$(ff_refused)" merge -q --ff-only "$VERIFIED"
   else
     # An explicit PROJECT_INIT_REF — a literal branch OR tag. Check it out;
     # a tag lands detached (immutable), while a branch pin fast-forwards to
@@ -184,9 +244,9 @@ ensure_repo() {
     else
       verify_guard "$REF" "ref '$REF'"
     fi
-    git -C "$INSTALL_DIR" checkout -q "$REF"
+    git_step "cannot check out ref '$REF' in $INSTALL_DIR." checkout -q "$REF"
     if git -C "$INSTALL_DIR" symbolic-ref -q HEAD >/dev/null 2>&1; then
-      git -C "$INSTALL_DIR" merge -q --ff-only "$VERIFIED"
+      git_step "$(ff_refused)" merge -q --ff-only "$VERIFIED"
     fi
   fi
   verify_checkout

@@ -156,14 +156,15 @@ def test_install_sh_writes_slash_command(boot: Bootstrap):
 
 
 def test_installed_template_carries_the_symlink_refusal():
-    """PI-1045: the file install.sh checks exists at HEAD and has the marker it greps.
+    """PI-1045: the file install.sh checks exists at HEAD, with the refusal in the shape it matches.
 
-    If a refactor renames the refusal or moves the file, install.sh would refuse
-    every ref, main included. This fails first.
+    If a refactor reshapes the refusal or moves the file, install.sh would refuse
+    every ref, main included. This names the cause; test_release_with_refusal_installs
+    runs the real guard through install.sh's match.
     """
     declared = re.search(r'^GUARD_FILE="([^"]+)"$', _INSTALL_SH.read_text(), re.MULTILINE)
     assert declared and declared.group(1) == _GUARD
-    assert "is_symlink" in _guard_with_refusal()
+    assert _MARKER + _REFUSAL in _guard_with_refusal()
 
 
 def test_default_release_without_refusal_is_refused(boot: Bootstrap):
@@ -301,20 +302,144 @@ def test_upstream_commit_landing_after_the_check_is_never_checked_out(
     assert boot.cmd.is_file()
 
 
+def _diverge(boot: Bootstrap) -> str:
+    """A clone with a local commit while upstream moved on; returns the local commit."""
+    boot.existing_clone()
+    (boot.install / "README.md").write_text("local\n")
+    _git(boot.install, "add", "-A")
+    _git(boot.install, "commit", "-q", "-m", "local work")
+    boot.commit_upstream("OTHER.md", "upstream\n", "upstream work")
+    return _git(boot.install, "rev-parse", "HEAD")
+
+
 @_BRANCH_PATHS
 def test_diverged_local_branch_is_refused_and_kept(
     boot: Bootstrap, ref_env: dict[str, str], label: str
 ):
     """Landing on VERIFIED is a fast-forward only: a diverged branch stops, nothing is reset."""
-    boot.existing_clone()
-    (boot.install / "README.md").write_text("local\n")
-    _git(boot.install, "add", "-A")
-    _git(boot.install, "commit", "-q", "-m", "local work")
-    local = _git(boot.install, "rev-parse", "HEAD")
-    boot.commit_upstream("OTHER.md", "upstream\n", "upstream work")
+    local = _diverge(boot)
     result = boot.run(**ref_env)
     assert f"(ref: {label})" in result.stdout, result.stdout + result.stderr
     assert result.returncode != 0, result.stdout + result.stderr
     assert _git(boot.install, "rev-parse", "HEAD") == local, "the local commit must survive"
     assert (boot.install / "README.md").read_text() == "local\n"
     assert not boot.cmd.exists()
+
+
+# ── PR #1047 review: a refused git step says why, and that nothing was reset ──
+
+
+@_BRANCH_PATHS
+def test_diverged_local_branch_refusal_says_why_and_that_nothing_was_reset(
+    boot: Bootstrap, ref_env: dict[str, str], label: str
+):
+    """A failed fast-forward is install.sh's refusal, not raw git output under set -e."""
+    _diverge(boot)
+    result = boot.run(**ref_env)
+    assert f"(ref: {label})" in result.stdout, result.stdout + result.stderr
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "cannot fast-forward" in result.stderr, result.stderr
+    assert "Nothing was reset" in result.stderr, result.stderr
+
+
+def test_checkout_git_refuses_says_why_and_that_nothing_was_reset(boot: Bootstrap):
+    """A stale index.lock makes `git checkout` fail after every check has passed."""
+    boot.existing_clone()
+    (boot.install / ".git" / "index.lock").write_text("")
+    result = boot.run(PROJECT_INIT_REF="v1.3.0")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "cannot check out ref 'v1.3.0'" in result.stderr, result.stderr
+    assert "Nothing was reset" in result.stderr, result.stderr
+    assert _git(boot.install, "rev-parse", "HEAD") == boot.main
+    assert not boot.cmd.exists()
+
+
+# ── PR #1047 review: the refusal must be code, not the word `is_symlink` ─────
+
+_REFUSAL = "        if agents.is_symlink() or config.is_symlink():\n            continue\n"
+_MARKER = '        agents = candidate / ".agents"\n        config = agents / "config.yaml"\n'
+
+
+def _guard_where(variant: str) -> str:
+    """The real guard with its refusal turned into something that is not the refusal."""
+    real = _guard_with_refusal()
+    assert real.count(_MARKER + _REFUSAL) == 1, "the refusal's shape moved: update this test"
+    if variant == "comment":
+        return real.replace(
+            _REFUSAL, "".join(f"        # {ln.strip()}\n" for ln in _REFUSAL.splitlines())
+        )
+    if variant == "docstring":
+        # The whole construct, marker included, inside a string in the loop body.
+        return real.replace(_REFUSAL, f'        """\n{_MARKER}{_REFUSAL}        """\n')
+    if variant == "dead-branch":
+        nested = "".join(f"    {ln}\n" for ln in (_MARKER + _REFUSAL).splitlines())
+        return real.replace(_MARKER + _REFUSAL, "        if False:\n" + nested)
+    if variant == "dead-loop":
+        # In _find_config, at the walk loop's depth, but in a loop that never runs.
+        end = "    return None\n\n\ndef _unquote("
+        assert real.count(end) == 1
+        return real.replace(_REFUSAL, "").replace(
+            end, "    while False:\n" + _MARKER + _REFUSAL + end
+        )
+    if variant == "unused-helper":
+        helper = (
+            "\n\ndef _unused(start: Path) -> None:\n    for candidate in (start, *start.parents):\n"
+        )
+        return real.replace(_REFUSAL, "") + helper + _MARKER + _REFUSAL
+    if variant == "never-called":
+        assert real.count("config = _find_config(root)") == 1
+        return real.replace("config = _find_config(root)", "config = None")
+    raise AssertionError(variant)
+
+
+_NOT_THE_REFUSAL = pytest.mark.parametrize(
+    "variant", ["comment", "docstring", "dead-branch", "dead-loop", "unused-helper", "never-called"]
+)
+
+
+@_NOT_THE_REFUSAL
+def test_ref_whose_refusal_is_not_live_code_is_refused(boot: Bootstrap, variant: str):
+    """verify_guard reads the git object: the word surviving the refusal is not enough."""
+    guard = _guard_where(variant)
+    assert "is_symlink" in guard
+    boot.commit_upstream(_GUARD, guard, variant)
+    _git(boot.upstream, "tag", "v1.4.0")
+    result = boot.run(PROJECT_INIT_REF="v1.4.0")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "without the symlink refusal" in result.stderr, result.stderr
+    assert not boot.cmd.exists()
+
+
+@_NOT_THE_REFUSAL
+def test_on_disk_guard_whose_refusal_is_not_live_code_is_refused(boot: Bootstrap, variant: str):
+    """verify_checkout reads the file on disk, behind a skip-worktree edit git hides."""
+    guard = boot.existing_clone()
+    _git(boot.install, "update-index", "--skip-worktree", _GUARD)
+    guard.write_text(_guard_where(variant))
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "on disk has no symlink refusal" in result.stderr, result.stderr
+    assert not boot.cmd.exists()
+
+
+def test_refusal_with_comments_around_it_is_still_the_refusal(boot: Bootstrap):
+    """The match skips comments and blank lines, so annotating the refusal never refuses a ref."""
+    real = _guard_with_refusal()
+    noted = real.replace(_MARKER + _REFUSAL, _MARKER + "\n        # PI-903\n" + _REFUSAL)
+    boot.commit_upstream(
+        _GUARD, noted.replace("config.is_symlink():", "config.is_symlink():  # PI-903"), "noted"
+    )
+    _git(boot.upstream, "tag", "v1.4.0")
+    result = boot.run(PROJECT_INIT_REF="v1.4.0")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert boot.cmd.is_file()
+
+
+def test_on_disk_guard_with_crlf_line_endings_keeps_its_refusal(boot: Bootstrap):
+    """A Windows clone (core.autocrlf) writes the guard CRLF; that is still the refusal."""
+    guard = boot.existing_clone()
+    _git(boot.install, "update-index", "--skip-worktree", _GUARD)
+    guard.write_bytes(guard.read_bytes().replace(b"\n", b"\r\n"))
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert boot.cmd.is_file()
