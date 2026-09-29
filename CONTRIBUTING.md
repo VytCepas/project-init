@@ -28,6 +28,7 @@ just --list         # see all recipes
 | `just test` | full pytest suite (`pytest -n auto`) |
 | `just docs` | serve the MkDocs site locally |
 | `just ci` | lint + test (also enforced automatically on `git push`) |
+| `just install` | install this checkout as the `project-init` uv tool: a dry run by default, `--apply` from a clean `main` in sync with origin, `--check` to diff the installed build against HEAD |
 
 `just setup` points `core.hooksPath` at `.githooks/`, so the `pre-push` hook
 runs `just ci` before every push — nothing red reaches a PR. Bypass in an
