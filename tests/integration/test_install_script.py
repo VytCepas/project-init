@@ -71,6 +71,20 @@ class Bootstrap:
         }
         guard = self.upstream / _GUARD
         guard.parent.mkdir(parents=True)
+        # A minimal hatch wheel layout so refuse_ignored (PI-1047) has packaged
+        # paths to check: one `packages` entry, one `force-include` entry.
+        (self.upstream / "pyproject.toml").write_text(
+            '[tool.hatch.build.targets.wheel]\npackages = ["src/project_init"]\n\n'
+            "[tool.hatch.build.targets.wheel.force-include]\n"
+            '"templates" = "project_init/templates"\n'
+        )
+        (self.upstream / ".gitignore").write_text("*.local\n")
+        src = self.upstream / "src" / "project_init"
+        src.mkdir(parents=True)
+        (src / "__init__.py").write_text("")
+        # templates/ already exists: guard.parent.mkdir(parents=True) above made
+        # templates/base/dot_agents/hooks/.
+        (self.upstream / "templates" / "marker.txt").write_text("tracked\n")
         _git(self.upstream, "init", "-q", "-b", "main")
         for tag, text in (("v1.2.2", _guard_without_refusal()), ("v1.3.0", _guard_with_refusal())):
             guard.write_text(text)
@@ -487,7 +501,6 @@ def test_on_disk_guard_with_crlf_line_endings_keeps_its_refusal(boot: Bootstrap)
 def test_hidden_edit_to_any_shipped_file_is_refused(boot: Bootstrap, flag: str):
     """`uvx --from` builds every file, so an edit hidden outside the guard refuses too."""
     scaffold = "src/project_init/scaffold.py"
-    (boot.upstream / scaffold).parent.mkdir(parents=True)
     boot.commit_upstream(scaffold, "def scaffold():\n    refuse_symlinks()\n", "scaffold")
     boot.existing_clone()
     _git(boot.install, "update-index", flag, scaffold)
@@ -499,3 +512,31 @@ def test_hidden_edit_to_any_shipped_file_is_refused(boot: Bootstrap, flag: str):
     assert scaffold in result.stderr and "Nothing was reset" in result.stderr, result.stderr
     assert (boot.install / scaffold).read_text() == edited, "the edit must survive"
     assert not boot.cmd.exists()
+
+
+# ── PR #1047 follow-up: an ignored file under a packaged path is refused ────
+
+
+def test_ignored_file_under_a_packaged_path_is_refused(boot: Bootstrap):
+    """`git status --porcelain` never lists an ignored file, so it must be checked separately."""
+    boot.existing_clone()
+    (boot.install / "templates" / "secret.local").write_text("unreviewed\n")
+    assert _git(boot.install, "status", "--porcelain") == ""
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "ignored files under a packaged path" in result.stderr, result.stderr
+    assert "templates/secret.local" in result.stderr, result.stderr
+    assert "clean -fdX" in result.stderr, result.stderr
+    assert "Nothing was reset" in result.stderr, result.stderr
+    assert (boot.install / "templates" / "secret.local").exists(), "nothing must be cleaned up"
+    assert not boot.cmd.exists()
+
+
+def test_ignored_file_outside_a_packaged_path_is_not_refused(boot: Bootstrap):
+    """An ignored file that the wheel would never pick up (e.g. a root .venv) is not the harm."""
+    boot.existing_clone()
+    (boot.install / "unpackaged.local").write_text("irrelevant\n")
+    assert _git(boot.install, "status", "--porcelain") == ""
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert boot.cmd.is_file()

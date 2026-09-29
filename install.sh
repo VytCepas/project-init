@@ -180,6 +180,55 @@ $dirty
   $KEPT"
 }
 
+# Read pyproject.toml's hatch wheel layout the way tools/box_install.py's
+# wheel_layout() does: `packages` (tree paths copied as-is) plus the keys of
+# `force-include` (tree paths whose whole subtree ships). TOML text read with
+# awk, not python — install.sh must not execute repo code before the guard
+# above is verified (project-init#1047).
+packaged_paths() {
+  awk '
+    /^\[/ { section = $0 }
+    section == "[tool.hatch.build.targets.wheel]" && /^packages[ \t]*=/ {
+      line = $0
+      while (match(line, /"[^"]*"/)) {
+        print substr(line, RSTART + 1, RLENGTH - 2)
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+    section == "[tool.hatch.build.targets.wheel.force-include]" && match($0, /^"[^"]*"/) {
+      print substr($0, RSTART + 1, RLENGTH - 2)
+    }
+  ' "$1"
+}
+
+# git status --porcelain (refuse_dirty above) never lists an ignored file, so
+# an existing clone that acquired one under a force-included path — a stray
+# templates/*.local next to templates/ — passes verify_checkout clean while
+# /project-init would scaffold its unreviewed bytes into every project it
+# touches. Same check tools/box_install.py's ignored_problems() runs for
+# `just install`, ported to shell for the same reason packaged_paths is
+# (project-init#1047).
+refuse_ignored() {
+  local pyproject paths=() p ignored
+  pyproject="$INSTALL_DIR/pyproject.toml"
+  [ -f "$pyproject" ] || die "$pyproject is missing, so the packaged paths cannot be read.
+  $KEPT"
+  while IFS= read -r p; do
+    [ -n "$p" ] && paths+=("$p")
+  done < <(packaged_paths "$pyproject")
+  [ "${#paths[@]}" -gt 0 ] || die "$pyproject has no hatch wheel layout (packages/force-include), so the packaged paths cannot be checked.
+  $KEPT"
+  ignored="$(git -C "$INSTALL_DIR" ls-files -z --others --ignored --exclude-standard -- "${paths[@]}" |
+    tr '\0' '\n' | awk 'NF && $0 !~ /(^|\/)__pycache__(\/|$)/')" ||
+    die "cannot list ignored files under ${paths[*]} in $INSTALL_DIR.
+  $KEPT"
+  [ -z "$ignored" ] || die "$INSTALL_DIR has ignored files under a packaged path, so /project-init would scaffold unreviewed bytes:
+$ignored
+  Preview: git -C $INSTALL_DIR clean -ndX -- ${paths[*]}
+  Clean up: git -C $INSTALL_DIR clean -fdX -- ${paths[*]}
+  $KEPT"
+}
+
 # The tree /project-init scaffolds from must be the verified commit, clean, and
 # carry the refusal on disk: a fast-forward keeps local commits and edits, and
 # skip-worktree hides an edit from status (PI-1045 review). uvx builds every
@@ -201,6 +250,7 @@ verify_checkout() {
   [ -z "$hidden" ] || die "$INSTALL_DIR has files git status does not check (skip-worktree or assume-unchanged), so /project-init would scaffold unverified files:
 $hidden
   $KEPT"
+  refuse_ignored
 }
 
 # A git step that refuses (a diverged branch, a stale lock) stops with the
