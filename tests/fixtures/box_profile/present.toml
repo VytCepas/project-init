@@ -1,4 +1,0 @@
-schema_version = 1
-harnesses = ["claude", "codex", "not-a-surface"]
-mcp_roster = ["context7", "playwright", "not-an-mcp"]
-profile = "org"
