@@ -118,6 +118,27 @@ def test_each_test_still_gets_a_home_of_its_own(session_home):
     assert Path.home() != session_home[0]
 """
 
+_PLANTED_CARGO = """\
+import os
+from pathlib import Path
+
+
+def test_cargo_home_is_not_the_real_one():
+    real = Path(os.environ["REAL_HOME"]) / ".cargo"
+    assert Path(os.environ["CARGO_HOME"]) != real
+
+
+def test_cargo_config_and_credentials_are_not_reachable():
+    fake = Path(os.environ["CARGO_HOME"])
+    assert not (fake / "credentials.toml").exists()
+    assert not (fake / "config.toml").exists()
+
+
+def test_cargo_registry_cache_is_still_reused():
+    fake = Path(os.environ["CARGO_HOME"])
+    assert (fake / "registry" / "marker.txt").read_text() == "cached\\n"
+"""
+
 _PLANTED_WINDOWS = """\
 import ntpath
 import os
@@ -268,6 +289,23 @@ class TestHermeticScaffold:
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
 
+    def test_cargo_home_isolates_config_and_credentials_but_reuses_the_cache(
+        self, tmp_path: Path
+    ) -> None:
+        """PR #1056 review: CARGO_HOME has no separate cache-vs-config env var (unlike
+        UV_CACHE_DIR), so the real ~/.cargo's config.toml/credentials.toml must never
+        be reachable from a test, while its registry/ download cache is still reused."""
+        real_cargo = tmp_path / "real-home" / ".cargo"
+        (real_cargo / "registry").mkdir(parents=True)
+        (real_cargo / "registry" / "marker.txt").write_text("cached\n")
+        (real_cargo / "credentials.toml").write_text('[registries.crates-io]\ntoken = "secret"\n')
+        (real_cargo / "config.toml").write_text("[net]\n")
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_cargo.py", _PLANTED_CARGO)
+        result = _pytest(target, tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 3, 0), result.stdout
+
     def test_the_session_home_is_removed_after_the_run(self, tmp_path: Path) -> None:
         target = _python_scaffold(tmp_path / "p")
         _plant(target, "test_ok.py", "def test_ok():\n    assert True\n")
@@ -318,6 +356,20 @@ class TestSummaryLine:
         result = _pytest(target, tmp_path)
         assert result.returncode == 1, "pytest's own code for a failed test, exactly"
         assert _last_line(result.stdout) == ("my-project", 2, 2), result.stdout
+
+    def test_the_line_prints_after_pytests_own_final_summary_line(self, tmp_path: Path) -> None:
+        """PR #1056 review: a reader taking "the last line" must get the contract's.
+
+        ``_last_line`` above finds the line anywhere in the output, so it cannot
+        catch the line printing too early; this checks physical line order.
+        """
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_ok.py", "def test_ok():\n    assert True\n")
+        result = _pytest(target, tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+        lines = [line for line in result.stdout.splitlines() if line.strip()]
+        assert lines[-1] == "my-project: 1 passed, 0 failed", result.stdout
+        assert re.search(r"^1 passed in [\d.]+s$", lines[-2]), result.stdout
 
     def test_the_line_survives_xdist(self, tmp_path: Path) -> None:
         pytest.importorskip("xdist")
