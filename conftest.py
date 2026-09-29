@@ -7,21 +7,35 @@ Rule 1: no test reads or writes the real home, so a verdict never depends on who
 ran it. HOME (with Windows' USERPROFILE, HOMEDRIVE, HOMEPATH, APPDATA and
 LOCALAPPDATA), the XDG dirs and CLAUDE_CONFIG_DIR move to a throwaway directory
 when pytest imports this file: before it collects a test module or runs a
-fixture of any scope. Every test then gets a directory of its own, TMPDIR
-included; TMPDIR moves per test only, because pytest keeps its own temporary
-directories under it. Toolchain caches (uv, cargo, rustup, go, bun) keep their
-real locations: they hold content, not configuration, and a cold cache would
-turn every ``uv run`` into a download. CARGO_HOME and RUSTUP_HOME are the two
-exceptions that cannot just point at the real thing: cargo has no separate env
-var for its cache the way UV_CACHE_DIR splits from uv's config, so CARGO_HOME
-governs config.toml and credentials.toml (real registry tokens) as well as the
+fixture of any scope. Every test then gets a directory of its own, TMPDIR (with
+TEMP and TMP, which Windows and some tools read instead) included; these move
+per test only, because pytest keeps its own temporary directories under
+TMPDIR. Toolchain *caches* (uv, cargo, rustup, go, bun) keep their real
+locations: they hold content, not configuration, and a cold cache would turn
+every ``uv run`` into a download. *Install roots* — UV_PYTHON_INSTALL_DIR,
+UV_TOOL_DIR, GOPATH (which also gates `go install`'s binaries) and BUN_INSTALL
+— move inside the throwaway root instead, the same as HOME: they are where a
+test's own `uv python install`/`uv tool install`/`go install`/`bun install -g`
+would write, so leaving them real would let a test install into it (#1062).
+GOMODCACHE and bun's install cache are pinned to their real locations
+explicitly, so isolating GOPATH/BUN_INSTALL does not accidentally cool them —
+both otherwise default to a path *under* the var each command just moved.
+CARGO_HOME and RUSTUP_HOME are further exceptions that cannot just point at
+the real thing even for their cache half: cargo has no separate env var for
+its cache the way UV_CACHE_DIR splits from uv's config, so CARGO_HOME governs
+config.toml and credentials.toml (real registry tokens) as well as the
 registry/git download caches, and rustup keeps settings.toml (the default
 toolchain and other mutable preferences) directly under RUSTUP_HOME beside its
 toolchains/downloads caches. The test run's CARGO_HOME and RUSTUP_HOME (set
 once per session, in ``_hermetic_session``) are therefore their own throwaway
 directories, with only the download caches — registry/ and git/ for Cargo,
-toolchains/ and downloads/ for rustup — symlinked back to the real ones:
-config and credentials are absent from them.
+toolchains/ and downloads/ for rustup — symlinked back to the real ones (or an
+inherited CARGO_HOME/RUSTUP_HOME's, if the runner already exported one):
+config and credentials are absent from them. That source directory, and the
+real home itself, are captured once and stashed in a private env var so an
+xdist worker re-importing this file — with HOME (and CARGO_HOME/RUSTUP_HOME)
+already redirected by the controller — recovers the genuine paths instead of
+re-deriving them from the now-fake HOME and losing the caches (#1062).
 
 Also at import: the variables git exports into a hook (GIT_DIR, and more from a
 linked worktree) are dropped, so a test's ``git -C <tmp>`` acts on <tmp>, never
@@ -49,50 +63,67 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Mapping
+    from collections.abc import Callable, Generator, Mapping
 
 
-def _cargo_home(root: Path, real_home: Path) -> str:
-    """The test run's CARGO_HOME: only the real registry/git *caches* symlinked in.
+def _cargo_home(root: Path, source: Path) -> str:
+    """The test run's CARGO_HOME: only *source*'s registry/git *caches* symlinked in.
 
-    config.toml and credentials.toml are absent from it — cargo reads none of
-    the real ones through this variable. A symlink that cannot be made (no
-    privilege on Windows without Developer Mode) is skipped: isolation still
-    holds, the cache is just cold.
+    *source* is the genuine CARGO_HOME — the incoming environment's own export
+    if it set one, else ``~/.cargo`` — captured once by ``_stashed`` before this
+    run's CARGO_HOME was overridden (#1062). config.toml and credentials.toml
+    are absent from the result — cargo reads none of the real ones through this
+    variable. A symlink that cannot be made (no privilege on Windows without
+    Developer Mode) is skipped: isolation still holds, the cache is just cold.
     """
     fake = root / "cargo-home"
     fake.mkdir(parents=True, exist_ok=True)
     for name in ("registry", "git"):
-        real, link = real_home / ".cargo" / name, fake / name
+        real, link = source / name, fake / name
         if real.is_dir() and not link.exists():
             with contextlib.suppress(OSError):
                 link.symlink_to(real, target_is_directory=True)
     return str(fake)
 
 
-def _rustup_home(root: Path, real_home: Path) -> str:
-    """The test run's RUSTUP_HOME: only the real toolchains/downloads *caches* symlinked in.
+def _rustup_home(root: Path, source: Path) -> str:
+    """The test run's RUSTUP_HOME: only *source*'s toolchains/downloads *caches* symlinked in.
 
-    settings.toml (the default toolchain and other rustup preferences) is
-    mutable state, not a cache, and is absent from it — rustup reads and
-    writes none of the real one through this variable. A symlink that cannot
-    be made (no privilege on Windows without Developer Mode) is skipped:
-    isolation still holds, the cache is just cold.
+    *source* is the genuine RUSTUP_HOME — the incoming environment's own
+    export if it set one, else ``~/.rustup`` — captured once by ``_stashed``
+    before this run's RUSTUP_HOME was overridden (#1062). settings.toml (the
+    default toolchain and other rustup preferences) is mutable state, not a
+    cache, and is absent from the result — rustup reads and writes none of the
+    real one through this variable. A symlink that cannot be made (no
+    privilege on Windows without Developer Mode) is skipped: isolation still
+    holds, the cache is just cold.
     """
     fake = root / "rustup-home"
     fake.mkdir(parents=True, exist_ok=True)
     for name in ("toolchains", "downloads"):
-        real, link = real_home / ".rustup" / name, fake / name
+        real, link = source / name, fake / name
         if real.is_dir() and not link.exists():
             with contextlib.suppress(OSError):
                 link.symlink_to(real, target_is_directory=True)
     return str(fake)
 
 
-def _toolchain_env(real_home: Path, env: Mapping[str, str], root: Path) -> dict[str, str]:
-    """Each toolchain's cache and install dirs as the real home places them today."""
+def _toolchain_env(
+    real_home: Path, cargo_src: Path, rustup_src: Path, env: Mapping[str, str], root: Path
+) -> dict[str, str]:
+    """Each toolchain's install roots (inside *root*) and its shared caches (real).
+
+    Verified on this machine: ``UV_CACHE_DIR``/``UV_PYTHON_INSTALL_DIR``/
+    ``UV_TOOL_DIR`` against ``uv python install --help``, ``uv tool dir --help``
+    and ``uv cache dir --help`` (uv 0.11.28); ``GOPATH``/``GOCACHE``/
+    ``GOMODCACHE`` against ``go help environment`` and ``go env`` (go 1.27.1,
+    installed via Homebrew for this check — GOMODCACHE defaults to
+    ``$GOPATH/pkg/mod``, so it must be pinned once GOPATH moves); ``BUN_INSTALL``
+    and ``BUN_INSTALL_CACHE_DIR`` empirically (bun 1.4.2: the cache defaults to
+    ``$BUN_INSTALL/install/cache``, confirmed by pointing each var in turn at a
+    scratch dir and reading back ``bun pm cache``).
+    """
     cache = Path(env.get("XDG_CACHE_HOME") or real_home / ".cache")
-    data = Path(env.get("XDG_DATA_HOME") or real_home / ".local" / "share")
     go_cache = (
         real_home / "Library" / "Caches" / "go-build"
         if sys.platform == "darwin"
@@ -100,13 +131,15 @@ def _toolchain_env(real_home: Path, env: Mapping[str, str], root: Path) -> dict[
     )
     return {
         "UV_CACHE_DIR": str(cache / "uv"),
-        "UV_PYTHON_INSTALL_DIR": str(data / "uv" / "python"),
-        "UV_TOOL_DIR": str(data / "uv" / "tools"),
-        "CARGO_HOME": _cargo_home(root, real_home),
-        "RUSTUP_HOME": _rustup_home(root, real_home),
-        "GOPATH": str(real_home / "go"),
+        "UV_PYTHON_INSTALL_DIR": str(root / "uv-python"),
+        "UV_TOOL_DIR": str(root / "uv-tools"),
+        "CARGO_HOME": _cargo_home(root, cargo_src),
+        "RUSTUP_HOME": _rustup_home(root, rustup_src),
+        "GOPATH": str(root / "go"),
         "GOCACHE": str(go_cache),
-        "BUN_INSTALL": str(real_home / ".bun"),
+        "GOMODCACHE": str(real_home / "go" / "pkg" / "mod"),
+        "BUN_INSTALL": str(root / "bun"),
+        "BUN_INSTALL_CACHE_DIR": str(real_home / ".bun" / "install" / "cache"),
     }
 
 
@@ -159,6 +192,24 @@ _GIT_HOOK_VARS = (
     "GIT_CONFIG_COUNT",
 )
 
+# Private stash vars: the controller's first _hermetic_session() call records the
+# genuine answer under each of these before moving anything, so a later re-import
+# in the same run (an xdist worker, which inherits the controller's already-moved
+# HOME/CARGO_HOME/RUSTUP_HOME) recovers it instead of re-deriving it wrong (#1062).
+_REAL_HOME_VAR = "_PROJECT_INIT_REAL_HOME"
+_REAL_CARGO_SRC_VAR = "_PROJECT_INIT_REAL_CARGO_SRC"
+_REAL_RUSTUP_SRC_VAR = "_PROJECT_INIT_REAL_RUSTUP_SRC"
+
+
+def _stashed(patch: pytest.MonkeyPatch, var: str, compute: Callable[[], Path]) -> Path:
+    """*var*'s value from an earlier process in this run, else computed and stashed now."""
+    found = os.environ.get(var)
+    if found:
+        return Path(found)
+    value = compute()
+    patch.setenv(var, str(value))
+    return value
+
 
 def _hermetic_session() -> tuple[pytest.MonkeyPatch, Path]:
     """Move home for the whole run, reading the real one first for the toolchain caches."""
@@ -168,7 +219,18 @@ def _hermetic_session() -> tuple[pytest.MonkeyPatch, Path]:
     root = Path(tempfile.mkdtemp(prefix="test-contract-"))
     # pytest_unconfigure removes it; this covers a run that never configures (--version).
     atexit.register(shutil.rmtree, root, ignore_errors=True)
-    for name, value in _toolchain_env(Path.home(), os.environ, root).items():
+    real_home = _stashed(patch, _REAL_HOME_VAR, Path.home)
+    cargo_src = _stashed(
+        patch,
+        _REAL_CARGO_SRC_VAR,
+        lambda: Path(os.environ.get("CARGO_HOME") or real_home / ".cargo"),
+    )
+    rustup_src = _stashed(
+        patch,
+        _REAL_RUSTUP_SRC_VAR,
+        lambda: Path(os.environ.get("RUSTUP_HOME") or real_home / ".rustup"),
+    )
+    for name, value in _toolchain_env(real_home, cargo_src, rustup_src, os.environ, root).items():
         if name in _ALWAYS_ISOLATED or name not in os.environ:
             patch.setenv(name, value)
     _redirect(_home_env(root), patch)
@@ -176,8 +238,9 @@ def _hermetic_session() -> tuple[pytest.MonkeyPatch, Path]:
 
 
 # At import, not in pytest_configure: pytest imports tests/conftest.py before
-# configure, and test modules at collection. xdist workers inherit the moved home
-# and the real toolchain paths, then move to a home of their own.
+# configure, and test modules at collection. An xdist worker inherits the
+# controller's moved HOME, but recovers the controller's real toolchain paths
+# from the stash above (#1062), then moves to a home of its own.
 _SESSION_PATCH, _SESSION_ROOT = _hermetic_session()
 
 
@@ -193,7 +256,9 @@ def _test_contract_hermetic_home(
 ) -> None:
     # A dir of its own, not tmp_path: a test that lists its tmp_path must not find these in it.
     root = tmp_path_factory.mktemp("hermetic")
-    env = {**_home_env(root), "TMPDIR": root / "tmp"}
+    tmp = root / "tmp"
+    # TEMP/TMP: Windows and some tools read these instead of TMPDIR (Copilot, #1056/#1062).
+    env = {**_home_env(root), "TMPDIR": tmp, "TEMP": tmp, "TMP": tmp}
     _redirect(env, monkeypatch)
     # tempfile caches its dir on first use, so the variable alone would not move it.
     monkeypatch.setattr(tempfile, "tempdir", str(env["TMPDIR"]))

@@ -33,7 +33,17 @@ _CONTRACT_VARS = {
     "RUSTUP_HOME",
     "GOPATH",
     "GOCACHE",
+    "GOMODCACHE",
     "BUN_INSTALL",
+    "BUN_INSTALL_CACHE_DIR",
+    "TEMP",
+    "TMP",
+    # The conftest's own private stash (#1062): this repo's outer suite is itself
+    # hermetic under the same conftest, so these would otherwise leak the outer
+    # run's real paths into the child's supposedly-independent hermetic session.
+    "_PROJECT_INIT_REAL_HOME",
+    "_PROJECT_INIT_REAL_CARGO_SRC",
+    "_PROJECT_INIT_REAL_RUSTUP_SRC",
 }
 LINE = re.compile(r"^([A-Za-z0-9._-]+): (\d+) passed, (\d+) failed$", re.MULTILINE)
 
@@ -219,6 +229,66 @@ def test_git_in_tmp_path_acts_on_tmp_path(tmp_path):
 
 def test_no_hook_git_variable_reaches_a_test():
     assert [v for v in os.environ["HOOK_VARS"].split() if v in os.environ] == []
+"""
+
+_PLANTED_TEMP_TMP = """\
+import os
+
+
+def test_temp_matches_tmpdir():
+    assert os.environ["TEMP"] == os.environ["TMPDIR"]
+
+
+def test_tmp_matches_tmpdir():
+    assert os.environ["TMP"] == os.environ["TMPDIR"]
+"""
+
+_PLANTED_INSTALL_ROOTS = """\
+import os
+from pathlib import Path
+
+
+def _under_real_home(var):
+    return Path(os.environ[var]).is_relative_to(Path(os.environ["REAL_HOME"]))
+
+
+def test_python_install_dir_is_not_the_real_home():
+    assert not _under_real_home("UV_PYTHON_INSTALL_DIR")
+
+
+def test_tool_dir_is_not_the_real_home():
+    assert not _under_real_home("UV_TOOL_DIR")
+
+
+def test_gopath_is_not_the_real_home():
+    assert not _under_real_home("GOPATH")
+
+
+def test_bun_install_is_not_the_real_home():
+    assert not _under_real_home("BUN_INSTALL")
+
+
+def test_gomodcache_stays_real():
+    assert _under_real_home("GOMODCACHE")
+
+
+def test_bun_install_cache_dir_stays_real():
+    assert _under_real_home("BUN_INSTALL_CACHE_DIR")
+"""
+
+_PLANTED_INHERITED_SOURCE = """\
+import os
+from pathlib import Path
+
+
+def test_cargo_cache_comes_from_the_inherited_cargo_home():
+    fake = Path(os.environ["CARGO_HOME"])
+    assert (fake / "registry" / "marker.txt").read_text() == "custom-cargo\\n"
+
+
+def test_rustup_cache_comes_from_the_inherited_rustup_home():
+    fake = Path(os.environ["RUSTUP_HOME"])
+    assert (fake / "toolchains" / "marker.txt").read_text() == "custom-rustup\\n"
 """
 
 _PLANTED_IMPORTS_CONFTEST = """\
@@ -470,6 +540,75 @@ class TestHermeticScaffold:
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
         assert state() == before
+
+    def test_cargo_and_rustup_caches_survive_under_xdist(self, tmp_path: Path) -> None:
+        """Codex on #1056: an xdist worker re-imports the root conftest with HOME
+        already moved by the controller; deriving CARGO_HOME/RUSTUP_HOME's cache
+        source from Path.home() at that point answers with the fake home, so the
+        worker loses the Rust toolchain. Codex reproduced it with `-n 2`; this runs
+        real pytest -n 2 in a subprocess against a scaffolded sandbox, not a
+        simulation."""
+        pytest.importorskip("xdist")
+        real_cargo = tmp_path / "real-home" / ".cargo"
+        (real_cargo / "registry").mkdir(parents=True)
+        (real_cargo / "registry" / "marker.txt").write_text("cached\n")
+        real_rustup = tmp_path / "real-home" / ".rustup"
+        (real_rustup / "toolchains").mkdir(parents=True)
+        (real_rustup / "toolchains" / "marker.txt").write_text("cached\n")
+        (real_rustup / "downloads").mkdir(parents=True)
+        (real_rustup / "downloads" / "marker.txt").write_text("cached\n")
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_cargo.py", _PLANTED_CARGO)
+        _plant(target, "test_rustup.py", _PLANTED_RUSTUP)
+        result = _pytest(target, tmp_path, "-n", "2")
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 6, 0), result.stdout
+
+    def test_inherited_cargo_and_rustup_home_are_the_cache_source(self, tmp_path: Path) -> None:
+        """Codex on #1056 (P2): a runner whose CARGO_HOME/RUSTUP_HOME already point
+        outside ~/.cargo, ~/.rustup must still see ITS toolchains — the cache
+        links are taken from the inherited location, not from the default."""
+        custom_cargo = tmp_path / "custom-cargo"
+        (custom_cargo / "registry").mkdir(parents=True)
+        (custom_cargo / "registry" / "marker.txt").write_text("custom-cargo\n")
+        custom_rustup = tmp_path / "custom-rustup"
+        (custom_rustup / "toolchains").mkdir(parents=True)
+        (custom_rustup / "toolchains" / "marker.txt").write_text("custom-rustup\n")
+        # A decoy at the default location proves the custom one wins, not ~/.rustup.
+        real_cargo_default = tmp_path / "real-home" / ".cargo"
+        (real_cargo_default / "registry").mkdir(parents=True)
+        (real_cargo_default / "registry" / "marker.txt").write_text("default-cargo\n")
+        real_rustup_default = tmp_path / "real-home" / ".rustup"
+        (real_rustup_default / "toolchains").mkdir(parents=True)
+        (real_rustup_default / "toolchains" / "marker.txt").write_text("default-rustup\n")
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_inherited_source.py", _PLANTED_INHERITED_SOURCE)
+        result = _pytest(
+            target, tmp_path, CARGO_HOME=str(custom_cargo), RUSTUP_HOME=str(custom_rustup)
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
+
+    def test_install_roots_move_but_shared_caches_stay_real(self, tmp_path: Path) -> None:
+        """Codex on #1056 (P1): UV_PYTHON_INSTALL_DIR, UV_TOOL_DIR, GOPATH and
+        BUN_INSTALL used to point at the real home, so `uv python install`,
+        `uv tool install`, `go install` or `bun install -g` from a test wrote
+        there. Only the shared caches (GOMODCACHE, bun's install cache) may
+        stay real."""
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_install_roots.py", _PLANTED_INSTALL_ROOTS)
+        result = _pytest(target, tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 6, 0), result.stdout
+
+    def test_temp_and_tmp_match_tmpdir(self, tmp_path: Path) -> None:
+        """Copilot on #1056/#1062: the per-test fixture set only TMPDIR; Windows
+        and some tools read TEMP/TMP, so point them at the same per-test dir."""
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_temp_tmp.py", _PLANTED_TEMP_TMP)
+        result = _pytest(target, tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
 
     def test_the_session_home_is_removed_after_the_run(self, tmp_path: Path) -> None:
         target = _python_scaffold(tmp_path / "p")
