@@ -63,18 +63,24 @@ curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.s
 
 This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to `~/.local/share/project-init` (override with `PROJECT_INIT_HOME=...`) **pinned to the latest tagged release**, and writes a user-level slash command at `~/.claude/commands/project-init.md`.
 
+It refuses any ref whose `prod_guard.py` lacks the symlink refusal (PI-903), which covers every release up to v1.2.2. If the latest release is one of them, the installer stops before checkout and tells you to re-run with `PROJECT_INIT_REF=main`.
+
 Pin a specific version, or opt into the unreleased development head:
 
 ```bash
-PROJECT_INIT_REF=v1.0.1 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
+PROJECT_INIT_REF=vX.Y.Z bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 PROJECT_INIT_REF=main   bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 ```
 
-Direct tool install without the slash command (any pinned tag):
+Direct tool install without the slash command:
 
 ```bash
-uv tool install git+https://github.com/VytCepas/project-init@v1.0.1
+uv tool install git+https://github.com/VytCepas/project-init@main
 ```
+
+`uv tool install` bypasses `install.sh` entirely, so none of the checks above —
+including the PI-903 symlink-refusal check — run. Pin a tag only if you have
+verified it carries that refusal (v1.3.0 or newer); v1.2.2 and older do not.
 
 Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
 
