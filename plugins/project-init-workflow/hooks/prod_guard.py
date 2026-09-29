@@ -731,20 +731,24 @@ def _prose_spans(command: str) -> list[tuple[int, int]]:
         if not simple.words or _flows_onward(simple):
             continue
         head = _head(simple.words[0])
+        grep_args = _git_grep_args(simple)
         if head in _PROSE_HEADS or head in _PROSE_PATTERN_TOOLS:
-            if head == "printf" and any(word.text.startswith("-v") for word in simple.words[1:]):
+            if head == "printf" and any(
+                _dequote(word.text).startswith("-v") for word in simple.words[1:]
+            ):
                 # `printf -v c "…"; $c` RAN in bash: the text became a command
                 # through the variable, and no verb was left anywhere to see.
+                # Dequoted, because `printf '-v' c "…"` assigns too (#1043).
                 continue
             regions = [region for word in simple.words[1:] for region in word.quoted]
-        elif _is_git_grep(simple):  # past `VAR=…` prefixes too
+        elif grep_args is not None:
             # #1039: `git grep <pattern>` searches its argument like `grep`, so a
             # quoted pattern naming a destructive verb is prose, not the verb —
             # `git grep 'terraform destroy'` asked before this. `git grep` never
-            # executes a quoted argument, so blanking them all is safe; the one
-            # exec path, `-O`/`--open-files-in-pager`, is caught by
-            # `_git_grep_runs_pager` whether its value is blanked or not.
-            regions = [region for word in simple.words[1:] for region in word.quoted]
+            # executes its own quoted arguments; the one exec path,
+            # `-O`/`--open-files-in-pager`, is caught by `_git_grep_runs_pager`
+            # whether its value is blanked or not.
+            regions = [region for word in simple.words[grep_args:] for region in word.quoted]
         else:
             regions = _message_regions(simple)
         spans.extend(
@@ -880,14 +884,47 @@ _GIT_GREP_PAGER_LONG = "open-files-in-pager"
 _GIT_GREP_SHORT_PAGER = re.compile(r"-[A-Za-z0-9]*O")  # `-1O` too: -NUM is context
 
 
-def _is_git_grep(simple: _Simple) -> bool:
-    """True when *simple* is a `git grep …` invocation (past global options)."""
+#: Wrappers that exec the rest of their argv as given — no shell, no search path of
+#: their own — with the only options modelled for each (#1043). Any other option
+#: keeps the prompt: `env -S'bash -c "eval \$3" x' git grep '…'` RAN the pattern.
+_EXEC_WRAPPERS: dict[str, frozenset[str]] = {
+    "builtin": frozenset(),
+    "command": frozenset({"-p"}),
+    "env": frozenset({"-", "-i", "--ignore-environment"}),
+    "nice": frozenset(),
+    "nohup": frozenset(),
+    "noglob": frozenset(),
+    "nocorrect": frozenset(),
+    "time": frozenset({"-p"}),
+}
+#: An assignment that decides which `git` runs (zsh ties `path` to PATH).
+_SEARCH_PATH_ASSIGN = re.compile(r"(?:PATH|path)(?:\[[^\]]*\])?\+?=")
+
+
+def _git_grep_args(simple: _Simple) -> int | None:
+    """Index of the first argument `git grep` itself takes in *simple*, or None.
+
+    Past `VAR=…` prefixes, `_EXEC_WRAPPERS` and git's global options. Only the
+    words from here on are prose: `git -c core.fsmonitor='…' grep` and a
+    GIT_CONFIG_* prefix RAN their value, and with a PATH prefix a planted
+    ./git ran the pattern (#1043).
+    """
     words = simple.words
     i = 0
-    while i < len(words) and _ASSIGN_PREFIX.match(words[i].text):
+    while i < len(words):
+        if _ASSIGN_PREFIX.match(words[i].text):
+            if _SEARCH_PATH_ASSIGN.match(words[i].text):
+                return None
+            i += 1
+            continue
+        options = _EXEC_WRAPPERS.get(_head(words[i]))
+        if options is None:
+            break
         i += 1
+        while i < len(words) and words[i].plain and words[i].text in options:
+            i += 1
     if i >= len(words) or _head(words[i]) != "git":
-        return False
+        return None
     i += 1
     while i < len(words):
         text = words[i].text
@@ -898,7 +935,7 @@ def _is_git_grep(simple: _Simple) -> bool:
             i += 1
             continue
         break
-    return i < len(words) and words[i].text == "grep"
+    return i + 1 if i < len(words) and words[i].text == "grep" else None
 
 
 def _git_grep_runs_pager(after_git: list[str]) -> str | None:
@@ -934,6 +971,59 @@ def _git_grep_runs_pager(after_git: list[str]) -> str | None:
     return None
 
 
+# ── #1043: a name split by quoting is still the name ────────────────────────
+# The shell joins adjacent quoted pieces, so `RIPGREP_'CONFIG_PATH'=…` sets the var
+# and `terraform "destroy"` runs the verb; no text check saw either. One mechanism
+# instead of a regex per spelling: every check also reads the command after quote
+# removal. A matching VIEW, never a parse — it only adds matches, so a rough edge
+# can flag a harmless command (ask, or deny in an autonomous mode such as
+# bypassPermissions) but never clears one the raw text flags.
+_ANSI_C_QUOTED = re.compile(r"\$'((?:[^'\\]|\\.)*)'", re.DOTALL)
+_ANSI_C_ESCAPE = re.compile(
+    r"\\(?:x([0-9A-Fa-f]{1,2})|u([0-9A-Fa-f]{1,4})|U([0-9A-Fa-f]{1,8})|([0-7]{1,3})|c(.)|(.))",
+    re.DOTALL,
+)
+_ANSI_C_LETTERS = {
+    "a": "\a",
+    "b": "\b",
+    "e": "\x1b",
+    "E": "\x1b",
+    "f": "\f",
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
+    "v": "\v",
+}
+
+
+def _ansi_c_escape(escape: re.Match[str]) -> str:
+    hexa, short, long, octal, control, other = escape.groups()
+    code = hexa or short or long
+    if code:
+        decoded = chr(min(int(code, 16), 0x10FFFF))
+    elif octal:
+        decoded = chr(int(octal, 8) & 0xFF)
+    elif control is not None:
+        decoded = chr(ord(control) & 0x1F)
+    else:
+        decoded = _ANSI_C_LETTERS.get(other, other)
+    # A word or environment name cannot hold a NUL byte, so bash drops a
+    # decoded NUL from it entirely: `terraform des$'\x00'troy` reaches bash as
+    # `terraform destroy`. Elide it here too (\0, \x00, \u0000, octal and
+    # control forms all land here), or the dequoted view still reads
+    # `des\0troy` and evaluate() never recognizes the spliced word (#1043
+    # review; PI-881 bump).
+    return "" if decoded == "\x00" else decoded
+
+
+def _dequoted(command: str) -> str:
+    """*command* after quote removal: `$'…'` decoded, quotes and backslashes gone."""
+    text = command.replace("\\\n", "")
+    text = _ANSI_C_QUOTED.sub(lambda m: _ANSI_C_ESCAPE.sub(_ansi_c_escape, m[1]), text)
+    text = text.replace('$"', '"')
+    return re.sub(r"\\(.)|['\"]", lambda m: m[1] or "", text, flags=re.DOTALL)
+
+
 # ── #1039: exec flags injected through a config file named in the environment ─
 # `RIPGREP_CONFIG_PATH=cfg rg` runs `--pre=CMD` from cfg; `ACKRC=cfg ack` runs its
 # `--pager`. Three review rounds each found another way to set the var (after
@@ -943,14 +1033,20 @@ def _git_grep_runs_pager(after_git: list[str]) -> str | None:
 _CONFIG_ENV: dict[str, str] = {"RIPGREP_CONFIG_PATH": "rg", "ACKRC": "ack"}
 
 
-def _config_env_runs_program(command: str) -> str | None:
-    """A config-path env var set beside the search tool that reads it, or None."""
+def _config_env_runs_program(views: tuple[str, ...]) -> str | None:
+    """A config-path env var set beside the search tool that reads it, or None.
+
+    *views* are the prose-blanked command, raw and dequoted (#1043); a match in
+    either counts.
+    """
     for var, tool in _CONFIG_ENV.items():
-        set_here = re.search(rf"(?<![A-Za-z0-9_]){var}\+?=", command) or re.search(
-            rf"\b(?:export|declare|typeset|local|readonly)\b[^;&|\n]*(?<![A-Za-z0-9_]){var}\b",
-            command,
+        set_at = re.compile(rf"(?<![A-Za-z0-9_]){var}\+?=")
+        exported = re.compile(
+            rf"\b(?:export|declare|typeset|local|readonly)\b[^;&|\n]*(?<![A-Za-z0-9_]){var}\b"
         )
-        named = re.search(rf"(?<![A-Za-z0-9_.-]){tool}(?![A-Za-z0-9_.-])", command)
+        tool_at = re.compile(rf"(?<![A-Za-z0-9_.-]){tool}(?![A-Za-z0-9_.-])")
+        set_here = any(set_at.search(view) or exported.search(view) for view in views)
+        named = any(tool_at.search(view) for view in views)
         if named and (set_here or _inherited_config_runs(var, tool)):
             return var
     return None
@@ -1002,16 +1098,17 @@ _PLAIN_PARAM = re.compile(
 )
 
 
-def _trace_runs_program(command: str) -> str | None:
+def _trace_runs_program(views: tuple[str, ...]) -> str | None:
     """PS4 named beside xtrace and a construct able to run a program, or None.
 
-    Read from the raw string, so `bash -c '…'` bodies and lines that do not
-    tokenise are seen as well.
+    *views* are the prose-blanked command, raw and dequoted (#1043), so
+    `bash -c '…'` bodies and lines that do not tokenise are seen as well.
     """
-    if not (_PS4_NAMED.search(command) and _XTRACE_ON.search(command)):
+    named = any(_PS4_NAMED.search(view) for view in views)
+    if not (named and any(_XTRACE_ON.search(view) for view in views)):
         return None
-    rest = _PLAIN_PARAM.sub("", command)
-    return "PS4 with set -x" if "$" in rest or "`" in rest else None
+    rests = [_PLAIN_PARAM.sub("", view) for view in views]
+    return "PS4 with set -x" if any("$" in rest or "`" in rest for rest in rests) else None
 
 
 # ── Secret-file exposure (PI-893) ───────────────────────────────────────────
@@ -2050,13 +2147,16 @@ def evaluate(
         return None
     # Computed once, not per rule: 20-odd rules over the same string.
     prose_free = _without_prose(command)
+    # #1043: every check also reads the command after quote removal, so
+    # `terraform "destroy"` is the verb it runs. Prose names nothing that runs,
+    # so the checks after the deny table read only the prose-blanked views.
+    views = (prose_free, _dequoted(prose_free))
+    pairs = ((command, views[0]), (_dequoted(command), views[1]))
     for pattern, label in DENY_RULES:
-        if pattern.search(command):
-            # #965: the verb is real only if it survives blanking the prose. A
-            # rule that matches ONLY inside a commit message or a grep pattern
-            # was reading documentation, not an operation.
-            if not pattern.search(prose_free):
-                continue
+        # #965: the verb is real only if it survives blanking the prose. A rule
+        # that matches ONLY inside a commit message or a grep pattern was
+        # reading documentation, not an operation.
+        if any(pattern.search(whole) and pattern.search(bare) for whole, bare in pairs):
             return _verdict(
                 f"prod_guard: '{label}' is a destructive operation. "
                 "If this is intentional and safe, add a matching regex to "
@@ -2066,7 +2166,7 @@ def evaluate(
                 permission_mode,
                 problems,
             )
-    runner = _search_runs_program(command) or _config_env_runs_program(command)
+    runner = _search_runs_program(command) or _config_env_runs_program(views)
     if runner is not None:
         return _verdict(
             f"prod_guard: '{runner}' makes a search tool run another program, "
@@ -2076,7 +2176,7 @@ def evaluate(
             permission_mode,
             problems,
         )
-    tracer = _trace_runs_program(command)
+    tracer = _trace_runs_program(views)
     if tracer is not None:
         return _verdict(
             f"prod_guard: '{tracer}' runs a PS4 command substitution on every "
