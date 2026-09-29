@@ -112,14 +112,15 @@ class TestInstallScriptPinning:
 
     def test_no_unpinned_update_path(self):
         """The old `git pull` on whatever-was-checked-out update path is gone:
-        pull only happens on an explicit, resolved default-branch checkout (a
-        fork/mirror may not use `main`), never a bare `git pull`."""
+        an explicit, resolved branch (a fork/mirror may not use `main`) is
+        fast-forwarded to the commit verify_guard checked, and nothing pulls,
+        since a pull fetches again and can land past it (PI-1045 review)."""
         content = self._script()
         assert 'checkout -q "$default_branch"' in content
-        assert 'pull --ff-only origin "$default_branch"' in content
         assert 'checkout -q "$REF"' in content
-        # No unpinned `git pull` that would track whatever HEAD happens to be.
-        assert "pull --ff-only\n" not in content
+        assert content.count('merge -q --ff-only "$VERIFIED"') == 2
+        code = [ln for ln in content.splitlines() if not ln.lstrip().startswith("#")]
+        assert not [ln for ln in code if re.search(r"\bpull\b", ln)]
 
 
 class TestVersionConsistency:
