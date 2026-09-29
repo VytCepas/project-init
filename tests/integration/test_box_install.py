@@ -335,6 +335,74 @@ def test_apply_refuses_an_edit_git_status_skips(box: Box, label: str):
     _no_install(box)
 
 
+# ── PR #1047 review round 4 / #1060: a local clean filter can hide an edit ──
+
+
+def _clean_filter(box: Box, name: str, path: str) -> None:
+    """Configure a local clean filter that maps any edit to *path* back to its blob at HEAD.
+
+    `git status`/`diff` run a clean filter over the working-tree copy only to
+    compare it with the index — the filter's output never touches the file on
+    disk, so the edited bytes stay there for uv to build (project-init#1060).
+    """
+    original = box.tmp / f"{name}.orig"
+    original.write_bytes((box.repo / path).read_bytes())
+    script = box.tmp / f"{name}.sh"
+    script.write_text(f"#!/usr/bin/env bash\ncat {original}\n")
+    script.chmod(0o755)
+    _git(box.repo, "config", f"filter.{name}.clean", str(script))
+    _git(box.repo, "config", f"filter.{name}.smudge", "cat")
+    attrs = box.repo / ".git" / "info" / "attributes"
+    attrs.write_text((attrs.read_text() if attrs.exists() else "") + f"{path} filter={name}\n")
+
+
+def test_apply_refuses_a_clean_filter_hidden_edit_to_a_packaged_file(box: Box):
+    """A clean filter smudges the edit back to HEAD for status/diff, so only a raw byte
+    compare — bypassing filters — catches it before uv builds the edited bytes (#1060).
+
+    The edit keeps the file's byte length: git's stat-based fast path marks a
+    path modified on a bare size mismatch without ever running the clean
+    filter, so only a same-length edit reaches the filtered comparison this
+    attack (and this check) both depend on.
+    """
+    _clean_filter(box, "hide", "templates/base/hook.sh")
+    original = (box.repo / "templates/base/hook.sh").read_text()
+    edited = original.replace("echo hi\n", "echo rm\n")
+    assert len(edited) == len(original) and edited != original
+    (box.repo / "templates/base/hook.sh").write_text(edited)
+    assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
+    assert _git(box.repo, "ls-files", "-v", "--", "templates/base/hook.sh").startswith("H")
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "raw bytes do not match" in result.stderr
+    assert "templates/base/hook.sh" in result.stderr, result.stderr
+    _no_install(box)
+    dry = box.run()
+    assert dry.returncode == 1 and "templates/base/hook.sh" in dry.stdout, dry.stdout
+
+
+def test_apply_refuses_a_clean_filter_hidden_edit_to_pyproject(box: Box):
+    """The same smuggle on pyproject.toml itself: force-include, dependencies or entry
+    points can be rewritten there, and nothing but pyproject.toml's own raw bytes catch
+    it — the layout used to pick packaged paths is read from HEAD, never disk (#1060)."""
+    _clean_filter(box, "hidepy", "pyproject.toml")
+    original = (box.repo / "pyproject.toml").read_text()
+    # Same byte length (see the packaged-file test above for why that matters):
+    # the force-include destination is rewritten in place.
+    edited = original.replace(
+        '"schemas" = "project_init/schemas"\n', '"schemas" = "project_init/SCHEMAS"\n'
+    )
+    assert len(edited) == len(original) and edited != original
+    (box.repo / "pyproject.toml").write_text(edited)
+    assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
+    assert _git(box.repo, "ls-files", "-v", "--", "pyproject.toml").startswith("H")
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "raw bytes do not match" in result.stderr
+    assert "pyproject.toml" in result.stderr, result.stderr
+    _no_install(box)
+
+
 # Every place an ignore rule can live. Each hides the file from git status.
 _IGNORE_FILES = (".gitignore", "templates/.gitignore", ".git/info/exclude")
 _CLEAN = "git clean -fdX -- src/project_init templates schemas"
