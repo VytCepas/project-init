@@ -565,4 +565,42 @@ def test_clean_filter_hidden_edit_to_a_packaged_file_is_refused(boot: Bootstrap)
     assert result.returncode == 1, result.stdout + result.stderr
     assert target in result.stderr and "Nothing was reset" in result.stderr, result.stderr
     assert (boot.install / target).read_text() == edited, "the edit must survive"
+
+
+# ── #1060: the same smuggle on pyproject.toml itself ────────────────────────
+
+
+def test_clean_filter_hidden_edit_to_pyproject_is_refused(boot: Bootstrap):
+    """packaged_paths() reads pyproject.toml straight off disk to learn the layout, so a
+    clean filter that hides an edit there — a rewritten force-include, dependency or entry
+    point — must be caught before that file is trusted for anything (project-init#1060).
+
+    The edit keeps the file's byte length: git's stat-based fast path marks a
+    path modified on a bare size mismatch without ever running the clean
+    filter (verified empirically), so only a same-length edit reaches the
+    filtered comparison this attack, and this check, both depend on.
+    """
+    target = "pyproject.toml"
+    boot.existing_clone()
+    original = (boot.install / target).read_text()
+    clean_filter = boot.tmp / "clean_filter_pyproject.sh"
+    orig_file = boot.tmp / "pyproject.orig.toml"
+    orig_file.write_text(original)
+    clean_filter.write_text(f"#!/usr/bin/env bash\ncat {orig_file}\n")
+    clean_filter.chmod(0o755)
+    _git(boot.install, "config", "filter.hidepy.clean", str(clean_filter))
+    _git(boot.install, "config", "filter.hidepy.smudge", "cat")
+    (boot.install / ".git" / "info" / "attributes").write_text(f"{target} filter=hidepy\n")
+    # force-include's destination is rewritten in place, same length: "project_init" -> "PROJECT_INIT".
+    edited = original.replace(
+        '"templates" = "project_init/templates"\n', '"templates" = "PROJECT_INIT/templates"\n'
+    )
+    assert len(edited) == len(original) and edited != original
+    (boot.install / target).write_text(edited)
+    assert _git(boot.install, "status", "--porcelain") == ""
+    assert _git(boot.install, "ls-files", "-v", "--", target).startswith("H")
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert target in result.stderr and "Nothing was reset" in result.stderr, result.stderr
+    assert (boot.install / target).read_text() == edited, "the edit must survive"
     assert not boot.cmd.exists()

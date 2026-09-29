@@ -229,23 +229,19 @@ $ignored
   $KEPT"
 }
 
-# A local `.git/info/attributes` clean filter can smudge an edited packaged
-# file back to its blob's bytes when git reads it for comparison, so both the
-# status check above and `ls-files -v` read clean even though uvx builds the
-# raw bytes on disk. Stage 1: hash every tracked file under a packaged path
-# with --no-filters and compare it to its blob at HEAD — cheap, but a CRLF
-# checkout (core.autocrlf) legitimately differs here too, so a mismatch is
-# only a suspect. Stage 2: a suspect is confirmed only if it also differs from
-# what `git archive` produces for HEAD, which applies the same eol/text
-# conversion a real checkout would but never a local custom filter driver.
-# Same two-stage check tools/box_install.py's check() runs before calling a
-# file modified (#1047 review, round 4).
-refuse_edited() {
-  local pyproject paths=() p entry kind sha path actual suspects=() edited=() checkout_tmp
-  pyproject="$INSTALL_DIR/pyproject.toml"
-  while IFS= read -r p; do
-    [ -n "$p" ] && paths+=("$p")
-  done < <(packaged_paths "$pyproject")
+# A local `.git/info/attributes` clean filter can smudge an edited file back
+# to its blob's bytes when git reads it for comparison, so both the status
+# check above and `ls-files -v` read clean even though uvx (or, for
+# pyproject.toml, packaged_paths() itself) builds the raw bytes on disk.
+# Stage 1: hash every path with --no-filters and compare it to its blob at
+# HEAD — cheap, but a CRLF checkout (core.autocrlf) legitimately differs here
+# too, so a mismatch is only a suspect. Stage 2: a suspect is confirmed only
+# if it also differs from what `git archive` produces for HEAD, which applies
+# the same eol/text conversion a real checkout would but never a local custom
+# filter driver. Same two-stage check tools/box_install.py's check() runs
+# before calling a file modified (#1047 review round 4; shared helper #1060).
+refuse_edited_paths() {
+  local paths=("$@") entry kind sha path actual suspects=() edited=() checkout_tmp
   [ "${#paths[@]}" -gt 0 ] || return 0
   while IFS=$'\t' read -r -d '' entry path; do
     read -r _ kind sha <<<"$entry"
@@ -272,9 +268,28 @@ refuse_edited() {
     done
     rm -rf "$checkout_tmp"
   fi
-  [ "${#edited[@]}" -eq 0 ] || die "$INSTALL_DIR has packaged files whose on-disk bytes do not match HEAD, though git reports the tree clean (a local clean filter?):
+  [ "${#edited[@]}" -eq 0 ] || die "$INSTALL_DIR has files whose on-disk bytes do not match HEAD, though git reports the tree clean (a local clean filter?):
 $(printf '  %s\n' "${edited[@]}")
   $KEPT"
+}
+
+# pyproject.toml is read for its own bytes here, before packaged_paths() ever
+# parses it: a hidden edit to force-include, dependencies or entry points
+# would otherwise never be checked at all, since none of those change which
+# paths get hashed by refuse_edited_paths below (project-init#1060).
+refuse_edited_pyproject() {
+  [ -f "$INSTALL_DIR/pyproject.toml" ] || return 0
+  refuse_edited_paths pyproject.toml
+}
+
+# The packaged paths pyproject.toml declares (project-init#1047).
+refuse_edited() {
+  local pyproject paths=() p
+  pyproject="$INSTALL_DIR/pyproject.toml"
+  while IFS= read -r p; do
+    [ -n "$p" ] && paths+=("$p")
+  done < <(packaged_paths "$pyproject")
+  refuse_edited_paths "${paths[@]}"
 }
 
 # The tree /project-init scaffolds from must be the verified commit, clean, and
@@ -298,6 +313,7 @@ verify_checkout() {
   [ -z "$hidden" ] || die "$INSTALL_DIR has files git status does not check (skip-worktree or assume-unchanged), so /project-init would scaffold unverified files:
 $hidden
   $KEPT"
+  refuse_edited_pyproject
   refuse_edited
   refuse_ignored
 }
