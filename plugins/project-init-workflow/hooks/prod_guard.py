@@ -1000,12 +1000,20 @@ def _ansi_c_escape(escape: re.Match[str]) -> str:
     hexa, short, long, octal, control, other = escape.groups()
     code = hexa or short or long
     if code:
-        return chr(min(int(code, 16), 0x10FFFF))
-    if octal:
-        return chr(int(octal, 8) & 0xFF)
-    if control is not None:
-        return chr(ord(control) & 0x1F)
-    return _ANSI_C_LETTERS.get(other, other)
+        decoded = chr(min(int(code, 16), 0x10FFFF))
+    elif octal:
+        decoded = chr(int(octal, 8) & 0xFF)
+    elif control is not None:
+        decoded = chr(ord(control) & 0x1F)
+    else:
+        decoded = _ANSI_C_LETTERS.get(other, other)
+    # A word or environment name cannot hold a NUL byte, so bash drops a
+    # decoded NUL from it entirely: `terraform des$'\x00'troy` reaches bash as
+    # `terraform destroy`. Elide it here too (\0, \x00, \u0000, octal and
+    # control forms all land here), or the dequoted view still reads
+    # `des\0troy` and evaluate() never recognizes the spliced word (#1043
+    # review; PI-881 bump).
+    return "" if decoded == "\x00" else decoded
 
 
 def _dequoted(command: str) -> str:

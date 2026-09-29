@@ -896,6 +896,8 @@ RUNS_A_PROGRAM_1043 = [
     ('export "RIPGREP_"CONFIG_PATH=cfg; rg needle', "RIPGREP_CONFIG_PATH"),
     ("export RIPGREP_$'CONFIG_PATH'=cfg; rg needle", "RIPGREP_CONFIG_PATH"),
     ("export RIPGREP_CONFIG_PAT$'\\x48'=cfg; rg needle", "RIPGREP_CONFIG_PATH"),  # $'…' escape
+    # A decoded NUL splices the two halves together the same way (#1043 review).
+    ("export RIPGREP_CONFIG_PA$'\\x00'TH=cfg; rg needle", "RIPGREP_CONFIG_PATH"),
     ("export RIPGREP_CONFIG_\\PATH=cfg; rg needle", "RIPGREP_CONFIG_PATH"),
     ("export RIPGREP_CONFIG_\\\nPATH=cfg; rg needle", "RIPGREP_CONFIG_PATH"),  # continuation
     ("env RIPGREP_'CONFIG_PATH'=cfg rg needle", "RIPGREP_CONFIG_PATH"),
@@ -917,6 +919,11 @@ QUOTE_SPLIT_VERBS_1043 = [
     "bash -c terraform' 'destroy",
     "bash -c terraform\\ destroy",
     "bash -c terraform$'\\x20'destroy",
+    # Bash drops a decoded NUL from the word entirely (a C string cannot hold
+    # one), so these all reach it as plain "terraform destroy" (#1043 review).
+    "terraform des$'\\x00'troy",
+    "terraform des$'\\0'troy",
+    "terraform des$'\\u0000'troy",
     # A quoted `-v` still assigns, so printf's text is not prose (ran in bash, zsh).
     "printf '-v' c 'terraform destroy'; bash -c \"$c\"",
     # Only git grep's OWN arguments are prose. core.fsmonitor from `-c` or the
