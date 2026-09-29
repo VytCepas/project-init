@@ -235,13 +235,22 @@ $ignored
 # pyproject.toml, packaged_paths() itself) builds the raw bytes on disk.
 # Stage 1: hash every path with --no-filters and compare it to its blob at
 # HEAD — cheap, but a CRLF checkout (core.autocrlf) legitimately differs here
-# too, so a mismatch is only a suspect. Stage 2: a suspect is confirmed only
-# if it also differs from what `git archive` produces for HEAD, which applies
-# the same eol/text conversion a real checkout would but never a local custom
-# filter driver. Same two-stage check tools/box_install.py's check() runs
-# before calling a file modified (#1047 review round 4; shared helper #1060).
+# too, so a mismatch is only a suspect. Stage 2: a suspect is confirmed with
+# `git cat-file blob HEAD:<path>` — the object store's own bytes, never
+# `git archive`/a checkout: archive runs any `filter=` smudge driver the repo's
+# own attributes configure, and a clean+smudge pair can make that driver's
+# output equal the edit, so archive's "trusted" bytes were then the edit itself
+# (project-init#1064, Codex P1, reproduced on git 2.43). The one checkout-side
+# conversion still allowed for is LF -> CRLF, derived from the trusted blob
+# with `sed`, never a filter driver; a blob whose last line has no trailing
+# newline is a known, conservative exception — sed's `s/$/\r/` appends `\r`
+# there too, so such a file always refuses under an autocrlf checkout (see
+# test_crlf_checkout_of_a_trailing_newline_file_is_not_refused and its
+# no-trailing-newline counterpart). Same two-stage check tools/box_install.py's
+# check() runs before calling a file modified (#1047 review round 4; shared
+# helper #1060; object-store confirmation #1064).
 refuse_edited_paths() {
-  local paths=("$@") entry kind sha path actual suspects=() edited=() checkout_tmp
+  local paths=("$@") entry kind sha path actual suspects=() edited=() blob_tmp crlf_tmp
   [ "${#paths[@]}" -gt 0 ] || return 0
   while IFS=$'\t' read -r -d '' entry path; do
     read -r _ kind sha <<<"$entry"
@@ -256,17 +265,27 @@ refuse_edited_paths() {
     [ "$actual" = "$sha" ] || suspects+=("$path")
   done < <(git -C "$INSTALL_DIR" ls-tree -r -z --full-tree HEAD -- "${paths[@]}")
   if [ "${#suspects[@]}" -gt 0 ]; then
-    checkout_tmp="$(mktemp -d)" || die "cannot create a temp dir to verify suspect files against HEAD.
+    blob_tmp="$(mktemp)" && crlf_tmp="$(mktemp)" ||
+      die "cannot create a temp file to verify suspect files against HEAD.
   $KEPT"
-    if ! git -C "$INSTALL_DIR" archive --format=tar HEAD -- "${suspects[@]}" 2>/dev/null | tar -x -C "$checkout_tmp"; then
-      rm -rf "$checkout_tmp"
-      die "cannot read HEAD's checkout bytes in $INSTALL_DIR to verify ${suspects[*]}.
-  $KEPT"
-    fi
     for path in "${suspects[@]}"; do
-      cmp -s "$checkout_tmp/$path" "$INSTALL_DIR/$path" || edited+=("$path")
+      if ! git -C "$INSTALL_DIR" cat-file blob "HEAD:$path" >"$blob_tmp" 2>/dev/null; then
+        edited+=("$path (cannot read HEAD's object)")
+        continue
+      fi
+      cmp -s "$blob_tmp" "$INSTALL_DIR/$path" && continue
+      # eol=lf pins this path to LF on any checkout (a declarative attribute
+      # lookup, never a driver — check-attr runs no external command): an
+      # injected CRLF there is still an edit, matching the eol=lf case
+      # tools/box_install.py's modified_paths() also gates on (#1064 review).
+      if [ "$(git -C "$INSTALL_DIR" check-attr eol -- "$path")" = "$path: eol: lf" ]; then
+        edited+=("$path")
+        continue
+      fi
+      sed 's/$/\r/' "$blob_tmp" >"$crlf_tmp"
+      cmp -s "$crlf_tmp" "$INSTALL_DIR/$path" || edited+=("$path")
     done
-    rm -rf "$checkout_tmp"
+    rm -f "$blob_tmp" "$crlf_tmp"
   fi
   [ "${#edited[@]}" -eq 0 ] || die "$INSTALL_DIR has files whose on-disk bytes do not match HEAD, though git reports the tree clean (a local clean filter?):
 $(printf '  %s\n' "${edited[@]}")

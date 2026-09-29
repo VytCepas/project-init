@@ -32,7 +32,6 @@ import shutil
 import subprocess
 import sys
 import sysconfig
-import tarfile
 import tomllib
 from email.parser import Parser
 from pathlib import Path, PurePosixPath
@@ -121,24 +120,63 @@ def blob_ids(paths: list[Path]) -> list[str]:
     return ids
 
 
-def checkout_bytes(commit: str, pathspecs: list[str]) -> dict[str, bytes]:
-    """Map each file under *pathspecs* to the bytes a checkout of *commit* writes.
+def blob_bytes(commit: str, paths: list[str]) -> dict[str, bytes]:
+    """Map each of *paths* to its raw object bytes at *commit*, straight from the store.
 
-    ``git archive`` applies checkout's eol conversion and filters, so a text file
-    that ``core.autocrlf`` made CRLF on disk, and so in the wheel, matches its LF
-    blob here, while a CRLF copy of an ``eol=lf`` file still does not.
+    ``git cat-file --batch``, never ``git archive``: archive runs the checkout
+    machinery, including any ``filter=`` smudge driver a repo's own
+    ``.gitattributes``/``.git/info/attributes`` configures — a clean+smudge pair
+    can make its smudge output equal an edited working-tree file, so archive's
+    "trusted" bytes are then exactly the edit (project-init#1064, Codex P1,
+    reproduced on git 2.43). ``cat-file`` reads the object unconverted.
     """
-    argv = ["git", "-C", str(_REPO_ROOT), "archive", "--format=tar", commit, "--", *pathspecs]
-    proc = subprocess.run(argv, capture_output=True, check=False)  # noqa: S603 — fixed argv
+    if not paths:
+        return {}
+    argv = ["git", "-C", str(_REPO_ROOT), "cat-file", "--batch"]
+    stdin = "".join(f"{commit}:{p}\n" for p in paths).encode()
+    proc = subprocess.run(argv, input=stdin, capture_output=True, check=False)  # noqa: S603
     if proc.returncode != 0:
-        raise RefusedError(f"git archive failed: {proc.stderr.decode(errors='replace').strip()}")
-    files: dict[str, bytes] = {}
-    with tarfile.open(fileobj=io.BytesIO(proc.stdout)) as tar:
-        for member in tar:
-            data = tar.extractfile(member) if member.isfile() else None
-            if data is not None:
-                files[member.name] = data.read()
-    return files
+        raise RefusedError(
+            f"git cat-file --batch failed: {proc.stderr.decode(errors='replace').strip()}"
+        )
+    out = proc.stdout
+    blobs: dict[str, bytes] = {}
+    pos = 0
+    for path in paths:
+        nl = out.index(b"\n", pos)
+        header = out[pos:nl].decode()
+        pos = nl + 1
+        if header.endswith(" missing"):
+            continue
+        size = int(header.rsplit(" ", 1)[-1])
+        blobs[path] = out[pos : pos + size]
+        pos += size + 1  # the batch's own trailing newline after each object's content
+    return blobs
+
+
+def eol_lf_paths(paths: list[str]) -> set[str]:
+    """Return the subset of *paths* whose ``eol`` gitattribute pins them to ``lf``.
+
+    ``git check-attr`` only pattern-matches ``.gitattributes``/local attribute
+    files — it runs no external command, so it cannot become another P1-shaped
+    bypass. A hostile local ``.git/info/attributes`` entry can at most widen
+    which of ``modified_paths()``'s two blob-derived candidates a suspect is
+    compared against; it can never choose the bytes either candidate holds
+    (project-init#1064 review).
+    """
+    if not paths:
+        return set()
+    argv = ["git", "-C", str(_REPO_ROOT), "check-attr", "--stdin", "eol"]
+    stdin = "".join(f"{p}\n" for p in paths)
+    proc = subprocess.run(argv, input=stdin, capture_output=True, text=True, check=False)  # noqa: S603
+    if proc.returncode != 0:
+        raise RefusedError(f"git check-attr failed: {proc.stderr.strip()}")
+    pinned = set()
+    for line in proc.stdout.splitlines():
+        path, _, value = line.rpartition(": eol: ")
+        if path and value.strip() == "lf":
+            pinned.add(path)
+    return pinned
 
 
 def wheel_layout(project_toml: dict[str, Any]) -> list[tuple[str, str]]:
@@ -209,18 +247,30 @@ def modified_paths(
     (core.autocrlf) can legitimately differ from the blob there, and a local
     clean filter can smudge an edit back to it for ``git status``/``diff`` while
     leaving the on-disk bytes untouched. A mismatch is only a suspect until
-    confirmed against ``checkout_bytes``, which applies the same eol conversion
-    a real checkout would but never a local clean filter driver.
+    confirmed against ``blob_bytes``, the trusted object bytes straight from the
+    store. The CRLF allowance is derived from those same trusted bytes (LF ->
+    CRLF) rather than by asking git to check the path out, so nothing here ever
+    runs a configured filter driver (project-init#1064, Codex P1) — and it is
+    withheld for a path an ``eol=lf`` attribute pins to LF, so an injected CRLF
+    there still reads as modified.
     """
     suspect = {dest for dest, (sha, _, _) in expected.items() if present.get(dest, sha) != sha}
     if not suspect:
         return []
-    checkout = checkout_bytes(commit, sorted({expected[dest][1] for dest in suspect}))
+    srcs = sorted({expected[dest][1] for dest in suspect})
+    trusted = blob_bytes(commit, srcs)
+    pinned_lf = eol_lf_paths(srcs)
     modified = []
     for dest in suspect:
         src = expected[dest][1]
         path = root / dest
-        if not path.is_file() or checkout.get(src) != path.read_bytes():
+        blob = trusted.get(src)
+        if blob is None or not path.is_file():
+            modified.append(dest)
+            continue
+        disk = path.read_bytes()
+        crlf_ok = src not in pinned_lf and disk == blob.replace(b"\n", b"\r\n")
+        if disk != blob and not crlf_ok:
             modified.append(dest)
     return modified
 
@@ -525,8 +575,8 @@ def edited_problems(head: str, project_toml: dict[str, Any]) -> list[str]:
         return []
     shown = "\n      ".join(edited[:10] + (["..."] if len(edited) > 10 else []))
     return [
-        f"packaged files whose raw bytes do not match {head}, though git reports the tree "
-        f"clean (a local clean filter?):\n      {shown}"
+        f"files whose on-disk bytes do not match {head}, though git reports the tree clean "
+        f"(a local clean filter?):\n      {shown}"
     ]
 
 
