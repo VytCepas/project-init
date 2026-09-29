@@ -229,6 +229,54 @@ $ignored
   $KEPT"
 }
 
+# A local `.git/info/attributes` clean filter can smudge an edited packaged
+# file back to its blob's bytes when git reads it for comparison, so both the
+# status check above and `ls-files -v` read clean even though uvx builds the
+# raw bytes on disk. Stage 1: hash every tracked file under a packaged path
+# with --no-filters and compare it to its blob at HEAD — cheap, but a CRLF
+# checkout (core.autocrlf) legitimately differs here too, so a mismatch is
+# only a suspect. Stage 2: a suspect is confirmed only if it also differs from
+# what `git archive` produces for HEAD, which applies the same eol/text
+# conversion a real checkout would but never a local custom filter driver.
+# Same two-stage check tools/box_install.py's check() runs before calling a
+# file modified (#1047 review, round 4).
+refuse_edited() {
+  local pyproject paths=() p entry kind sha path actual suspects=() edited=() checkout_tmp
+  pyproject="$INSTALL_DIR/pyproject.toml"
+  while IFS= read -r p; do
+    [ -n "$p" ] && paths+=("$p")
+  done < <(packaged_paths "$pyproject")
+  [ "${#paths[@]}" -gt 0 ] || return 0
+  while IFS=$'\t' read -r -d '' entry path; do
+    read -r _ kind sha <<<"$entry"
+    [ "$kind" = "blob" ] || continue
+    if [ ! -e "$INSTALL_DIR/$path" ]; then
+      edited+=("$path (missing on disk)")
+      continue
+    fi
+    actual="$(git -C "$INSTALL_DIR" hash-object --no-filters -- "$path")" ||
+      die "cannot hash $path in $INSTALL_DIR to verify it against HEAD.
+  $KEPT"
+    [ "$actual" = "$sha" ] || suspects+=("$path")
+  done < <(git -C "$INSTALL_DIR" ls-tree -r -z --full-tree HEAD -- "${paths[@]}")
+  if [ "${#suspects[@]}" -gt 0 ]; then
+    checkout_tmp="$(mktemp -d)" || die "cannot create a temp dir to verify suspect files against HEAD.
+  $KEPT"
+    if ! git -C "$INSTALL_DIR" archive --format=tar HEAD -- "${suspects[@]}" 2>/dev/null | tar -x -C "$checkout_tmp"; then
+      rm -rf "$checkout_tmp"
+      die "cannot read HEAD's checkout bytes in $INSTALL_DIR to verify ${suspects[*]}.
+  $KEPT"
+    fi
+    for path in "${suspects[@]}"; do
+      cmp -s "$checkout_tmp/$path" "$INSTALL_DIR/$path" || edited+=("$path")
+    done
+    rm -rf "$checkout_tmp"
+  fi
+  [ "${#edited[@]}" -eq 0 ] || die "$INSTALL_DIR has packaged files whose on-disk bytes do not match HEAD, though git reports the tree clean (a local clean filter?):
+$(printf '  %s\n' "${edited[@]}")
+  $KEPT"
+}
+
 # The tree /project-init scaffolds from must be the verified commit, clean, and
 # carry the refusal on disk: a fast-forward keeps local commits and edits, and
 # skip-worktree hides an edit from status (PI-1045 review). uvx builds every
@@ -250,6 +298,7 @@ verify_checkout() {
   [ -z "$hidden" ] || die "$INSTALL_DIR has files git status does not check (skip-worktree or assume-unchanged), so /project-init would scaffold unverified files:
 $hidden
   $KEPT"
+  refuse_edited
   refuse_ignored
 }
 

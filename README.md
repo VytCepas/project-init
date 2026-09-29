@@ -72,11 +72,15 @@ PROJECT_INIT_REF=vX.Y.Z bash -c "$(curl -sSL https://raw.githubusercontent.com/V
 PROJECT_INIT_REF=main   bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 ```
 
-Direct tool install without the slash command (any pinned tag):
+Direct tool install without the slash command:
 
 ```bash
-uv tool install git+https://github.com/VytCepas/project-init@v1.0.1
+uv tool install git+https://github.com/VytCepas/project-init@main
 ```
+
+`uv tool install` bypasses `install.sh` entirely, so none of the checks above —
+including the PI-903 symlink-refusal check — run. Pin a tag only if you have
+verified it carries that refusal (v1.3.0 or newer); v1.2.2 and older do not.
 
 Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
 

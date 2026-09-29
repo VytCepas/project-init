@@ -540,3 +540,29 @@ def test_ignored_file_outside_a_packaged_path_is_not_refused(boot: Bootstrap):
     result = boot.run(PROJECT_INIT_REF="main")
     assert result.returncode == 0, result.stdout + result.stderr
     assert boot.cmd.is_file()
+
+
+# ── PR #1047 review, round 4: a local clean filter can hide an edit from status ──
+
+
+def test_clean_filter_hidden_edit_to_a_packaged_file_is_refused(boot: Bootstrap):
+    """A `.git/info/attributes` clean filter can smudge an equal-length edit back to its
+    blob's bytes, so both `git status --porcelain` and `ls-files -v` read clean while
+    `uvx` still builds the edited working-tree bytes. Only a raw byte compare catches it."""
+    target = "templates/marker.txt"  # tracked upstream as "tracked\n" (8 bytes)
+    boot.existing_clone()
+    clean_filter = boot.tmp / "clean_filter.sh"
+    clean_filter.write_text("#!/usr/bin/env bash\nprintf 'tracked\\n'\n")
+    clean_filter.chmod(0o755)
+    _git(boot.install, "config", "filter.hide.clean", str(clean_filter))
+    _git(boot.install, "config", "filter.hide.smudge", "cat")
+    (boot.install / ".git" / "info" / "attributes").write_text(f"{target} filter=hide\n")
+    edited = "edited1\n"  # 8 bytes: same length as the tracked content
+    (boot.install / target).write_text(edited)
+    assert _git(boot.install, "status", "--porcelain") == ""
+    assert _git(boot.install, "ls-files", "-v", "--", target).startswith("H")
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert target in result.stderr and "Nothing was reset" in result.stderr, result.stderr
+    assert (boot.install / target).read_text() == edited, "the edit must survive"
+    assert not boot.cmd.exists()
