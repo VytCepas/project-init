@@ -157,6 +157,47 @@ def test_userprofile_is_redirected():
 def test_homedrive_homepath_are_redirected(monkeypatch):
     monkeypatch.delenv("USERPROFILE")
     assert not _is_real(ntpath.expanduser("~"))
+
+
+def test_appdata_is_redirected():
+    assert not _is_real(os.environ["APPDATA"])
+
+
+def test_localappdata_is_redirected():
+    assert not _is_real(os.environ["LOCALAPPDATA"])
+"""
+
+_PLANTED_RUSTUP = """\
+import os
+from pathlib import Path
+
+
+def test_rustup_home_is_not_the_real_one():
+    real = Path(os.environ["REAL_HOME"]) / ".rustup"
+    assert Path(os.environ["RUSTUP_HOME"]) != real
+
+
+def test_rustup_settings_are_not_reachable():
+    fake = Path(os.environ["RUSTUP_HOME"])
+    assert not (fake / "settings.toml").exists()
+
+
+def test_rustup_toolchains_and_downloads_are_still_reused():
+    fake = Path(os.environ["RUSTUP_HOME"])
+    assert (fake / "toolchains" / "marker.txt").read_text() == "cached\\n"
+    assert (fake / "downloads" / "marker.txt").read_text() == "cached\\n"
+"""
+
+_PLANTED_PREEXISTING = """\
+import os
+
+
+def test_cargo_home_overrides_the_inherited_export():
+    assert os.environ["CARGO_HOME"] != os.environ["DECOY_CARGO_HOME"]
+
+
+def test_rustup_home_overrides_the_inherited_export():
+    assert os.environ["RUSTUP_HOME"] != os.environ["DECOY_RUSTUP_HOME"]
 """
 
 _PLANTED_IMPORTS_CONFTEST = """\
@@ -214,8 +255,16 @@ def _plant(target: Path, name: str, body: str) -> None:
     (target / "tests" / name).write_text(body)
 
 
-def _pytest(target: Path, tmp: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    """Run the scaffold's own pytest with a HOME the scaffold must not reach."""
+def _pytest(
+    target: Path, tmp: Path, *args: str, **extra_env: str
+) -> subprocess.CompletedProcess[str]:
+    """Run the scaffold's own pytest with a HOME the scaffold must not reach.
+
+    *extra_env* is applied last, after the contract vars are stripped from this
+    process's own environment: it simulates a runner that already exports one
+    (e.g. CARGO_HOME) before invoking pytest, which the fixture must still
+    override for the vars that hold credentials or mutable state (#1056 review).
+    """
     real_home, real_tmp = tmp / "real-home", tmp / "real-tmp"
     real_home.mkdir(exist_ok=True)
     real_tmp.mkdir(exist_ok=True)
@@ -235,6 +284,7 @@ def _pytest(target: Path, tmp: Path, *args: str) -> subprocess.CompletedProcess[
         "TMPDIR": str(real_tmp),
         "REAL_TMPDIR": str(real_tmp),
     }
+    env |= extra_env
     return subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
         cwd=target,
@@ -287,7 +337,7 @@ class TestHermeticScaffold:
         _plant(target, "test_windows.py", _PLANTED_WINDOWS)
         result = _pytest(target, tmp_path)
         assert result.returncode == 0, result.stdout + result.stderr
-        assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
+        assert _last_line(result.stdout) == ("my-project", 4, 0), result.stdout
 
     def test_cargo_home_isolates_config_and_credentials_but_reuses_the_cache(
         self, tmp_path: Path
@@ -305,6 +355,46 @@ class TestHermeticScaffold:
         result = _pytest(target, tmp_path)
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 3, 0), result.stdout
+
+    def test_rustup_home_isolates_settings_but_reuses_the_toolchains(self, tmp_path: Path) -> None:
+        """#1056 review: RUSTUP_HOME's settings.toml is mutable preference state (the
+        default toolchain), not just a cache, so the real ~/.rustup's settings.toml
+        must never be reachable from a test, while toolchains/ and downloads/ are
+        still reused."""
+        real_rustup = tmp_path / "real-home" / ".rustup"
+        (real_rustup / "toolchains").mkdir(parents=True)
+        (real_rustup / "toolchains" / "marker.txt").write_text("cached\n")
+        (real_rustup / "downloads").mkdir(parents=True)
+        (real_rustup / "downloads" / "marker.txt").write_text("cached\n")
+        (real_rustup / "settings.toml").write_text('default_toolchain = "stable"\n')
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_rustup.py", _PLANTED_RUSTUP)
+        result = _pytest(target, tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 3, 0), result.stdout
+
+    def test_preexisting_cargo_and_rustup_home_are_still_overridden(self, tmp_path: Path) -> None:
+        """#1056 review: when the runner already exports CARGO_HOME/RUSTUP_HOME, the
+        fixture must still replace them with the isolated ones _cargo_home()/
+        _rustup_home() build — the old code only set a toolchain var when it was
+        absent from the environment, so an inherited export leaked real credentials
+        and settings straight through."""
+        decoy_cargo = tmp_path / "decoy-cargo"
+        decoy_rustup = tmp_path / "decoy-rustup"
+        decoy_cargo.mkdir()
+        decoy_rustup.mkdir()
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_preexisting.py", _PLANTED_PREEXISTING)
+        result = _pytest(
+            target,
+            tmp_path,
+            CARGO_HOME=str(decoy_cargo),
+            RUSTUP_HOME=str(decoy_rustup),
+            DECOY_CARGO_HOME=str(decoy_cargo),
+            DECOY_RUSTUP_HOME=str(decoy_rustup),
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
 
     def test_the_session_home_is_removed_after_the_run(self, tmp_path: Path) -> None:
         target = _python_scaffold(tmp_path / "p")
