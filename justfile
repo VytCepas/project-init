@@ -1,0 +1,2 @@
+fast-ci:
+	@true
