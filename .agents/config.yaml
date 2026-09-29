@@ -1,0 +1,107 @@
+# project-init: record of choices made at init time.
+# Safe to hand-edit; re-running `project-init` will reconcile with this file.
+
+# Detect-and-defer boundary marker (PI-901; the ambient-layer marker contract).
+# Declares to every layer ABOVE this repo — a root orchestrator, a global agent
+# environment, any hook that would otherwise write a machine-wide log — that this
+# project governs itself.
+#   repo    — this repo wins on PROJECT matters — workflow, conventions, branch
+#             naming, tooling, task tracking — and the ambient layer stands down
+#             for those (what a scaffold always emits). THE STAND-DOWN IS SCOPED:
+#             safety and verification posture (destructive-command refusal,
+#             secret handling, evidence before claiming done) still applies from
+#             the ambient layer wherever AGENTS.md is silent, because a fresh
+#             scaffold does not restate those rules and an unscoped stand-down
+#             would delete them rather than replace them. AGENTS.md's "Key rules
+#             for agents" states the same scope in the surface an agent actually
+#             loads — the two must not drift apart (#968).
+#   ambient — opt out: let the global layer keep acting here
+# Deliberately NOT `governance:` — that name is already a project-init boolean
+# (the AI-governance overlay gate, ADR-018), and overloading it collides in both
+# the wizard and the schema.
+# A reader also treats the PRESENCE of .agents/ as the marker, so deleting this
+# line does not hand the repo back to the ambient layer — it only removes the
+# explicit declaration a reader can act on.
+context: repo
+
+project:
+  name: "my-project"
+  description: "A test project"
+  created: "2026-01-01"
+  project_init_version: 0.1.0
+  project_init_contract_version: 2  # descriptor-contract schema a root orchestrator reads (#498, ADR-025); absent ⇒ v0
+  project_init_plugin_version: 0.1.0  # plugin payload version (ADR-010)
+  profile: individual     # individual | standalone | org — distribution profile (ADR-013)
+  enforcement: advisory      # advisory | hard — see ADR-013 / #251
+  project_init_host: github.com  # upstream GitHub host (github.com | *.ghe.com | GHES) — #255/#259
+  project_key: ""          # e.g. "PI" → branches use feat/PI-42-slug, PR titles use feat(PI-42):
+  github_project_number: 1 # numeric GitHub Project V2 board number — single source of truth read by board-automation.yml, create_issue.sh, and setup_github.sh (#556)
+  review_cycles: 2       # review-fix passes monitor_pr.sh runs before it stops asking (#714); 0 = no review control, merge on green CI. Override per-run with PI_REVIEW_CYCLES.
+  monitor_ignore_checks: []  # single-line JSON array of check names monitor_pr.sh treats as informational — reported, never blocking (#837), e.g. ["board-sync"] when a GitHub-hosted job is billing-locked while real CI runs self-hosted. Override per-run with PI_MONITOR_IGNORE_CHECKS (comma-separated).
+
+
+language: python            # python | node | go | none
+
+delivery: prototype            # library | service | prototype — how this ships (ADR-015)
+deploy: none            # none | cloud-run | fly | k8s | registry | custom — service deploy overlay (ADR-015)
+iac: none            # none | opentofu — infrastructure-as-code overlay (ADR-015)
+
+memory:
+  # Stable descriptor (#498): tier + resolved paths a root orchestrator reads to
+  # introspect this project. Anchors (memory_path, MEMORY.md) are invariant across
+  # tiers; higher tiers only ADD retrieval surfaces (vault, graph).
+  # `stack` is the source of truth and `tier` is derived from it (#960): a tier
+  # that disagrees with its stack is invalid. Change memory with
+  # `project-init add memory <stack> --apply`, never by editing the tier alone.
+  tier: 1             # 0 auto | 1 obsidian-only | 2 obsidian-graphify | 3 obsidian-graphify-rag
+  stack: obsidian-only         # obsidian-only | obsidian-graphify | obsidian-graphify-rag
+  memory_path: .agents/memory
+  vault_path: .agents/vault
+
+mcps:
+  installed: []
+
+safety:
+  # prod_guard escape hatch: JSON list of regex patterns for commands the
+  # destructive-operation guard should never flag (e.g. a dev-cluster
+  # kubectl context). Keep it narrow.
+  allow: []
+
+tooling:
+  lint_command: "uv run ruff check ."
+  format_command: "uv run ruff format ."
+  test_command: "uv run pytest"
+  run_command: "uv run python -m my-project"
+
+commit:
+  # Append a `Co-Authored-By: Claude <noreply@anthropic.com>` trailer to
+  # agent-generated commits (#888). Read by the scaffolded commit guidance and
+  # the optional bootstrap initial commit. false = no scaffolded commit path
+  # emits the trailer.
+  coauthor: true
+
+ci:
+  # Where a root orchestrator can read this project's build status when CI is
+  # NOT the forge's own (Jenkins, Buildkite, Drone, a self-hosted runner).
+  # Empty = the orchestrator falls back to `gh`/`glab`, which is what almost
+  # every project wants. Set status_url to a JSON endpoint reporting the latest
+  # build, e.g. https://jenkins.example.com/job/app/lastBuild/api/json
+  status_url: ""
+  # Optional dot-path to the status value inside that JSON (e.g. "data.outcome").
+  # Empty = auto-detect the usual keys (result, status, conclusion, state).
+  status_field: ""
+
+hooks:
+  expected: [pre-commit, commit-msg, pre-push]
+
+
+# Extra files never overwritten or reported as drift on `upgrade` (and on
+# `project-init` re-runs) (#243): a single-line JSON array of globs.
+# memory/ and vault/ are always preserved.
+# preserve: ["ci.yml", "justfile", "docs/*.md"]
+
+updates:
+  # Addition-group consent state (#249): IDs the owner has declined are stored
+  # here and suppressed on future `upgrade --apply` unless the upstream addition
+  # changes materially. Populated by `--decline-new`; empty by default.
+  declined_additions: {}
