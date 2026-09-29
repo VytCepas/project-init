@@ -308,6 +308,10 @@ _ADDED_SINCE_BASELINE = {
     # code existed. The template is python-gated, so this path appears on a
     # Python scaffold only.
     "pyproject.toml",
+    # PI-1044: the cross-repo test contract's root conftest.py (hermetic HOME
+    # fixture + summary line) is a new always-copied file on a Python scaffold;
+    # the justfile's `test` edit is already excluded above.
+    "conftest.py",
     # PI-848: local agent specs removed — explore duplicates the built-in
     # Explore agent; code-reviewer ships only on --no-egress scaffolds.
     ".agents/agents/explore.md",
