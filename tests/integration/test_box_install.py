@@ -335,6 +335,56 @@ def test_apply_refuses_an_edit_git_status_skips(box: Box, label: str):
     _no_install(box)
 
 
+# Every place an ignore rule can live. Each hides the file from git status.
+_IGNORE_FILES = (".gitignore", "templates/.gitignore", ".git/info/exclude")
+_CLEAN = "git clean -fdX -- src/project_init templates schemas"
+
+
+def _ignore(box: Box, rules: str, where: str = ".gitignore") -> None:
+    path = box.repo / where
+    path.write_text(path.read_text() + rules if path.exists() else rules)
+    if not where.startswith(".git/"):
+        _git(box.repo, "add", where)
+        _git(box.repo, "commit", "-q", "-m", "ignore")
+        _git(box.repo, "push", "-q")
+
+
+@pytest.mark.parametrize("where", _IGNORE_FILES)
+def test_apply_refuses_an_ignored_file_the_wheel_packages(box: Box, where: str):
+    """status reads clean, yet force-include ships the ignored file (#1047 review)."""
+    _ignore(box, "__pycache__/\n", ".git/info/exclude")
+    _ignore(box, "*.local\n", where)
+    (box.repo / "templates/base/extra.local").write_text("unreviewed\n")
+    # hatchling never packages a bytecode cache, so this one is no reason to refuse.
+    (box.repo / "src/project_init/__pycache__").mkdir()
+    (box.repo / "src/project_init/__pycache__/cli.cpython-313.pyc").write_bytes(b"\0")
+    assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "ignored files the wheel packages" in result.stderr
+    assert "\n      templates/base/extra.local\n" in result.stderr, result.stderr
+    assert "__pycache__" not in result.stderr
+    _no_install(box)
+    dry = box.run()
+    assert dry.returncode == 1 and "templates/base/extra.local" in dry.stdout, dry.stdout
+    # The command the refusal names removes it, and the dry run then proceeds.
+    assert f"`{_CLEAN}`" in dry.stdout
+    subprocess.run(_CLEAN.split(), cwd=box.repo, check=True, capture_output=True)
+    after = box.run()
+    assert after.returncode == 0 and "--apply would proceed" in after.stdout, after.stdout
+
+
+def test_ignored_file_check_reads_the_packaged_paths_from_pyproject(box: Box):
+    _ignore(box, "*.local\n")
+    (box.repo / "assets").mkdir()
+    (box.repo / "assets/extra.local").write_text("unreviewed\n")
+    assert box.run().returncode == 0  # not packaged, so not a reason to refuse
+    box.commit_pyproject('"schemas" = ', '"assets" = "project_init/assets"\n"schemas" = ')
+    _git(box.repo, "push", "-q")
+    dry = box.run()
+    assert dry.returncode == 1 and "\n      assets/extra.local\n" in dry.stdout, dry.stdout
+
+
 def test_apply_refuses_when_not_in_sync_with_origin(box: Box):
     (box.repo / "README.md").write_text("local only\n")
     _git(box.repo, "commit", "-q", "-am", "unpushed")
