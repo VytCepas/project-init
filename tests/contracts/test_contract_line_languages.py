@@ -44,9 +44,17 @@ def _scaffold(tmp_path: Path, language: str) -> Path:
 
 
 def _just_test(target: Path, env: dict[str, str] | None = None) -> tuple[str, int]:
+    proc = _just_test_full(target, env)
+    lines = proc.stdout.strip().splitlines()
+    return (lines[-1] if lines else ""), proc.returncode
+
+
+def _just_test_full(
+    target: Path, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     if shutil.which("just") is None:
         pytest.skip("just is not on PATH")
-    proc = subprocess.run(
+    return subprocess.run(
         ["just", "test"],
         cwd=target,
         capture_output=True,
@@ -55,8 +63,6 @@ def _just_test(target: Path, env: dict[str, str] | None = None) -> tuple[str, in
         timeout=600,
         check=False,
     )
-    lines = proc.stdout.strip().splitlines()
-    return (lines[-1] if lines else ""), proc.returncode
 
 
 def _need(tool: str) -> None:
@@ -83,6 +89,16 @@ class TestNode:
         last, code = _just_test(self._repo(tmp_path, failing=False))
         assert (last, code) == ("my-project: 1 passed, 0 failed", 0)
 
+    def test_a_test_that_prints_summary_lookalikes_is_not_counted(self, tmp_path: Path) -> None:
+        """#1076 review: a test's own `100 pass` / `7 errors` stdout is not bun's summary."""
+        target = self._repo(tmp_path, failing=False)
+        (target / "src" / "b.test.ts").write_text(
+            'import { test } from "bun:test";\n'
+            'test("chatty", () => { console.log("100 pass"); console.log("7 errors"); });\n'
+        )
+        last, code = _just_test(target)
+        assert (last, code) == ("my-project: 2 passed, 0 failed", 0)
+
 
 class TestGo:
     def _repo(self, tmp_path: Path, failing: bool) -> Path:
@@ -102,6 +118,18 @@ class TestGo:
     def test_all_pass(self, tmp_path: Path) -> None:
         last, code = _just_test(self._repo(tmp_path, failing=False), {"GOTOOLCHAIN": "local"})
         assert (last, code) == ("my-project: 2 passed, 0 failed", 0)
+
+    def test_a_failing_subtest_keeps_its_log_and_counts_once(self, tmp_path: Path) -> None:
+        """#1076 review: `TestSub/bad`'s assertion line is printed; only the parent counts."""
+        target = self._repo(tmp_path, failing=False)
+        (target / "p_test.go").write_text(
+            GO_TESTS + 'func TestTable(t *testing.T) {\n\tt.Run("bad", func(t *testing.T) {'
+            ' t.Errorf("got 1 want 2") })\n}\n'
+        )
+        proc = _just_test_full(target, {"GOTOOLCHAIN": "local"})
+        assert "got 1 want 2" in proc.stdout
+        assert proc.stdout.strip().splitlines()[-1] == "my-project: 2 passed, 1 failed"
+        assert proc.returncode == 1
 
     def test_a_build_error_is_a_run_that_did_not_finish(self, tmp_path: Path) -> None:
         target = self._repo(tmp_path, failing=False)
@@ -157,6 +185,33 @@ class TestRust:
         (stub / "cargo").chmod(0o755)
         last, code = _just_test(target, {"PATH": f"{stub}{os.pathsep}{os.environ['PATH']}"})
         assert (last, code) == ("my-project: 3 passed, 1 failed", 101)
+
+    def test_a_failing_tests_printed_summary_is_not_counted(self, tmp_path: Path) -> None:
+        """#1076 review: cargo echoes a failing test's stdout verbatim; a `test result:`
+        line in it is not a harness summary. Stub mirrors cargo's failure report."""
+        target = self._repo(tmp_path, failing=True)
+        stub = tmp_path / "stub"
+        stub.mkdir()
+        (stub / "cargo").write_text(
+            "#!/bin/sh\n"
+            "echo 'running 1 test'\n"
+            "echo 'test tests::bad ... FAILED'\n"
+            "echo ''\n"
+            "echo 'failures:'\n"
+            "echo ''\n"
+            "echo '---- tests::bad stdout ----'\n"
+            "echo 'test result: ok. 100 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out'\n"
+            "echo 'thread panicked at src/lib.rs:1:1'\n"
+            "echo ''\n"
+            "echo 'failures:'\n"
+            "echo '    tests::bad'\n"
+            "echo ''\n"
+            "echo 'test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out'\n"
+            "exit 101\n"
+        )
+        (stub / "cargo").chmod(0o755)
+        last, code = _just_test(target, {"PATH": f"{stub}{os.pathsep}{os.environ['PATH']}"})
+        assert (last, code) == ("my-project: 0 passed, 1 failed", 101)
 
 
 @pytest.mark.parametrize("language", ["node", "go", "rust"])

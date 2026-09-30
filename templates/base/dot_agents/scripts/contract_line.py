@@ -7,11 +7,13 @@ The runner's output passes through (stderr folded into stdout), then the last
 line is ``<suite>: N passed, M failed`` and the exit code is the runner's own,
 so a fleet runner can add the numbers up. A skip counts in neither.
 
-- bun: the ``N pass`` / ``N fail`` summary lines; an ``N error`` line counts as failed.
+- bun: the closing ``N pass`` / ``N fail`` block before ``Ran N tests``; an
+  ``N error`` line counts as failed. A test's own ``100 pass`` output is not counted.
 - go: run it as ``go test -json``. Top-level tests are counted (a subtest's
   result already decides its parent's), and the output printed is go's plain
-  form: package lines, plus the log of each test that failed.
-- cargo: every ``test result:`` line (lib, each test binary, doc-tests) is summed.
+  form: package lines, plus the log of each test and subtest that failed.
+- cargo: every harness ``test result:`` line (lib, each test binary, doc-tests)
+  is summed; one inside a failing test's captured output is not.
 
 A run that never reaches its tests (a build error) prints ``0 passed, 0 failed``
 beside a non-zero exit, which the contract reads as a run that did not finish.
@@ -27,25 +29,55 @@ import sys
 from collections.abc import Iterable, Iterator
 
 _BUN = re.compile(r"^\s*(\d+) (pass|fail|errors?)\s*$")
+_BUN_EXTRA = re.compile(
+    r"^\s*(?:\d+ (?:skip|todo|expect\(\) calls|snapshots?)|\d+ snapshots?,.*)\s*$"
+)
+_BUN_RAN = re.compile(r"^Ran \d+ tests? across \d+ files?\b")
 _CARGO = re.compile(r"^test result: \w+\. (\d+) passed; (\d+) failed;")
+_CARGO_CAPTURE = re.compile(r"^---- .* stdout ----$")
 
 
 def bun(lines: Iterable[str]) -> Iterator[tuple[str, int, int]]:
-    """Pass bun's output through; yield its pass/fail totals as they appear."""
+    """Pass bun's output through; yield the totals of its closing summary block.
+
+    The block (``N pass`` / ``N fail`` ... ) is the run of summary lines directly
+    before ``Ran N tests across M files``; a test's own ``100 pass`` stdout is
+    never followed by that line, so it is not counted.
+    """
+    passed = failed = 0
     for line in lines:
         m = _BUN.match(line)
-        if m is None:
-            yield line, 0, 0
-        elif m[2] == "pass":
-            yield line, int(m[1]), 0
+        if m is not None:
+            if m[2] == "pass":  # the block opens with `N pass`: anything before it is stray
+                passed, failed = int(m[1]), 0
+            else:
+                failed += int(m[1])
+        elif _BUN_EXTRA.match(line):
+            pass
+        elif _BUN_RAN.match(line):
+            yield line, passed, failed
+            passed = failed = 0
+            continue
         else:
-            yield line, 0, int(m[1])
+            passed = failed = 0
+        yield line, 0, 0
 
 
 def cargo(lines: Iterable[str]) -> Iterator[tuple[str, int, int]]:
-    """Pass cargo's output through; yield each test binary's totals."""
+    """Pass cargo's output through; yield each test binary's totals.
+
+    Cargo reprints a failing test's stdout verbatim under ``---- name stdout ----``
+    until the closing ``failures:`` list; a ``test result:`` inside is test output.
+    """
+    captured = False
+    previous = ""
     for line in lines:
-        m = _CARGO.match(line)
+        if _CARGO_CAPTURE.match(line):
+            captured = True
+        elif captured and line.strip() == "failures:" and not previous.strip():
+            captured = False
+        m = None if captured else _CARGO.match(line)
+        previous = line
         yield (line, int(m[1]), int(m[2])) if m else (line, 0, 0)
 
 
@@ -69,9 +101,10 @@ def go(lines: Iterable[str]) -> Iterator[tuple[str, int, int]]:
             yield event.get("Output", ""), 0, 0
         elif action in ("pass", "fail", "skip") and test:
             log = held.pop(key, [])
-            if action == "fail" and "/" not in test:
-                yield "".join(log), 0, 1
-            elif action == "pass" and "/" not in test:
+            top = "/" not in test
+            if action == "fail":
+                yield "".join(log), 0, int(top)  # a subtest's log says why; only the parent counts
+            elif action == "pass" and top:
                 yield "", 1, 0
 
 
