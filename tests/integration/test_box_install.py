@@ -1026,3 +1026,46 @@ def test_check_still_catches_an_edit_under_autocrlf(box: Box):
     assert result.returncode == 1
     assert "modified: project_init/cli.py (tree: src/project_init/cli.py)" in result.stderr
     assert result.stderr.count("    - ") == 1, result.stderr
+
+
+# ── #1071: a SHA-256 clone's eol policy ──────────────────────────────────────
+
+
+@pytest.fixture
+def box256(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Box:
+    probe = subprocess.run(
+        ["git", "init", "-q", "--object-format=sha256", str(tmp_path / "probe")],
+        capture_output=True,
+    )
+    if probe.returncode != 0:
+        pytest.skip("this git cannot create a SHA-256 repository")
+    return _make_box(tmp_path, monkeypatch, "sha256")
+
+
+def test_check_passes_a_crlf_checkout_in_a_sha256_repository(box256: Box):
+    """The eol-policy scratch repo must share the clone's object format: a SHA-1
+    scratch rejects a 64-hex `--source` and the CRLF allowance was lost (#1071)."""
+    _autocrlf_checkout(box256)
+    box256.install_layout()
+    result = box256.run("--check")
+    assert result.returncode == 0, result.stderr
+    assert "(5 files)" in result.stdout
+
+
+def test_dry_run_passes_a_crlf_checkout_in_a_sha256_repository(box256: Box):
+    _autocrlf_checkout(box256)
+    _git(box256.repo, "push", "-q", "origin", "main")
+    result = box256.run()
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "--apply would proceed" in result.stdout
+
+
+def test_sha256_eol_lf_pin_still_catches_crlf_under_autocrlf(box256: Box):
+    _autocrlf_checkout(box256)
+    pkg = box256.install_layout()
+    hook = pkg / "templates" / "base" / "hook.sh"
+    hook.write_bytes(hook.read_bytes().replace(b"\n", b"\r\n"))
+    result = box256.run("--check")
+    assert result.returncode == 1
+    assert "modified: project_init/templates/base/hook.sh" in result.stderr
+    assert result.stderr.count("    - ") == 1, result.stderr
