@@ -64,8 +64,11 @@ def _eq_zero(node: ast.expr) -> bool:
 
 
 def _asserts_nonzero(test: ast.expr) -> bool:
-    """True when *test*, or any `and` operand of it, only says "not zero"."""
-    if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.And):
+    """True when *test*, or any `and`/`or` operand of it, only says "not zero".
+
+    An `or` operand counts too: `assert rc != 0 or cond` passes for every non-zero code.
+    """
+    if isinstance(test, ast.BoolOp):
         return any(_asserts_nonzero(value) for value in test.values)
     if isinstance(test, ast.Compare):
         return _nonzero_compare(test)

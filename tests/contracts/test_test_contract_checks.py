@@ -10,15 +10,21 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
 
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
+from tools.sync_agents_from_templates import strip_conditional_wrapper
 
 REPO = Path(__file__).resolve().parents[2]
-SCRIPT = REPO / "templates" / "base" / "dot_agents" / "scripts" / "check_test_contract.py"
+TEMPLATE = REPO / "templates" / "base" / "dot_agents" / "scripts" / "check_test_contract.py.tmpl"
+# The template is stored `{{#if python}}`-gated; render it (Python scaffold) once.
+_RENDERED = Path(tempfile.mkdtemp(prefix="test-contract-")) / "check_test_contract.py"
+_RENDERED.write_text(strip_conditional_wrapper(TEMPLATE.read_text()))
+SCRIPT = _RENDERED
 
 
 def _check(*args: str, cwd: Path = REPO) -> subprocess.CompletedProcess[str]:
@@ -44,11 +50,15 @@ FLAGGED = [
     "assert proc.returncode",
     "assert not proc.returncode == 0",
     "assert proc.returncode != 0 and 'x' in proc.stderr",
+    "assert proc.returncode != 0 or 'x' in proc.stderr",
+    "assert 'x' in proc.stderr or proc.returncode > 0",
+    "assert ('x' in proc.stderr and proc.returncode != 0) or y",
     "assert proc.returncode != 0  # test-contract: nonzero-ok:",
 ]
 ALLOWED = [
     "assert proc.returncode == 1",
     "assert proc.returncode in (1, 2)",
+    "assert proc.returncode == 1 or proc.returncode == 2",
     "assert proc.returncode == 0",
     "if proc.returncode != 0:\n    pass",
     "assert count != 0",
@@ -92,6 +102,20 @@ class TestExitCodeCheck:
 
     def test_a_named_path_that_does_not_exist_is_a_usage_error(self, tmp_path: Path) -> None:
         assert _check("exit-codes", "nope", cwd=tmp_path).returncode == 2
+
+
+class TestScaffoldShipsItOnlyWherePythonRuns:
+    """#1074 review: a Python-only helper is not copied into node/go/rust scaffolds."""
+
+    @pytest.mark.parametrize("language", ["node", "go", "rust"])
+    def test_non_python_scaffold_omits_it(self, tmp_path: Path, language: str) -> None:
+        target = tmp_path / "p"
+        scaffold(
+            target,
+            load_preset("core"),
+            make_variables(language=language, python="", **{language: "true"}),
+        )
+        assert not (target / ".agents" / "scripts" / "check_test_contract.py").exists()
 
 
 class TestScaffoldRunsIt:
