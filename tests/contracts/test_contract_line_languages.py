@@ -111,6 +111,15 @@ class TestGo:
         assert code == 1
 
 
+def _rustup_toolchain() -> dict[str, str]:
+    """Name a toolchain for the rustup proxy: conftest's isolated RUSTUP_HOME has no
+    settings.toml, so without one `cargo` exits 1 ("no default is configured")."""
+    toolchains = Path(os.environ.get("RUSTUP_HOME", "")) / "toolchains"
+    names = sorted(p.name for p in toolchains.iterdir()) if toolchains.is_dir() else []
+    pick = next((n for n in names if n.startswith("stable")), names[0] if names else "")
+    return {"RUSTUP_TOOLCHAIN": pick} if pick else {}
+
+
 class TestRust:
     def _repo(self, tmp_path: Path, failing: bool) -> Path:
         target = _scaffold(tmp_path, "rust")
@@ -126,7 +135,7 @@ class TestRust:
 
     def test_one_pass_one_fail_real_cargo(self, tmp_path: Path) -> None:
         _need("cargo")
-        last, code = _just_test(self._repo(tmp_path, failing=True))
+        last, code = _just_test(self._repo(tmp_path, failing=True), _rustup_toolchain())
         assert (last, code) == ("my-project: 1 passed, 1 failed", 101)
 
     def test_one_pass_one_fail_stub_cargo(self, tmp_path: Path) -> None:
