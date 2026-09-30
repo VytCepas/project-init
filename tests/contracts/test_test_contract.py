@@ -41,12 +41,6 @@ _CONTRACT_VARS = {
     "GOBIN",
     "TEMP",
     "TMP",
-    # The conftest's own private stash (#1062): this repo's outer suite is itself
-    # hermetic under the same conftest, so these would otherwise leak the outer
-    # run's real paths into the child's supposedly-independent hermetic session.
-    "_PROJECT_INIT_REAL_HOME",
-    "_PROJECT_INIT_REAL_CARGO_SRC",
-    "_PROJECT_INIT_REAL_RUSTUP_SRC",
 }
 LINE = re.compile(r"^([A-Za-z0-9._-]+): (\d+) passed, (\d+) failed$", re.MULTILINE)
 

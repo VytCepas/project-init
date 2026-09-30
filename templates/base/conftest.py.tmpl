@@ -33,11 +33,9 @@ once per session, in ``_hermetic_session``) are therefore their own throwaway
 directories, with only the download caches — registry/ and git/ for Cargo,
 toolchains/ and downloads/ for rustup — symlinked back to the real ones (or an
 inherited CARGO_HOME/RUSTUP_HOME's, if the runner already exported one):
-config and credentials are absent from them. That source directory, and the
-real home itself, are captured once and stashed in a private env var so an
-xdist worker re-importing this file — with HOME (and CARGO_HOME/RUSTUP_HOME)
-already redirected by the controller — recovers the genuine paths instead of
-re-deriving them from the now-fake HOME and losing the caches (#1062).
+config and credentials are absent from them. An xdist worker inherits the
+controller's CARGO_HOME/RUSTUP_HOME as that source, so its links resolve
+through the controller's to the real caches (#1062).
 
 Also at import: the variables git exports into a hook (GIT_DIR, and more from a
 linked worktree) are dropped, so a test's ``git -C <tmp>`` acts on <tmp>, never
@@ -65,18 +63,17 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Mapping
+    from collections.abc import Generator, Mapping
 
 
 def _cargo_home(root: Path, source: Path) -> str:
     """The test run's CARGO_HOME: only *source*'s registry/git *caches* symlinked in.
 
-    *source* is the genuine CARGO_HOME — the incoming environment's own export
-    if it set one, else ``~/.cargo`` — captured once by ``_stashed`` before this
-    run's CARGO_HOME was overridden (#1062). config.toml and credentials.toml
-    are absent from the result — cargo reads none of the real ones through this
-    variable. A symlink that cannot be made (no privilege on Windows without
-    Developer Mode) is skipped: isolation still holds, the cache is just cold.
+    *source* is the CARGO_HOME this process inherited, else ``~/.cargo``
+    (#1062). config.toml and credentials.toml are absent from the result —
+    cargo reads none of the real ones through this variable. A symlink that
+    cannot be made (no privilege on Windows without Developer Mode) is
+    skipped: isolation still holds, the cache is just cold.
     """
     fake = root / "cargo-home"
     fake.mkdir(parents=True, exist_ok=True)
@@ -91,12 +88,11 @@ def _cargo_home(root: Path, source: Path) -> str:
 def _rustup_home(root: Path, source: Path) -> str:
     """The test run's RUSTUP_HOME: only *source*'s toolchains/downloads *caches* symlinked in.
 
-    *source* is the genuine RUSTUP_HOME — the incoming environment's own
-    export if it set one, else ``~/.rustup`` — captured once by ``_stashed``
-    before this run's RUSTUP_HOME was overridden (#1062). settings.toml (the
-    default toolchain and other rustup preferences) is mutable state, not a
-    cache, and is absent from the result — rustup reads and writes none of the
-    real one through this variable. A symlink that cannot be made (no
+    *source* is the RUSTUP_HOME this process inherited, else ``~/.rustup``
+    (#1062). settings.toml (the default toolchain and other rustup
+    preferences) is mutable state, not a cache, and is absent from the result
+    — rustup reads and writes none of the real one through this variable. A
+    symlink that cannot be made (no
     privilege on Windows without Developer Mode) is skipped: isolation still
     holds, the cache is just cold.
     """
@@ -210,24 +206,6 @@ _GIT_HOOK_VARS = (
     "GIT_CONFIG_COUNT",
 )
 
-# Private stash vars: the controller's first _hermetic_session() call records the
-# genuine answer under each of these before moving anything, so a later re-import
-# in the same run (an xdist worker, which inherits the controller's already-moved
-# HOME/CARGO_HOME/RUSTUP_HOME) recovers it instead of re-deriving it wrong (#1062).
-_REAL_HOME_VAR = "_PROJECT_INIT_REAL_HOME"
-_REAL_CARGO_SRC_VAR = "_PROJECT_INIT_REAL_CARGO_SRC"
-_REAL_RUSTUP_SRC_VAR = "_PROJECT_INIT_REAL_RUSTUP_SRC"
-
-
-def _stashed(patch: pytest.MonkeyPatch, var: str, compute: Callable[[], Path]) -> Path:
-    """*var*'s value from an earlier process in this run, else computed and stashed now."""
-    found = os.environ.get(var)
-    if found:
-        return Path(found)
-    value = compute()
-    patch.setenv(var, str(value))
-    return value
-
 
 def _hermetic_session() -> tuple[pytest.MonkeyPatch, Path]:
     """Move home for the whole run, reading the real one first for the toolchain caches."""
@@ -237,17 +215,9 @@ def _hermetic_session() -> tuple[pytest.MonkeyPatch, Path]:
     root = Path(tempfile.mkdtemp(prefix="test-contract-"))
     # pytest_unconfigure removes it; this covers a run that never configures (--version).
     atexit.register(shutil.rmtree, root, ignore_errors=True)
-    real_home = _stashed(patch, _REAL_HOME_VAR, Path.home)
-    cargo_src = _stashed(
-        patch,
-        _REAL_CARGO_SRC_VAR,
-        lambda: Path(os.environ.get("CARGO_HOME") or real_home / ".cargo"),
-    )
-    rustup_src = _stashed(
-        patch,
-        _REAL_RUSTUP_SRC_VAR,
-        lambda: Path(os.environ.get("RUSTUP_HOME") or real_home / ".rustup"),
-    )
+    real_home = Path.home()
+    cargo_src = Path(os.environ.get("CARGO_HOME") or real_home / ".cargo")
+    rustup_src = Path(os.environ.get("RUSTUP_HOME") or real_home / ".rustup")
     for name, value in _toolchain_env(real_home, cargo_src, rustup_src, os.environ, root).items():
         if name in _ALWAYS_ISOLATED or name not in os.environ:
             patch.setenv(name, value)
@@ -257,8 +227,7 @@ def _hermetic_session() -> tuple[pytest.MonkeyPatch, Path]:
 
 # At import, not in pytest_configure: pytest imports tests/conftest.py before
 # configure, and test modules at collection. An xdist worker inherits the
-# controller's moved HOME, but recovers the controller's real toolchain paths
-# from the stash above (#1062), then moves to a home of its own.
+# controller's moved home and toolchain paths, then moves to a home of its own.
 _SESSION_PATCH, _SESSION_ROOT = _hermetic_session()
 
 
