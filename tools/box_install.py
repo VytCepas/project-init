@@ -32,7 +32,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
-import tarfile
+import tempfile
 import tomllib
 from email.parser import Parser
 from pathlib import Path, PurePosixPath
@@ -121,24 +121,78 @@ def blob_ids(paths: list[Path]) -> list[str]:
     return ids
 
 
-def checkout_bytes(commit: str, pathspecs: list[str]) -> dict[str, bytes]:
-    """Map each file under *pathspecs* to the bytes a checkout of *commit* writes.
+def blob_bytes(commit: str, paths: list[str]) -> dict[str, bytes]:
+    """Map each of *paths* to its raw object bytes at *commit*, straight from the store.
 
-    ``git archive`` applies checkout's eol conversion and filters, so a text file
-    that ``core.autocrlf`` made CRLF on disk, and so in the wheel, matches its LF
-    blob here, while a CRLF copy of an ``eol=lf`` file still does not.
+    ``git cat-file --batch``, never ``git archive``: archive runs the checkout
+    machinery, including any ``filter=`` smudge driver a repo's own
+    ``.gitattributes``/``.git/info/attributes`` configures — a clean+smudge pair
+    can make its smudge output equal an edited working-tree file, so archive's
+    "trusted" bytes are then exactly the edit (project-init#1064, Codex P1,
+    reproduced on git 2.43). ``cat-file`` reads the object unconverted.
     """
-    argv = ["git", "-C", str(_REPO_ROOT), "archive", "--format=tar", commit, "--", *pathspecs]
-    proc = subprocess.run(argv, capture_output=True, check=False)  # noqa: S603 — fixed argv
+    if not paths:
+        return {}
+    argv = ["git", "-C", str(_REPO_ROOT), "cat-file", "--batch"]
+    stdin = "".join(f"{commit}:{p}\n" for p in paths).encode()
+    proc = subprocess.run(argv, input=stdin, capture_output=True, check=False)  # noqa: S603
     if proc.returncode != 0:
-        raise RefusedError(f"git archive failed: {proc.stderr.decode(errors='replace').strip()}")
-    files: dict[str, bytes] = {}
-    with tarfile.open(fileobj=io.BytesIO(proc.stdout)) as tar:
-        for member in tar:
-            data = tar.extractfile(member) if member.isfile() else None
-            if data is not None:
-                files[member.name] = data.read()
-    return files
+        raise RefusedError(
+            f"git cat-file --batch failed: {proc.stderr.decode(errors='replace').strip()}"
+        )
+    out = proc.stdout
+    blobs: dict[str, bytes] = {}
+    pos = 0
+    for path in paths:
+        nl = out.index(b"\n", pos)
+        header = out[pos:nl].decode()
+        pos = nl + 1
+        if header.endswith(" missing"):
+            continue
+        size = int(header.rsplit(" ", 1)[-1])
+        blobs[path] = out[pos : pos + size]
+        pos += size + 1  # the batch's own trailing newline after each object's content
+    return blobs
+
+
+def eol_lf_paths(commit: str, paths: list[str]) -> set[str]:
+    """Return the subset of *paths* whose committed ``eol`` gitattribute is ``lf``.
+
+    Read from *commit*'s own ``.gitattributes`` only (#1068 review): a local
+    ``.git/info/attributes``, ``core.attributesFile`` or system file saying
+    ``eol=crlf`` makes a checkout write CRLF under a clean ``git status``, so it
+    must not grant the CRLF allowance. ``check-attr --source`` (git 2.40+) runs in
+    a throwaway git dir that shares only the object store; it runs no driver.
+    """
+    if not paths:
+        return set()
+    objects = _git("rev-parse", "--path-format=absolute", "--git-path", "objects")
+    with tempfile.TemporaryDirectory() as scratch:
+        git_dir, no_attrs = Path(scratch) / "git", Path(scratch) / "no-attributes"
+        no_attrs.write_text("")
+        init = _run(["git", "init", "-q", "--bare", "--template=", str(git_dir)])
+        if init.returncode != 0:
+            raise RefusedError(f"git init (eol policy) failed: {init.stderr.strip()}")
+        argv = [
+            "git",
+            f"--git-dir={git_dir}",
+            "-c",
+            f"core.attributesFile={no_attrs}",
+            "check-attr",
+            "-z",
+            "--stdin",
+            f"--source={commit}",
+            "eol",
+        ]
+        env = {**os.environ, "GIT_ATTR_NOSYSTEM": "1", "GIT_OBJECT_DIRECTORY": objects}
+        stdin = "".join(f"{p}\0" for p in paths)
+        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+            argv, input=stdin, capture_output=True, text=True, check=False, env=env
+        )
+    if proc.returncode != 0:
+        raise RefusedError(f"git check-attr --source failed (git 2.40+?): {proc.stderr.strip()}")
+    fields = proc.stdout.split("\0")
+    return {fields[i] for i in range(0, len(fields) - 2, 3) if fields[i + 2] == "lf"}
 
 
 def wheel_layout(project_toml: dict[str, Any]) -> list[tuple[str, str]]:
@@ -173,22 +227,75 @@ def ignored_problems(project_toml: dict[str, Any]) -> list[str]:
     ]
 
 
-def expected_files(project_toml: dict[str, Any], commit: str) -> dict[str, tuple[str, str, str]]:
-    """Map each installed path the commit should produce to (blob id, tree path, tree mode)."""
-    layout = wheel_layout(project_toml)
-    out = _git("ls-tree", "-r", "-z", "--full-tree", commit, "--", *(src for src, _ in layout))
-    files: dict[str, tuple[str, str, str]] = {}
+def tree_blobs(commit: str, pathspecs: list[str]) -> dict[str, tuple[str, str]]:
+    """Map each blob's git path under *pathspecs* at *commit* to (blob id, tree mode)."""
+    out = _git("ls-tree", "-r", "-z", "--full-tree", commit, "--", *pathspecs)
+    blobs: dict[str, tuple[str, str]] = {}
     for entry in filter(None, out.split("\0")):
         meta, path = entry.split("\t", 1)
         mode, kind, sha = meta.split()
-        if kind != "blob":
-            continue
+        if kind == "blob":
+            blobs[path] = (sha, mode)
+    return blobs
+
+
+def expected_files(project_toml: dict[str, Any], commit: str) -> dict[str, tuple[str, str, str]]:
+    """Map each installed path the commit should produce to (blob id, tree path, tree mode)."""
+    layout = wheel_layout(project_toml)
+    blobs = tree_blobs(commit, [src for src, _ in layout])
+    files: dict[str, tuple[str, str, str]] = {}
+    for path, (sha, mode) in blobs.items():
         for src, dst in layout:
             src, dst = src.rstrip("/"), dst.rstrip("/")
             if path == src or path.startswith(src + "/"):
                 files[dst + path[len(src) :]] = (sha, path, mode)
                 break
     return files
+
+
+def modified_paths(
+    commit: str, expected: dict[str, tuple[str, str, str]], present: dict[str, str], root: Path
+) -> list[str]:
+    """Return each *dest* in *expected* whose raw bytes under *root* do not match *commit*.
+
+    Two-stage (project-init#1047, #1060): *present* maps a dest already hashed
+    (``hash-object --no-filters``) to its id — cheap, but a CRLF checkout
+    (core.autocrlf) can legitimately differ from the blob there, and a local
+    clean filter can smudge an edit back to it for ``git status``/``diff`` while
+    leaving the on-disk bytes untouched. A mismatch is only a suspect until
+    confirmed against ``blob_bytes``, the trusted object bytes straight from the
+    store. The CRLF allowance is derived from those same trusted bytes (LF ->
+    CRLF) rather than by asking git to check the path out, so nothing here ever
+    runs a configured filter driver (project-init#1064, Codex P1) — and it is
+    withheld for a path an ``eol=lf`` attribute pins to LF, so an injected CRLF
+    there still reads as modified.
+    """
+    suspect = {dest for dest, (sha, _, _) in expected.items() if present.get(dest, sha) != sha}
+    if not suspect:
+        return []
+    srcs = sorted({expected[dest][1] for dest in suspect})
+    trusted = blob_bytes(commit, srcs)
+    pinned_lf = eol_lf_paths(commit, srcs)
+    modified = []
+    for dest in suspect:
+        src = expected[dest][1]
+        path = root / dest
+        blob = trusted.get(src)
+        if blob is None or not path.is_file():
+            modified.append(dest)
+            continue
+        disk = path.read_bytes()
+        crlf_ok = src not in pinned_lf and disk == blob.replace(b"\n", b"\r\n")
+        if disk != blob and not crlf_ok:
+            modified.append(dest)
+    return modified
+
+
+def raw_ids(root: Path, names: list[str]) -> dict[str, str]:
+    """Hash each of *names* under *root*, as it is on disk, with ``hash-object --no-filters``."""
+    present = [(name, root / name) for name in names if (root / name).is_file()]
+    ids = blob_ids([path for _, path in present])
+    return {name: i for (name, _), i in zip(present, ids, strict=True)}
 
 
 def env_paths(env: Path) -> tuple[Path, Path]:
@@ -452,15 +559,12 @@ def check(env: Path) -> tuple[list[str], int]:
     installed = installed_files(site, owned | {p.split("/", 1)[0] for p in expected})
     drift = receipt_problems(env, scripts) + path_problems(scripts)
     drift += metadata_problems(site, project_toml, head) + record_drift
-    # Not the blob is not yet modified: a CRLF checkout (core.autocrlf) builds CRLF files.
-    suspect = {dest for dest, (sha, _, _) in expected.items() if installed.get(dest, sha) != sha}
-    layout = [src for src, _ in wheel_layout(project_toml)]
-    checkout = checkout_bytes(head, layout) if suspect else {}
+    modified = set(modified_paths(head, expected, installed, site))
     for dest, (_, src, mode) in sorted(expected.items()):
         if dest not in installed:
             drift.append(f"missing: {dest} (tree: {src})")
             continue
-        if dest in suspect and checkout.get(src) != (site / dest).read_bytes():
+        if dest in modified:
             drift.append(f"modified: {dest} (tree: {src})")
         perms = (site / dest).stat().st_mode & 0o777
         # The scaffolder gives an output the exec bit its template has (any of 0o111).
@@ -468,6 +572,28 @@ def check(env: Path) -> tuple[list[str], int]:
             drift.append(f"mode: {dest} installed {perms:o}, tree {mode} (tree: {src})")
     drift += [f"not in tree: {dest}" for dest in sorted(set(installed) - set(expected))]
     return drift, len(expected)
+
+
+def edited_problems(head: str, project_toml: dict[str, Any]) -> list[str]:
+    """Name each packaged path (plus pyproject.toml) whose raw bytes do not match *head*.
+
+    HEAD's own committed bytes, never the working tree: a clean filter can
+    smudge an edit back to the blob for status/diff while uv still builds the
+    raw bytes on disk (project-init#1060). pyproject.toml is checked too — it
+    is read for its own layout, dependencies and entry points, none of which
+    a dirty-tree or hidden-file check covers.
+    """
+    packaged = [src for src, _ in wheel_layout(project_toml)] + ["pyproject.toml"]
+    expected_src = {p: (sha, p, mode) for p, (sha, mode) in tree_blobs(head, packaged).items()}
+    present_src = raw_ids(_REPO_ROOT, list(expected_src))
+    edited = sorted(modified_paths(head, expected_src, present_src, _REPO_ROOT))
+    if not edited:
+        return []
+    shown = "\n      ".join(edited[:10] + (["..."] if len(edited) > 10 else []))
+    return [
+        f"files whose on-disk bytes do not match {head}, though git reports the tree clean "
+        f"(a local clean filter?):\n      {shown}"
+    ]
 
 
 def apply_problems(*, fetch: bool) -> list[str]:
@@ -497,8 +623,10 @@ def apply_problems(*, fetch: bool) -> list[str]:
             "`git update-index --no-skip-worktree -- <file>` or "
             f"`git update-index --no-assume-unchanged -- <file>`, one call per flag:\n      {shown}"
         )
-    # HEAD's layout: a pyproject on disk that differs from it is refused above.
-    problems += ignored_problems(tomllib.loads(_git("show", "HEAD:pyproject.toml")))
+    head = _git("rev-parse", "HEAD")
+    project_toml = tomllib.loads(_git("show", f"{head}:pyproject.toml"))
+    problems += edited_problems(head, project_toml)
+    problems += ignored_problems(project_toml)
     if fetch:
         proc = _git_proc("fetch", "--quiet", "origin", _BASE)
         if proc.returncode != 0:
@@ -506,7 +634,7 @@ def apply_problems(*, fetch: bool) -> list[str]:
     upstream = _git_proc("rev-parse", "-q", "--verify", f"origin/{_BASE}").stdout.strip()
     if not upstream:
         problems.append(f"no origin/{_BASE} to compare with: fetch it first")
-    elif upstream != _git("rev-parse", "HEAD"):
+    elif upstream != head:
         counts = _git_proc("rev-list", "--left-right", "--count", f"HEAD...origin/{_BASE}")
         ahead, _, behind = counts.stdout.strip().partition("\t")
         problems.append(f"not in sync with origin/{_BASE} (ahead {ahead}, behind {behind})")
