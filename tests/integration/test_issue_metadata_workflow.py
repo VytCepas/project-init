@@ -211,7 +211,7 @@ class TestIssueMetadataScaffold:
             capture_output=True,
             text=True,
         )
-        assert rejected.returncode != 0, "control: a label set with no type must still fail"
+        assert rejected.returncode == 1, "control: a label set with no type must still fail"
 
     def test_board_automation_status_mapping_executes(self):
         """Run the *shipped* status-determination block for each issue action and

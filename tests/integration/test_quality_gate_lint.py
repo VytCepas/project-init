@@ -152,4 +152,4 @@ def test_biome_passes_on_freshly_scaffolded_node_project(tmp_target: Path):
     src.mkdir(exist_ok=True)
     (src / "bad.ts").write_text("export const  x=1\n")
     broken = _biome_format_check(tmp_target)
-    assert broken.returncode != 0, "biome must still catch unformatted project source"
+    assert broken.returncode == 1, "biome must still catch unformatted project source"
