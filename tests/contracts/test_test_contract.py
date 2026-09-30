@@ -622,6 +622,20 @@ class TestHermeticScaffold:
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
 
+    def test_relative_cargo_and_rustup_home_still_reach_the_cache(self, tmp_path: Path) -> None:
+        """Codex on #1067: a relative CARGO_HOME/RUSTUP_HOME is relative to the
+        runner's cwd, but a relative symlink target resolves against the link's
+        own directory, so the cache link dangled inside the fake home."""
+        target = _python_scaffold(tmp_path / "p")
+        (target / "relcargo" / "registry").mkdir(parents=True)
+        (target / "relcargo" / "registry" / "marker.txt").write_text("custom-cargo\n")
+        (target / "relrustup" / "toolchains").mkdir(parents=True)
+        (target / "relrustup" / "toolchains" / "marker.txt").write_text("custom-rustup\n")
+        _plant(target, "test_inherited_source.py", _PLANTED_INHERITED_SOURCE)
+        result = _pytest(target, tmp_path, CARGO_HOME="relcargo", RUSTUP_HOME="relrustup")
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
+
     def test_install_roots_move_but_shared_caches_stay_real(self, tmp_path: Path) -> None:
         """Codex on #1056 (P1): UV_PYTHON_INSTALL_DIR, UV_TOOL_DIR, GOPATH and
         BUN_INSTALL used to point at the real home, so `uv python install`,

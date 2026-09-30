@@ -223,8 +223,10 @@ def _hermetic_session() -> tuple[pytest.MonkeyPatch, Path]:
     # pytest_unconfigure removes it; this covers a run that never configures (--version).
     atexit.register(shutil.rmtree, root, ignore_errors=True)
     real_home = Path.home()
-    cargo_src = Path(os.environ.get("CARGO_HOME") or real_home / ".cargo")
-    rustup_src = Path(os.environ.get("RUSTUP_HOME") or real_home / ".rustup")
+    # Absolute: a relative export means the runner's cwd, but a relative link target
+    # would resolve inside the fake home and dangle (#1067 review).
+    cargo_src = Path(os.environ.get("CARGO_HOME") or real_home / ".cargo").absolute()
+    rustup_src = Path(os.environ.get("RUSTUP_HOME") or real_home / ".rustup").absolute()
     for name, value in _toolchain_env(real_home, cargo_src, rustup_src, os.environ, root).items():
         if name in _ALWAYS_ISOLATED or name not in os.environ:
             patch.setenv(name, value)
