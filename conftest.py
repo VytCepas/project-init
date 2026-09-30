@@ -23,6 +23,10 @@ directories, with only the download caches — registry/ and git/ for Cargo,
 toolchains/ and downloads/ for rustup — symlinked back to the real ones:
 config and credentials are absent from them.
 
+Also at import: the variables git exports into a hook (GIT_DIR, and more from a
+linked worktree) are dropped, so a test's ``git -C <tmp>`` acts on <tmp>, never
+on the repository whose pre-push hook ran pytest (#1065).
+
 Rule 3: every run ends with ``<project>: N passed, M failed`` (an error counts
 as failed, a skip as neither), the line a fleet runner adds up, printed after
 pytest's own final summary line so a reader taking "the last line" gets it.
@@ -141,10 +145,26 @@ def _redirect(env: Mapping[str, Path], patch: pytest.MonkeyPatch) -> None:
 # which a runner's own override is left alone (#1056 review).
 _ALWAYS_ISOLATED = {"CARGO_HOME", "RUSTUP_HOME"}
 
+# The same list the scaffolded git hooks strip before their gate; a test pins them equal.
+_GIT_HOOK_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_QUARANTINE_PATH",
+    "GIT_PREFIX",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+)
+
 
 def _hermetic_session() -> tuple[pytest.MonkeyPatch, Path]:
     """Move home for the whole run, reading the real one first for the toolchain caches."""
     patch = pytest.MonkeyPatch()
+    for name in _GIT_HOOK_VARS:
+        patch.delenv(name, raising=False)
     root = Path(tempfile.mkdtemp(prefix="test-contract-"))
     # pytest_unconfigure removes it; this covers a run that never configures (--version).
     atexit.register(shutil.rmtree, root, ignore_errors=True)

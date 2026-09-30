@@ -96,9 +96,12 @@ if [[ "$PUSHING_BRANCH" == "1" ]]; then
       echo "  Commit or stash your changes to run the gate before pushing." >&2
     else
       echo "pre-push: running 'just fast-ci' (lint + tests) before push…"
+      # GIT_CONFIG_PARAMETERS/COUNT: a `git -c key=val push` exports its config
+      # here too, and command-line config outranks every test repo's own (#1065).
       if ! (cd "$REPO_ROOT" && env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE \
-        -u GIT_PREFIX -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
-        -u GIT_QUARANTINE_PATH just fast-ci); then
+        -u GIT_COMMON_DIR -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
+        -u GIT_QUARANTINE_PATH -u GIT_PREFIX -u GIT_CONFIG_PARAMETERS \
+        -u GIT_CONFIG_COUNT just fast-ci); then
         echo ""
         echo "❌ pre-push: 'just fast-ci' failed — fix the errors above before pushing."
         echo "   (bypass in an emergency with: git push --no-verify)"

@@ -200,6 +200,27 @@ def test_rustup_home_overrides_the_inherited_export():
     assert os.environ["RUSTUP_HOME"] != os.environ["DECOY_RUSTUP_HOME"]
 """
 
+# #1065: a pre-push hook exports GIT_DIR (and more) into the suite it runs.
+_PLANTED_GIT_SANDBOX = """\
+import os
+import subprocess
+
+
+def test_git_in_tmp_path_acts_on_tmp_path(tmp_path):
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init", "-q")
+    git("config", "user.name", "t")
+    git("config", "user.email", "t@example.com")
+    git("commit", "-q", "--allow-empty", "-m", "init")
+    assert (tmp_path / ".git").is_dir()
+
+
+def test_no_hook_git_variable_reaches_a_test():
+    assert [v for v in os.environ["HOOK_VARS"].split() if v in os.environ] == []
+"""
+
 _PLANTED_IMPORTS_CONFTEST = """\
 import json
 
@@ -395,6 +416,60 @@ class TestHermeticScaffold:
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
+
+    def test_a_hook_exported_git_dir_cannot_reach_the_enclosing_repo(self, tmp_path: Path) -> None:
+        """#1065: pytest run from a git hook inherits GIT_DIR (GIT_WORK_TREE and
+        GIT_INDEX_FILE from a linked worktree, GIT_CONFIG_PARAMETERS from `git -c`),
+        and a test's `git -C <tmp>` then writes to the repo the hook fired in."""
+        enclosing = tmp_path / "enclosing"
+        subprocess.run(["git", "init", "-q", str(enclosing)], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(enclosing),
+                "-c",
+                "user.name=x",
+                "-c",
+                "user.email=x@x",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "base",
+            ],
+            check=True,
+        )
+
+        def state() -> list[str]:
+            return [
+                subprocess.run(
+                    ["git", "-C", str(enclosing), *args],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout
+                for args in (
+                    ["for-each-ref"],
+                    ["config", "--local", "--list"],
+                    ["worktree", "list"],
+                )
+            ]
+
+        before = state()
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_git_sandbox.py", _PLANTED_GIT_SANDBOX)
+        hook_env = {
+            "GIT_DIR": str(enclosing / ".git"),
+            "GIT_WORK_TREE": str(enclosing),
+            "GIT_INDEX_FILE": str(enclosing / ".git" / "index"),
+            "GIT_PREFIX": "",
+            "GIT_CONFIG_PARAMETERS": "'core.hookspath'='/nonexistent'",
+        }
+        result = _pytest(target, tmp_path, HOOK_VARS=" ".join(hook_env), **hook_env)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
+        assert state() == before
 
     def test_the_session_home_is_removed_after_the_run(self, tmp_path: Path) -> None:
         target = _python_scaffold(tmp_path / "p")
