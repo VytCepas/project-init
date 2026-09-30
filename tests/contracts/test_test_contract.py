@@ -65,19 +65,18 @@ def test_toolchain_caches_stay_real():
 """
 
 # Each read happens before any function-scoped fixture: at import, at collection,
-# in a broader-scoped fixture. ntpath.expanduser is Path.home() on Windows.
+# in a broader-scoped fixture.
 _PLANTED_EARLY_CONFTEST = """\
-import ntpath
 from pathlib import Path
 
 import pytest
 
-AT_CONFTEST_IMPORT = (Path.home(), ntpath.expanduser("~"))
+AT_CONFTEST_IMPORT = (Path.home(),)
 
 
 @pytest.fixture(scope="session")
 def session_home():
-    return Path.home(), ntpath.expanduser("~")
+    return (Path.home(),)
 
 
 @pytest.fixture(scope="session")
@@ -86,18 +85,17 @@ def conftest_import_home():
 """
 
 _PLANTED_EARLY = """\
-import ntpath
 import os
 from pathlib import Path
 
 import pytest
 
-AT_COLLECTION = (Path.home(), ntpath.expanduser("~"))
+AT_COLLECTION = (Path.home(),)
 
 
 @pytest.fixture(scope="module")
 def module_home():
-    return Path.home(), ntpath.expanduser("~")
+    return (Path.home(),)
 
 
 def _real(*homes):
@@ -144,34 +142,6 @@ def test_cargo_config_and_credentials_are_not_reachable():
 def test_cargo_registry_cache_is_still_reused():
     fake = Path(os.environ["CARGO_HOME"])
     assert (fake / "registry" / "marker.txt").read_text() == "cached\\n"
-"""
-
-_PLANTED_WINDOWS = """\
-import ntpath
-import os
-from pathlib import Path
-
-
-def _is_real(path):
-    assert path != "~", "nothing to expand from: the variable is unset"
-    return Path(path).is_relative_to(Path(os.environ["REAL_HOME"]))
-
-
-def test_userprofile_is_redirected():
-    assert not _is_real(ntpath.expanduser("~"))
-
-
-def test_homedrive_homepath_are_redirected(monkeypatch):
-    monkeypatch.delenv("USERPROFILE")
-    assert not _is_real(ntpath.expanduser("~"))
-
-
-def test_appdata_is_redirected():
-    assert not _is_real(os.environ["APPDATA"])
-
-
-def test_localappdata_is_redirected():
-    assert not _is_real(os.environ["LOCALAPPDATA"])
 """
 
 _PLANTED_RUSTUP = """\
@@ -328,15 +298,13 @@ def test_uv_itself_resolves_outside_the_real_home(args):
 _PLANTED_GO_CROSS = """\
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 
 def test_a_cross_compiled_go_install_lands_in_the_isolated_gopath(tmp_path):
     (tmp_path / "go.mod").write_text("module example.com/hello\\n\\ngo 1.21\\n")
     (tmp_path / "main.go").write_text("package main\\n\\nfunc main() {}\\n")
-    goos = "linux" if sys.platform == "win32" else "windows"
-    env = {**os.environ, "GOOS": goos, "GOTOOLCHAIN": "local"}
+    env = {**os.environ, "GOOS": "windows", "GOTOOLCHAIN": "local"}
     result = subprocess.run(
         ["go", "install", "."], cwd=tmp_path, env=env, capture_output=True, text=True
     )
@@ -418,12 +386,8 @@ def _pytest(
         for k, v in os.environ.items()
         if not k.startswith(("XDG_", "PYTEST_")) and k not in _CONTRACT_VARS
     }
-    drive = Path(real_home).drive
     env |= {
         "HOME": str(real_home),
-        "USERPROFILE": str(real_home),
-        "HOMEDRIVE": drive,
-        "HOMEPATH": str(real_home)[len(drive) :],
         "REAL_HOME": str(real_home),
         "TMPDIR": str(real_tmp),
         "REAL_TMPDIR": str(real_tmp),
@@ -473,15 +437,6 @@ class TestHermeticScaffold:
         result = _pytest(target, tmp_path, *workers)
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 7, 0), result.stdout
-
-    def test_windows_home_variables_are_redirected(self, tmp_path: Path) -> None:
-        """PR #1056 review: Path.home() on Windows reads USERPROFILE, then
-        HOMEDRIVE + HOMEPATH, and never HOME."""
-        target = _python_scaffold(tmp_path / "p")
-        _plant(target, "test_windows.py", _PLANTED_WINDOWS)
-        result = _pytest(target, tmp_path)
-        assert result.returncode == 0, result.stdout + result.stderr
-        assert _last_line(result.stdout) == ("my-project", 4, 0), result.stdout
 
     def test_cargo_home_isolates_config_and_credentials_but_reuses_the_cache(
         self, tmp_path: Path
@@ -714,7 +669,7 @@ class TestHermeticScaffold:
         assert not real_gobin.exists()
 
     def test_temp_and_tmp_match_tmpdir(self, tmp_path: Path) -> None:
-        """Copilot on #1056/#1062: the per-test fixture set only TMPDIR; Windows
+        """Copilot on #1056/#1062: the per-test fixture set only TMPDIR; tempfile
         and some tools read TEMP/TMP, so point them at the same per-test dir."""
         target = _python_scaffold(tmp_path / "p")
         _plant(target, "test_temp_tmp.py", _PLANTED_TEMP_TMP)

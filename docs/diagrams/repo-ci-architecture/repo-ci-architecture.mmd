@@ -24,7 +24,7 @@ flowchart TB
     PREPUSH -->|"git push"| GH[("GitHub repo")]
 
     subgraph WORKFLOWS[".github/workflows/*.yml"]
-        CI["ci.yml\nlint-and-test · wheel-smoke · secret-scan (gitleaks)\nshellcheck · macos/windows-portability (path-filtered)"]
+        CI["ci.yml\nlint-and-test · wheel-smoke · secret-scan (gitleaks)\nshellcheck · macos-portability (path-filtered)"]
         VALIDATE["validate-pr.yml\nPR title lint + Closes-keyword check"]
         REVSTATUS["review-status.yml\nmirrors PR review decision -> commit status"]
         BOARD["board-automation.yml\nissue/PR -> project board card moves"]

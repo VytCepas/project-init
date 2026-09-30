@@ -4,11 +4,10 @@ Scaffolded by project-init (PI-1044) and refreshed by ``project-init upgrade``; 
 your own fixtures in ``tests/conftest.py``, which pytest loads beside this one.
 
 Rule 1: no test reads or writes the real home, so a verdict never depends on who
-ran it. HOME (with Windows' USERPROFILE, HOMEDRIVE, HOMEPATH, APPDATA and
-LOCALAPPDATA), the XDG dirs and CLAUDE_CONFIG_DIR move to a throwaway directory
+ran it. HOME, the XDG dirs and CLAUDE_CONFIG_DIR move to a throwaway directory
 when pytest imports this file: before it collects a test module or runs a
 fixture of any scope. Every test then gets a directory of its own, TMPDIR (with
-TEMP and TMP, which Windows and some tools read instead) included; these move
+TEMP and TMP, which Python's tempfile and some tools read instead) included; these move
 per test only, because pytest keeps its own temporary directories under
 TMPDIR. Toolchain *caches* (uv, cargo, rustup, go, bun) keep their real
 locations: they hold content, not configuration, and a cold cache would turn
@@ -75,8 +74,7 @@ def _cargo_home(root: Path, source: Path) -> str:
     *source* is the CARGO_HOME this process inherited, else ``~/.cargo``
     (#1062). config.toml and credentials.toml are absent from the result —
     cargo reads none of the real ones through this variable. A symlink that
-    cannot be made (no privilege on Windows without Developer Mode) is
-    skipped: isolation still holds, the cache is just cold.
+    cannot be made is skipped: isolation still holds, the cache is just cold.
     """
     fake = root / "cargo-home"
     fake.mkdir(parents=True, exist_ok=True)
@@ -95,9 +93,8 @@ def _rustup_home(root: Path, source: Path) -> str:
     (#1062). settings.toml (the default toolchain and other rustup
     preferences) is mutable state, not a cache, and is absent from the result
     — rustup reads and writes none of the real one through this variable. A
-    symlink that cannot be made (no
-    privilege on Windows without Developer Mode) is skipped: isolation still
-    holds, the cache is just cold.
+    symlink that cannot be made is skipped: isolation still holds, the cache
+    is just cold.
     """
     fake = root / "rustup-home"
     fake.mkdir(parents=True, exist_ok=True)
@@ -154,12 +151,6 @@ def _home_env(root: Path) -> dict[str, Path]:
     home = root / "home"
     return {
         "HOME": home,
-        # Windows: Path.home() reads USERPROFILE, then HOMEDRIVE + HOMEPATH, never HOME.
-        "USERPROFILE": home,
-        # Windows: normally inherited absolute paths under the real profile, so
-        # redirecting USERPROFILE/the XDG vars alone leaves them pointing at it.
-        "APPDATA": home / "AppData" / "Roaming",
-        "LOCALAPPDATA": home / "AppData" / "Local",
         "XDG_CONFIG_HOME": home / ".config",
         "XDG_DATA_HOME": home / ".local" / "share",
         "XDG_CACHE_HOME": home / ".cache",
@@ -175,9 +166,6 @@ def _redirect(env: Mapping[str, Path], patch: pytest.MonkeyPatch) -> None:
     for name, path in env.items():
         path.mkdir(parents=True, exist_ok=True)
         patch.setenv(name, str(path))
-    home = env["HOME"]
-    patch.setenv("HOMEDRIVE", home.drive)
-    patch.setenv("HOMEPATH", str(home)[len(home.drive) :])
 
 
 # Config homes (CARGO_HOME, RUSTUP_HOME: #1056 review) and install roots (#1062)
@@ -255,7 +243,7 @@ def _test_contract_hermetic_home(
     # A dir of its own, not tmp_path: a test that lists its tmp_path must not find these in it.
     root = tmp_path_factory.mktemp("hermetic")
     tmp = root / "tmp"
-    # TEMP/TMP: Windows and some tools read these instead of TMPDIR (Copilot, #1056/#1062).
+    # TEMP/TMP: tempfile and some tools read these instead of TMPDIR (Copilot, #1056/#1062).
     env = {**_home_env(root), "TMPDIR": tmp, "TEMP": tmp, "TMP": tmp}
     _redirect(env, monkeypatch)
     # tempfile caches its dir on first use, so the variable alone would not move it.

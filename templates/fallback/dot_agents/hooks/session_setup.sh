@@ -11,6 +11,15 @@ case "${1-}" in
 esac
 set -uo pipefail # not -e: a failed bootstrap must never break the session
 
+# Native Windows is refused before anything is written: WSL2 only (#1070).
+_pi_os="$(uname -s 2>/dev/null)"
+case "$_pi_os" in
+MINGW* | MSYS* | CYGWIN*)
+  echo "session_setup: native Windows shell ($_pi_os) is not supported; run Claude Code inside WSL2 (https://learn.microsoft.com/windows/wsl/install)" >&2
+  exit 2
+  ;;
+esac
+
 ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "$ROOT" || exit 0
 STAMP=".agents/.session_setup_stamp"

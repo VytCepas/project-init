@@ -342,8 +342,15 @@ def main(argv: list[str] | None = None) -> int:
 
     A single top-level handler turns an EOF (non-TTY / piped stdin) or Ctrl-C at
     any interactive prompt — in the wizard or in `upgrade --apply -i` — into a
-    clean exit 130 instead of a raw traceback (2026-07 review).
+    clean exit 130 instead of a raw traceback (2026-07 review). A native
+    Windows shell is refused first, naming WSL2 (#1070).
     """
+    from project_init.platform_guard import REFUSAL_EXIT, native_windows_shell, refusal
+
+    native = native_windows_shell()
+    if native is not None:  # #1070: WSL2 only, refused before anything runs
+        sys.stderr.write(refusal(native))
+        return REFUSAL_EXIT
     try:
         return _cli(list(sys.argv[1:]) if argv is None else list(argv))
     except (EOFError, KeyboardInterrupt):

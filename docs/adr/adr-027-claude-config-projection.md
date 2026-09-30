@@ -1,6 +1,6 @@
 # ADR-027: `.claude/` is a scoped, delete-aware, plain-file projection of `.agents/`
 
-- Status: Accepted
+- Status: Accepted; Windows rationale superseded by [ADR-030](adr-030-macos-linux-wsl2-only.md)
 - Date: 2026-07-08
 - Implements: [#627](https://github.com/VytCepas/project-init/issues/627)
   (`.claude` projection blindly copies the whole `.agents` tree → split-brain drift)
@@ -56,7 +56,9 @@ a *committed* projection: `core.symlinks=false` is the default on **both Windows
 (set false as a security measure). Under it, a checked-out symlink is materialised
 as a **plain text file containing the link target**, so Claude Code sees `.claude`
 as a *file*, loads nothing, and says nothing. Only Linux restores it reliably.
-Claude Code now runs natively on Windows (no WSL), so those users are real. The
+Claude Code now runs natively on Windows (no WSL), so those users are real
+(superseded: native Windows is refused, [ADR-030](adr-030-macos-linux-wsl2-only.md);
+the macOS reason stands on its own). The
 break happens at *clone time on another machine*, before any scaffolder code
 runs — nothing we ship can repair it.
 

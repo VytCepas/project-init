@@ -1854,10 +1854,6 @@ def _port_root() -> Path | None:
     database when HOME is unset and would invent the default the contract says
     not to.
 
-    THE DEFAULT IS PER OS. Only the POSIX one is decided and the Windows one
-    is still open, so off POSIX an exported PORT_ROOT counts but nothing is
-    defaulted.
-
     Trailing slashes need no code: pathlib drops them at construction, so
     ``~/port/`` and ``~/port`` are one Path before the equality test. Resolved
     for the same reason ``start`` is — the stop compares physical paths, and a
@@ -1873,7 +1869,7 @@ def _port_root() -> Path | None:
         root = Path(exported)
     else:
         home = os.environ.get("HOME") or ""
-        if not home or os.name != "posix":
+        if not home:
             return None
         root = Path(home) / "port"
     with contextlib.suppress(OSError, RuntimeError):

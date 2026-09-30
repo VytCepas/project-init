@@ -455,7 +455,19 @@ CMD
   say "installed slash command -> $COMMANDS_DIR/project-init.md"
 }
 
+# Native Windows is refused before anything installs: WSL2 only (#1070).
+refuse_native_windows() {
+  local os
+  os="$(uname -s 2>/dev/null || true)"
+  case "$os" in
+  MINGW* | MSYS* | CYGWIN*)
+    die "native Windows shell ($os) is not supported; run this installer inside WSL2 (https://learn.microsoft.com/windows/wsl/install)"
+    ;;
+  esac
+}
+
 main() {
+  refuse_native_windows
   say "bootstrap starting"
   ensure_uv
   ensure_repo
