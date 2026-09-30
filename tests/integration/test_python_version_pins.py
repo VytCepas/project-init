@@ -82,7 +82,7 @@ def test_flag_contradicting_requires_python_is_rejected(tmp_path: Path):
     """
     (tmp_path / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.12"\n')
     result = _scaffold(tmp_path, "--python-version", "3.14")
-    assert result.returncode != 0
+    assert result.returncode == 2
     assert "conflicts with the Python floor (3.12)" in result.stderr
     assert not (tmp_path / "mise.toml").exists()
 
@@ -95,7 +95,7 @@ def test_flag_agreeing_with_requires_python_is_accepted(tmp_path: Path):
 
 def test_unsupported_python_version_is_rejected(tmp_path: Path):
     result = _scaffold(tmp_path, "--python-version", "3.9")
-    assert result.returncode != 0
+    assert result.returncode == 2
     assert "invalid choice: '3.9'" in result.stderr
     # Rejected before the target is touched (PI-20): no half-scaffold left behind.
     assert not (tmp_path / "mise.toml").exists()
@@ -133,7 +133,7 @@ def test_python_version_without_python_language_is_rejected(tmp_path: Path, lang
         text=True,
         check=False,
     )
-    assert result.returncode != 0
+    assert result.returncode == 2
     assert "requires --language python" in result.stderr
     assert not (tmp_path / ".agents").exists()
 
@@ -241,7 +241,7 @@ def test_pyproject_floor_outranks_python_version_file(tmp_path: Path):
 def test_flag_contradicting_python_version_file_is_rejected(tmp_path: Path):
     (tmp_path / ".python-version").write_text("3.12\n")
     result = _scaffold(tmp_path, "--python-version", "3.14")
-    assert result.returncode != 0
+    assert result.returncode == 2
     assert "conflicts with the Python floor" in result.stderr
 
 

@@ -17,6 +17,7 @@ setup:
 lint:
     uv run ruff check .
     uv run ruff format --check .
+    uv run python .agents/scripts/check_test_contract.py exit-codes tests
 
 # auto-format
 format:

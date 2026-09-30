@@ -56,7 +56,7 @@ class TestNonUtf8Config:
         cfg.write_bytes(b"\xff\xfe\n" + cfg.read_bytes())
         # run_upgrade must surface a clean error, not a raw UnicodeDecodeError.
         rc = run_upgrade(target, apply=False)
-        assert rc != 0
+        assert rc == 1
         assert "UnicodeDecodeError" not in capsys.readouterr().err
 
 

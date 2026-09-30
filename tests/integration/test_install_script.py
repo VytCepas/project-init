@@ -334,7 +334,7 @@ def test_diverged_local_branch_is_refused_and_kept(
     local = _diverge(boot)
     result = boot.run(**ref_env)
     assert f"(ref: {label})" in result.stdout, result.stdout + result.stderr
-    assert result.returncode != 0, result.stdout + result.stderr
+    assert result.returncode == 1, result.stdout + result.stderr
     assert _git(boot.install, "rev-parse", "HEAD") == local, "the local commit must survive"
     assert (boot.install / "README.md").read_text() == "local\n"
     assert not boot.cmd.exists()

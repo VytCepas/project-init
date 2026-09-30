@@ -282,7 +282,7 @@ def test_git_pre_commit_lints_the_index_not_the_worktree(tmp_path: Path):
     result = subprocess.run(["bash", str(hook)], cwd=target, capture_output=True, text=True)
 
     # The staged (index) content is BAD, so the hook must block the commit …
-    assert result.returncode != 0, (
+    assert result.returncode == 1, (
         "pre-commit passed on a staged lint error hidden by an unstaged fix"
     )
     # … and the developer's unstaged fix must be restored intact afterward.

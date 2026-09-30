@@ -88,6 +88,8 @@ SYNCED: dict[str, str | tuple[str, object]] = {
     "scripts/push_wiki.sh": "lifecycle/dot_agents/scripts/push_wiki.sh",
     # subagent specs (Claude Code reads them from the .claude/ mirror)
     "agents/README.md": "base/dot_agents/agents/README.md",
+    # test-contract checks (#1052): `just lint` runs them on this repo's tests too
+    "scripts/check_test_contract.py": "base/dot_agents/scripts/check_test_contract.py",
     # code map generator (stored Python-gated; this repo is Python)
     "scripts/gen_code_map.py": (
         "base/dot_agents/scripts/gen_code_map.py.tmpl",

@@ -251,7 +251,7 @@ class TestDay2HelperRuntime:
 
     def test_add_unknown_provider_fails(self):
         r = self._run("add", "openai", "gpt-5")
-        assert r.returncode != 0
+        assert r.returncode == 1
         assert "not in config" in (r.stdout + r.stderr)
 
     def test_register_ollama_model_without_pull(self, tmp_path: Path):
