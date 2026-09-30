@@ -1,4 +1,4 @@
-"""#1052: test-contract rule 2 (exact exit codes) is mechanised, here and in the scaffold.
+"""#1052/#1053: test-contract rules 2 and 4 are mechanised, here and in the scaffold.
 
 `check_test_contract.py exit-codes` fails on an assertion that accepts any
 non-zero exit. The ratchet is zero: every assertion in this repo names its code.
@@ -107,6 +107,7 @@ class TestScaffoldRunsIt:
         (stub / "uv").write_text(
             "#!/usr/bin/env bash\n"
             '[ "$1" = run ] && shift\n'
+            'while [ "$1" = --with ]; do shift 2; done\n'
             f'if [ "$1" = python ]; then shift; exec "{sys.executable}" "$@"; fi\n'
             "exit 0\n"
         )
@@ -129,3 +130,71 @@ class TestScaffoldRunsIt:
         red = self._lint(target, tmp_path)
         assert red.returncode == 1, red.stdout + red.stderr
         assert "tests/test_planted.py:2:" in red.stdout
+
+
+class TestDiscoveryCheck:
+    """#1053: a file under tests/ defining a test that no full collection reaches."""
+
+    def test_this_repo_has_no_undiscovered_test_file(self) -> None:
+        result = _check("discovery", "tests")
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "def test_x():\n    assert False\n",
+            "class TestX:\n    def test_x(self):\n        assert False\n",
+            "async def test_x():\n    assert False\n",
+        ],
+    )
+    def test_a_planted_check_file_goes_red(self, tmp_path: Path, body: str) -> None:
+        _plant(tmp_path, "def test_ok():\n    assert True\n")
+        (tmp_path / "tests" / "check_x.py").write_text(body)
+        result = _check("discovery", cwd=tmp_path)
+        assert result.returncode == 1, result.stdout + result.stderr
+        line = 2 if body.startswith("class") else 1
+        assert (
+            f"tests/check_x.py:{line}: defines a test that pytest never collects" in result.stdout
+        )
+
+    def test_collected_and_helper_files_are_clean(self, tmp_path: Path) -> None:
+        _plant(tmp_path, "def test_ok():\n    assert True\n")
+        (tmp_path / "tests" / "helpers.py").write_text("def make():\n    return 1\n")
+        (tmp_path / "tests" / "widget_test.py").write_text("def test_w():\n    assert True\n")
+        result = _check("discovery", cwd=tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    def test_an_ignored_file_counts_as_unreached(self, tmp_path: Path) -> None:
+        """Discovery is what pytest actually collects, not a filename pattern."""
+        _plant(tmp_path, "def test_ok():\n    assert True\n")
+        (tmp_path / "tests" / "test_skipped_dir.py").write_text("def test_s():\n    assert True\n")
+        (tmp_path / "pytest.ini").write_text(
+            "[pytest]\naddopts = --ignore=tests/test_skipped_dir.py\n"
+        )
+        result = _check("discovery", cwd=tmp_path)
+        assert result.returncode == 1, result.stdout + result.stderr
+        assert "tests/test_skipped_dir.py" in result.stdout
+
+    def test_a_collection_error_is_a_finding(self, tmp_path: Path) -> None:
+        _plant(tmp_path, "import no_such_module\n\ndef test_ok():\n    assert True\n")
+        result = _check("discovery", cwd=tmp_path)
+        assert result.returncode == 1, result.stdout + result.stderr
+        assert "pytest --collect-only exited 2" in result.stdout
+
+    def test_no_tests_dir_is_clean(self, tmp_path: Path) -> None:
+        assert _check("discovery", cwd=tmp_path).returncode == 0
+
+    def test_a_named_dir_that_does_not_exist_is_a_usage_error(self, tmp_path: Path) -> None:
+        assert _check("discovery", "nope", cwd=tmp_path).returncode == 2
+
+    def test_scaffold_lint_goes_red_on_a_planted_check_file(self, tmp_path: Path) -> None:
+        target = tmp_path / "p"
+        scaffold(target, load_preset("core"), make_variables())
+        (target / "tests").mkdir(exist_ok=True)
+        (target / "tests" / "test_ok.py").write_text("def test_ok():\n    assert True\n")
+        green = TestScaffoldRunsIt._lint(target, tmp_path)
+        assert green.returncode == 0, green.stdout + green.stderr
+        (target / "tests" / "check_x.py").write_text("def test_x():\n    assert False\n")
+        red = TestScaffoldRunsIt._lint(target, tmp_path)
+        assert red.returncode == 1, red.stdout + red.stderr
+        assert "tests/check_x.py:1:" in red.stdout
