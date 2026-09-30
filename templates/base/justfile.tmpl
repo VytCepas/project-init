@@ -21,6 +21,7 @@ lint:
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint_context_budget.sh
     uv run python .agents/scripts/check_test_contract.py exit-codes
+    uv run --with pytest python .agents/scripts/check_test_contract.py discovery
 
 # static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
 # no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path.

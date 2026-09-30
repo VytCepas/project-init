@@ -2,6 +2,7 @@
 """Mechanise the cross-repo test contract's rules that pytest itself cannot see.
 
     check_test_contract.py exit-codes [PATH ...]   (default: tests)
+    check_test_contract.py discovery [DIR]         (default: tests)
 
 exit-codes (rule 2, exact exit codes): a test asserts the exit code it expects,
 never "non-zero". A crash, a usage error and a refusal are different answers,
@@ -14,6 +15,15 @@ its place only with a reason on its first line::
 
     assert proc.returncode != 0  # test-contract: nonzero-ok: <why no one code>
 
+discovery (rule 4, every suite is in the manifest): for pytest the manifest is
+discovery itself, so a file under DIR that defines a ``test_`` function (at
+module level, or in a ``Test*`` class) but that a full ``pytest --collect-only``
+from the current directory does not reach runs nowhere, and nothing says so:
+``tests/check_upgrade.py`` holding ``def test_...`` is the usual case. Rename
+it to ``test_*.py``, or move the function out if it is not a test. Collection
+runs under ``sys.executable``, so run this with the project's interpreter
+(``uv run python``).
+
 Exit codes: 0 clean, 1 a finding (each printed as path:line), 2 usage. Stdlib only.
 """
 
@@ -22,6 +32,7 @@ from __future__ import annotations
 import argparse
 import ast
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -94,6 +105,58 @@ def exit_code_findings(path: Path) -> list[str]:
     return findings
 
 
+def _defines_tests(path: Path) -> int | None:
+    """The line of the first test function pytest would look for in *path*, else None."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except (SyntaxError, UnicodeDecodeError):
+        return None
+    funcs = (ast.FunctionDef, ast.AsyncFunctionDef)
+    for node in tree.body:
+        if isinstance(node, funcs) and node.name.startswith("test"):
+            return node.lineno
+        if isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+            for item in node.body:
+                if isinstance(item, funcs) and item.name.startswith("test"):
+                    return item.lineno
+    return None
+
+
+def collected_files(root: Path) -> set[Path] | str:
+    """The files a full pytest collection from *root* reaches, or why it failed."""
+    argv = [sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"]
+    proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+        [*argv, f"--rootdir={root}"], capture_output=True, text=True, cwd=root, check=False
+    )
+    if proc.returncode not in (0, 5):  # 5: nothing collected, which is an answer
+        tail = "\n".join((proc.stdout + proc.stderr).strip().splitlines()[-15:])
+        return f"pytest --collect-only exited {proc.returncode}:\n{tail}"
+    return {
+        (root / line.split("::", 1)[0]).resolve()
+        for line in proc.stdout.splitlines()
+        if "::" in line
+    }
+
+
+def discovery_findings(root: Path, tests: Path) -> list[str]:
+    """Each file under *tests* that defines a test no full collection reaches."""
+    candidates = {}
+    for path in sorted(tests.rglob("*.py")):
+        line = _defines_tests(path)
+        if line is not None:
+            candidates[path.resolve()] = (path, line)
+    if not candidates:
+        return []
+    reached = collected_files(root)
+    if isinstance(reached, str):
+        return [reached]
+    return [
+        f"{path}:{line}: defines a test that pytest never collects"
+        for resolved, (path, line) in candidates.items()
+        if resolved not in reached
+    ]
+
+
 def _python_files(roots: list[Path]) -> list[Path]:
     files: list[Path] = []
     for root in roots:
@@ -107,7 +170,11 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="check", required=True)
     codes = sub.add_parser("exit-codes", help="rule 2: no 'non-zero' exit-code assertion")
     codes.add_argument("paths", nargs="*", type=Path, default=[Path("tests")])
+    found = sub.add_parser("discovery", help="rule 4: every test file is collected")
+    found.add_argument("dir", nargs="?", type=Path, default=Path("tests"))
     args = parser.parse_args(argv)
+    if args.check == "discovery":
+        return _discovery(parser, args.dir)
     missing = [str(p) for p in args.paths if not p.exists()]
     if missing and missing != ["tests"]:
         parser.error(f"no such path: {', '.join(missing)}")
@@ -122,6 +189,24 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"test contract rule 2: {len(findings)} assertion(s) accept any non-zero exit. "
             "Assert the exact code, or add `# test-contract: nonzero-ok: <reason>`.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def _discovery(parser: argparse.ArgumentParser, tests: Path) -> int:
+    if not tests.is_dir():
+        if tests == Path("tests"):
+            return 0  # nothing to discover yet
+        parser.error(f"no such directory: {tests}")
+    findings = discovery_findings(Path.cwd(), tests)
+    for finding in findings:
+        print(finding)
+    if findings:
+        print(
+            f"test contract rule 4: {len(findings)} file(s) under {tests} run nowhere. "
+            "Name them test_*.py or *_test.py, or move the non-test out.",
             file=sys.stderr,
         )
         return 1
