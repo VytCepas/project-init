@@ -90,7 +90,7 @@ class TestJustfilePerLanguage:
         [
             ("python", "uv run ruff check .", "pytest -n auto"),
             ("node", "bunx eslint .", "bun test"),
-            ("go", "golangci-lint run", "go test ./..."),
+            ("go", "golangci-lint run", "go test -json ./..."),
             ("rust", "cargo clippy", "cargo test"),
         ],
     )

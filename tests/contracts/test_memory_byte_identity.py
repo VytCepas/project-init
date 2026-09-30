@@ -315,6 +315,9 @@ _ADDED_SINCE_BASELINE = {
     # PI-694: token-budget lint gate — new always-copied script (justfile
     # wiring already excluded above)
     ".agents/scripts/lint_context_budget.sh",
+    # #1054: the test contract's summary line for Node/Go/Rust `just test` — new
+    # always-copied script (justfile wiring already excluded above)
+    ".agents/scripts/contract_line.py",
     # #1052: test-contract exit-code check — new always-copied script (justfile
     # wiring already excluded above)
     ".agents/scripts/check_test_contract.py",
