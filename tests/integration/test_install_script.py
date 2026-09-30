@@ -44,7 +44,7 @@ def _git(cwd: Path, *args: str) -> str:
 class Bootstrap:
     """A local upstream (v1.2.2 without the refusal, v1.3.0 and main with it) and a temp HOME."""
 
-    def __init__(self, tmp: Path, git_env: dict[str, str]):
+    def __init__(self, tmp: Path, git_env: dict[str, str], object_format: str = "sha1"):
         self.tmp = tmp
         self.home = tmp / "home"
         self.install = tmp / "install"
@@ -85,7 +85,7 @@ class Bootstrap:
         # templates/ already exists: guard.parent.mkdir(parents=True) above made
         # templates/base/dot_agents/hooks/.
         (self.upstream / "templates" / "marker.txt").write_text("tracked\n")
-        _git(self.upstream, "init", "-q", "-b", "main")
+        _git(self.upstream, "init", "-q", "-b", "main", f"--object-format={object_format}")
         for tag, text in (("v1.2.2", _guard_without_refusal()), ("v1.3.0", _guard_with_refusal())):
             guard.write_text(text)
             _git(self.upstream, "add", "-A")
@@ -135,6 +135,21 @@ class Bootstrap:
 
 @pytest.fixture
 def boot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Bootstrap:
+    return _make_boot(tmp_path, monkeypatch, "sha1")
+
+
+@pytest.fixture
+def boot256(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Bootstrap:
+    probe = subprocess.run(
+        ["git", "init", "-q", "--object-format=sha256", str(tmp_path / "probe")],
+        capture_output=True,
+    )
+    if probe.returncode != 0:
+        pytest.skip("this git cannot create a SHA-256 repository")
+    return _make_boot(tmp_path, monkeypatch, "sha256")
+
+
+def _make_boot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, object_format: str) -> Bootstrap:
     # Hermetic git: no global hooks, signing or identity leak into the temp repos.
     gitconfig = tmp_path / "gitconfig"
     gitconfig.write_text(
@@ -144,7 +159,7 @@ def boot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Bootstrap:
     git_env = {"GIT_CONFIG_GLOBAL": str(gitconfig), "GIT_CONFIG_NOSYSTEM": "1"}
     for key, value in git_env.items():
         monkeypatch.setenv(key, value)
-    return Bootstrap(tmp_path, git_env)
+    return Bootstrap(tmp_path, git_env, object_format)
 
 
 def test_install_sh_syntax_is_valid():
@@ -736,5 +751,41 @@ def test_crlf_from_a_local_eol_override_is_refused(boot: Bootstrap):
     assert b"\r\n" in target.read_bytes()
     assert _git(boot.install, "status", "--porcelain") == ""
     result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "templates/hook.sh" in result.stderr, result.stderr
+
+
+# ── #1071: a SHA-256 clone's eol policy ──────────────────────────────────────
+
+
+def test_sha256_clone_crlf_checkout_is_not_refused(boot256: Bootstrap):
+    """The eol-policy scratch repo must share the clone's object format: a SHA-1
+    scratch rejects a 64-hex `--source`, so no path got the CRLF allowance (#1071)."""
+    boot256.existing_clone()
+    assert _git(boot256.install, "rev-parse", "--show-object-format") == "sha256"
+    _git(boot256.install, "config", "core.autocrlf", "true")
+    target = boot256.install / "templates" / "marker.txt"
+    target.unlink()
+    _git(boot256.install, "checkout", "--", "templates/marker.txt")
+    assert target.read_bytes() == b"tracked\r\n"
+    assert _git(boot256.install, "status", "--porcelain") == ""
+    result = boot256.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert boot256.cmd.is_file()
+
+
+def test_sha256_clone_eol_lf_pin_still_refuses_crlf(boot256: Bootstrap):
+    """The allowance is still withheld where the committed tree pins eol=lf."""
+    boot256.commit_upstream(".gitattributes", "*.sh text eol=lf\n", "pin .sh files to LF")
+    boot256.commit_upstream("templates/hook.sh", "line1\nline2\n", "add a shell hook")
+    boot256.existing_clone()
+    (boot256.install / ".git" / "info").mkdir(exist_ok=True)
+    (boot256.install / ".git" / "info" / "attributes").write_text("*.sh eol=crlf\n")
+    target = boot256.install / "templates" / "hook.sh"
+    target.unlink()
+    _git(boot256.install, "checkout", "--", "templates/hook.sh")
+    assert b"\r\n" in target.read_bytes()
+    assert _git(boot256.install, "status", "--porcelain") == ""
+    result = boot256.run(PROJECT_INIT_REF="main")
     assert result.returncode == 1, result.stdout + result.stderr
     assert "templates/hook.sh" in result.stderr, result.stderr
