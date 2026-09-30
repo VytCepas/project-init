@@ -13,13 +13,15 @@ per test only, because pytest keeps its own temporary directories under
 TMPDIR. Toolchain *caches* (uv, cargo, rustup, go, bun) keep their real
 locations: they hold content, not configuration, and a cold cache would turn
 every ``uv run`` into a download. *Install roots* — UV_PYTHON_INSTALL_DIR,
-UV_TOOL_DIR, GOPATH (which also gates `go install`'s binaries) and BUN_INSTALL
-— move inside the throwaway root instead, the same as HOME: they are where a
-test's own `uv python install`/`uv tool install`/`go install`/`bun install -g`
-would write, so leaving them real would let a test install into it (#1062).
+UV_TOOL_DIR, GOPATH and BUN_INSTALL, with the bin dirs UV_PYTHON_BIN_DIR,
+UV_TOOL_BIN_DIR, GOBIN and XDG_BIN_HOME — move inside the throwaway root
+instead, even when the runner exports them: they are where a test's own
+`uv python install`/`uv tool install`/`go install`/`bun install -g` would
+write, so leaving them real would let a test install into it (#1062).
 GOMODCACHE and bun's install cache are pinned to their real locations
-explicitly, so isolating GOPATH/BUN_INSTALL does not accidentally cool them —
-both otherwise default to a path *under* the var each command just moved.
+explicitly (under the runner's own GOPATH/BUN_INSTALL, if exported), so
+isolating GOPATH/BUN_INSTALL does not accidentally cool them — both otherwise
+default to a path *under* the var each command just moved.
 CARGO_HOME and RUSTUP_HOME are further exceptions that cannot just point at
 the real thing even for their cache half: cargo has no separate env var for
 its cache the way UV_CACHE_DIR splits from uv's config, so CARGO_HOME governs
@@ -124,6 +126,9 @@ def _toolchain_env(
     scratch dir and reading back ``bun pm cache``).
     """
     cache = Path(env.get("XDG_CACHE_HOME") or real_home / ".cache")
+    # GOMODCACHE defaults to the first GOPATH entry's pkg/mod, bun's cache to BUN_INSTALL's.
+    gopath = next((p for p in env.get("GOPATH", "").split(os.pathsep) if p), "")
+    bun = Path(env.get("BUN_INSTALL") or real_home / ".bun")
     go_cache = (
         real_home / "Library" / "Caches" / "go-build"
         if sys.platform == "darwin"
@@ -132,14 +137,17 @@ def _toolchain_env(
     return {
         "UV_CACHE_DIR": str(cache / "uv"),
         "UV_PYTHON_INSTALL_DIR": str(root / "uv-python"),
+        "UV_PYTHON_BIN_DIR": str(root / "uv-python-bin"),
         "UV_TOOL_DIR": str(root / "uv-tools"),
+        "UV_TOOL_BIN_DIR": str(root / "uv-tools-bin"),
         "CARGO_HOME": _cargo_home(root, cargo_src),
         "RUSTUP_HOME": _rustup_home(root, rustup_src),
         "GOPATH": str(root / "go"),
+        "GOBIN": str(root / "go" / "bin"),
         "GOCACHE": str(go_cache),
-        "GOMODCACHE": str(real_home / "go" / "pkg" / "mod"),
+        "GOMODCACHE": str(Path(gopath or real_home / "go") / "pkg" / "mod"),
         "BUN_INSTALL": str(root / "bun"),
-        "BUN_INSTALL_CACHE_DIR": str(real_home / ".bun" / "install" / "cache"),
+        "BUN_INSTALL_CACHE_DIR": str(bun / "install" / "cache"),
     }
 
 
@@ -158,6 +166,8 @@ def _home_env(root: Path) -> dict[str, Path]:
         "XDG_DATA_HOME": home / ".local" / "share",
         "XDG_CACHE_HOME": home / ".cache",
         "XDG_STATE_HOME": home / ".local" / "state",
+        # Not in the XDG spec, but uv installs executables there when it is set.
+        "XDG_BIN_HOME": home / ".local" / "bin",
         "CLAUDE_CONFIG_DIR": root / "claude-config",
     }
 
@@ -172,11 +182,19 @@ def _redirect(env: Mapping[str, Path], patch: pytest.MonkeyPatch) -> None:
     patch.setenv("HOMEPATH", str(home)[len(home.drive) :])
 
 
-# CARGO_HOME and RUSTUP_HOME hold mutable config, credentials or preferences
-# (not just a cache), so a pre-existing export of either must still be
-# replaced with the isolated one below — unlike the other toolchain vars,
-# which a runner's own override is left alone (#1056 review).
-_ALWAYS_ISOLATED = {"CARGO_HOME", "RUSTUP_HOME"}
+# Config homes (CARGO_HOME, RUSTUP_HOME: #1056 review) and install roots (#1062)
+# replace a runner's own export; only a cache keeps the runner's override.
+_ALWAYS_ISOLATED = {
+    "CARGO_HOME",
+    "RUSTUP_HOME",
+    "UV_PYTHON_INSTALL_DIR",
+    "UV_PYTHON_BIN_DIR",
+    "UV_TOOL_DIR",
+    "UV_TOOL_BIN_DIR",
+    "GOPATH",
+    "GOBIN",
+    "BUN_INSTALL",
+}
 
 # The same list the scaffolded git hooks strip before their gate; a test pins them equal.
 _GIT_HOOK_VARS = (

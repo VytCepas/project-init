@@ -36,6 +36,9 @@ _CONTRACT_VARS = {
     "GOMODCACHE",
     "BUN_INSTALL",
     "BUN_INSTALL_CACHE_DIR",
+    "UV_PYTHON_BIN_DIR",
+    "UV_TOOL_BIN_DIR",
+    "GOBIN",
     "TEMP",
     "TMP",
     # The conftest's own private stash (#1062): this repo's outer suite is itself
@@ -289,6 +292,38 @@ def test_cargo_cache_comes_from_the_inherited_cargo_home():
 def test_rustup_cache_comes_from_the_inherited_rustup_home():
     fake = Path(os.environ["RUSTUP_HOME"])
     assert (fake / "toolchains" / "marker.txt").read_text() == "custom-rustup\\n"
+"""
+
+# #1062: a runner that exports an install root (bun's installer adds BUN_INSTALL
+# to the shell profile) must not get it back inside a test.
+_PLANTED_EXPORTED_ROOTS = """\
+import os
+import subprocess
+from pathlib import Path
+
+import pytest
+
+REAL = Path(os.environ["REAL_HOME"])
+ROOTS = (
+    "UV_PYTHON_INSTALL_DIR", "UV_PYTHON_BIN_DIR", "UV_TOOL_DIR", "UV_TOOL_BIN_DIR",
+    "GOPATH", "GOBIN", "BUN_INSTALL", "XDG_BIN_HOME",
+)
+
+
+@pytest.mark.parametrize("var", ROOTS)
+def test_an_exported_install_root_still_moves(var):
+    assert not Path(os.environ[var]).is_relative_to(REAL), os.environ[var]
+
+
+def test_caches_follow_the_runners_own_roots():
+    assert os.environ["GOMODCACHE"] == str(REAL / "custom-go" / "pkg" / "mod")
+    assert os.environ["BUN_INSTALL_CACHE_DIR"] == str(REAL / "custom-bun" / "install" / "cache")
+
+
+@pytest.mark.parametrize("args", ["tool dir", "tool dir --bin", "python dir", "python dir --bin"])
+def test_uv_itself_resolves_outside_the_real_home(args):
+    out = subprocess.run(["uv", *args.split()], capture_output=True, text=True, check=True)
+    assert not Path(out.stdout.strip()).is_relative_to(REAL), out.stdout
 """
 
 _PLANTED_IMPORTS_CONFTEST = """\
@@ -600,6 +635,31 @@ class TestHermeticScaffold:
         result = _pytest(target, tmp_path)
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 6, 0), result.stdout
+
+    def test_exported_install_roots_still_move(self, tmp_path: Path) -> None:
+        """#1062: the salvaged fix moved an install root only when the runner had not
+        exported it, so an exported BUN_INSTALL, GOPATH, GOBIN, UV_*_DIR or
+        XDG_BIN_HOME still let a test install into the real home. Caches follow the
+        runner's own GOPATH/BUN_INSTALL instead of assuming ~/go and ~/.bun."""
+        if shutil.which("uv") is None:
+            pytest.skip("uv is not on PATH")
+        real = tmp_path / "real-home"
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_exported_roots.py", _PLANTED_EXPORTED_ROOTS)
+        result = _pytest(
+            target,
+            tmp_path,
+            UV_PYTHON_INSTALL_DIR=str(real / ".local" / "share" / "uv" / "python"),
+            UV_PYTHON_BIN_DIR=str(real / ".local" / "bin"),
+            UV_TOOL_DIR=str(real / ".local" / "share" / "uv" / "tools"),
+            UV_TOOL_BIN_DIR=str(real / ".local" / "bin"),
+            GOPATH=str(real / "custom-go"),
+            GOBIN=str(real / "custom-go" / "bin"),
+            BUN_INSTALL=str(real / "custom-bun"),
+            XDG_BIN_HOME=str(real / ".local" / "bin"),
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 13, 0), result.stdout
 
     def test_temp_and_tmp_match_tmpdir(self, tmp_path: Path) -> None:
         """Copilot on #1056/#1062: the per-test fixture set only TMPDIR; Windows
