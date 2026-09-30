@@ -32,6 +32,7 @@ import shutil
 import subprocess
 import sys
 import sysconfig
+import tempfile
 import tomllib
 from email.parser import Parser
 from pathlib import Path, PurePosixPath
@@ -154,29 +155,44 @@ def blob_bytes(commit: str, paths: list[str]) -> dict[str, bytes]:
     return blobs
 
 
-def eol_lf_paths(paths: list[str]) -> set[str]:
-    """Return the subset of *paths* whose ``eol`` gitattribute pins them to ``lf``.
+def eol_lf_paths(commit: str, paths: list[str]) -> set[str]:
+    """Return the subset of *paths* whose committed ``eol`` gitattribute is ``lf``.
 
-    ``git check-attr`` only pattern-matches ``.gitattributes``/local attribute
-    files — it runs no external command, so it cannot become another P1-shaped
-    bypass. A hostile local ``.git/info/attributes`` entry can at most widen
-    which of ``modified_paths()``'s two blob-derived candidates a suspect is
-    compared against; it can never choose the bytes either candidate holds
-    (project-init#1064 review).
+    Read from *commit*'s own ``.gitattributes`` only (#1068 review): a local
+    ``.git/info/attributes``, ``core.attributesFile`` or system file saying
+    ``eol=crlf`` makes a checkout write CRLF under a clean ``git status``, so it
+    must not grant the CRLF allowance. ``check-attr --source`` (git 2.40+) runs in
+    a throwaway git dir that shares only the object store; it runs no driver.
     """
     if not paths:
         return set()
-    argv = ["git", "-C", str(_REPO_ROOT), "check-attr", "--stdin", "eol"]
-    stdin = "".join(f"{p}\n" for p in paths)
-    proc = subprocess.run(argv, input=stdin, capture_output=True, text=True, check=False)  # noqa: S603
+    objects = _git("rev-parse", "--path-format=absolute", "--git-path", "objects")
+    with tempfile.TemporaryDirectory() as scratch:
+        git_dir, no_attrs = Path(scratch) / "git", Path(scratch) / "no-attributes"
+        no_attrs.write_text("")
+        init = _run(["git", "init", "-q", "--bare", "--template=", str(git_dir)])
+        if init.returncode != 0:
+            raise RefusedError(f"git init (eol policy) failed: {init.stderr.strip()}")
+        argv = [
+            "git",
+            f"--git-dir={git_dir}",
+            "-c",
+            f"core.attributesFile={no_attrs}",
+            "check-attr",
+            "-z",
+            "--stdin",
+            f"--source={commit}",
+            "eol",
+        ]
+        env = {**os.environ, "GIT_ATTR_NOSYSTEM": "1", "GIT_OBJECT_DIRECTORY": objects}
+        stdin = "".join(f"{p}\0" for p in paths)
+        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+            argv, input=stdin, capture_output=True, text=True, check=False, env=env
+        )
     if proc.returncode != 0:
-        raise RefusedError(f"git check-attr failed: {proc.stderr.strip()}")
-    pinned = set()
-    for line in proc.stdout.splitlines():
-        path, _, value = line.rpartition(": eol: ")
-        if path and value.strip() == "lf":
-            pinned.add(path)
-    return pinned
+        raise RefusedError(f"git check-attr --source failed (git 2.40+?): {proc.stderr.strip()}")
+    fields = proc.stdout.split("\0")
+    return {fields[i] for i in range(0, len(fields) - 2, 3) if fields[i + 2] == "lf"}
 
 
 def wheel_layout(project_toml: dict[str, Any]) -> list[tuple[str, str]]:
@@ -259,7 +275,7 @@ def modified_paths(
         return []
     srcs = sorted({expected[dest][1] for dest in suspect})
     trusted = blob_bytes(commit, srcs)
-    pinned_lf = eol_lf_paths(srcs)
+    pinned_lf = eol_lf_paths(commit, srcs)
     modified = []
     for dest in suspect:
         src = expected[dest][1]

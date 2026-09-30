@@ -462,6 +462,24 @@ def test_apply_refuses_a_crlf_variant_of_an_eol_lf_packaged_file(box: Box):
     _no_install(box)
 
 
+def test_apply_refuses_crlf_from_a_local_eol_override(box: Box):
+    """Codex on #1068: `.git/info/attributes` overriding the committed `*.sh eol=lf`
+    with `eol=crlf` makes a checkout write CRLF while git status stays clean. The
+    eol policy must come from the committed tree, not from a local attribute file."""
+    target = "templates/base/hook.sh"
+    (box.repo / ".git" / "info").mkdir(exist_ok=True)
+    (box.repo / ".git" / "info" / "attributes").write_text("*.sh eol=crlf\n")
+    (box.repo / target).unlink()
+    _git(box.repo, "checkout", "--", target)
+    assert b"\r\n" in (box.repo / target).read_bytes()
+    assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "on-disk bytes do not match" in result.stderr
+    assert target in result.stderr, result.stderr
+    _no_install(box)
+
+
 # Every place an ignore rule can live. Each hides the file from git status.
 _IGNORE_FILES = (".gitignore", "templates/.gitignore", ".git/info/exclude")
 _CLEAN = "git clean -fdX -- src/project_init templates schemas"

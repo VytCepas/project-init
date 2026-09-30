@@ -229,6 +229,35 @@ $ignored
   $KEPT"
 }
 
+# Print each of "$@" whose eol attribute in HEAD's own .gitattributes is lf.
+# check-attr --source (git 2.40+) runs in a throwaway git dir sharing only the
+# object store, so .git/info/attributes, core.attributesFile and the system file
+# cannot override it: a local eol=crlf there gives a CRLF checkout under a clean
+# git status (#1068 review). Fails on any error; the caller then pins everything.
+committed_lf_paths() {
+  local scratch objects head rc=0
+  objects="$(git -C "$INSTALL_DIR" rev-parse --path-format=absolute --git-path objects)" || return 1
+  head="$(git -C "$INSTALL_DIR" rev-parse HEAD)" || return 1
+  scratch="$(mktemp -d)" || return 1
+  : >"$scratch/no-attributes"
+  if git init -q --bare --template= "$scratch/git" >/dev/null 2>&1; then
+    printf '%s\0' "$@" |
+      GIT_ATTR_NOSYSTEM=1 GIT_OBJECT_DIRECTORY="$objects" git --git-dir="$scratch/git" \
+        -c core.attributesFile="$scratch/no-attributes" \
+        check-attr -z --stdin --source="$head" eol >"$scratch/eol" || rc=1
+  else
+    rc=1
+  fi
+  if [ "$rc" -eq 0 ]; then
+    local p v
+    while IFS= read -r -d '' p && IFS= read -r -d '' _ && IFS= read -r -d '' v; do
+      if [ "$v" = "lf" ]; then printf '%s\n' "$p"; fi
+    done <"$scratch/eol"
+  fi
+  rm -rf "$scratch"
+  return "$rc"
+}
+
 # A local `.git/info/attributes` clean filter can smudge an edited file back
 # to its blob's bytes when git reads it for comparison, so both the status
 # check above and `ls-files -v` read clean even though uvx (or, for
@@ -251,6 +280,7 @@ $ignored
 # helper #1060; object-store confirmation #1064).
 refuse_edited_paths() {
   local paths=("$@") entry kind sha path actual suspects=() edited=() blob_tmp crlf_tmp
+  local pinned_lf
   [ "${#paths[@]}" -gt 0 ] || return 0
   while IFS=$'\t' read -r -d '' entry path; do
     read -r _ kind sha <<<"$entry"
@@ -265,23 +295,27 @@ refuse_edited_paths() {
     [ "$actual" = "$sha" ] || suspects+=("$path")
   done < <(git -C "$INSTALL_DIR" ls-tree -r -z --full-tree HEAD -- "${paths[@]}")
   if [ "${#suspects[@]}" -gt 0 ]; then
-    blob_tmp="$(mktemp)" && crlf_tmp="$(mktemp)" ||
+    if ! blob_tmp="$(mktemp)" || ! crlf_tmp="$(mktemp)"; then
       die "cannot create a temp file to verify suspect files against HEAD.
   $KEPT"
+    fi
+    # No readable committed policy: grant no CRLF allowance at all.
+    pinned_lf="$(committed_lf_paths "${suspects[@]}")" || pinned_lf="$(printf '%s\n' "${suspects[@]}")"
     for path in "${suspects[@]}"; do
       if ! git -C "$INSTALL_DIR" cat-file blob "HEAD:$path" >"$blob_tmp" 2>/dev/null; then
         edited+=("$path (cannot read HEAD's object)")
         continue
       fi
       cmp -s "$blob_tmp" "$INSTALL_DIR/$path" && continue
-      # eol=lf pins this path to LF on any checkout (a declarative attribute
-      # lookup, never a driver — check-attr runs no external command): an
-      # injected CRLF there is still an edit, matching the eol=lf case
-      # tools/box_install.py's modified_paths() also gates on (#1064 review).
-      if [ "$(git -C "$INSTALL_DIR" check-attr eol -- "$path")" = "$path: eol: lf" ]; then
+      # A committed eol=lf pins this path to LF on any checkout: an injected CRLF
+      # there is still an edit, matching tools/box_install.py's modified_paths()
+      # (#1064 review; committed policy only, #1068 review).
+      case $'\n'"$pinned_lf"$'\n' in
+      *$'\n'"$path"$'\n'*)
         edited+=("$path")
         continue
-      fi
+        ;;
+      esac
       sed 's/$/\r/' "$blob_tmp" >"$crlf_tmp"
       cmp -s "$crlf_tmp" "$INSTALL_DIR/$path" || edited+=("$path")
     done

@@ -650,6 +650,30 @@ def test_crlf_checkout_of_a_trailing_newline_file_is_not_refused(boot: Bootstrap
     assert boot.cmd.is_file()
 
 
+def test_no_crlf_allowance_without_a_readable_committed_eol_policy(boot: Bootstrap):
+    """The fail-closed branch of committed_lf_paths() (#1068 review): when
+    `check-attr --source` cannot answer (git older than 2.40, or any error), no path
+    gets the CRLF allowance, so the ordinary autocrlf checkout above now refuses."""
+    boot.existing_clone()
+    _git(boot.install, "config", "core.autocrlf", "true")
+    target = boot.install / "templates" / "marker.txt"
+    target.unlink()
+    _git(boot.install, "checkout", "--", "templates/marker.txt")
+    assert target.read_bytes() == b"tracked\r\n"
+    real_git = shutil.which("git")
+    assert real_git
+    shim = boot.bindir / "git"
+    shim.write_text(
+        "#!/usr/bin/env bash\n"
+        'case " $* " in *" check-attr "*) exit 128 ;; esac\n'
+        f'exec "{real_git}" "$@"\n'
+    )
+    shim.chmod(0o755)
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "templates/marker.txt" in result.stderr, result.stderr
+
+
 def test_crlf_checkout_of_a_no_trailing_newline_file_is_conservatively_refused(
     boot: Bootstrap,
 ):
@@ -691,6 +715,25 @@ def test_crlf_checkout_before_an_eol_lf_pin_is_still_refused(boot: Bootstrap):
     _git(boot.install, "fetch", "-q", "origin")
     _git(boot.install, "merge", "-q", "--ff-only", "origin/main")
     assert b"\r\n" in target.read_bytes(), "the pin alone must not rewrite the file"
+    assert _git(boot.install, "status", "--porcelain") == ""
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "templates/hook.sh" in result.stderr, result.stderr
+
+
+def test_crlf_from_a_local_eol_override_is_refused(boot: Bootstrap):
+    """Codex on #1068: `.git/info/attributes` overriding the committed `*.sh eol=lf`
+    with `eol=crlf` gives a CRLF checkout and a clean git status, and `check-attr`
+    then answers crlf. The eol policy must come from the verified tree alone."""
+    boot.commit_upstream(".gitattributes", "*.sh text eol=lf\n", "pin .sh files to LF")
+    boot.commit_upstream("templates/hook.sh", "line1\nline2\n", "add a shell hook")
+    boot.existing_clone()
+    (boot.install / ".git" / "info").mkdir(exist_ok=True)
+    (boot.install / ".git" / "info" / "attributes").write_text("*.sh eol=crlf\n")
+    target = boot.install / "templates" / "hook.sh"
+    target.unlink()
+    _git(boot.install, "checkout", "--", "templates/hook.sh")
+    assert b"\r\n" in target.read_bytes()
     assert _git(boot.install, "status", "--porcelain") == ""
     result = boot.run(PROJECT_INIT_REF="main")
     assert result.returncode == 1, result.stdout + result.stderr
