@@ -19,18 +19,12 @@ import pytest
 
 _HOOKS = Path(__file__).resolve().parents[2] / ".githooks"
 _BASH = shutil.which("bash")
-_SCRUBBED = (
-    "GIT_DIR",
-    "GIT_WORK_TREE",
-    "GIT_INDEX_FILE",
-    "GIT_COMMON_DIR",
-    "GIT_OBJECT_DIRECTORY",
-    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-    "GIT_QUARANTINE_PATH",
-    "GIT_PREFIX",
-    "GIT_CONFIG_PARAMETERS",
-    "GIT_CONFIG_COUNT",
-)
+# Every repo-local variable this git names (the pin in test_git_hook_env_scrub.py).
+_SCRUBBED = set(
+    subprocess.run(
+        ["git", "rev-parse", "--local-env-vars"], capture_output=True, text=True, check=True
+    ).stdout.split()
+) | {"GIT_QUARANTINE_PATH"}
 
 
 def _git(*args: str, cwd: Path, env: dict[str, str] | None = None) -> str:
@@ -101,7 +95,14 @@ def test_pre_push_gate_cannot_reach_the_pushing_clone(
     worktree = tmp_path / "wt"
     ran, seen, sandbox = tmp_path / "ran", tmp_path / "seen", tmp_path / "sandbox"
     _fake_just(tmp_path / "bin", sandbox, ran, seen)
-    env = {**os.environ, "PATH": f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}"}
+    # An exported GIT_CONFIG makes `git config` write to that file, whatever -C says.
+    outside = tmp_path / "outside.cfg"
+    outside.write_text("")
+    env = {
+        **os.environ,
+        "PATH": f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}",
+        "GIT_CONFIG": str(outside),
+    }
     before = _snapshot(clone)
 
     if wiring == "exported":
@@ -125,6 +126,7 @@ def test_pre_push_gate_cannot_reach_the_pushing_clone(
     assert result.returncode == 0, result.stdout + result.stderr
     assert ran.exists(), f"the gate never ran, so nothing was tested:\n{result.stderr}"
     assert _snapshot(clone) == before
+    assert outside.read_text() == ""
     leaked = [
         line.split("=", 1)[0]
         for line in seen.read_text().splitlines()

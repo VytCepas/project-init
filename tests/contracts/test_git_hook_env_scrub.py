@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -47,6 +48,19 @@ def _conftest_list() -> set[str]:
 
 def test_the_conftest_list_covers_the_issue_floor() -> None:
     assert _conftest_list() >= _REQUIRED
+
+
+def test_the_list_covers_every_repo_local_git_variable() -> None:
+    """Pinned to this git's own answer, so a variable a newer git adds fails here first."""
+    local = subprocess.run(
+        ["git", "rev-parse", "--local-env-vars"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    assert local, "git rev-parse --local-env-vars printed nothing"
+    assert sorted(set(local) - _conftest_list()) == []
 
 
 def test_every_hook_gate_strips_the_conftest_list() -> None:

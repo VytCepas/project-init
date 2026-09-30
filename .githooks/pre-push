@@ -24,11 +24,13 @@ if command -v just >/dev/null 2>&1 && just --show fast-ci >/dev/null 2>&1; then
   else
     echo "pre-push: running 'just fast-ci' (lint + tests)…"
     # git exports GIT_DIR (and more from a linked worktree) into hooks, so a test's
-    # `git -C <tmp>` would act on THIS clone (#1065). Same list as the scaffolded hook.
-    if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR \
-      -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
-      -u GIT_QUARANTINE_PATH -u GIT_PREFIX -u GIT_CONFIG_PARAMETERS \
-      -u GIT_CONFIG_COUNT just fast-ci; then
+    # `git -C <tmp>` would act on THIS clone (#1065). Every `git rev-parse
+    # --local-env-vars` name, plus GIT_QUARANTINE_PATH; same list as the scaffolded hook.
+    if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_IMPLICIT_WORK_TREE -u GIT_INDEX_FILE \
+      -u GIT_COMMON_DIR -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
+      -u GIT_QUARANTINE_PATH -u GIT_PREFIX -u GIT_CONFIG -u GIT_CONFIG_PARAMETERS \
+      -u GIT_CONFIG_COUNT -u GIT_GRAFT_FILE -u GIT_NO_REPLACE_OBJECTS \
+      -u GIT_REPLACE_REF_BASE -u GIT_SHALLOW_FILE just fast-ci; then
       echo ""
       echo "❌ pre-push: 'just fast-ci' failed — fix the errors above before pushing."
       echo "   (bypass in an emergency with: git push --no-verify)"

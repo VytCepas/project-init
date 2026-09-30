@@ -192,18 +192,25 @@ _ALWAYS_ISOLATED = {
     "BUN_INSTALL",
 }
 
-# The same list the scaffolded git hooks strip before their gate; a test pins them equal.
+# Every name `git rev-parse --local-env-vars` prints, plus GIT_QUARANTINE_PATH; the
+# scaffolded git hooks strip the same list before their gate, and tests pin both.
 _GIT_HOOK_VARS = (
     "GIT_DIR",
     "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
     "GIT_INDEX_FILE",
     "GIT_COMMON_DIR",
     "GIT_OBJECT_DIRECTORY",
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_QUARANTINE_PATH",
     "GIT_PREFIX",
+    "GIT_CONFIG",
     "GIT_CONFIG_PARAMETERS",
     "GIT_CONFIG_COUNT",
+    "GIT_GRAFT_FILE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_SHALLOW_FILE",
 )
 
 

@@ -556,9 +556,12 @@ class TestHermeticScaffold:
             ]
 
         before = state()
+        outside = tmp_path / "outside.cfg"
+        outside.write_text("")
         target = _python_scaffold(tmp_path / "p")
         _plant(target, "test_git_sandbox.py", _PLANTED_GIT_SANDBOX)
         hook_env = {
+            "GIT_CONFIG": str(outside),
             "GIT_DIR": str(enclosing / ".git"),
             "GIT_WORK_TREE": str(enclosing),
             "GIT_INDEX_FILE": str(enclosing / ".git" / "index"),
@@ -569,6 +572,7 @@ class TestHermeticScaffold:
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 2, 0), result.stdout
         assert state() == before
+        assert outside.read_text() == ""
 
     def test_cargo_and_rustup_caches_survive_under_xdist(self, tmp_path: Path) -> None:
         """Codex on #1056: an xdist worker re-imports the root conftest with HOME
