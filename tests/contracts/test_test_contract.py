@@ -300,13 +300,17 @@ import pytest
 REAL = Path(os.environ["REAL_HOME"])
 ROOTS = (
     "UV_PYTHON_INSTALL_DIR", "UV_PYTHON_BIN_DIR", "UV_TOOL_DIR", "UV_TOOL_BIN_DIR",
-    "GOPATH", "GOBIN", "BUN_INSTALL", "XDG_BIN_HOME",
+    "GOPATH", "BUN_INSTALL", "XDG_BIN_HOME",
 )
 
 
 @pytest.mark.parametrize("var", ROOTS)
 def test_an_exported_install_root_still_moves(var):
     assert not Path(os.environ[var]).is_relative_to(REAL), os.environ[var]
+
+
+def test_an_exported_gobin_is_dropped():
+    assert "GOBIN" not in os.environ, os.environ.get("GOBIN")
 
 
 def test_caches_follow_the_runners_own_roots():
@@ -318,6 +322,26 @@ def test_caches_follow_the_runners_own_roots():
 def test_uv_itself_resolves_outside_the_real_home(args):
     out = subprocess.run(["uv", *args.split()], capture_output=True, text=True, check=True)
     assert not Path(out.stdout.strip()).is_relative_to(REAL), out.stdout
+"""
+
+# #1069: Go refuses a cross-compiled `go install` while GOBIN is set.
+_PLANTED_GO_CROSS = """\
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+def test_a_cross_compiled_go_install_lands_in_the_isolated_gopath(tmp_path):
+    (tmp_path / "go.mod").write_text("module example.com/hello\\n\\ngo 1.21\\n")
+    (tmp_path / "main.go").write_text("package main\\n\\nfunc main() {}\\n")
+    goos = "linux" if sys.platform == "win32" else "windows"
+    env = {**os.environ, "GOOS": goos, "GOTOOLCHAIN": "local"}
+    result = subprocess.run(
+        ["go", "install", "."], cwd=tmp_path, env=env, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert list((Path(os.environ["GOPATH"]) / "bin").rglob("hello*"))
 """
 
 _PLANTED_IMPORTS_CONFTEST = """\
@@ -672,6 +696,22 @@ class TestHermeticScaffold:
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert _last_line(result.stdout) == ("my-project", 13, 0), result.stdout
+
+    def test_a_cross_compiled_go_install_works_under_an_exported_gobin(
+        self, tmp_path: Path
+    ) -> None:
+        """#1069: setting GOBIN made Go refuse `GOOS=<other> go install`. An inherited
+        GOBIN is dropped instead, so the install lands in the isolated GOPATH/bin and
+        never in the runner's own GOBIN."""
+        if shutil.which("go") is None:
+            pytest.skip("go is not on PATH")
+        real_gobin = tmp_path / "real-home" / "go" / "bin"
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_go_cross.py", _PLANTED_GO_CROSS)
+        result = _pytest(target, tmp_path, GOBIN=str(real_gobin))
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 1, 0), result.stdout
+        assert not real_gobin.exists()
 
     def test_temp_and_tmp_match_tmpdir(self, tmp_path: Path) -> None:
         """Copilot on #1056/#1062: the per-test fixture set only TMPDIR; Windows

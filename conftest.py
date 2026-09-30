@@ -14,10 +14,13 @@ TMPDIR. Toolchain *caches* (uv, cargo, rustup, go, bun) keep their real
 locations: they hold content, not configuration, and a cold cache would turn
 every ``uv run`` into a download. *Install roots* — UV_PYTHON_INSTALL_DIR,
 UV_TOOL_DIR, GOPATH and BUN_INSTALL, with the bin dirs UV_PYTHON_BIN_DIR,
-UV_TOOL_BIN_DIR, GOBIN and XDG_BIN_HOME — move inside the throwaway root
-instead, even when the runner exports them: they are where a test's own
+UV_TOOL_BIN_DIR and XDG_BIN_HOME — move inside the throwaway root instead,
+even when the runner exports them: they are where a test's own
 `uv python install`/`uv tool install`/`go install`/`bun install -g` would
-write, so leaving them real would let a test install into it (#1062).
+write, so leaving them real would let a test install into it (#1062). An
+inherited GOBIN is dropped rather than moved, so `go install` writes to the
+isolated GOPATH/bin: Go refuses a cross-compiled install while GOBIN is set
+(#1069).
 GOMODCACHE and bun's install cache are pinned to their real locations
 explicitly (under the runner's own GOPATH/BUN_INSTALL, if exported), so
 isolating GOPATH/BUN_INSTALL does not accidentally cool them — both otherwise
@@ -139,7 +142,6 @@ def _toolchain_env(
         "CARGO_HOME": _cargo_home(root, cargo_src),
         "RUSTUP_HOME": _rustup_home(root, rustup_src),
         "GOPATH": str(root / "go"),
-        "GOBIN": str(root / "go" / "bin"),
         "GOCACHE": str(go_cache),
         "GOMODCACHE": str(Path(gopath or real_home / "go") / "pkg" / "mod"),
         "BUN_INSTALL": str(root / "bun"),
@@ -188,7 +190,6 @@ _ALWAYS_ISOLATED = {
     "UV_TOOL_DIR",
     "UV_TOOL_BIN_DIR",
     "GOPATH",
-    "GOBIN",
     "BUN_INSTALL",
 }
 
@@ -219,6 +220,7 @@ def _hermetic_session() -> tuple[pytest.MonkeyPatch, Path]:
     patch = pytest.MonkeyPatch()
     for name in _GIT_HOOK_VARS:
         patch.delenv(name, raising=False)
+    patch.delenv("GOBIN", raising=False)  # go install then uses the isolated GOPATH/bin (#1069)
     root = Path(tempfile.mkdtemp(prefix="test-contract-"))
     # pytest_unconfigure removes it; this covers a run that never configures (--version).
     atexit.register(shutil.rmtree, root, ignore_errors=True)
