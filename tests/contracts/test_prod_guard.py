@@ -1024,6 +1024,17 @@ COMMENT_LOOKALIKE_STILL_DENIED_1061 = [
     ("a=x#y; terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
     # `#` inside quotes is not a comment start either.
     ("echo \"#\"; terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    # #1063 review: with bash `interactive_comments` off (or zsh `histchars`
+    # changed) `#` is a word, so a separator inside the "comment" runs the rest.
+    ("true # inert; terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    ("true # x && kubectl de'lete' namespace prod", "kubectl delete"),
+    ("true # x | terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    ("true # $(terraform de'stroy')", "terraform/tofu destroy/apply -destroy"),
+    ("histchars='!^x'\ntrue # x; terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    (
+        "setopt no_interactive_comments\ntrue # x; kubectl de'lete' namespace prod",
+        "kubectl delete",
+    ),
 ]
 
 

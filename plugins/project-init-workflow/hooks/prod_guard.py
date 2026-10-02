@@ -717,6 +717,10 @@ def _message_regions(simple: _Simple) -> list[tuple[int, int]]:
     return regions
 
 
+# Operators that would start, pipe or substitute a command if `#` were a word.
+_COMMENT_CAN_RUN = re.compile(r"[;&|()`<>]")
+
+
 def _prose_spans(command: str) -> list[tuple[int, int]]:
     """Character spans in *command* that are prose or a shell comment, not execution.
 
@@ -724,10 +728,10 @@ def _prose_spans(command: str) -> list[tuple[int, int]]:
     command that only prints or searches its arguments, or when it is the value
     of a commit-message flag — AND that command's output goes nowhere but the
     terminal. Prose that is DISPLAYED or SEARCHED is inert; prose that is SENT
-    somewhere is not. A comment span (#1061) is inert unconditionally: `_lex()`
-    already excluded it from every simple command's words, so nothing later
-    can execute it — but a blind dequote of the raw text would still rejoin a
-    quote-split phrase sitting inside it.
+    somewhere is not. A comment span (#1061) is inert only when it holds no
+    shell operator: a shell that reads `#` as a word would run what follows a
+    separator, so such a span stays visible. Without one, a blind dequote of
+    the raw text would rejoin a quote-split phrase sitting inside it.
     """
     lexed = _lex(command)
     if lexed is None:
@@ -735,7 +739,9 @@ def _prose_spans(command: str) -> list[tuple[int, int]]:
     simples, comments = lexed
     if any(_ends_analysis(simple) for simple in simples):
         return []
-    spans: list[tuple[int, int]] = list(comments)
+    # #1063 review: `#` is a plain word under bash `interactive_comments` off or
+    # zsh's `histchars`, so a comment holding a separator stays in the views.
+    spans = [c for c in comments if not _COMMENT_CAN_RUN.search(command, *c)]
     for simple in simples:
         if not simple.words or _flows_onward(simple):
             continue
