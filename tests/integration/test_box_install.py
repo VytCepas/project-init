@@ -335,6 +335,151 @@ def test_apply_refuses_an_edit_git_status_skips(box: Box, label: str):
     _no_install(box)
 
 
+# ── PR #1047 review round 4 / #1060: a local clean filter can hide an edit ──
+
+
+def _clean_filter(box: Box, name: str, path: str) -> None:
+    """Configure a local clean filter that maps any edit to *path* back to its blob at HEAD.
+
+    `git status`/`diff` run a clean filter over the working-tree copy only to
+    compare it with the index — the filter's output never touches the file on
+    disk, so the edited bytes stay there for uv to build (project-init#1060).
+    """
+    original = box.tmp / f"{name}.orig"
+    original.write_bytes((box.repo / path).read_bytes())
+    script = box.tmp / f"{name}.sh"
+    script.write_text(f"#!/usr/bin/env bash\ncat {original}\n")
+    script.chmod(0o755)
+    _git(box.repo, "config", f"filter.{name}.clean", str(script))
+    _git(box.repo, "config", f"filter.{name}.smudge", "cat")
+    attrs = box.repo / ".git" / "info" / "attributes"
+    attrs.write_text((attrs.read_text() if attrs.exists() else "") + f"{path} filter={name}\n")
+
+
+def test_apply_refuses_a_clean_filter_hidden_edit_to_a_packaged_file(box: Box):
+    """A clean filter smudges the edit back to HEAD for status/diff, so only a raw byte
+    compare — bypassing filters — catches it before uv builds the edited bytes (#1060).
+
+    The edit keeps the file's byte length: git's stat-based fast path marks a
+    path modified on a bare size mismatch without ever running the clean
+    filter, so only a same-length edit reaches the filtered comparison this
+    attack (and this check) both depend on.
+    """
+    _clean_filter(box, "hide", "templates/base/hook.sh")
+    original = (box.repo / "templates/base/hook.sh").read_text()
+    edited = original.replace("echo hi\n", "echo rm\n")
+    assert len(edited) == len(original) and edited != original
+    (box.repo / "templates/base/hook.sh").write_text(edited)
+    assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
+    assert _git(box.repo, "ls-files", "-v", "--", "templates/base/hook.sh").startswith("H")
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "on-disk bytes do not match" in result.stderr
+    assert "templates/base/hook.sh" in result.stderr, result.stderr
+    _no_install(box)
+    dry = box.run()
+    assert dry.returncode == 1 and "templates/base/hook.sh" in dry.stdout, dry.stdout
+
+
+def test_apply_refuses_a_clean_filter_hidden_edit_to_pyproject(box: Box):
+    """The same smuggle on pyproject.toml itself: force-include, dependencies or entry
+    points can be rewritten there, and nothing but pyproject.toml's own raw bytes catch
+    it — the layout used to pick packaged paths is read from HEAD, never disk (#1060)."""
+    _clean_filter(box, "hidepy", "pyproject.toml")
+    original = (box.repo / "pyproject.toml").read_text()
+    # Same byte length (see the packaged-file test above for why that matters):
+    # the force-include destination is rewritten in place.
+    edited = original.replace(
+        '"schemas" = "project_init/schemas"\n', '"schemas" = "project_init/SCHEMAS"\n'
+    )
+    assert len(edited) == len(original) and edited != original
+    (box.repo / "pyproject.toml").write_text(edited)
+    assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
+    assert _git(box.repo, "ls-files", "-v", "--", "pyproject.toml").startswith("H")
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "on-disk bytes do not match" in result.stderr
+    assert "pyproject.toml" in result.stderr, result.stderr
+    _no_install(box)
+
+
+def _clean_and_smudge_filter(box: Box, name: str, path: str, *, clean: str, smudge: str) -> None:
+    """A clean filter that maps *path* back to *clean* for status/diff, paired with a
+    smudge filter that plays *smudge* back for a checkout — e.g. ``git archive``, the
+    trusted side of stage 2 before #1064 (Codex P1, reproduced on git 2.43: a smudge
+    driver a repo's own `.gitattributes` configures runs during `archive` too, so its
+    output — not the blob — is what confirmation compared the edit against)."""
+    clean_src = box.tmp / f"{name}.clean.src"
+    clean_src.write_bytes(clean.encode())
+    clean_sh = box.tmp / f"{name}.clean.sh"
+    clean_sh.write_text(f"#!/usr/bin/env bash\ncat {clean_src}\n")
+    clean_sh.chmod(0o755)
+    smudge_src = box.tmp / f"{name}.smudge.src"
+    smudge_src.write_bytes(smudge.encode())
+    smudge_sh = box.tmp / f"{name}.smudge.sh"
+    smudge_sh.write_text(f"#!/usr/bin/env bash\ncat {smudge_src}\n")
+    smudge_sh.chmod(0o755)
+    _git(box.repo, "config", f"filter.{name}.clean", str(clean_sh))
+    _git(box.repo, "config", f"filter.{name}.smudge", str(smudge_sh))
+    attrs = box.repo / ".git" / "info" / "attributes"
+    attrs.write_text((attrs.read_text() if attrs.exists() else "") + f"{path} filter={name}\n")
+
+
+def test_apply_refuses_an_edit_a_clean_and_smudge_pair_hides(box: Box):
+    """A clean filter alone (the tests above) only defeats git status/diff. Pair it with
+    a smudge filter that reproduces the edited bytes, and a stage-2 confirmation reading
+    a checkout (`git archive`) — not the object store — sees the edit as 'trusted' too,
+    since archive runs the same smudge driver a real checkout would (#1064, Codex P1)."""
+    target = "templates/base/hook.sh"
+    original = (box.repo / target).read_text()
+    edited = original.replace("echo hi\n", "echo rm\n")
+    assert len(edited) == len(original) and edited != original
+    _clean_and_smudge_filter(box, "evil", target, clean=original, smudge=edited)
+    (box.repo / target).write_text(edited)
+    assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
+    assert _git(box.repo, "ls-files", "-v", "--", target).startswith("H")
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "on-disk bytes do not match" in result.stderr
+    assert target in result.stderr, result.stderr
+    _no_install(box)
+
+
+def test_apply_refuses_a_crlf_variant_of_an_eol_lf_packaged_file(box: Box):
+    """A CRLF variant of an `eol=lf`-pinned file (`*.sh` here) is not the checkout
+    allowance the CRLF form exists for — a real checkout never produces it — so it
+    must still refuse, matching modified_paths()'s eol=lf gate (#1064 review). No
+    clean filter is needed to show this: CRLF injection changes the file's length,
+    which a clean filter cannot survive (see the two tests above), and apply_problems()
+    reads the raw disk bytes directly regardless of what git status reports."""
+    target = "templates/base/hook.sh"
+    original = (box.repo / target).read_bytes()
+    (box.repo / target).write_bytes(original.replace(b"\n", b"\r\n"))
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "on-disk bytes do not match" in result.stderr
+    assert target in result.stderr, result.stderr
+    _no_install(box)
+
+
+def test_apply_refuses_crlf_from_a_local_eol_override(box: Box):
+    """Codex on #1068: `.git/info/attributes` overriding the committed `*.sh eol=lf`
+    with `eol=crlf` makes a checkout write CRLF while git status stays clean. The
+    eol policy must come from the committed tree, not from a local attribute file."""
+    target = "templates/base/hook.sh"
+    (box.repo / ".git" / "info").mkdir(exist_ok=True)
+    (box.repo / ".git" / "info" / "attributes").write_text("*.sh eol=crlf\n")
+    (box.repo / target).unlink()
+    _git(box.repo, "checkout", "--", target)
+    assert b"\r\n" in (box.repo / target).read_bytes()
+    assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert "on-disk bytes do not match" in result.stderr
+    assert target in result.stderr, result.stderr
+    _no_install(box)
+
+
 # Every place an ignore rule can live. Each hides the file from git status.
 _IGNORE_FILES = (".gitignore", "templates/.gitignore", ".git/info/exclude")
 _CLEAN = "git clean -fdX -- src/project_init templates schemas"
@@ -880,4 +1025,47 @@ def test_check_still_catches_an_edit_under_autocrlf(box: Box):
     result = box.run("--check")
     assert result.returncode == 1
     assert "modified: project_init/cli.py (tree: src/project_init/cli.py)" in result.stderr
+    assert result.stderr.count("    - ") == 1, result.stderr
+
+
+# ── #1071: a SHA-256 clone's eol policy ──────────────────────────────────────
+
+
+@pytest.fixture
+def box256(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Box:
+    probe = subprocess.run(
+        ["git", "init", "-q", "--object-format=sha256", str(tmp_path / "probe")],
+        capture_output=True,
+    )
+    if probe.returncode != 0:
+        pytest.skip("this git cannot create a SHA-256 repository")
+    return _make_box(tmp_path, monkeypatch, "sha256")
+
+
+def test_check_passes_a_crlf_checkout_in_a_sha256_repository(box256: Box):
+    """The eol-policy scratch repo must share the clone's object format: a SHA-1
+    scratch rejects a 64-hex `--source` and the CRLF allowance was lost (#1071)."""
+    _autocrlf_checkout(box256)
+    box256.install_layout()
+    result = box256.run("--check")
+    assert result.returncode == 0, result.stderr
+    assert "(5 files)" in result.stdout
+
+
+def test_dry_run_passes_a_crlf_checkout_in_a_sha256_repository(box256: Box):
+    _autocrlf_checkout(box256)
+    _git(box256.repo, "push", "-q", "origin", "main")
+    result = box256.run()
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "--apply would proceed" in result.stdout
+
+
+def test_sha256_eol_lf_pin_still_catches_crlf_under_autocrlf(box256: Box):
+    _autocrlf_checkout(box256)
+    pkg = box256.install_layout()
+    hook = pkg / "templates" / "base" / "hook.sh"
+    hook.write_bytes(hook.read_bytes().replace(b"\n", b"\r\n"))
+    result = box256.run("--check")
+    assert result.returncode == 1
+    assert "modified: project_init/templates/base/hook.sh" in result.stderr
     assert result.stderr.count("    - ") == 1, result.stderr

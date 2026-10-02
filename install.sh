@@ -229,23 +229,60 @@ $ignored
   $KEPT"
 }
 
-# A local `.git/info/attributes` clean filter can smudge an edited packaged
-# file back to its blob's bytes when git reads it for comparison, so both the
-# status check above and `ls-files -v` read clean even though uvx builds the
-# raw bytes on disk. Stage 1: hash every tracked file under a packaged path
-# with --no-filters and compare it to its blob at HEAD — cheap, but a CRLF
-# checkout (core.autocrlf) legitimately differs here too, so a mismatch is
-# only a suspect. Stage 2: a suspect is confirmed only if it also differs from
-# what `git archive` produces for HEAD, which applies the same eol/text
-# conversion a real checkout would but never a local custom filter driver.
-# Same two-stage check tools/box_install.py's check() runs before calling a
-# file modified (#1047 review, round 4).
-refuse_edited() {
-  local pyproject paths=() p entry kind sha path actual suspects=() edited=() checkout_tmp
-  pyproject="$INSTALL_DIR/pyproject.toml"
-  while IFS= read -r p; do
-    [ -n "$p" ] && paths+=("$p")
-  done < <(packaged_paths "$pyproject")
+# Print each of "$@" whose eol attribute in HEAD's own .gitattributes is lf.
+# check-attr --source (git 2.40+) runs in a throwaway git dir sharing only the
+# object store, so .git/info/attributes, core.attributesFile and the system file
+# cannot override it: a local eol=crlf there gives a CRLF checkout under a clean
+# git status (#1068 review). Fails on any error; the caller then pins everything.
+committed_lf_paths() {
+  local scratch objects head format rc=0
+  objects="$(git -C "$INSTALL_DIR" rev-parse --path-format=absolute --git-path objects)" || return 1
+  # The clone's own object format, or a SHA-256 HEAD is "not a valid tree-ish" (#1071).
+  format="$(git -C "$INSTALL_DIR" rev-parse --show-object-format)" || return 1
+  head="$(git -C "$INSTALL_DIR" rev-parse HEAD)" || return 1
+  scratch="$(mktemp -d)" || return 1
+  : >"$scratch/no-attributes"
+  if git init -q --bare --template= --object-format="$format" "$scratch/git" >/dev/null 2>&1; then
+    printf '%s\0' "$@" |
+      GIT_ATTR_NOSYSTEM=1 GIT_OBJECT_DIRECTORY="$objects" git --git-dir="$scratch/git" \
+        -c core.attributesFile="$scratch/no-attributes" \
+        check-attr -z --stdin --source="$head" eol >"$scratch/eol" || rc=1
+  else
+    rc=1
+  fi
+  if [ "$rc" -eq 0 ]; then
+    local p v
+    while IFS= read -r -d '' p && IFS= read -r -d '' _ && IFS= read -r -d '' v; do
+      if [ "$v" = "lf" ]; then printf '%s\n' "$p"; fi
+    done <"$scratch/eol"
+  fi
+  rm -rf "$scratch"
+  return "$rc"
+}
+
+# A local `.git/info/attributes` clean filter can smudge an edited file back
+# to its blob's bytes when git reads it for comparison, so both the status
+# check above and `ls-files -v` read clean even though uvx (or, for
+# pyproject.toml, packaged_paths() itself) builds the raw bytes on disk.
+# Stage 1: hash every path with --no-filters and compare it to its blob at
+# HEAD — cheap, but a CRLF checkout (core.autocrlf) legitimately differs here
+# too, so a mismatch is only a suspect. Stage 2: a suspect is confirmed with
+# `git cat-file blob HEAD:<path>` — the object store's own bytes, never
+# `git archive`/a checkout: archive runs any `filter=` smudge driver the repo's
+# own attributes configure, and a clean+smudge pair can make that driver's
+# output equal the edit, so archive's "trusted" bytes were then the edit itself
+# (project-init#1064, Codex P1, reproduced on git 2.43). The one checkout-side
+# conversion still allowed for is LF -> CRLF, derived from the trusted blob
+# with `sed`, never a filter driver; a blob whose last line has no trailing
+# newline is a known, conservative exception — sed's `s/$/\r/` appends `\r`
+# there too, so such a file always refuses under an autocrlf checkout (see
+# test_crlf_checkout_of_a_trailing_newline_file_is_not_refused and its
+# no-trailing-newline counterpart). Same two-stage check tools/box_install.py's
+# check() runs before calling a file modified (#1047 review round 4; shared
+# helper #1060; object-store confirmation #1064).
+refuse_edited_paths() {
+  local paths=("$@") entry kind sha path actual suspects=() edited=() blob_tmp crlf_tmp
+  local pinned_lf
   [ "${#paths[@]}" -gt 0 ] || return 0
   while IFS=$'\t' read -r -d '' entry path; do
     read -r _ kind sha <<<"$entry"
@@ -260,21 +297,54 @@ refuse_edited() {
     [ "$actual" = "$sha" ] || suspects+=("$path")
   done < <(git -C "$INSTALL_DIR" ls-tree -r -z --full-tree HEAD -- "${paths[@]}")
   if [ "${#suspects[@]}" -gt 0 ]; then
-    checkout_tmp="$(mktemp -d)" || die "cannot create a temp dir to verify suspect files against HEAD.
-  $KEPT"
-    if ! git -C "$INSTALL_DIR" archive --format=tar HEAD -- "${suspects[@]}" 2>/dev/null | tar -x -C "$checkout_tmp"; then
-      rm -rf "$checkout_tmp"
-      die "cannot read HEAD's checkout bytes in $INSTALL_DIR to verify ${suspects[*]}.
+    if ! blob_tmp="$(mktemp)" || ! crlf_tmp="$(mktemp)"; then
+      die "cannot create a temp file to verify suspect files against HEAD.
   $KEPT"
     fi
+    # No readable committed policy: grant no CRLF allowance at all.
+    pinned_lf="$(committed_lf_paths "${suspects[@]}")" || pinned_lf="$(printf '%s\n' "${suspects[@]}")"
     for path in "${suspects[@]}"; do
-      cmp -s "$checkout_tmp/$path" "$INSTALL_DIR/$path" || edited+=("$path")
+      if ! git -C "$INSTALL_DIR" cat-file blob "HEAD:$path" >"$blob_tmp" 2>/dev/null; then
+        edited+=("$path (cannot read HEAD's object)")
+        continue
+      fi
+      cmp -s "$blob_tmp" "$INSTALL_DIR/$path" && continue
+      # A committed eol=lf pins this path to LF on any checkout: an injected CRLF
+      # there is still an edit, matching tools/box_install.py's modified_paths()
+      # (#1064 review; committed policy only, #1068 review).
+      case $'\n'"$pinned_lf"$'\n' in
+      *$'\n'"$path"$'\n'*)
+        edited+=("$path")
+        continue
+        ;;
+      esac
+      sed 's/$/\r/' "$blob_tmp" >"$crlf_tmp"
+      cmp -s "$crlf_tmp" "$INSTALL_DIR/$path" || edited+=("$path")
     done
-    rm -rf "$checkout_tmp"
+    rm -f "$blob_tmp" "$crlf_tmp"
   fi
-  [ "${#edited[@]}" -eq 0 ] || die "$INSTALL_DIR has packaged files whose on-disk bytes do not match HEAD, though git reports the tree clean (a local clean filter?):
+  [ "${#edited[@]}" -eq 0 ] || die "$INSTALL_DIR has files whose on-disk bytes do not match HEAD, though git reports the tree clean (a local clean filter?):
 $(printf '  %s\n' "${edited[@]}")
   $KEPT"
+}
+
+# pyproject.toml is read for its own bytes here, before packaged_paths() ever
+# parses it: a hidden edit to force-include, dependencies or entry points
+# would otherwise never be checked at all, since none of those change which
+# paths get hashed by refuse_edited_paths below (project-init#1060).
+refuse_edited_pyproject() {
+  [ -f "$INSTALL_DIR/pyproject.toml" ] || return 0
+  refuse_edited_paths pyproject.toml
+}
+
+# The packaged paths pyproject.toml declares (project-init#1047).
+refuse_edited() {
+  local pyproject paths=() p
+  pyproject="$INSTALL_DIR/pyproject.toml"
+  while IFS= read -r p; do
+    [ -n "$p" ] && paths+=("$p")
+  done < <(packaged_paths "$pyproject")
+  refuse_edited_paths "${paths[@]}"
 }
 
 # The tree /project-init scaffolds from must be the verified commit, clean, and
@@ -298,6 +368,7 @@ verify_checkout() {
   [ -z "$hidden" ] || die "$INSTALL_DIR has files git status does not check (skip-worktree or assume-unchanged), so /project-init would scaffold unverified files:
 $hidden
   $KEPT"
+  refuse_edited_pyproject
   refuse_edited
   refuse_ignored
 }

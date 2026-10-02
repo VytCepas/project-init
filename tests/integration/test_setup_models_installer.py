@@ -193,7 +193,7 @@ def test_a_router_rewrite_is_put_back_byte_for_byte(box: _Box):
 def test_a_rewrite_is_put_back_even_when_the_install_fails(box: _Box):
     """The check runs on EXIT, so a run that dies half-way still cleans up."""
     proc = box.run(REWRITE_TO=box.router_file(_ROUTED), STUB_RC="1")
-    assert proc.returncode != 0
+    assert proc.returncode == 1
     assert box.settings.read_bytes() == box.original
 
 
@@ -242,7 +242,7 @@ def test_a_3x_router_is_refused_before_anything_is_installed(box: _Box, tmp_path
     script.write_text(bumped, encoding="utf-8")
     before = box.snapshot()
     proc = box.run(script=script)
-    assert proc.returncode != 0
+    assert proc.returncode == 1
     assert "is not supported" in proc.stderr
     assert box.calls() == []
     assert box.snapshot() == before

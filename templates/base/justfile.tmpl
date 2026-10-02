@@ -20,6 +20,8 @@ lint:
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint_context_budget.sh
+    uv run python .agents/scripts/check_test_contract.py exit-codes
+    uv run --with pytest python .agents/scripts/check_test_contract.py discovery
 
 # static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
 # no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path.
@@ -34,9 +36,12 @@ typecheck:
 format:
     uv run ruff format .
 
-# run the test suite (xdist pulled in on demand so -n works without declaring it)
+# run the test suite (xdist pulled in on demand so -n works without declaring it).
+# The cross-repo test contract (PI-1044): it ends with `<project>: N passed, M failed`,
+# printed by the root conftest.py, and exits with pytest's own code.
+[doc("run the test suite; ends with `<project>: N passed, M failed` (the test contract)")]
 test:
-    sh -c 'if find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run --with pytest-xdist pytest -n auto --tb=short -q; else echo "No test files yet — nothing to test."; fi'
+    sh -c 'if find tests -type f \( -name "test_*.py" -o -name "*_test.py" \) 2>/dev/null | grep -q .; then uv run --with pytest-xdist pytest -n auto --tb=short -q; else echo "No test files yet — nothing to test."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
 
 # fail-fast quiet run for the edit-test loop (token-efficiency; PI-641) —
 # stops at the first failure so agents ingest one traceback, not the suite's
@@ -163,9 +168,11 @@ format:
 # `bun test` exits 1 when it finds zero test files, which would fail `just ci`
 # (and the pre-push gate) on a fresh scaffold before the first test exists — so
 # skip cleanly until a test file appears, like the go/rust day-one guards.
+# Ends with the test contract's `<project>: N passed, M failed` line and bun's
+# own exit code (#1054).
 [doc("run the test suite (coverage-gated per bunfig.toml — PI-569).")]
 test:
-    sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bun test; else echo "No test files yet — nothing to test."; fi'
+    sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bash .agents/hooks/_py.sh .agents/scripts/contract_line.py {{project_slug}} bun -- bun test; else echo "No test files yet — nothing to test."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
 
 # fail-fast run for the edit-test loop (token-efficiency; PI-641)
 test-quick:
@@ -259,9 +266,11 @@ format:
 # run the test suite. Skips cleanly before any Go source exists — `go test ./...`
 # errors on a fresh module (no go.mod), so a fresh scaffold's `just test` /
 # pre-push `fast-ci` would fail day-one without this guard (matches typecheck).
+# `-json` feeds the test contract's `<project>: N passed, M failed` line, printed
+# last; the output shown is go's plain form and the exit code is go's (#1054).
 [doc("run the test suite")]
 test:
-    sh -c 'if find . -name "*.go" | grep -q .; then go test ./...; else echo "No Go sources yet — nothing to test."; fi'
+    sh -c 'if find . -name "*.go" | grep -q .; then bash .agents/hooks/_py.sh .agents/scripts/contract_line.py {{project_slug}} go -- go test -json ./...; else echo "No Go sources yet — nothing to test."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
 
 # fail-fast run for the edit-test loop (token-efficiency; PI-641). Same day-one
 # guard as `test`.
@@ -388,9 +397,11 @@ typecheck:
 format:
     sh -c 'if [ -f Cargo.toml ]; then cargo fmt; else echo "No Cargo project yet — run cargo init."; fi'
 
-# run the test suite
+# run the test suite; ends with the test contract's `<project>: N passed, M failed`
+# line and cargo's own exit code (#1054).
+[doc("run the test suite")]
 test:
-    sh -c 'if [ -f Cargo.toml ]; then cargo test; else echo "No Cargo project yet — run cargo init."; fi'
+    sh -c 'if [ -f Cargo.toml ]; then bash .agents/hooks/_py.sh .agents/scripts/contract_line.py {{project_slug}} cargo -- cargo test; else echo "No Cargo project yet — run cargo init."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
 
 # quiet run for the edit-test loop (token-efficiency; PI-641; cargo has no
 # stable fail-fast flag, so quiet output is the lever here)

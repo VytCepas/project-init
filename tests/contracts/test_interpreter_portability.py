@@ -192,6 +192,6 @@ def test_resolver_rejects_python2_and_errors_clearly(tmp_path: Path):
         capture_output=True,
         text=True,
     )
-    assert proc.returncode != 0, "must not run under Python 2"
+    assert proc.returncode == 127, "must not run under Python 2"
     assert "py2 ran" not in proc.stdout
     assert "no Python 3" in proc.stderr

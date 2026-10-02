@@ -44,7 +44,7 @@ def _git(cwd: Path, *args: str) -> str:
 class Bootstrap:
     """A local upstream (v1.2.2 without the refusal, v1.3.0 and main with it) and a temp HOME."""
 
-    def __init__(self, tmp: Path, git_env: dict[str, str]):
+    def __init__(self, tmp: Path, git_env: dict[str, str], object_format: str = "sha1"):
         self.tmp = tmp
         self.home = tmp / "home"
         self.install = tmp / "install"
@@ -85,7 +85,7 @@ class Bootstrap:
         # templates/ already exists: guard.parent.mkdir(parents=True) above made
         # templates/base/dot_agents/hooks/.
         (self.upstream / "templates" / "marker.txt").write_text("tracked\n")
-        _git(self.upstream, "init", "-q", "-b", "main")
+        _git(self.upstream, "init", "-q", "-b", "main", f"--object-format={object_format}")
         for tag, text in (("v1.2.2", _guard_without_refusal()), ("v1.3.0", _guard_with_refusal())):
             guard.write_text(text)
             _git(self.upstream, "add", "-A")
@@ -135,6 +135,21 @@ class Bootstrap:
 
 @pytest.fixture
 def boot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Bootstrap:
+    return _make_boot(tmp_path, monkeypatch, "sha1")
+
+
+@pytest.fixture
+def boot256(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Bootstrap:
+    probe = subprocess.run(
+        ["git", "init", "-q", "--object-format=sha256", str(tmp_path / "probe")],
+        capture_output=True,
+    )
+    if probe.returncode != 0:
+        pytest.skip("this git cannot create a SHA-256 repository")
+    return _make_boot(tmp_path, monkeypatch, "sha256")
+
+
+def _make_boot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, object_format: str) -> Bootstrap:
     # Hermetic git: no global hooks, signing or identity leak into the temp repos.
     gitconfig = tmp_path / "gitconfig"
     gitconfig.write_text(
@@ -144,7 +159,7 @@ def boot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Bootstrap:
     git_env = {"GIT_CONFIG_GLOBAL": str(gitconfig), "GIT_CONFIG_NOSYSTEM": "1"}
     for key, value in git_env.items():
         monkeypatch.setenv(key, value)
-    return Bootstrap(tmp_path, git_env)
+    return Bootstrap(tmp_path, git_env, object_format)
 
 
 def test_install_sh_syntax_is_valid():
@@ -334,7 +349,7 @@ def test_diverged_local_branch_is_refused_and_kept(
     local = _diverge(boot)
     result = boot.run(**ref_env)
     assert f"(ref: {label})" in result.stdout, result.stdout + result.stderr
-    assert result.returncode != 0, result.stdout + result.stderr
+    assert result.returncode == 1, result.stdout + result.stderr
     assert _git(boot.install, "rev-parse", "HEAD") == local, "the local commit must survive"
     assert (boot.install / "README.md").read_text() == "local\n"
     assert not boot.cmd.exists()
@@ -565,4 +580,212 @@ def test_clean_filter_hidden_edit_to_a_packaged_file_is_refused(boot: Bootstrap)
     assert result.returncode == 1, result.stdout + result.stderr
     assert target in result.stderr and "Nothing was reset" in result.stderr, result.stderr
     assert (boot.install / target).read_text() == edited, "the edit must survive"
+
+
+# ── #1060: the same smuggle on pyproject.toml itself ────────────────────────
+
+
+def test_clean_filter_hidden_edit_to_pyproject_is_refused(boot: Bootstrap):
+    """packaged_paths() reads pyproject.toml straight off disk to learn the layout, so a
+    clean filter that hides an edit there — a rewritten force-include, dependency or entry
+    point — must be caught before that file is trusted for anything (project-init#1060).
+
+    The edit keeps the file's byte length: git's stat-based fast path marks a
+    path modified on a bare size mismatch without ever running the clean
+    filter (verified empirically), so only a same-length edit reaches the
+    filtered comparison this attack, and this check, both depend on.
+    """
+    target = "pyproject.toml"
+    boot.existing_clone()
+    original = (boot.install / target).read_text()
+    clean_filter = boot.tmp / "clean_filter_pyproject.sh"
+    orig_file = boot.tmp / "pyproject.orig.toml"
+    orig_file.write_text(original)
+    clean_filter.write_text(f"#!/usr/bin/env bash\ncat {orig_file}\n")
+    clean_filter.chmod(0o755)
+    _git(boot.install, "config", "filter.hidepy.clean", str(clean_filter))
+    _git(boot.install, "config", "filter.hidepy.smudge", "cat")
+    (boot.install / ".git" / "info" / "attributes").write_text(f"{target} filter=hidepy\n")
+    # force-include's destination is rewritten in place, same length: "project_init" -> "PROJECT_INIT".
+    edited = original.replace(
+        '"templates" = "project_init/templates"\n', '"templates" = "PROJECT_INIT/templates"\n'
+    )
+    assert len(edited) == len(original) and edited != original
+    (boot.install / target).write_text(edited)
+    assert _git(boot.install, "status", "--porcelain") == ""
+    assert _git(boot.install, "ls-files", "-v", "--", target).startswith("H")
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert target in result.stderr and "Nothing was reset" in result.stderr, result.stderr
+    assert (boot.install / target).read_text() == edited, "the edit must survive"
     assert not boot.cmd.exists()
+
+
+# ── #1064, Codex P1: a clean+smudge pair defeats a `git archive` confirmation ──
+
+
+def test_clean_and_smudge_filter_hidden_edit_is_refused(boot: Bootstrap):
+    """A clean filter alone (the test above) only defeats git status/diff. Pair it with a
+    smudge filter that reproduces the edited bytes, and a stage-2 confirmation reading a
+    checkout (`git archive`) — not the object store — sees the edit as 'trusted' too,
+    since archive runs the same smudge driver a real checkout would apply."""
+    target = "templates/marker.txt"  # tracked upstream as "tracked\n" (8 bytes)
+    boot.existing_clone()
+    edited = "edited1\n"  # 8 bytes: same length, so status/ls-files still read clean
+    clean_sh, smudge_sh = boot.tmp / "clean.sh", boot.tmp / "smudge.sh"
+    clean_sh.write_text("#!/usr/bin/env bash\nprintf 'tracked\\n'\n")
+    smudge_sh.write_text(f"#!/usr/bin/env bash\nprintf '{edited}'\n")
+    clean_sh.chmod(0o755)
+    smudge_sh.chmod(0o755)
+    _git(boot.install, "config", "filter.evil.clean", str(clean_sh))
+    _git(boot.install, "config", "filter.evil.smudge", str(smudge_sh))
+    (boot.install / ".git" / "info" / "attributes").write_text(f"{target} filter=evil\n")
+    (boot.install / target).write_text(edited)
+    assert _git(boot.install, "status", "--porcelain") == ""
+    assert _git(boot.install, "ls-files", "-v", "--", target).startswith("H")
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert target in result.stderr and "Nothing was reset" in result.stderr, result.stderr
+    assert (boot.install / target).read_text() == edited, "the edit must survive"
+
+
+def test_crlf_checkout_of_a_trailing_newline_file_is_not_refused(boot: Bootstrap):
+    """The common case: every tracked file here ends with a newline, so the CRLF form
+    `sed 's/$/\\r/'` derives from the trusted blob matches a real autocrlf checkout
+    exactly, and stage 2 does not mistake it for an edit."""
+    boot.existing_clone()
+    _git(boot.install, "config", "core.autocrlf", "true")
+    target = boot.install / "templates" / "marker.txt"
+    target.unlink()
+    _git(boot.install, "checkout", "--", "templates/marker.txt")
+    assert target.read_bytes() == b"tracked\r\n"
+    assert _git(boot.install, "status", "--porcelain") == ""
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert boot.cmd.is_file()
+
+
+def test_no_crlf_allowance_without_a_readable_committed_eol_policy(boot: Bootstrap):
+    """The fail-closed branch of committed_lf_paths() (#1068 review): when
+    `check-attr --source` cannot answer (git older than 2.40, or any error), no path
+    gets the CRLF allowance, so the ordinary autocrlf checkout above now refuses."""
+    boot.existing_clone()
+    _git(boot.install, "config", "core.autocrlf", "true")
+    target = boot.install / "templates" / "marker.txt"
+    target.unlink()
+    _git(boot.install, "checkout", "--", "templates/marker.txt")
+    assert target.read_bytes() == b"tracked\r\n"
+    real_git = shutil.which("git")
+    assert real_git
+    shim = boot.bindir / "git"
+    shim.write_text(
+        "#!/usr/bin/env bash\n"
+        'case " $* " in *" check-attr "*) exit 128 ;; esac\n'
+        f'exec "{real_git}" "$@"\n'
+    )
+    shim.chmod(0o755)
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "templates/marker.txt" in result.stderr, result.stderr
+
+
+def test_crlf_checkout_of_a_no_trailing_newline_file_is_conservatively_refused(
+    boot: Bootstrap,
+):
+    """Documented trade-off (#1064 review): sed's `s/$/\\r/` appends `\\r` to a blob's
+    last line even when that line has no trailing newline, which a real checkout never
+    does. A tracked file shaped that way is refused under an autocrlf checkout — a false
+    positive (fails closed), never a false negative."""
+    boot.commit_upstream(
+        "templates/notrail.txt", "line1\nline2\nline3", "add a file with no final newline"
+    )
+    boot.existing_clone()
+    _git(boot.install, "config", "core.autocrlf", "true")
+    target = boot.install / "templates" / "notrail.txt"
+    target.unlink()
+    _git(boot.install, "checkout", "--", "templates/notrail.txt")
+    assert target.read_bytes() == b"line1\r\nline2\r\nline3", "a real checkout adds no CR at EOF"
+    assert _git(boot.install, "status", "--porcelain") == ""
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "templates/notrail.txt" in result.stderr, result.stderr
+
+
+def test_crlf_checkout_before_an_eol_lf_pin_is_still_refused(boot: Bootstrap):
+    """Not an attack: a Windows checkout writes a file CRLF before upstream pins it
+    `eol=lf`. A fast-forward to that pin never rewrites the file (its own blob did not
+    change, only `.gitattributes` did), so the CRLF bytes stay on disk, and git status
+    reads clean — its own eol=lf comparison now masks exactly this difference, the same
+    way core.autocrlf masks an ordinary CRLF checkout. `hash-object --no-filters` still
+    sees the mismatch, so it must still refuse (#1064 review; reproduced with a real
+    clone, autocrlf checkout, upstream commit and `git merge --ff-only`, no filter)."""
+    boot.commit_upstream("templates/hook.sh", "line1\nline2\n", "add a shell hook")
+    boot.existing_clone()
+    _git(boot.install, "config", "core.autocrlf", "true")
+    target = boot.install / "templates" / "hook.sh"
+    target.unlink()
+    _git(boot.install, "checkout", "--", "templates/hook.sh")
+    assert b"\r\n" in target.read_bytes()
+    boot.commit_upstream(".gitattributes", "*.sh text eol=lf\n", "pin .sh files to LF")
+    _git(boot.install, "fetch", "-q", "origin")
+    _git(boot.install, "merge", "-q", "--ff-only", "origin/main")
+    assert b"\r\n" in target.read_bytes(), "the pin alone must not rewrite the file"
+    assert _git(boot.install, "status", "--porcelain") == ""
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "templates/hook.sh" in result.stderr, result.stderr
+
+
+def test_crlf_from_a_local_eol_override_is_refused(boot: Bootstrap):
+    """Codex on #1068: `.git/info/attributes` overriding the committed `*.sh eol=lf`
+    with `eol=crlf` gives a CRLF checkout and a clean git status, and `check-attr`
+    then answers crlf. The eol policy must come from the verified tree alone."""
+    boot.commit_upstream(".gitattributes", "*.sh text eol=lf\n", "pin .sh files to LF")
+    boot.commit_upstream("templates/hook.sh", "line1\nline2\n", "add a shell hook")
+    boot.existing_clone()
+    (boot.install / ".git" / "info").mkdir(exist_ok=True)
+    (boot.install / ".git" / "info" / "attributes").write_text("*.sh eol=crlf\n")
+    target = boot.install / "templates" / "hook.sh"
+    target.unlink()
+    _git(boot.install, "checkout", "--", "templates/hook.sh")
+    assert b"\r\n" in target.read_bytes()
+    assert _git(boot.install, "status", "--porcelain") == ""
+    result = boot.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "templates/hook.sh" in result.stderr, result.stderr
+
+
+# ── #1071: a SHA-256 clone's eol policy ──────────────────────────────────────
+
+
+def test_sha256_clone_crlf_checkout_is_not_refused(boot256: Bootstrap):
+    """The eol-policy scratch repo must share the clone's object format: a SHA-1
+    scratch rejects a 64-hex `--source`, so no path got the CRLF allowance (#1071)."""
+    boot256.existing_clone()
+    assert _git(boot256.install, "rev-parse", "--show-object-format") == "sha256"
+    _git(boot256.install, "config", "core.autocrlf", "true")
+    target = boot256.install / "templates" / "marker.txt"
+    target.unlink()
+    _git(boot256.install, "checkout", "--", "templates/marker.txt")
+    assert target.read_bytes() == b"tracked\r\n"
+    assert _git(boot256.install, "status", "--porcelain") == ""
+    result = boot256.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert boot256.cmd.is_file()
+
+
+def test_sha256_clone_eol_lf_pin_still_refuses_crlf(boot256: Bootstrap):
+    """The allowance is still withheld where the committed tree pins eol=lf."""
+    boot256.commit_upstream(".gitattributes", "*.sh text eol=lf\n", "pin .sh files to LF")
+    boot256.commit_upstream("templates/hook.sh", "line1\nline2\n", "add a shell hook")
+    boot256.existing_clone()
+    (boot256.install / ".git" / "info").mkdir(exist_ok=True)
+    (boot256.install / ".git" / "info" / "attributes").write_text("*.sh eol=crlf\n")
+    target = boot256.install / "templates" / "hook.sh"
+    target.unlink()
+    _git(boot256.install, "checkout", "--", "templates/hook.sh")
+    assert b"\r\n" in target.read_bytes()
+    assert _git(boot256.install, "status", "--porcelain") == ""
+    result = boot256.run(PROJECT_INIT_REF="main")
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "templates/hook.sh" in result.stderr, result.stderr

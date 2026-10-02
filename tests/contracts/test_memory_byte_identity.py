@@ -290,6 +290,10 @@ _ADDED_SINCE_BASELINE = {
     # code existed. The template is python-gated, so this path appears on a
     # Python scaffold only.
     "pyproject.toml",
+    # PI-1044: the cross-repo test contract's root conftest.py (hermetic HOME
+    # fixture + summary line) is a new always-copied file on a Python scaffold;
+    # the justfile's `test` edit is already excluded above.
+    "conftest.py",
     # PI-848: local agent specs removed — explore duplicates the built-in
     # Explore agent; code-reviewer ships only on --no-egress scaffolds.
     ".agents/agents/explore.md",
@@ -311,6 +315,12 @@ _ADDED_SINCE_BASELINE = {
     # PI-694: token-budget lint gate — new always-copied script (justfile
     # wiring already excluded above)
     ".agents/scripts/lint_context_budget.sh",
+    # #1054: the test contract's summary line for Node/Go/Rust `just test` — new
+    # always-copied script (justfile wiring already excluded above)
+    ".agents/scripts/contract_line.py",
+    # #1052: test-contract exit-code check — new always-copied script (justfile
+    # wiring already excluded above)
+    ".agents/scripts/check_test_contract.py",
     # Board-visibility fix: one-time backfill that reconciles the Projects board
     # with closed-issue state (new lifecycle script; board-automation.yml already
     # excluded above).
