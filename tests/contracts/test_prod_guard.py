@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import re
 import subprocess
 import types
@@ -1455,19 +1454,6 @@ class TestPortRootStopCondition:
         assert mod._port_root() is None
         monkeypatch.setenv("HOME", "")
         assert mod._port_root() is None
-
-    def test_no_default_is_guessed_off_posix(self, tmp_path: Path, monkeypatch):
-        """The default is per OS and only the POSIX one is decided (Windows is
-        still open upstream). Off POSIX an exported PORT_ROOT still counts;
-        nothing is defaulted. `os` is swapped on the module only — patching the
-        real `os.name` would change pathlib's behaviour for the whole process."""
-        mod = _load_guard()
-        monkeypatch.setattr(mod, "os", types.SimpleNamespace(name="nt", environ=os.environ))
-        monkeypatch.setenv("HOME", str(tmp_path))
-        monkeypatch.delenv("PORT_ROOT", raising=False)
-        assert mod._port_root() is None, "a Windows default was guessed"
-        monkeypatch.setenv("PORT_ROOT", str(tmp_path / "port"))
-        assert mod._port_root() == (tmp_path / "port").resolve()
 
 
 # ── PI-893: secret-file exposure ────────────────────────────────────────────

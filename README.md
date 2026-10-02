@@ -86,15 +86,13 @@ Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/
 
 ### Platform requirements
 
-macOS, Linux, and WSL work out of the box. The scaffolded hooks and lifecycle
-scripts are bash (a single bash-3.2 portability floor, epic #359) — so on **native Windows
-(non-WSL)** you need **[Git for Windows](https://gitforwindows.org/)** (it ships
-`bash`/`sh` + coreutils), and you should run from a **Git Bash** shell. Claude
-Code then runs hooks through Git Bash automatically; the wired hooks also pin
-`"shell": "bash"` to make that explicit. Without Git for Windows, Claude Code
-falls back to PowerShell, which can't run a bash hook — so the enforcement
-hooks won't fire. PowerShell-only is not a supported target; there are no
-`.ps1` equivalents by design. (WSL remains the smoothest Windows path.)
+**macOS and Linux.** On Windows, only inside **WSL2**, working in the WSL
+filesystem (`~/...`), never across `/mnt/c/...`. A native Windows shell (Git
+Bash, MSYS2, Cygwin: `uname -s` starting with `MINGW`, `MSYS` or `CYGWIN`) is
+refused by `install.sh`, by `project-init` itself and by the scaffolded
+SessionStart hook, each naming WSL2 (#1070, [ADR-030](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-030-macos-linux-wsl2-only.md)).
+The scaffolded hooks and lifecycle scripts are bash, with a single bash-3.2
+portability floor (epic #359).
 
 ## Agent support tiers
 
@@ -459,8 +457,8 @@ curl -fsSL https://bun.sh/install | bash
 **Hooks silently do nothing on commit**
 The hooks need `python3` on `PATH` (replaces the previous `jq` dependency). They auto-detect `uv run ruff` for uv-managed Python projects and fall back to a system `ruff`.
 
-**WSL: phantom permission/CRLF changes when working from Git Bash on Windows**
-Edit and commit from inside WSL (`wsl` then `cd ~/projects/...`). Editing WSL files from Git Bash on Windows mangles executable bits and line endings.
+**WSL: phantom permission/CRLF changes when editing WSL files from the Windows side**
+Edit and commit from inside WSL (`wsl` then `cd ~/projects/...`). Editing WSL files from the Windows side mangles executable bits and line endings.
 
 **`Unknown preset 'foo'`**
 Run `project-init --list-presets` and pick from `core` (vault-free), `auto` (memory files, no vault), `obsidian-only`, `obsidian-graphify` (ADR-009), or `governed`. Custom presets go in `templates/presets/<name>.toml` — author one with `project-init preset new <name> --extends <base>` (#252).

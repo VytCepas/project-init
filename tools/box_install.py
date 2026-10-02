@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import filecmp
 import io
 import json
 import os
@@ -365,10 +364,10 @@ def record_tops(dists: list[Path]) -> tuple[set[str], list[str]]:
 
 
 def _same_entry(link: Path, want: Path) -> bool:
-    """True when *link* is *want* through a symlink, or a byte-identical copy (Windows)."""
+    """True when *link* is *want* through a symlink (uv links entrypoints on macOS and Linux)."""
     if not link.exists() or not want.exists():
         return False
-    return link.resolve() == want.resolve() or filecmp.cmp(link, want, shallow=False)
+    return link.resolve() == want.resolve()
 
 
 def receipt_problems(env: Path, scripts: Path) -> list[str]:
@@ -572,7 +571,7 @@ def check(env: Path) -> tuple[list[str], int]:
             drift.append(f"modified: {dest} (tree: {src})")
         perms = (site / dest).stat().st_mode & 0o777
         # The scaffolder gives an output the exec bit its template has (any of 0o111).
-        if os.name != "nt" and mode in _FILE_MODES and bool(perms & 0o111) != (mode == "100755"):
+        if mode in _FILE_MODES and bool(perms & 0o111) != (mode == "100755"):
             drift.append(f"mode: {dest} installed {perms:o}, tree {mode} (tree: {src})")
     drift += [f"not in tree: {dest}" for dest in sorted(set(installed) - set(expected))]
     return drift, len(expected)

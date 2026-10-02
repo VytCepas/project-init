@@ -106,6 +106,13 @@ Curated per-version upgrade notes surfaced by `project-init upgrade` (#244).
 
 - `def notes_for_span` — Return ``[(version, entry)]`` for the span, newest version first.
 
+### `project_init/platform_guard.py`
+
+Refuse a native Windows shell before anything runs (#1070, ADR-030).
+
+- `def native_windows_shell` — Return the native Windows system name this process runs under, else None.
+- `def refusal` — The message naming WSL2 as the way in.
+
 ### `project_init/scaffold.py`
 
 Core scaffolding logic — pure functions, no user interaction.

@@ -143,15 +143,14 @@ class Box:
     def uv_calls(self) -> list[str]:
         return self.uv_log.read_text().splitlines() if self.uv_log.exists() else []
 
-    def build_layout(self, dest: Path, *, at: Path | None = None, windows: bool = False) -> Path:
+    def build_layout(self, dest: Path, *, at: Path | None = None) -> Path:
         """Lay out what `uv tool install` produces for this repo's HEAD, in *dest*.
 
         *at* is where the env will finally live (its interpreter reports paths
-        there); *windows* uses `Lib/site-packages` and `Scripts`, as a Windows venv does.
+        there).
         """
         at = at or dest
-        site_rel = Path("Lib/site-packages") if windows else Path("lib/python3.13/site-packages")
-        scripts_rel = Path("Scripts") if windows else Path("bin")
+        site_rel, scripts_rel = Path("lib/python3.13/site-packages"), Path("bin")
         site, scripts = dest / site_rel, dest / scripts_rel
         mapping = {"src/project_init/": "project_init/", "templates/": "project_init/templates/"}
         mapping["schemas/"] = "project_init/schemas/"
@@ -174,7 +173,7 @@ class Box:
         scripts.mkdir(parents=True)
         (scripts / "project-init").write_text("#!/bin/sh\n")
         (scripts / "project-init").chmod(0o755)
-        python = scripts / ("python.exe" if windows else "python")
+        python = scripts / "python"
         paths = {"purelib": str(at / site_rel), "scripts": str(at / scripts_rel)}
         python.write_text(f"#!/bin/sh\nprintf '%s\\n' '{json.dumps(paths)}'\n")
         python.chmod(0o755)
@@ -188,11 +187,10 @@ class Box:
         )
         return scripts_rel
 
-    def install_layout(self, *, windows: bool = False) -> Path:
-        scripts_rel = self.build_layout(self.env_dir, windows=windows)
+    def install_layout(self) -> Path:
+        scripts_rel = self.build_layout(self.env_dir)
         (self.bin / "project-init").symlink_to(self.env_dir / scripts_rel / "project-init")
-        site = "Lib/site-packages" if windows else "lib/python3.13/site-packages"
-        return self.env_dir / site / "project_init"
+        return self.env_dir / "lib/python3.13/site-packages" / "project_init"
 
     def commit_pyproject(self, old: str, new: str) -> None:
         path = self.repo / "pyproject.toml"
@@ -738,14 +736,6 @@ def test_check_flags_a_version_change_in_pyproject_only(box: Box):
     assert result.stderr.count("metadata:") == 1, result.stderr
 
 
-def test_check_reads_a_windows_layout_from_the_env_interpreter(box: Box):
-    # `Lib/site-packages` and `Scripts`: the env's interpreter says where, not a guess.
-    box.install_layout(windows=True)
-    result = box.run("--check")
-    assert result.returncode == 0, result.stderr
-    assert "(5 files)" in result.stdout
-
-
 def test_check_names_a_shadowing_executable_on_path(box: Box):
     box.install_layout()
     shadow = box.tmp / "shadow"
@@ -985,7 +975,7 @@ def test_recipe_creates_no_venv_and_needs_no_network(box: Box, args: tuple[str, 
 
 
 def _autocrlf_checkout(box: Box) -> None:
-    """Git for Windows' defaults: `* text=auto` committed, core.autocrlf=true, a fresh checkout."""
+    """A CRLF checkout: `* text=auto` committed, core.autocrlf=true, a fresh checkout."""
     attributes = box.repo / ".gitattributes"
     attributes.write_text("* text=auto\n" + attributes.read_text())
     _git(box.repo, "commit", "-q", "-am", "text=auto")

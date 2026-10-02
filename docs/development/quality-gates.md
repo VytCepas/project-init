@@ -53,7 +53,7 @@ merge. Already in place. This is the whole of "reduce what blocks a merge."
 **DON'T — merge jobs into one mega-job.** Collapsing `lint-and-test` /
 `secret-scan` / `shellcheck` / `wheel-smoke` into a single job is a regression:
 - kills parallelism (they run concurrently on separate runners; serialized, wall-clock = sum, not max — directly fights time-to-merge),
-- can't span OSes (`macos-portability`/`windows-portability` need their own runners),
+- can't span OSes (`macos-portability` needs its own runner),
 - loses failure isolation (one red X instead of "gitleaks vs shellcheck"),
 - loses per-piece conditional/scheduled triggers,
 - a flaky step re-runs the whole blob (no per-job re-run).
