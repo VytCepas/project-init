@@ -235,12 +235,14 @@ $ignored
 # cannot override it: a local eol=crlf there gives a CRLF checkout under a clean
 # git status (#1068 review). Fails on any error; the caller then pins everything.
 committed_lf_paths() {
-  local scratch objects head rc=0
+  local scratch objects head format rc=0
   objects="$(git -C "$INSTALL_DIR" rev-parse --path-format=absolute --git-path objects)" || return 1
+  # The clone's own object format, or a SHA-256 HEAD is "not a valid tree-ish" (#1071).
+  format="$(git -C "$INSTALL_DIR" rev-parse --show-object-format)" || return 1
   head="$(git -C "$INSTALL_DIR" rev-parse HEAD)" || return 1
   scratch="$(mktemp -d)" || return 1
   : >"$scratch/no-attributes"
-  if git init -q --bare --template= "$scratch/git" >/dev/null 2>&1; then
+  if git init -q --bare --template= --object-format="$format" "$scratch/git" >/dev/null 2>&1; then
     printf '%s\0' "$@" |
       GIT_ATTR_NOSYSTEM=1 GIT_OBJECT_DIRECTORY="$objects" git --git-dir="$scratch/git" \
         -c core.attributesFile="$scratch/no-attributes" \

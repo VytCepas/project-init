@@ -162,14 +162,18 @@ def eol_lf_paths(commit: str, paths: list[str]) -> set[str]:
     ``eol=crlf`` makes a checkout write CRLF under a clean ``git status``, so it
     must not grant the CRLF allowance. ``check-attr --source`` (git 2.40+) runs in
     a throwaway git dir that shares only the object store; it runs no driver.
+    The throwaway repo takes the clone's own object format, or a SHA-256 clone's
+    ``--source`` is "not a valid tree-ish" and the CRLF allowance is lost (#1071).
     """
     if not paths:
         return set()
     objects = _git("rev-parse", "--path-format=absolute", "--git-path", "objects")
+    object_format = _git("rev-parse", "--show-object-format")
     with tempfile.TemporaryDirectory() as scratch:
         git_dir, no_attrs = Path(scratch) / "git", Path(scratch) / "no-attributes"
         no_attrs.write_text("")
-        init = _run(["git", "init", "-q", "--bare", "--template=", str(git_dir)])
+        fmt = f"--object-format={object_format}"
+        init = _run(["git", "init", "-q", "--bare", "--template=", fmt, str(git_dir)])
         if init.returncode != 0:
             raise RefusedError(f"git init (eol policy) failed: {init.stderr.strip()}")
         argv = [

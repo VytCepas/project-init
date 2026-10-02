@@ -74,14 +74,14 @@ def test_lifecycle_none_renders_no_cycle_key(tmp_path: Path):
 
 def test_review_cycles_without_lifecycle_is_rejected(tmp_path: Path):
     result = _scaffold(tmp_path, "--lifecycle", "none", "--review-cycles", "2")
-    assert result.returncode != 0
+    assert result.returncode == 2
     assert "requires the GitHub lifecycle" in result.stderr
     assert not (tmp_path / ".agents").exists()
 
 
 def test_negative_review_cycles_is_rejected(tmp_path: Path):
     result = _scaffold(tmp_path, "--review-cycles", "-1")
-    assert result.returncode != 0
+    assert result.returncode == 2
     assert "non-negative integer" in result.stderr
 
 
@@ -220,7 +220,7 @@ def test_interactive_runs_validate_the_flag_before_prompting(tmp_path: Path, ext
         input="",
         check=False,
     )
-    assert result.returncode != 0
+    assert result.returncode == 2
     assert expected in result.stderr
     assert not (tmp_path / ".agents").exists()
 

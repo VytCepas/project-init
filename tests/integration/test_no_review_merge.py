@@ -105,7 +105,7 @@ def test_a_blocked_pr_is_still_refused(tmp_target: Path, tmp_path: Path):
     this one.
     """
     result = _run_monitor(tmp_target, tmp_path, merge_state="BLOCKED")
-    assert result.returncode != 0, result.stdout + result.stderr
+    assert result.returncode == 1, result.stdout + result.stderr
 
 
 def test_a_blocked_pr_says_which_state_stopped_it(tmp_target: Path, tmp_path: Path):
