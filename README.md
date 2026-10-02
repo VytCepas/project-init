@@ -90,7 +90,7 @@ Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/
 filesystem (`~/...`), never across `/mnt/c/...`. A native Windows shell (Git
 Bash, MSYS2, Cygwin: `uname -s` starting with `MINGW`, `MSYS` or `CYGWIN`) is
 refused by `install.sh`, by `project-init` itself and by the scaffolded
-SessionStart hook, each naming WSL2 (#1070, [ADR-030](docs/adr/adr-030-macos-linux-wsl2-only.md)).
+SessionStart hook, each naming WSL2 (#1070, [ADR-030](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-030-macos-linux-wsl2-only.md)).
 The scaffolded hooks and lifecycle scripts are bash, with a single bash-3.2
 portability floor (epic #359).
 
