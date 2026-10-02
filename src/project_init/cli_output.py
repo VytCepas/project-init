@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -127,7 +128,13 @@ def _emit_scaffold_output(  # noqa: PLR0913 — one arg per piece of the result
         _print_profile_notice(
             inputs.profile, no_plugin=inputs.no_plugin, no_egress=inputs.no_egress
         )
-    _print_summary(target, created, preset["name"], variables.get("memory_stack", "none"))
+    _print_summary(
+        target,
+        created,
+        preset["name"],
+        variables.get("memory_stack", "none"),
+        plugins=_project_plugins(variables),
+    )
     if conflicts:
         _print_conflicts(conflicts)
     _print_mcp_commands(inputs.selected_mcps, js_runner="bunx" if variables.get("node") else "npx")
@@ -142,9 +149,64 @@ def _emit_preset_list(presets: list[dict[str, Any]], *, as_json: bool) -> None:
         print(f"{p['name']:<20} {p['description']}  [memory: {p['memory_stack']}]")
 
 
+def _project_plugins(variables: dict[str, str]) -> list[str]:
+    """The project-init plugins this scaffold enables for Claude Code.
+
+    The same conditions as the ``enabledPlugins`` block of
+    ``templates/base/dot_agents/settings.json.tmpl``; a test cross-checks the two
+    against a rendered ``.claude/settings.json`` so they cannot drift apart.
+    """
+    if not variables.get("plugin_mode"):
+        return []
+    plugins = ["project-init-workflow"]
+    if variables.get("lifecycle"):
+        plugins.append("project-init-lifecycle")
+    return plugins
+
+
+def _start_lines(target: Path, plugins: list[str]) -> list[str]:
+    """The closing instruction: how a Claude Code session picks this scaffold up (#1026).
+
+    The first line is the command; the rest state the three facts it depends on.
+    The CONDITION: project settings, hooks and plugins load only in a session
+    started here. The DIRECTORY: Claude Code reads the ``.claude/`` projection,
+    not ``.agents/`` (ADR-027 measured a hook in ``.agents/`` only never firing).
+    The SCOPE: in plugin mode the skills and hooks arrive through project-scoped
+    plugins, so a user-scope install is how to have them in every session.
+    Plain text, no markup — both renderers print these same lines.
+    """
+    lines = [
+        f"cd {shlex.quote(str(target.resolve()))} && claude",
+        "Only a session started in this project loads its settings, hooks and "
+        "plugins; start claude anywhere else and none of them load.",
+        "Claude Code takes its config from .claude/ (generated from .agents/, which "
+        "it does not read) and its instructions from CLAUDE.md, which imports AGENTS.md.",
+    ]
+    if plugins:
+        noun = "plugin" if len(plugins) == 1 else "plugins"
+        pronoun = "it" if len(plugins) == 1 else "them"
+        lines.append(
+            f"Skills and hooks come from {len(plugins)} project-scoped {noun} "
+            f"({', '.join(plugins)}); to have {pronoun} in every session, install "
+            f"{pronoun} at user scope (commands in CLAUDE.md)."
+        )
+    else:
+        lines.append(
+            "Skills and hooks are copied into this project (--no-plugin): skills in "
+            ".claude/skills/, hooks wired in .claude/settings.json."
+        )
+    return lines
+
+
 def _print_summary(
-    target: Path, created: list[Path], preset_name: str, memory_stack: str = "none"
+    target: Path,
+    created: list[Path],
+    preset_name: str,
+    memory_stack: str = "none",
+    *,
+    plugins: list[str] | None = None,
 ) -> None:
+    start = _start_lines(target, plugins or [])
     dirs = sorted({str(p.parent) for p in created if str(p.parent) != "."})
     files_count = len(created)
     next_step = _MEMORY_NEXT_STEPS.get(memory_stack, "")
@@ -158,10 +220,17 @@ def _print_summary(
     # word-wrap mid-phrase, and nothing decorative to bloat a transcript.
     if not is_interactive():
         _print_summary_plain(
-            target, dirs, files_count, preset_name, next_step, git_missing=git_missing
+            target,
+            dirs,
+            files_count,
+            preset_name,
+            next_step,
+            git_missing=git_missing,
+            start=start,
         )
         return
 
+    from rich.markup import escape
     from rich.panel import Panel
     from rich.rule import Rule
     from rich.table import Table
@@ -183,12 +252,12 @@ def _print_summary(
             "  Run [heading]git init && git add -A && git commit -m 'scaffold'[/heading]"
         )
     rows.append(
-        "[heading]Start[/heading]  cd into the project and run [key]claude[/key] — "
-        "it picks up CLAUDE.md and .agents/ automatically."
+        f"[heading]Start[/heading]  [key]{escape(start[0])}[/key]\n"
+        + "\n".join(f"  {escape(line)}" for line in start[1:])
     )
 
     body = Table.grid(padding=(1, 0))
-    body.add_column()
+    body.add_column(overflow="fold")  # a long target path must stay copyable, not "…"
     for row in rows:
         body.add_row(row)
 
@@ -212,6 +281,7 @@ def _print_summary_plain(  # noqa: PLR0913 — one arg per rendered summary fiel
     next_step: str,
     *,
     git_missing: bool,
+    start: list[str],
     limit: int = 24,
 ) -> None:
     """Colourless, unwrapped summary for non-TTY runs (uses builtin print)."""
@@ -232,10 +302,9 @@ def _print_summary_plain(  # noqa: PLR0913 — one arg per rendered summary fiel
             "hooks and CI workflows assume one."
         )
         print("    Run: git init && git add -A && git commit -m 'scaffold'")
-    print(
-        "  Start: cd into the project and run claude — it picks up CLAUDE.md and "
-        ".agents/ automatically."
-    )
+    print(f"  Start: {start[0]}")
+    for line in start[1:]:
+        print(f"    {line}")
     print()
 
 
