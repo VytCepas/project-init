@@ -1007,6 +1007,54 @@ class TestQuoteSplitPI1043:
         assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
 
 
+# ── #1061: a comment `_lex()` recognises must not have its quote-split phrase
+# rejoined by the dequoted matching view; a `#` it does NOT recognise as a
+# comment (inside quotes, mid-word) must not blank anything either.
+COMMENT_QUOTE_SPLIT_ALLOWED_1061 = [
+    "echo ok # terraform 'destroy'",  # as filed
+    "true # kubectl de'lete' namespace prod",  # as filed
+    "echo hi # gh repo de'lete' o/r",
+]
+
+COMMENT_LOOKALIKE_STILL_DENIED_1061 = [
+    ("terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    ("kubectl de'lete' namespace prod", "kubectl delete"),
+    # `#` glued to the prior word (no leading space) never opens a comment —
+    # the destructive verb after it must still be live.
+    ("a=x#y; terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    # `#` inside quotes is not a comment start either.
+    ("echo \"#\"; terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    # #1063 review: with bash `interactive_comments` off (or zsh `histchars`
+    # changed) `#` is a word, so a separator inside the "comment" runs the rest.
+    ("true # inert; terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    ("true # x && kubectl de'lete' namespace prod", "kubectl delete"),
+    ("true # x | terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    ("true # $(terraform de'stroy')", "terraform/tofu destroy/apply -destroy"),
+    ("histchars='!^x'\ntrue # x; terraform de'stroy'", "terraform/tofu destroy/apply -destroy"),
+    (
+        "setopt no_interactive_comments\ntrue # x; kubectl de'lete' namespace prod",
+        "kubectl delete",
+    ),
+]
+
+
+class TestCommentQuoteSplitPI1061:
+    """#1061 — the dequoted view must not rejoin a quote-split phrase sitting
+    inside a shell comment; a `#` that is not a comment must not blank anything."""
+
+    @pytest.mark.parametrize("command", COMMENT_QUOTE_SPLIT_ALLOWED_1061)
+    def test_split_phrase_inside_a_real_comment_is_allowed(self, tmp_path: Path, command: str):
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+
+    @pytest.mark.parametrize(("command", "label"), COMMENT_LOOKALIKE_STILL_DENIED_1061)
+    def test_executable_split_phrase_still_denied(self, tmp_path: Path, command: str, label: str):
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict is not None, f"FAIL-OPEN: {command!r}"
+        hso = verdict["hookSpecificOutput"]
+        assert hso["permissionDecision"] == "deny"
+        assert f"'{label}'" in hso["permissionDecisionReason"], hso["permissionDecisionReason"]
+
+
 class TestWiring:
     def test_fallback_settings_wire_the_guard(self, tmp_path: Path):
         """Default scaffolds get the guard from the plugin; --no-plugin

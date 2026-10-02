@@ -520,9 +520,11 @@ def _read_word(command: str, i: int) -> tuple[_Word, int] | None:
     return _Word(command[start:i], tuple(quoted), plain), i
 
 
-def _lex(command: str) -> list[_Simple] | None:
-    """*command* as its simple commands in order, or None when any part is unmodelled."""
+def _lex(command: str) -> tuple[list[_Simple], list[tuple[int, int]]] | None:
+    """*command* as its simple commands plus recognised comment spans, in order,
+    or None when any part is unmodelled."""
     simples: list[_Simple] = []
+    comments: list[tuple[int, int]] = []
     words: list[_Word] = []
     redirects: list[tuple[str, str, _Word]] = []
     i, n = 0, len(command)
@@ -539,6 +541,7 @@ def _lex(command: str) -> list[_Simple] | None:
             # measured in bash, zsh, an interactive zsh with no rc, and bash with
             # `interactive_comments` off. The newline stays: it ends a statement.
             end = command.find("\n", i)
+            comments.append((i, n if end < 0 else end))
             i = n if end < 0 else end
             continue
         if ch in "()`":
@@ -584,7 +587,7 @@ def _lex(command: str) -> list[_Simple] | None:
         target, i = read
         redirects.append((io, redirect, target))
     simples.append(_Simple(words, redirects, ""))
-    return simples
+    return simples, comments
 
 
 def _dequote(text: str) -> str:
@@ -714,19 +717,31 @@ def _message_regions(simple: _Simple) -> list[tuple[int, int]]:
     return regions
 
 
+# Operators that would start, pipe or substitute a command if `#` were a word.
+_COMMENT_CAN_RUN = re.compile(r"[;&|()`<>]")
+
+
 def _prose_spans(command: str) -> list[tuple[int, int]]:
-    """Character spans in *command* that are prose rather than execution.
+    """Character spans in *command* that are prose or a shell comment, not execution.
 
     A quoted region qualifies when the simple command holding it is headed by a
     command that only prints or searches its arguments, or when it is the value
     of a commit-message flag — AND that command's output goes nowhere but the
     terminal. Prose that is DISPLAYED or SEARCHED is inert; prose that is SENT
-    somewhere is not.
+    somewhere is not. A comment span (#1061) is inert only when it holds no
+    shell operator: a shell that reads `#` as a word would run what follows a
+    separator, so such a span stays visible. Without one, a blind dequote of
+    the raw text would rejoin a quote-split phrase sitting inside it.
     """
-    simples = _lex(command)
-    if simples is None or any(_ends_analysis(simple) for simple in simples):
+    lexed = _lex(command)
+    if lexed is None:
         return []
-    spans: list[tuple[int, int]] = []
+    simples, comments = lexed
+    if any(_ends_analysis(simple) for simple in simples):
+        return []
+    # #1063 review: `#` is a plain word under bash `interactive_comments` off or
+    # zsh's `histchars`, so a comment holding a separator stays in the views.
+    spans = [c for c in comments if not _COMMENT_CAN_RUN.search(command, *c)]
     for simple in simples:
         if not simple.words or _flows_onward(simple):
             continue
@@ -2148,8 +2163,8 @@ def evaluate(
     # Computed once, not per rule: 20-odd rules over the same string.
     prose_free = _without_prose(command)
     # #1043: every check also reads the command after quote removal, so
-    # `terraform "destroy"` is the verb it runs. Prose names nothing that runs,
-    # so the checks after the deny table read only the prose-blanked views.
+    # `terraform "destroy"` is the verb it runs. Only the checks that consume
+    # `views` below — config-env and PS4 — read the prose-blanked forms.
     views = (prose_free, _dequoted(prose_free))
     pairs = ((command, views[0]), (_dequoted(command), views[1]))
     for pattern, label in DENY_RULES:
