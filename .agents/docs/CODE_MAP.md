@@ -172,6 +172,7 @@ Per-surface agent-config generation (ADR-017, PI-366).
 - `def read_recorded_manifest` — Recorded content hashes for *target*, ``{}`` when absent or unreadable.
 - `def compute_drift` — Compare the staged re-render against the project tree.
 - `def apply_drift` — Apply changes; 3-way-merge user edits (#240); conflicts become ``.new``.
+- `def adopt_base` — Record the current render of each path as its merge base; files untouched (#1033).
 - `def run_upgrade` — Entry point for the upgrade subcommand; returns a process exit code.
 
 ### `project_init/variables.py`

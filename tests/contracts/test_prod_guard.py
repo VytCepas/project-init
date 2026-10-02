@@ -226,6 +226,13 @@ SAFE = [
     "curl https://tagmanager.googleapis.com/tagmanager/v2/accounts/1/containers/2/versions/3",
     # `--schema` is not `--source`: a column addition is not an ACL swap.
     "bq update --schema schema.json my-proj:analytics.t",
+    # #1035: `--` ends the options, so `--pre` here is the search pattern.
+    "rg -- --pre docs/",
+    "rg --no-pre needle docs/",
+    # PR #1037 review: a tool name that is only an ARGUMENT runs nothing.
+    "echo rg --pre terraform x",
+    "printf %s rg --pre terraform x",
+    "git log --grep rg --pre",
 ]
 
 
@@ -299,6 +306,15 @@ PROSE = [
     # must not cost what follows them its exemption.
     '[ -f notes.md ] && grep -c "terraform destroy" notes.md',
     '[[ -f notes.md ]] && grep -c "terraform destroy" notes.md',
+    # #1035 controls: an ordinary search, or a flag that runs nothing, keeps
+    # its exemption once exec-capable flags are refused.
+    "rg 'terraform destroy' docs/",
+    "grep -r 'kubectl delete' .",
+    "ag 'terraform destroy' docs/",
+    "rg --pretty --pre-glob '*.pdf' 'terraform destroy' docs/",
+    "grep --no-config -rn 'terraform destroy' docs/",
+    'git commit -m "terraform destroy"',
+    'echo "terraform destroy"',
 ]
 
 # ── #965 fail-open guard. THIS IS THE IMPORTANT LIST. ───────────────────────
@@ -395,6 +411,36 @@ PROSE_EVASION = [
     'printf -v c "terraform destroy"; sh -c "$c"',
     'bash -c -m "terraform destroy"',
     './echo "terraform destroy"',
+    # #1035: a search tool that RUNS a program. `rg --pre CMD` runs `CMD PATH`,
+    # so the first two run `terraform destroy` when a file named `destroy`
+    # exists; ag/ack `--pager` and ugrep's `--filter`/`--pager`/`--view` run
+    # their value. `--config`/`--ackrc` load a file that can set any of them.
+    "rg --pre terraform needle 'destroy'",
+    "rg --pre=terraform needle destroy",
+    "rg '--pre' terraform needle destroy",
+    "rg --hostname-bin=terraform needle .",
+    "ag --pager='terraform destroy' x",
+    "ag --pag='terraform destroy' x",
+    "ack --pager='terraform destroy' x",
+    "ack --ackrc=evil.ackrc x",
+    "grep --filter='*:terraform %' needle destroy",
+    "grep --pager='terraform destroy' x .",
+    "grep --view='terraform destroy' -Q x .",
+    "grep --config=evil.ugrep needle .",
+    "env rg --pre terraform needle destroy",
+    # PR #1037 review: a wrapper's option argument that spells a tool name
+    # must not hide the tool that actually runs (`env -C DIR` takes a dir).
+    "env -C ag rg --pre terraform needle destroy",
+    "sudo -u rg rg --pre terraform needle destroy",
+    "timeout 5 rg --pre terraform needle destroy",
+    "FOO=1 command rg --pre terraform needle destroy",
+    "cat list | xargs -I{} rg --pre terraform needle {}",
+    # #1035 review: a name rebinding the lexer did not know. Each RAN a PATH
+    # `echo` (or a trap) with a harmless payload in bash/zsh before listing.
+    'PATH=./bin:$PATH; export PATH; enable -n echo; echo "terraform destroy"',
+    'disable echo; echo "terraform destroy"',
+    'autoload -Uz echo; echo "terraform destroy"',
+    'trap \'x=${BASH_COMMAND#echo }; eval "sh -c $x"\' DEBUG; echo "terraform destroy"',
 ]
 
 
@@ -699,6 +745,266 @@ class TestVerdicts:
         config.write_text('safety:\n  allow: "terraform destroy"\n')
         verdict = _run_hook(_payload("terraform destroy", "bypassPermissions", tmp_path), tmp_path)
         assert verdict is not None, "a scalar allow must not disable the guard"
+
+
+# ── #1039: exec paths #1035 left open — each reproduced with a `touch`/`echo`
+# payload before it was written down (see PR). git grep opens hits in a program,
+# a config file named in the environment injects the exec flags refused in
+# #1035, and PS4 command substitution runs under `set -x`.
+RUNS_A_PROGRAM_1039 = [
+    # `git grep -O<pager>` / `--open-files-in-pager` runs <pager> FILE.
+    ("git grep -O'terraform destroy' needle", "git grep -O"),
+    ("git grep -iO'terraform destroy' needle", "git grep -O"),
+    ("git grep -O needle", "git grep -O"),  # bare -O still launches the pager
+    ("git grep --open-files-in-pager='terraform destroy' needle", "git grep --open-files-in-pager"),
+    ("git grep --op='terraform destroy' needle", "git grep --open-files-in-pager"),  # git abbrev
+    ("git -C /repo grep -Ovim needle", "git grep -O"),  # a global option before grep
+    ("git grep -1O./pager needle", "git grep -O"),  # -NUM context clustered with -O
+    ("git grep --textconv needle", "git grep --textconv"),
+    ("git grep --textc needle", "git grep --textconv"),  # git abbrev
+    ("FOO+=bar git grep -O./pager needle", "git grep -O"),  # append prefix
+    # Exec flags from a config file whose path is in the environment — set inline
+    # on the tool's own command, or exported earlier in the same statement.
+    ("RIPGREP_CONFIG_PATH=/x rg needle", "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_CONFIG_PATH=/x && rg needle", "RIPGREP_CONFIG_PATH"),
+    ("RIPGREP_CONFIG_PATH=/x command rg needle", "RIPGREP_CONFIG_PATH"),  # past a wrapper
+    ("ACKRC=/x ack needle", "ACKRC"),
+    ("env RIPGREP_CONFIG_PATH=/x rg needle", "RIPGREP_CONFIG_PATH"),  # after `env`
+    ("env -i ACKRC=/x ack needle", "ACKRC"),
+    ("RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),  # reaches rg if exported
+    ("RIPGREP_CONFIG_PATH=/x export RIPGREP_CONFIG_PATH; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("bash -c 'RIPGREP_CONFIG_PATH=/x rg needle'", "RIPGREP_CONFIG_PATH"),
+    ("RIPGREP_CONFIG_PATH+=/x rg needle", "RIPGREP_CONFIG_PATH"),
+    ("declare -x RIPGREP_CONFIG_PATH=/x; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("typeset -x ACKRC=/x; ack needle", "ACKRC"),
+    ("RIPGREP_CONFIG_PATH=/x /usr/bin/rg needle", "RIPGREP_CONFIG_PATH"),
+    # Presence-based on purpose (three review rounds of new spellings): these do
+    # not reach rg, but order is not modelled, so they ask too — fail closed.
+    ("RIPGREP_CONFIG_PATH=/x echo hi; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("rg needle; export RIPGREP_CONFIG_PATH=/x", "RIPGREP_CONFIG_PATH"),
+    # PS4 command substitution with `set -x` (bash) / xtrace (zsh).
+    ("PS4='$(id)'; set -x; echo hi", "PS4 with set -x"),
+    ("set -x; PS4='$(whoami)'; echo hi", "PS4 with set -x"),
+    ("PS4='[$(id)]'; set -o xtrace; ls", "PS4 with set -x"),
+    ("set -ex; PS4='$(id)'; echo hi", "PS4 with set -x"),
+    ("setopt xtrace; PS4='$(id)'; echo hi", "PS4 with set -x"),
+    ("PS4+='$(id)'; set -x; echo hi", "PS4 with set -x"),  # append assignment
+    ("PS4[0]='$(id)'; set -x; :", "PS4 with set -x"),  # array-element spelling
+    ("printf -v PS4 '$(id)'; set -x; :", "PS4 with set -x"),  # set without `=`
+    ("bash -c \"PS4='\\$(id)'; set -x; echo hi\"", "PS4 with set -x"),  # inside a -c body
+    ("set -x; PS4='$(id)'; echo 'unbalanced", "PS4 with set -x"),  # does not tokenise
+    ("PS4='$((a[$(id)]))'; set -x; :", "PS4 with set -x"),
+    ("PS4='${!ref}'; set -x; :", "PS4 with set -x"),
+]
+
+# The ordinary work that MUST stay allowed once the exec paths above are refused.
+# `git grep 'terraform destroy'` asked before this — the pattern was not treated
+# as searched text the way a bare `grep` pattern is (#1039).
+CONTROLS_1039 = [
+    "git grep 'terraform destroy'",
+    "git grep -i 'kubectl delete' src/",
+    "git grep -o needle",  # lower-case only-matching runs nothing
+    "rg needle docs/",
+    "FOO=1 rg needle docs/",  # an unrelated inline assignment
+    "PS4='+ ${BASH_SOURCE}:${LINENO}: '; set -x; echo hi",  # parameter expansion only
+    "set +x; echo hi",
+    "git grep --text needle",  # -a, not textconv
+    "git grep --no-textconv needle",
+    "GIT_OPTIONAL_LOCKS=0 git grep 'terraform destroy'",  # prose past a prefix
+    "rg RIPGREP_CONFIG_PATH src/",  # searching for the name does not set it
+    "ssh -X host; PS4='$(id)'",  # -X is ssh's, not a shell's xtrace
+    "set -x",
+    "set -x; echo hi",
+    "PS4='+ '; set -x; echo hi",  # a PS4 with no substitution
+    "PS4='$(id)'; echo hi",  # a substitution but no tracing
+    'echo "terraform destroy"',
+]
+
+
+class TestExecPathsPI1039:
+    """#1039 — search/shell features that run a program a deny rule cannot see."""
+
+    @pytest.mark.parametrize(("command", "label"), RUNS_A_PROGRAM_1039)
+    def test_asks_in_interactive(self, tmp_path: Path, command: str, label: str):
+        verdict = _run_hook(_payload(command, "default", tmp_path), tmp_path)
+        assert verdict is not None, f"not flagged: {command}"
+        hso = verdict["hookSpecificOutput"]
+        assert hso["permissionDecision"] == "ask"
+        assert f"'{label}'" in hso["permissionDecisionReason"], hso["permissionDecisionReason"]
+
+    @pytest.mark.parametrize(("command", "label"), RUNS_A_PROGRAM_1039)
+    def test_blocks_in_autonomous(self, tmp_path: Path, command: str, label: str):
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    @pytest.mark.parametrize("command", CONTROLS_1039)
+    def test_controls_stay_allowed(self, tmp_path: Path, command: str):
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+
+
+class TestInheritedConfigPI1039:
+    """#1039 — a config-path var the session inherited, read from the hook's env."""
+
+    def _verdict(self, tmp_path: Path, monkeypatch, var: str, body: str | None, command: str):
+        if body is None:
+            monkeypatch.setenv(var, str(tmp_path / "missing.conf"))
+        else:
+            cfg = tmp_path / "search.conf"
+            cfg.write_text(body, encoding="utf-8")
+            monkeypatch.setenv(var, str(cfg))
+        return _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+
+    def test_inherited_rg_config_with_pre_is_denied(self, tmp_path: Path, monkeypatch):
+        verdict = self._verdict(
+            tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", "--pre=./x\n", "rg needle"
+        )
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_inherited_ackrc_with_pager_is_denied(self, tmp_path: Path, monkeypatch):
+        verdict = self._verdict(tmp_path, monkeypatch, "ACKRC", "--pager=./x\n", "ack needle")
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_unreadable_inherited_config_fails_closed(self, tmp_path: Path, monkeypatch):
+        verdict = self._verdict(tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", None, "rg needle")
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_special_file_fails_closed_without_hanging(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setenv("RIPGREP_CONFIG_PATH", "/dev/zero")
+        verdict = _run_hook(_payload("rg needle", "bypassPermissions", tmp_path), tmp_path)
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_oversized_config_fails_closed(self, tmp_path: Path, monkeypatch):
+        body = "--smart-case\n" * 10_000
+        verdict = self._verdict(tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", body, "rg needle")
+        assert verdict["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_benign_inherited_config_stays_allowed(self, tmp_path: Path, monkeypatch):
+        body = "# house style\n--smart-case\n--hidden\n"
+        assert (
+            self._verdict(tmp_path, monkeypatch, "RIPGREP_CONFIG_PATH", body, "rg needle") is None
+        )
+
+
+# ── #1043: a name split by quoting is still the name ────────────────────────
+# bash and zsh rejoin adjacent quoted pieces into one word, so each of these sets
+# the watched name (each printed its value back under that name in both shells).
+# The raw-text checks never saw the name contiguous.
+RUNS_A_PROGRAM_1043 = [
+    ("export RIPGREP_'CONFIG_PATH'=cfg; rg needle", "RIPGREP_CONFIG_PATH"),  # as filed
+    ("printf -v P'S'4 '$(id)'; set -x; :", "PS4 with set -x"),  # as filed
+    ('export "RIPGREP_"CONFIG_PATH=cfg; rg needle', "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_$'CONFIG_PATH'=cfg; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_CONFIG_PAT$'\\x48'=cfg; rg needle", "RIPGREP_CONFIG_PATH"),  # $'…' escape
+    # A decoded NUL splices the two halves together the same way (#1043 review).
+    ("export RIPGREP_CONFIG_PA$'\\x00'TH=cfg; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_CONFIG_\\PATH=cfg; rg needle", "RIPGREP_CONFIG_PATH"),
+    ("export RIPGREP_CONFIG_\\\nPATH=cfg; rg needle", "RIPGREP_CONFIG_PATH"),  # continuation
+    ("env RIPGREP_'CONFIG_PATH'=cfg rg needle", "RIPGREP_CONFIG_PATH"),
+    ("declare -x A'CKRC'=cfg; ack needle", "ACKRC"),
+    ("export RIPGREP_CONFIG_PATH=cfg; r'g' needle", "RIPGREP_CONFIG_PATH"),  # the tool, split
+    ("export P'S'4='$(id)'; set -x; :", "PS4 with set -x"),
+    ("PS4='$(id)'; set \"-x\"; :", "PS4 with set -x"),  # the switch, split
+    ("PS4='$(id)'; set -o x'trace'; :", "PS4 with set -x"),
+]
+
+# The same gap in the deny table: a quoted verb is the verb. All allowed on main.
+QUOTE_SPLIT_VERBS_1043 = [
+    'terraform "destroy" -auto-approve',
+    "terraform 'destroy'",
+    "t'erraform' destroy",
+    "kubectl de'lete' namespace prod",
+    'gh repo "delete" o/r',
+    "docker system 'prune'",
+    "bash -c terraform' 'destroy",
+    "bash -c terraform\\ destroy",
+    "bash -c terraform$'\\x20'destroy",
+    # Bash drops a decoded NUL from the word entirely (a C string cannot hold
+    # one), so these all reach it as plain "terraform destroy" (#1043 review).
+    "terraform des$'\\x00'troy",
+    "terraform des$'\\0'troy",
+    "terraform des$'\\u0000'troy",
+    # A quoted `-v` still assigns, so printf's text is not prose (ran in bash, zsh).
+    "printf '-v' c 'terraform destroy'; bash -c \"$c\"",
+    # Only git grep's OWN arguments are prose. core.fsmonitor from `-c` or the
+    # environment ran its value, and PATH picks which `git` runs — a planted
+    # ./git ran the pattern. Each measured with a touch payload.
+    "git -c core.fsmonitor='terraform destroy' grep needle",
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.fsmonitor"
+    " GIT_CONFIG_VALUE_0='terraform destroy' git grep needle",
+    "PATH=.:$PATH git grep 'terraform destroy'",
+]
+
+# P2: git grep behind an exec-transparent wrapper searches exactly as it does bare.
+WRAPPED_GIT_GREP_1043 = [
+    "command git grep 'terraform destroy'",
+    "builtin git grep 'terraform destroy'",
+    "env git grep 'terraform destroy'",
+    "env -i git grep 'terraform destroy'",
+    "env GIT_PAGER=cat git grep -n 'kubectl delete' src/",
+    "nice git grep 'terraform destroy'",
+    "time git grep 'terraform destroy'",
+    "time -p git grep 'DROP DATABASE'",
+    "nohup git grep 'terraform destroy'",
+    "command -p git grep 'terraform destroy'",
+    "/usr/bin/env git grep 'terraform destroy'",
+    "time env -i git grep 'terraform destroy'",  # wrappers chain
+]
+
+# Wrapper options that change what runs keep the prompt; both ran the pattern.
+WRAPPER_STILL_FLAGGED_1043 = [
+    "env -S'bash -c \"eval \\$3\" x' git grep 'terraform destroy'",
+    "env PATH=.:$PATH git grep 'terraform destroy'",
+]
+
+# No false positives: prose and search patterns that QUOTE the spellings above
+# name nothing that runs. The last two asked before #1043 as well.
+CONTROLS_1043 = [
+    "git commit -m \"fix: catch export RIPGREP_'CONFIG_PATH'=cfg; rg needle\"",
+    "git grep -n \"RIPGREP_'CONFIG_PATH'=cfg; rg\" tests/",
+    "git commit -m \"docs: never run terraform 'destroy'\"",
+    "grep -rn 'terraform \"destroy\"' docs/",
+    "echo \"printf -v P'S'4 then set -x\"",
+    "rg 'RIPGREP_CONFIG_PATH' src/",
+    "kubectl get pods -o 'jsonpath={.items[*].metadata.name}'",
+    'echo "it\'s fine"; rg needle',
+    "terraform plan -destroy -out 'plan.out'",
+    "rg -n 'export RIPGREP_CONFIG_PATH' docs/",
+    'git commit -m "fix: RIPGREP_CONFIG_PATH=cfg made rg run --pre"',
+]
+
+
+class TestQuoteSplitPI1043:
+    """#1043 — quote-split names, and git grep behind a wrapper."""
+
+    @pytest.mark.parametrize(("command", "label"), RUNS_A_PROGRAM_1043)
+    def test_split_name_is_the_name(self, tmp_path: Path, command: str, label: str):
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict is not None, f"not flagged: {command!r}"
+        hso = verdict["hookSpecificOutput"]
+        assert hso["permissionDecision"] == "deny"
+        assert f"'{label}'" in hso["permissionDecisionReason"], hso["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("command", QUOTE_SPLIT_VERBS_1043)
+    def test_split_verb_is_the_verb(self, tmp_path: Path, command: str):
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict is not None, f"FAIL-OPEN: {command!r}"
+        hso = verdict["hookSpecificOutput"]
+        assert hso["permissionDecision"] == "deny"
+        assert "is a destructive operation" in hso["permissionDecisionReason"]
+
+    @pytest.mark.parametrize("command", WRAPPED_GIT_GREP_1043)
+    def test_wrapped_git_grep_pattern_is_prose(self, tmp_path: Path, command: str):
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
+
+    @pytest.mark.parametrize("command", WRAPPER_STILL_FLAGGED_1043)
+    def test_wrapper_that_changes_the_command_is_not_peeled(self, tmp_path: Path, command: str):
+        verdict = _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path)
+        assert verdict is not None, f"FAIL-OPEN: {command!r}"
+
+    @pytest.mark.parametrize("command", CONTROLS_1043)
+    def test_controls_stay_allowed(self, tmp_path: Path, command: str):
+        assert _run_hook(_payload(command, "bypassPermissions", tmp_path), tmp_path) is None
 
 
 class TestWiring:

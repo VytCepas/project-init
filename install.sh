@@ -29,6 +29,9 @@ COMMANDS_DIR="$CLAUDE_CONFIG_DIR_RESOLVED/commands"
 # clone URL; the REST API base is derived from its host, or set it explicitly
 # with PROJECT_INIT_API_BASE (e.g. https://ghes.example.com/api/v3).
 REQUESTED_REF="${PROJECT_INIT_REF:-}"
+# The guard every scaffold copies. A ref whose copy lacks the symlink refusal
+# (PI-903, #904; v1.2.2 and older) is refused before checkout (PI-1045).
+GUARD_FILE="templates/base/dot_agents/hooks/prod_guard.py"
 
 say() { printf '\033[1;36m[project-init]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[project-init]\033[0m %s\n' "$*" >&2; }
@@ -96,6 +99,293 @@ resolve_ref() {
   fi
 }
 
+# Exit 0 when the prod_guard.py on stdin carries PI-903's refusal as live code:
+# `if agents.is_symlink() or config.is_symlink(): continue`, right after the
+# marker it tests, directly in _find_config's walk loop, with _find_config
+# called. Comments and triple-quoted strings are skipped, so the word alone, a
+# dead branch or an unused helper do not pass (PI-1045 review). Static on
+# purpose: nothing from an unverified ref runs.
+has_symlink_refusal() {
+  awk '
+    function indent(s) { match(s, /^ */); return RLENGTH }
+    # Cut at the first # outside a quoted string: a quote in a comment is comment text.
+    function uncomment(s, i, c, q) {
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (q != "") { if (c == "\\") i++; else if (c == q) q = "" }
+        else if (c == "\"" || c == "\047") q = c
+        else if (c == "#") return substr(s, 1, i - 1)
+      }
+      return s
+    }
+    { sub(/\r$/, "") }
+    {
+      rest = $0; skip = (open != "")
+      while (1) {
+        if (open != "") {
+          p = index(rest, open)
+          if (!p) break
+          rest = substr(rest, p + 3); open = ""; continue
+        }
+        a = index(rest, "\"\"\""); b = index(rest, "\047\047\047")
+        if (!a && !b) break
+        skip = 1
+        if (a && (!b || a < b)) { open = "\"\"\""; rest = substr(rest, a + 3) }
+        else { open = "\047\047\047"; rest = substr(rest, b + 3) }
+      }
+      if (skip) next
+      code = uncomment($0)
+      sub(/[ \t]+$/, "", code)
+      if (code ~ /^[ \t]*$/) next
+      k = indent(code); code = substr(code, k + 1)
+      while (depth && ind[depth] >= k) depth--
+      if (k == 0 && code !~ /^\)/) fn = (code ~ /^def _find_config\(/) ? "_find_config" : ""
+      if (code ~ /_find_config\(/ && code !~ /^def /) called = 1
+      if (cand && code == "continue" && k > cand) found = 1
+      cand = 0
+      if (code == "if agents.is_symlink() or config.is_symlink():" && k == k1 && k == k2 &&
+        c1 == "config = agents / \"config.yaml\"" && c2 ~ /^agents = [A-Za-z_][A-Za-z0-9_]* \/ "\.agents"$/ &&
+        depth >= 2 && ind[depth - 1] == 0 && fn == "_find_config") {
+        v = c2; sub(/^agents = /, "", v); sub(/ \/.*/, "", v)
+        if (index(txt[depth], "for " v " in ") == 1) cand = k
+      }
+      if (code ~ /:$/) { depth++; ind[depth] = k; txt[depth] = code }
+      c2 = c1; k2 = k1; c1 = code; k1 = k
+    }
+    END { exit !(found && called) }
+  '
+}
+
+# Fail closed unless <commit-ish> ships a prod_guard that refuses a symlinked
+# .agents marker. Runs before checkout, so a refused ref never moves the clone
+# an existing /project-init already scaffolds from (PI-1045). Sets VERIFIED.
+verify_guard() {
+  local content
+  content="$(git -C "$INSTALL_DIR" show "$1:$GUARD_FILE" 2>/dev/null)" ||
+    die "cannot read $GUARD_FILE at $2, so its symlink refusal cannot be checked — refusing to install"
+  if printf '%s\n' "$content" | has_symlink_refusal; then
+    VERIFIED="$(git -C "$INSTALL_DIR" rev-parse "$1^{commit}")" && return 0
+  fi
+  die "$2 ships a prod_guard.py without the symlink refusal (PI-903), so /project-init would scaffold a guard that a planted .agents symlink can switch off. Refusing to install it.
+  Fix: re-run with PROJECT_INIT_REF=main, or with PROJECT_INIT_REF=vX.Y.Z naming a release newer than v1.2.2."
+}
+
+KEPT="Nothing was reset or discarded: the clone may hold work you want. Inspect it, move it aside (or set PROJECT_INIT_HOME), then re-run."
+
+refuse_dirty() {
+  local dirty
+  dirty="$(git -C "$INSTALL_DIR" status --porcelain)"
+  [ -z "$dirty" ] || die "$INSTALL_DIR has uncommitted changes, so /project-init would scaffold unverified files:
+$dirty
+  $KEPT"
+}
+
+# Read pyproject.toml's hatch wheel layout the way tools/box_install.py's
+# wheel_layout() does: `packages` (tree paths copied as-is) plus the keys of
+# `force-include` (tree paths whose whole subtree ships). TOML text read with
+# awk, not python — install.sh must not execute repo code before the guard
+# above is verified (project-init#1047).
+packaged_paths() {
+  awk '
+    /^\[/ { section = $0 }
+    section == "[tool.hatch.build.targets.wheel]" && /^packages[ \t]*=/ {
+      line = $0
+      while (match(line, /"[^"]*"/)) {
+        print substr(line, RSTART + 1, RLENGTH - 2)
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+    section == "[tool.hatch.build.targets.wheel.force-include]" && match($0, /^"[^"]*"/) {
+      print substr($0, RSTART + 1, RLENGTH - 2)
+    }
+  ' "$1"
+}
+
+# git status --porcelain (refuse_dirty above) never lists an ignored file, so
+# an existing clone that acquired one under a force-included path — a stray
+# templates/*.local next to templates/ — passes verify_checkout clean while
+# /project-init would scaffold its unreviewed bytes into every project it
+# touches. Same check tools/box_install.py's ignored_problems() runs for
+# `just install`, ported to shell for the same reason packaged_paths is
+# (project-init#1047).
+refuse_ignored() {
+  local pyproject paths=() p ignored
+  pyproject="$INSTALL_DIR/pyproject.toml"
+  [ -f "$pyproject" ] || die "$pyproject is missing, so the packaged paths cannot be read.
+  $KEPT"
+  while IFS= read -r p; do
+    [ -n "$p" ] && paths+=("$p")
+  done < <(packaged_paths "$pyproject")
+  [ "${#paths[@]}" -gt 0 ] || die "$pyproject has no hatch wheel layout (packages/force-include), so the packaged paths cannot be checked.
+  $KEPT"
+  ignored="$(git -C "$INSTALL_DIR" ls-files -z --others --ignored --exclude-standard -- "${paths[@]}" |
+    tr '\0' '\n' | awk 'NF && $0 !~ /(^|\/)__pycache__(\/|$)/')" ||
+    die "cannot list ignored files under ${paths[*]} in $INSTALL_DIR.
+  $KEPT"
+  [ -z "$ignored" ] || die "$INSTALL_DIR has ignored files under a packaged path, so /project-init would scaffold unreviewed bytes:
+$ignored
+  Preview: git -C $INSTALL_DIR clean -ndX -- ${paths[*]}
+  Clean up: git -C $INSTALL_DIR clean -fdX -- ${paths[*]}
+  $KEPT"
+}
+
+# Print each of "$@" whose eol attribute in HEAD's own .gitattributes is lf.
+# check-attr --source (git 2.40+) runs in a throwaway git dir sharing only the
+# object store, so .git/info/attributes, core.attributesFile and the system file
+# cannot override it: a local eol=crlf there gives a CRLF checkout under a clean
+# git status (#1068 review). Fails on any error; the caller then pins everything.
+committed_lf_paths() {
+  local scratch objects head format rc=0
+  objects="$(git -C "$INSTALL_DIR" rev-parse --path-format=absolute --git-path objects)" || return 1
+  # The clone's own object format, or a SHA-256 HEAD is "not a valid tree-ish" (#1071).
+  format="$(git -C "$INSTALL_DIR" rev-parse --show-object-format)" || return 1
+  head="$(git -C "$INSTALL_DIR" rev-parse HEAD)" || return 1
+  scratch="$(mktemp -d)" || return 1
+  : >"$scratch/no-attributes"
+  if git init -q --bare --template= --object-format="$format" "$scratch/git" >/dev/null 2>&1; then
+    printf '%s\0' "$@" |
+      GIT_ATTR_NOSYSTEM=1 GIT_OBJECT_DIRECTORY="$objects" git --git-dir="$scratch/git" \
+        -c core.attributesFile="$scratch/no-attributes" \
+        check-attr -z --stdin --source="$head" eol >"$scratch/eol" || rc=1
+  else
+    rc=1
+  fi
+  if [ "$rc" -eq 0 ]; then
+    local p v
+    while IFS= read -r -d '' p && IFS= read -r -d '' _ && IFS= read -r -d '' v; do
+      if [ "$v" = "lf" ]; then printf '%s\n' "$p"; fi
+    done <"$scratch/eol"
+  fi
+  rm -rf "$scratch"
+  return "$rc"
+}
+
+# A local `.git/info/attributes` clean filter can smudge an edited file back
+# to its blob's bytes when git reads it for comparison, so both the status
+# check above and `ls-files -v` read clean even though uvx (or, for
+# pyproject.toml, packaged_paths() itself) builds the raw bytes on disk.
+# Stage 1: hash every path with --no-filters and compare it to its blob at
+# HEAD — cheap, but a CRLF checkout (core.autocrlf) legitimately differs here
+# too, so a mismatch is only a suspect. Stage 2: a suspect is confirmed with
+# `git cat-file blob HEAD:<path>` — the object store's own bytes, never
+# `git archive`/a checkout: archive runs any `filter=` smudge driver the repo's
+# own attributes configure, and a clean+smudge pair can make that driver's
+# output equal the edit, so archive's "trusted" bytes were then the edit itself
+# (project-init#1064, Codex P1, reproduced on git 2.43). The one checkout-side
+# conversion still allowed for is LF -> CRLF, derived from the trusted blob
+# with `sed`, never a filter driver; a blob whose last line has no trailing
+# newline is a known, conservative exception — sed's `s/$/\r/` appends `\r`
+# there too, so such a file always refuses under an autocrlf checkout (see
+# test_crlf_checkout_of_a_trailing_newline_file_is_not_refused and its
+# no-trailing-newline counterpart). Same two-stage check tools/box_install.py's
+# check() runs before calling a file modified (#1047 review round 4; shared
+# helper #1060; object-store confirmation #1064).
+refuse_edited_paths() {
+  local paths=("$@") entry kind sha path actual suspects=() edited=() blob_tmp crlf_tmp
+  local pinned_lf
+  [ "${#paths[@]}" -gt 0 ] || return 0
+  while IFS=$'\t' read -r -d '' entry path; do
+    read -r _ kind sha <<<"$entry"
+    [ "$kind" = "blob" ] || continue
+    if [ ! -e "$INSTALL_DIR/$path" ]; then
+      edited+=("$path (missing on disk)")
+      continue
+    fi
+    actual="$(git -C "$INSTALL_DIR" hash-object --no-filters -- "$path")" ||
+      die "cannot hash $path in $INSTALL_DIR to verify it against HEAD.
+  $KEPT"
+    [ "$actual" = "$sha" ] || suspects+=("$path")
+  done < <(git -C "$INSTALL_DIR" ls-tree -r -z --full-tree HEAD -- "${paths[@]}")
+  if [ "${#suspects[@]}" -gt 0 ]; then
+    if ! blob_tmp="$(mktemp)" || ! crlf_tmp="$(mktemp)"; then
+      die "cannot create a temp file to verify suspect files against HEAD.
+  $KEPT"
+    fi
+    # No readable committed policy: grant no CRLF allowance at all.
+    pinned_lf="$(committed_lf_paths "${suspects[@]}")" || pinned_lf="$(printf '%s\n' "${suspects[@]}")"
+    for path in "${suspects[@]}"; do
+      if ! git -C "$INSTALL_DIR" cat-file blob "HEAD:$path" >"$blob_tmp" 2>/dev/null; then
+        edited+=("$path (cannot read HEAD's object)")
+        continue
+      fi
+      cmp -s "$blob_tmp" "$INSTALL_DIR/$path" && continue
+      # A committed eol=lf pins this path to LF on any checkout: an injected CRLF
+      # there is still an edit, matching tools/box_install.py's modified_paths()
+      # (#1064 review; committed policy only, #1068 review).
+      case $'\n'"$pinned_lf"$'\n' in
+      *$'\n'"$path"$'\n'*)
+        edited+=("$path")
+        continue
+        ;;
+      esac
+      sed 's/$/\r/' "$blob_tmp" >"$crlf_tmp"
+      cmp -s "$crlf_tmp" "$INSTALL_DIR/$path" || edited+=("$path")
+    done
+    rm -f "$blob_tmp" "$crlf_tmp"
+  fi
+  [ "${#edited[@]}" -eq 0 ] || die "$INSTALL_DIR has files whose on-disk bytes do not match HEAD, though git reports the tree clean (a local clean filter?):
+$(printf '  %s\n' "${edited[@]}")
+  $KEPT"
+}
+
+# pyproject.toml is read for its own bytes here, before packaged_paths() ever
+# parses it: a hidden edit to force-include, dependencies or entry points
+# would otherwise never be checked at all, since none of those change which
+# paths get hashed by refuse_edited_paths below (project-init#1060).
+refuse_edited_pyproject() {
+  [ -f "$INSTALL_DIR/pyproject.toml" ] || return 0
+  refuse_edited_paths pyproject.toml
+}
+
+# The packaged paths pyproject.toml declares (project-init#1047).
+refuse_edited() {
+  local pyproject paths=() p
+  pyproject="$INSTALL_DIR/pyproject.toml"
+  while IFS= read -r p; do
+    [ -n "$p" ] && paths+=("$p")
+  done < <(packaged_paths "$pyproject")
+  refuse_edited_paths "${paths[@]}"
+}
+
+# The tree /project-init scaffolds from must be the verified commit, clean, and
+# carry the refusal on disk: a fast-forward keeps local commits and edits, and
+# skip-worktree hides an edit from status (PI-1045 review). uvx builds every
+# file, so any flag that hides one from status refuses (#1047 review, round 3).
+verify_checkout() {
+  local head hidden
+  head="$(git -C "$INSTALL_DIR" rev-parse HEAD)"
+  [ "$head" = "$VERIFIED" ] ||
+    die "$INSTALL_DIR is at $head, not the verified $ref_label ($VERIFIED): it holds commits that were not checked. See: git -C $INSTALL_DIR log $VERIFIED..HEAD
+  $KEPT"
+  refuse_dirty
+  has_symlink_refusal 2>/dev/null <"$INSTALL_DIR/$GUARD_FILE" ||
+    die "$INSTALL_DIR/$GUARD_FILE on disk has no symlink refusal, though git reports the tree clean (a skip-worktree or assume-unchanged edit?).
+  $KEPT"
+  # ls-files -v tags a plain entry H; S is skip-worktree, lower case assume-unchanged.
+  hidden="$(git -C "$INSTALL_DIR" ls-files -v | awk '$1 != "H"')" ||
+    die "cannot list the files in $INSTALL_DIR, so none can be checked.
+  $KEPT"
+  [ -z "$hidden" ] || die "$INSTALL_DIR has files git status does not check (skip-worktree or assume-unchanged), so /project-init would scaffold unverified files:
+$hidden
+  $KEPT"
+  refuse_edited_pyproject
+  refuse_edited
+  refuse_ignored
+}
+
+# A git step that refuses (a diverged branch, a stale lock) stops with the
+# reason and $KEPT, never raw git output under set -e (PI-1045 review).
+git_step() {
+  local why="$1"
+  shift
+  git -C "$INSTALL_DIR" "$@" || die "$why
+  $KEPT"
+}
+
+ff_refused() {
+  printf '%s' "cannot fast-forward $INSTALL_DIR to the verified $ref_label ($VERIFIED): its branch holds commits that are not on it. See: git -C $INSTALL_DIR log $VERIFIED..HEAD"
+}
+
 # 3. repo
 ensure_repo() {
   REF="$(resolve_ref)"
@@ -110,6 +400,7 @@ ensure_repo() {
       git -C "$INSTALL_DIR" remote set-url origin "$REPO_URL"
     fi
     git -C "$INSTALL_DIR" fetch --tags --force origin
+    refuse_dirty
   else
     say "cloning $REPO_URL ($ref_label) -> $INSTALL_DIR"
     mkdir -p "$(dirname "$INSTALL_DIR")"
@@ -123,18 +414,29 @@ ensure_repo() {
     default_branch="$(git -C "$INSTALL_DIR" symbolic-ref --quiet --short \
       refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')"
     [ -n "$default_branch" ] || default_branch="main"
-    git -C "$INSTALL_DIR" checkout -q "$default_branch"
-    git -C "$INSTALL_DIR" pull --ff-only origin "$default_branch"
+    verify_guard "origin/$default_branch" "the default branch ($default_branch)"
+    git_step "cannot check out the default branch ($default_branch) in $INSTALL_DIR." \
+      checkout -q "$default_branch"
+    # Fast-forward to the verified object, never pull: a second fetch could
+    # land past VERIFIED on a commit nobody checked (PI-1045 review).
+    git_step "$(ff_refused)" merge -q --ff-only "$VERIFIED"
   else
     # An explicit PROJECT_INIT_REF — a literal branch OR tag. Check it out;
-    # a tag lands detached (immutable, no pull), while a branch pin should
-    # fast-forward to its latest tip. symbolic-ref -q HEAD succeeds only when
-    # on a branch, so it distinguishes the two without guessing.
-    git -C "$INSTALL_DIR" checkout -q "$REF"
+    # a tag lands detached (immutable), while a branch pin fast-forwards to
+    # the fetched tip. symbolic-ref -q HEAD succeeds only when on a branch,
+    # so it distinguishes the two without guessing.
+    # A branch is verified at origin/<ref>, the tip the fast-forward lands on.
+    if git -C "$INSTALL_DIR" rev-parse -q --verify "refs/remotes/origin/$REF" >/dev/null 2>&1; then
+      verify_guard "origin/$REF" "ref '$REF'"
+    else
+      verify_guard "$REF" "ref '$REF'"
+    fi
+    git_step "cannot check out ref '$REF' in $INSTALL_DIR." checkout -q "$REF"
     if git -C "$INSTALL_DIR" symbolic-ref -q HEAD >/dev/null 2>&1; then
-      git -C "$INSTALL_DIR" pull --ff-only origin "$REF"
+      git_step "$(ff_refused)" merge -q --ff-only "$VERIFIED"
     fi
   fi
+  verify_checkout
   say "installed: $(git -C "$INSTALL_DIR" describe --tags --always)"
 }
 

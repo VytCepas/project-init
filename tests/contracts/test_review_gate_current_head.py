@@ -320,3 +320,28 @@ def test_an_unreadable_author_counts_no_comment_review_either(tmp_path: Path):
         pr={"number": 7, "user": None},
     )
     assert fields["state"] == "pending"
+
+
+# ── #1036: a dismissed review has been revoked, so it reviews nothing ──
+# A review dismissed after submission stays in the REST list as `DISMISSED`, and
+# the workflow re-runs on `dismissed` — so a count that excluded only PENDING kept
+# the revoked review and posted success over a head nobody now vouches for.
+
+
+def test_a_dismissed_review_of_the_head_does_not_count(tmp_path: Path):
+    """THE DEFECT: the only review of the head was dismissed, and the check went green."""
+    fields = _run_step(tmp_path, reviews=[_review(HEAD, "DISMISSED")])
+    assert fields["state"] == "pending"
+    assert fields["description"] == f"Awaiting review of {HEAD[:7]}"
+
+
+@pytest.mark.parametrize("state", ["APPROVED", "CHANGES_REQUESTED", "COMMENTED"])
+def test_every_active_review_state_of_the_head_still_counts(tmp_path: Path, state: str):
+    """The control: only DISMISSED (and PENDING) drop out of the count.
+
+    `decision` stays empty so the branch taken is decided by the count alone,
+    not by the separately-read reviewDecision.
+    """
+    fields = _run_step(tmp_path, reviews=[_review(HEAD, state)])
+    assert fields["state"] == "success"
+    assert fields["description"] == "Reviewed — no open comments"

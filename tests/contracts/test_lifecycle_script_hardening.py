@@ -469,7 +469,7 @@ class TestMonitorPrMergeRetry:
             'echo "OPEN"\n'
         )
         r = self._run_with_stub(tmp_path, stub, "_merge_with_retry")
-        assert r.returncode != 0, "an unmergeable PR must still fail"
+        assert r.returncode == 1, "an unmergeable PR must still fail"
         assert int((tmp_path / "n").read_text().strip()) == 4, (
             "expected 3 backoff attempts + 1 final attempt"
         )

@@ -17,6 +17,8 @@ setup:
 lint:
     uv run ruff check .
     uv run ruff format --check .
+    uv run python .agents/scripts/check_test_contract.py exit-codes tests
+    uv run python .agents/scripts/check_test_contract.py discovery tests
 
 # auto-format
 format:
@@ -112,6 +114,18 @@ sync-agents:
 code-map:
     uv run python .agents/scripts/gen_code_map.py
     uv run python tools/sync_claude_dir.py
+
+# Install this checkout as the machine's `project-init` uv tool (PI-1046). A dry
+# run by default. --apply installs from a clean main in sync with origin/main;
+# --check diffs the installed build against HEAD. Logic: tools/box_install.py.
+# --no-python-downloads: `uv run` would otherwise fetch the .python-version interpreter.
+# --no-project: the script is stdlib only, and a project run syncs .venv first
+# (creates it, installs, reaches the index), so the dry run would not be read-only.
+# --python keeps the floor the project set: tomllib needs 3.11.
+[doc("install this checkout as a uv tool: dry run by default, --apply, --check (PI-1046)")]
+[positional-arguments]
+install *ARGS:
+    uv run --no-python-downloads --no-project --python '>=3.11' python tools/box_install.py "$@"
 
 # advisory: show drift between personal ~/.claude/skills copies and their
 # template source (PI-681). Not a gate — the personal dir is outside VCS.

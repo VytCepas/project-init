@@ -553,7 +553,7 @@ class TestSubcommands:
 
     def test_create_pr_nojira_rejects_invalid_type(self):
         proc = self._run("create-pr-nojira", "wrong", "Some title")
-        assert proc.returncode != 0  # argparse choices rejection
+        assert proc.returncode == 2  # argparse choices rejection
         assert "invalid choice" in proc.stderr or "wrong" in proc.stderr
 
     def test_create_pr_nojira_rejects_empty_title(self, tmp_path: Path):

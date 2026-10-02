@@ -63,18 +63,24 @@ curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.s
 
 This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to `~/.local/share/project-init` (override with `PROJECT_INIT_HOME=...`) **pinned to the latest tagged release**, and writes a user-level slash command at `~/.claude/commands/project-init.md`.
 
+It refuses any ref whose `prod_guard.py` lacks the symlink refusal (PI-903), which covers every release up to v1.2.2. If the latest release is one of them, the installer stops before checkout and tells you to re-run with `PROJECT_INIT_REF=main`.
+
 Pin a specific version, or opt into the unreleased development head:
 
 ```bash
-PROJECT_INIT_REF=v1.0.1 bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
+PROJECT_INIT_REF=vX.Y.Z bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 PROJECT_INIT_REF=main   bash -c "$(curl -sSL https://raw.githubusercontent.com/VytCepas/project-init/main/install.sh)"
 ```
 
-Direct tool install without the slash command (any pinned tag):
+Direct tool install without the slash command:
 
 ```bash
-uv tool install git+https://github.com/VytCepas/project-init@v1.0.1
+uv tool install git+https://github.com/VytCepas/project-init@main
 ```
+
+`uv tool install` bypasses `install.sh` entirely, so none of the checks above —
+including the PI-903 symlink-refusal check — run. Pin a tag only if you have
+verified it carries that refusal (v1.3.0 or newer); v1.2.2 and older do not.
 
 Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
 
@@ -316,7 +322,23 @@ The report classifies every template-owned file:
 | changed | drifted, but you never edited it | updates it |
 | merged | drifted **and** locally edited, but the edits don't overlap | 3-way auto-merges both in place — no `.new` sibling |
 | conflict | drifted **and** locally edited with overlapping changes | keeps your file; writes the conflict-marked merge as a `<file>.new` sibling — your edit is never overwritten |
+| local edits only | locally edited, but the template has not changed it since the recorded base | nothing — listed without a diff |
 | removed | no longer rendered by current templates | nothing (reported only; upgrade never deletes) |
+
+For merged and conflicting files the preview diffs the **template's own
+change** (recorded base → new render), not your file against the render — so a
+merge that keeps your lines never shows them as deleted.
+
+**A conflict with no merge base.** A customised file whose base was never
+recorded (or is stale) has nothing to merge against, so every `--apply` writes
+its `.new` again; the report says so and names the fix. If your local content is
+what you want to keep, record the current render as its base — the file itself
+is not touched:
+
+```bash
+project-init upgrade --adopt-base pyproject.toml .gitignore   # paths relative to the project
+project-init upgrade --apply                                   # no .new; later template changes 3-way merge
+```
 
 **Migration notes.** Alongside the file drift, upgrade prints the curated
 changelog/migration notes for the version span it crosses (recorded → target),
