@@ -3,15 +3,20 @@
 Compute jobs in the scaffolded ci.yml read `vars.CI_RUNS_ON` (one repo
 variable routes CI to a self-hosted runner when a private repo runs out of
 Actions minutes). Security invariant, asserted in BOTH directions: the
-secret/PAT-bearing workflows and the pinned ci.yml jobs (scorecard, ci-gate)
-never use the variable, so tokens never materialize on a user's machine.
+secret/PAT-bearing workflows and scorecard never use the variable, so tokens
+never materialize on a user's machine. Every job a REQUIRED check depends on
+does use it, or a billing lockout blocks every merge (PI-1086).
 """
 
 from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
+import yaml
 
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
@@ -22,7 +27,6 @@ _EXPR = "${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}"
 # Workflows that carry secrets/PATs or deploy credentials — must stay pinned.
 _PINNED_WORKFLOWS = (
     "board-automation.yml",
-    "validate-pr.yml",
     "issue-validation.yml",
     "project-init-upgrade.yml",
 )
@@ -250,3 +254,38 @@ class TestShfmtInstallIsHostSafe:
         assert not (home / ".local" / "bin" / "shfmt").exists(), (
             "step wrote into $HOME despite a usable shfmt already being on PATH"
         )
+
+
+def _required_contexts(setup_github: str) -> set[str]:
+    """Every status-check context setup_github.sh makes required (protection + ruleset)."""
+    block = re.search(r'"contexts": \[(.*?)\]', setup_github, re.S)
+    assert block, "setup_github.sh: no branch-protection contexts list"
+    found = set(re.findall(r'"([^"]+)"', block.group(1)))
+    found |= set(re.findall(r'\{ "context": "([^"]+)" \}', setup_github))
+    return found
+
+
+@pytest.mark.parametrize("language", ["python", "node"])
+def test_every_job_a_required_check_depends_on_reads_the_variable(tmp_path: Path, language: str):
+    """PI-1086: the set is derived from setup_github.sh's required contexts, never listed
+    here, and walked through `needs:` — a pinned job anywhere under a required check
+    cannot start during a billing lockout, and the merge stays blocked."""
+    target = tmp_path / "p"
+    argv = [sys.executable, "-m", "project_init", str(target), "--non-interactive"]
+    argv += ["--preset", "core", "--name", "p", "--description", "t", "--language", language]
+    subprocess.run([*argv, "--no-plugin", "--strict"], check=True, capture_output=True)
+    required = _required_contexts((target / ".agents/scripts/setup_github.sh").read_text())
+    assert len(required) >= 2, required
+    gating: dict[str, str] = {}
+    for wf in sorted((target / ".github" / "workflows").glob("*.yml")):
+        jobs = yaml.safe_load(wf.read_text())["jobs"]
+        todo = [jid for jid, job in jobs.items() if job.get("name") in required]
+        required -= {jobs[jid]["name"] for jid in todo}
+        while todo:
+            jid = todo.pop()
+            gating[f"{wf.name}:{jid}"] = jobs[jid]["runs-on"]
+            needs = jobs[jid].get("needs", [])
+            todo += [n for n in ([needs] if isinstance(needs, str) else needs)]
+    assert not required, f"required contexts with no job behind them: {required}"
+    pinned = {job: runs_on for job, runs_on in gating.items() if runs_on != _EXPR}
+    assert not pinned, f"merge-gating jobs pinned to a hosted label: {pinned}"

@@ -363,6 +363,8 @@ _ADDED_SINCE_BASELINE = {
     # trips its own Semgrep mutable-action-tag gate. ci.yml/board-automation.yml
     # already excluded above; project-init-upgrade.yml is the remaining drift.
     ".github/workflows/project-init-upgrade.yml",
+    # PI-1086: validate-pr's required job reads CI_RUNS_ON (a deliberate edit).
+    ".github/workflows/validate-pr.yml",
     ".agents/skills/report_upstream_issue/SKILL.md",
     ".agents/skills/INDEX.md",
     ".agents/skills/README.md",

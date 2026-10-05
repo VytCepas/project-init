@@ -5,7 +5,8 @@ name: CI
 # repo exhausts its GitHub Actions minutes. Toggle with `just ci-local-on` /
 # `ci-local-off`; setup guide: .agents/docs/guides/self-hosted-ci-runner.md.
 # Secret/PAT-bearing workflows deliberately stay on GitHub-hosted ephemeral runners.
-{{#if lifecycle}}# Pinned here: board-automation, validate-pr, issue-validation, project-init-upgrade.
+{{#if lifecycle}}# Pinned here: board-automation, issue-validation, project-init-upgrade.
+# validate-pr follows CI_RUNS_ON: it is a required check and carries no PAT.
 {{/if lifecycle}}
 
 on:

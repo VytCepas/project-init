@@ -423,6 +423,8 @@ _ADDED_SINCE_BASELINE = {
     # are already excluded above; project-init-upgrade.yml is the remaining
     # lifecycle workflow whose rendered bytes this deliberate edit changes.
     ".github/workflows/project-init-upgrade.yml",
+    # PI-1086: validate-pr's required job reads CI_RUNS_ON (a deliberate edit).
+    ".github/workflows/validate-pr.yml",
 }
 
 

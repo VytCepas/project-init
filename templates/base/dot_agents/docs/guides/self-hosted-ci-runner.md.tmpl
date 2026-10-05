@@ -65,8 +65,8 @@ Assumed-present binaries:
 | `git` | checkout, every workflow step that touches the repo | `sudo apt install git` |
 | `curl` | download/API steps | `sudo apt install curl` |
 | `tar`, `gzip` | action tool downloads | usually present |
-| `gh` | `ci.yml`'s post-failure PR comment step runs `gh pr comment` on this runner whenever a PR job fails{{#if lifecycle}}; also the lifecycle workflows, if you route them here{{/if lifecycle}} | [cli.github.com](https://cli.github.com) |
-{{#if lifecycle}}| `jq` | JSON parsing in the lifecycle workflows (`validate-pr`, `board-automation`, `issue-validation`, `review-status`) — bites only if you route those here | `sudo apt install jq` |
+| `gh` | `ci.yml`'s post-failure PR comment step runs `gh pr comment` on this runner whenever a PR job fails{{#if lifecycle}}; `validate-pr` (a required check) runs `gh issue view` here on every PR{{/if lifecycle}} | [cli.github.com](https://cli.github.com) |
+{{#if lifecycle}}| `jq` | JSON parsing in `validate-pr`, which runs here on every PR, and in the pinned lifecycle workflows if you ever route those here | `sudo apt install jq` |
 {{/if lifecycle}}| `shellcheck` | the shell-lint step (preinstalled on GitHub images — **absent on bare hosts**) | `sudo apt install shellcheck` |
 | `docker` | container image jobs, if enabled | [docs.docker.com/engine/install](https://docs.docker.com/engine/install/) |
 
@@ -103,14 +103,17 @@ parallelism.
   self-hosted runner executes whatever the workflow (and the PR) tells it to,
   on your machine.
 - Never process public-fork PRs on a self-hosted runner.
-- Secret/PAT-bearing workflows{{#if lifecycle}} (`board-automation`, `validate-pr`,
+- Secret/PAT-bearing workflows{{#if lifecycle}} (`board-automation`,
   `issue-validation`, `project-init-upgrade`){{/if lifecycle}} — including any
   release/deploy/registry-publish workflows you enable — are **deliberately
   pinned** to GitHub-hosted ephemeral runners so tokens never materialize on
   your machine. They cost seconds and fit the free tier once `ci.yml` moves
   off. Do not point them at `CI_RUNS_ON`.
 - The `scorecard` job stays GitHub-hosted (an OSSF requirement).
-{{#if lifecycle}}
+{{#if lifecycle}}- `validate-pr` follows `CI_RUNS_ON`: it is a required check, so pinned it
+  would block every merge during a lockout. It carries only the job's
+  read-only `github.token` (issues + pull-requests read), no PAT.
+{{/if lifecycle}}{{#if lifecycle}}
 ## Known-dead checks during the lockout (PI-837)
 
 The GitHub-hosted workflows above keep **failing permanently** while the
