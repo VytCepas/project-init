@@ -17,6 +17,7 @@ jobs:
   publish:
     name: Build + push image to GHCR
     runs-on: ubuntu-24.04
+    if: ${{ vars.CI_RUNS_ON == '' }}  # hosted-only: skip (not fail) when CI_RUNS_ON routes CI to a self-hosted runner
     # Job-level perms override the workflow block; id-token + attestations back
     # the SLSA provenance attestation (#575).
     permissions:

@@ -425,6 +425,8 @@ _ADDED_SINCE_BASELINE = {
     ".github/workflows/project-init-upgrade.yml",
     # PI-1086: validate-pr's required job reads CI_RUNS_ON (a deliberate edit).
     ".github/workflows/validate-pr.yml",
+    # Hosted-pinned jobs skip when CI_RUNS_ON is set (deliberate if: guard).
+    ".github/workflows/review-status.yml",
 }
 
 

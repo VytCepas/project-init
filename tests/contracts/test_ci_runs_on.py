@@ -102,9 +102,12 @@ class TestCiRunsOnEscapeHatch:
             if not f.exists():
                 continue
             checked += 1
-            assert "CI_RUNS_ON" not in f.read_text(), (
-                f"{name} carries a PAT/secret — must never route to self-hosted"
-            )
+            # Routing is the invariant: the variable may appear only as the skip
+            # guard (`vars.CI_RUNS_ON == ''`), never in a `runs-on:` line.
+            for line in f.read_text().splitlines():
+                assert not ("runs-on:" in line and "CI_RUNS_ON" in line), (
+                    f"{name} carries a PAT/secret — must never route to self-hosted"
+                )
         assert checked, "no pinned workflows found to check"
 
     def test_header_renders_as_valid_comments_without_lifecycle(self, tmp_path: Path):
@@ -289,3 +292,52 @@ def test_every_job_a_required_check_depends_on_reads_the_variable(tmp_path: Path
     assert not required, f"required contexts with no job behind them: {required}"
     pinned = {job: runs_on for job, runs_on in gating.items() if runs_on != _EXPR}
     assert not pinned, f"merge-gating jobs pinned to a hosted label: {pinned}"
+
+
+_HOSTED_LABEL = re.compile(r"^(ubuntu|windows|macos)-[\w.]+$")
+_SKIP_GUARD = "vars.CI_RUNS_ON == ''"
+
+# One render per workflow family: ci/lifecycle (default), library release,
+# service deploy + registry publish + IaC.
+_HOSTED_SCENARIOS = {
+    "default": [],
+    "library": ["--delivery", "library"],
+    "service-deploy": ["--delivery", "service", "--deploy", "cloud-run", "--iac", "opentofu"],
+    "service-registry": ["--delivery", "service", "--deploy", "registry"],
+}
+
+
+def _guard_is_leading_conjunct(cond: object) -> bool:
+    expr = str(cond).strip()
+    if expr.startswith("${{") and expr.endswith("}}"):
+        expr = expr[3:-2].strip()
+    return expr == _SKIP_GUARD or expr.startswith(_SKIP_GUARD + " && ")
+
+
+@pytest.mark.parametrize("scenario", sorted(_HOSTED_SCENARIOS))
+def test_hosted_pinned_jobs_skip_under_self_hosted_ci_runs_on(tmp_path: Path, scenario: str):
+    """A job pinned to a hosted label cannot start when the account's Actions
+    minutes are locked out (CI_RUNS_ON is set exactly then): it shows `failure`
+    on every scheduled main run. Such a job must carry `vars.CI_RUNS_ON == ''`
+    as the leading conjunct of its `if:` so it concludes `skipped`."""
+    target = tmp_path / "p"
+    argv = [sys.executable, "-m", "project_init", str(target), "--non-interactive"]
+    argv += ["--preset", "core", "--name", "p", "--description", "t", "--language", "python"]
+    argv += _HOSTED_SCENARIOS[scenario]
+    subprocess.run([*argv, "--no-plugin", "--strict"], check=True, capture_output=True)
+    wf_dir = target / ".github" / "workflows"
+    seen = 0
+    bad: list[str] = []
+    for wf in sorted(wf_dir.glob("*.yml")):
+        for jid, job in yaml.safe_load(wf.read_text())["jobs"].items():
+            runs_on = job.get("runs-on")
+            if not (isinstance(runs_on, str) and _HOSTED_LABEL.match(runs_on)):
+                continue
+            seen += 1
+            if not _guard_is_leading_conjunct(job.get("if", "")):
+                bad.append(f"{wf.name}:{jid} (runs-on {runs_on}, if: {job.get('if')!r})")
+    if scenario != "default":
+        assert seen, (
+            f"{scenario}: no hosted-pinned job rendered; scenario is not exercising anything"
+        )
+    assert not bad, f"hosted-pinned jobs without a CI_RUNS_ON skip guard: {bad}"

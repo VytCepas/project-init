@@ -1236,8 +1236,9 @@ jobs:
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-24.04  # pinned: OSSF scorecard-action requires GitHub-hosted runners
-    # Weekly cron only — not the nightly one (see `on.schedule`).
-    if: github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'
+    # Weekly cron only — not the nightly one (see `on.schedule`). Skipped (not
+    # failed) when CI_RUNS_ON routes CI to a self-hosted runner: it can never start there.
+    if: vars.CI_RUNS_ON == '' && github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'
     permissions:
       security-events: write   # upload the SARIF result to code scanning
       id-token: write          # only needed if publish_results is turned on
