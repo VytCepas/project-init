@@ -181,8 +181,10 @@ class TestScaffoldGitHubFiles:
         workflows = self.target / ".github" / "workflows"
         for name in ("ci.yml", "validate-pr.yml", "board-automation.yml", "review-status.yml"):
             content = (workflows / name).read_text()
-            assert "runs-on: ubuntu-24.04" in content
-            assert "runs-on: ubuntu-latest" not in content
+            assert "ubuntu-latest" not in content
+            if name != "validate-pr.yml":  # PI-1086: it pins the CI_RUNS_ON fallback instead
+                assert "runs-on: ubuntu-24.04" in content
+        assert "|| 'ubuntu-24.04' }}" in (workflows / "validate-pr.yml").read_text()
 
     def test_ci_template_pins_uv_version(self):
         content = (self.target / ".github" / "workflows" / "ci.yml").read_text()
