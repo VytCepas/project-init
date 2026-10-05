@@ -921,12 +921,13 @@ class TestTypeScriptSecurityGate:
         """
         assert 'plugins: { tsdoc, security, "no-unsanitized": noUnsanitized }' in self.config
 
-    def test_setup_recipe_is_a_single_valid_command(self):
-        """PR #731 review: a reviewer read the trailing `\\` as a shell parse error.
+    def test_setup_recipe_respects_the_lockfile(self):
+        """PI-1080: an unconditional `bun add -d <names>` re-resolves to latest and
+        rewrites package.json/bun.lock on every session-start `just setup`.
 
-        `just` joins backslash-continued recipe lines into ONE command — verified
-        with `just -n setup`, which prints a single `bun add -d …` line and exits
-        0. Pinned so the continuation is not "fixed" into a broken one-liner.
+        The recipe installs from the lockfile once the toolchain is declared and
+        only `bun add -d`s what package.json lacks. `just` joins the
+        backslash-continued lines into one shell command, so it is read as one.
         """
         setup = self.justfile.split("\nsetup:", 1)[1].split("\n\n", 1)[0]
         # Executable lines only — the recipe's own comments mention `bun add`.
@@ -934,9 +935,12 @@ class TestTypeScriptSecurityGate:
             ln.strip() for ln in setup.splitlines() if ln.strip() and not ln.strip().startswith("#")
         ]
         assert commands, setup
-        assert commands[0].startswith("bun add -d"), commands
-        # One invocation, however the line is wrapped.
-        assert sum(c.startswith("bun add") for c in commands) == 1, commands
+        body = " ".join(c.rstrip("\\").strip() for c in commands)
+        assert "bun install --frozen-lockfile" in body, body
+        # `bun add -d` only behind the missing-deps branch, never the first command.
+        assert not commands[0].startswith("bun add"), commands
+        assert 'if [ -n "$missing" ]; then bun add -d $missing; else' in body, body
+        assert sum("bun add" in c for c in commands) == 1, commands
 
     def test_typescript_pinned_below_7(self):
         """PI-732: unpinned `bun add -d typescript` resolves to TS 7, which

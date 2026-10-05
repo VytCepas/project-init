@@ -103,7 +103,9 @@ def test_dev_deps_match_the_scaffolded_setup_recipe(tmp_path: Path):
         for ln in setup.splitlines()
         if ln.strip() and not ln.strip().startswith("#")
     )
-    installed = {tok.strip('"') for tok in command.split() if tok not in ("bun", "add", "-d")}
+    # The deps are the `for dep in <list>; do` word list (PI-1080).
+    words = command.split(" in ", 1)[1].split("; do", 1)[0]
+    installed = {tok.strip('"') for tok in words.split()}
     assert installed == set(_DEV_DEPS), (
         f"_DEV_DEPS drifted from `just setup`\n  only in recipe: "
         f"{sorted(installed - set(_DEV_DEPS))}\n  only in test:   {sorted(set(_DEV_DEPS) - installed)}"
