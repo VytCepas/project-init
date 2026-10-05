@@ -537,6 +537,36 @@ def test_apply_refuses_when_not_in_sync_with_origin(box: Box):
     _no_install(box)
 
 
+def _advance_origin(box: Box) -> None:
+    """Merge a commit into origin/main that this checkout has not fetched."""
+    other = box.tmp / "other"
+    _git(box.tmp, "clone", "-q", str(box.tmp / "origin.git"), str(other))
+    (other / "README.md").write_text("merged elsewhere\n")
+    _git(other, "commit", "-q", "-am", "merged")
+    _git(other, "push", "-q", "origin", "main")
+
+
+def test_dry_run_reports_a_checkout_behind_origin_as_apply_does(box: Box):
+    # PI-1082: a deploy preflight passed the dry run, then --apply refused the same checkout.
+    _advance_origin(box)
+    want = "not in sync with origin/main (ahead 0, behind 1)"
+    dry = box.run()
+    assert dry.returncode == 1, dry.stdout
+    assert want in dry.stdout and "--apply would proceed" not in dry.stdout, dry.stdout
+    applied = box.run("--apply")
+    assert applied.returncode == 1 and want in applied.stderr, applied.stderr
+    _no_install(box)
+
+
+def test_dry_run_says_sync_is_unverified_when_the_fetch_fails(box: Box):
+    _git(box.repo, "remote", "set-url", "origin", str(box.tmp / "unreachable.git"))
+    dry = box.run()
+    assert dry.returncode == 1, dry.stdout
+    assert "sync with origin/main is unverified" in dry.stdout, dry.stdout
+    assert "--apply would proceed" not in dry.stdout, dry.stdout
+    _no_install(box)
+
+
 def test_apply_refuses_inside_a_claude_session(box: Box):
     result = box.run("--apply", CLAUDECODE="1")
     assert result.returncode == 1
@@ -945,7 +975,7 @@ def test_recipe_asks_uv_for_a_python_with_tomllib(tmp_path: Path):
 @pytest.mark.skipif(shutil.which("just") is None or find_uv() is None, reason="just or uv missing")
 @pytest.mark.parametrize(
     ("args", "ran"),
-    [((), "DRY RUN, nothing written"), (("--check",), "not installed:")],
+    [((), "DRY RUN, nothing installed"), (("--check",), "not installed:")],
     ids=["dry-run", "check"],
 )
 def test_recipe_creates_no_venv_and_needs_no_network(box: Box, args: tuple[str, ...], ran: str):
