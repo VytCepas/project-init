@@ -2,8 +2,10 @@
 """Install this checkout as the machine's ``project-init`` uv tool, or check it (PI-1046).
 
 ``just install`` is a dry run. It prints the source, commit, target and command,
-and writes nothing. It exits 1 when ``--apply`` would refuse, unless the only
-reason is a Claude Code session. ``just install --apply`` runs ``uv tool install
+and installs nothing. It fetches ``origin/main`` as ``--apply`` does, so its verdict
+on sync is the apply's (PI-1082); a failed fetch is a refusal, never a pass. It
+exits 1 when ``--apply`` would refuse, unless the only reason is a Claude Code
+session. ``just install --apply`` runs ``uv tool install
 --reinstall <repo>``, and only from a clean ``main`` in sync with ``origin/main``.
 ``just install --check`` compares the installed package files, and their exec
 bits, with HEAD and exits 1 on drift, naming each file. The files read are those
@@ -599,7 +601,7 @@ def edited_problems(head: str, project_toml: dict[str, Any]) -> list[str]:
     ]
 
 
-def apply_problems(*, fetch: bool) -> list[str]:
+def apply_problems() -> list[str]:
     """Return every reason ``--apply`` must refuse; empty means it may install."""
     problems: list[str] = []
     if os.environ.get("CLAUDECODE"):
@@ -630,10 +632,14 @@ def apply_problems(*, fetch: bool) -> list[str]:
     project_toml = tomllib.loads(_git("show", f"{head}:pyproject.toml"))
     problems += edited_problems(head, project_toml)
     problems += ignored_problems(project_toml)
-    if fetch:
-        proc = _git_proc("fetch", "--quiet", "origin", _BASE)
-        if proc.returncode != 0:
-            problems.append(f"cannot fetch origin/{_BASE}: {proc.stderr.strip()}")
+    # The dry run fetches too: a preflight that skipped it passed a checkout one
+    # merge behind, which the apply then refused (PI-1082).
+    proc = _git_proc("fetch", "--quiet", "origin", _BASE)
+    if proc.returncode != 0:
+        problems.append(
+            f"cannot fetch origin/{_BASE}, so sync with origin/{_BASE} is unverified: "
+            f"{proc.stderr.strip()}"
+        )
     upstream = _git_proc("rev-parse", "-q", "--verify", f"origin/{_BASE}").stdout.strip()
     if not upstream:
         problems.append(f"no origin/{_BASE} to compare with: fetch it first")
@@ -660,20 +666,20 @@ def _report(lines: list[str], head: str, *, stream: TextIO | None = None) -> Non
 
 
 def _dry_run(env: Path, install: list[str]) -> int:
-    print(f"{_TOOL} box install: DRY RUN, nothing written")
+    print(f"{_TOOL} box install: DRY RUN, nothing installed (fetches origin/{_BASE})")
     _print_plan(env, install)
-    problems = apply_problems(fetch=False)
+    problems = apply_problems()
     if problems:
         _report(problems, "  --apply would refuse:", stream=sys.stdout)
     else:
-        print(f"  --apply would proceed (origin/{_BASE} as of the last fetch; --apply fetches)")
+        print(f"  --apply would proceed (in sync with origin/{_BASE} as fetched just now)")
     # Non-zero so a caller planning on the dry run stops early. A session alone is only
     # a note: dry runs are expected inside one, and deploy checks for a session itself.
     return 1 if any(p != _SESSION for p in problems) else 0
 
 
 def _apply(env: Path, install: list[str]) -> int:
-    problems = apply_problems(fetch=True)
+    problems = apply_problems()
     if problems:
         _report(problems, "refusing --apply:")
         return 1

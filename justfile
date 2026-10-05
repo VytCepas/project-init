@@ -120,7 +120,7 @@ code-map:
 # --check diffs the installed build against HEAD. Logic: tools/box_install.py.
 # --no-python-downloads: `uv run` would otherwise fetch the .python-version interpreter.
 # --no-project: the script is stdlib only, and a project run syncs .venv first
-# (creates it, installs, reaches the index), so the dry run would not be read-only.
+# (creates it, installs, reaches the index), which a dry run must not do.
 # --python keeps the floor the project set: tomllib needs 3.11.
 [doc("install this checkout as a uv tool: dry run by default, --apply, --check (PI-1046)")]
 [positional-arguments]
