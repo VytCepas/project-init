@@ -109,7 +109,10 @@ parallelism.
   pinned** to GitHub-hosted ephemeral runners so tokens never materialize on
   your machine. They cost seconds and fit the free tier once `ci.yml` moves
   off. Do not point them at `CI_RUNS_ON`.
-- The `scorecard` job stays GitHub-hosted (an OSSF requirement).
+- Every job that stays GitHub-hosted — `scorecard` (an OSSF requirement) and
+  the pinned workflows above — carries `vars.CI_RUNS_ON == ''` in its `if:`,
+  so while `CI_RUNS_ON` is set it concludes **skipped**, not a failed run that
+  could never start. Unset the variable and they run again.
 {{#if lifecycle}}- `validate-pr` follows `CI_RUNS_ON`: it is a required check, so pinned it
   would block every merge during a lockout. It carries only the job's
   read-only `github.token` (issues + pull-requests read), no PAT.

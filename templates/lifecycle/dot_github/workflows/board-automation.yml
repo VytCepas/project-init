@@ -40,6 +40,7 @@ permissions:
 jobs:
   board-sync:
     runs-on: ubuntu-24.04
+    if: ${{ vars.CI_RUNS_ON == '' }}  # hosted-only: skip (not fail) when CI_RUNS_ON routes CI to a self-hosted runner
     env:
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
       # Pin the repo so every `gh` call (e.g. `gh issue view`) resolves it

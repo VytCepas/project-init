@@ -14,6 +14,7 @@ jobs:
   plan:
     name: tofu plan
     runs-on: ubuntu-24.04
+    if: ${{ vars.CI_RUNS_ON == '' }}  # hosted-only: skip (not fail) when CI_RUNS_ON routes CI to a self-hosted runner
     permissions:
       contents: read
       id-token: write       # OIDC to your cloud (configure below)
@@ -43,7 +44,7 @@ jobs:
 
   apply:
     name: tofu apply (manual, gated)
-    if: github.event_name == 'workflow_dispatch'
+    if: vars.CI_RUNS_ON == '' && github.event_name == 'workflow_dispatch'
     needs: plan
     runs-on: ubuntu-24.04
     # Apply runs under the infra-apply GitHub Environment — the recommended human

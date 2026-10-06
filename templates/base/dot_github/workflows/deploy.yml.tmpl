@@ -18,6 +18,7 @@ jobs:
   build-push:
     name: Build + push image (by digest)
     runs-on: ubuntu-24.04
+    if: ${{ vars.CI_RUNS_ON == '' }}  # hosted-only: skip (not fail) when CI_RUNS_ON routes CI to a self-hosted runner
     permissions:
       contents: read
       packages: write
@@ -69,6 +70,7 @@ jobs:
     name: Deploy to staging
     needs: build-push
     runs-on: ubuntu-24.04
+    if: ${{ vars.CI_RUNS_ON == '' }}  # hosted-only: skip (not fail) when CI_RUNS_ON routes CI to a self-hosted runner
     environment: staging
     env:
       IMAGE: ${{ needs.build-push.outputs.image }}@${{ needs.build-push.outputs.digest }}
@@ -90,6 +92,7 @@ jobs:
     # `needs` context only exposes directly-declared jobs).
     needs: [build-push, deploy-staging]
     runs-on: ubuntu-24.04
+    if: ${{ vars.CI_RUNS_ON == '' }}  # hosted-only: skip (not fail) when CI_RUNS_ON routes CI to a self-hosted runner
     # The `production` GitHub Environment is the server-side gate (required
     # reviewers / wait timer). An agent cannot bypass it. See #324 / setup_env_protection.sh.
     environment: production
