@@ -5,3 +5,6 @@ project:
   name: "project-init"
   project_key: "PI"
   github_project_number: 2
+  # The scaffolder declares the descriptor contract it defines (scaffold.CONTRACT_VERSION); it is never
+  # scaffolded from itself, so it records no project_init_version or manifest (PI-1093).
+  project_init_contract_version: 2
