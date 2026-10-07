@@ -264,7 +264,7 @@ def _suite_name(config: pytest.Config) -> str:
 
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)
-def pytest_sessionfinish(session: pytest.Session) -> Generator[None, None, None]:
+def pytest_sessionfinish(session: pytest.Session) -> Generator[None, object, object]:
     """Print the contract's line: ``<project>: N passed, M failed``, printed last.
 
     TerminalReporter calls the ``pytest_terminal_summary`` hook and its own
