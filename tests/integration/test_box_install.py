@@ -266,6 +266,16 @@ def test_dry_run_exits_1_when_a_session_comes_with_another_reason(box: Box):
     assert "inside a Claude Code session" in result.stdout and "not main" in result.stdout
 
 
+def test_dry_run_leaves_the_index_unwritten(box: Box):
+    # #1057: `git status` refreshes stale stat data into .git/index; a dry run writes nothing.
+    index = box.repo / ".git" / "index"
+    os.utime(box.repo / "README.md", ns=(1, 1))
+    before = (index.read_bytes(), index.stat().st_mtime_ns)
+    result = box.run()
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (index.read_bytes(), index.stat().st_mtime_ns) == before
+
+
 def test_dirty_listing_keeps_the_porcelain_status_column(box: Box):
     (box.repo / "README.md").write_text("edited\n")
     result = box.run("--apply")
@@ -661,6 +671,19 @@ def test_check_flags_an_install_from_another_source(box: Box):
     result = box.run("--check")
     assert result.returncode == 1
     assert "source: installed from /elsewhere" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("damage", "why"), [(b"\xff\xfe[tool", "not UTF-8"), (b"[tool]\nrequirements = [", "not TOML")]
+)
+def test_check_reports_a_damaged_receipt_as_drift(box: Box, damage: bytes, why: str):
+    # #1057: a damaged receipt is a drift line, not a traceback.
+    box.install_layout()
+    (box.env_dir / "uv-receipt.toml").write_bytes(damage)
+    result = box.run("--check")
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr, result.stderr
+    assert f"receipt: uv-receipt.toml cannot be read ({why}" in result.stderr, result.stderr
 
 
 def test_check_flags_an_entrypoint_that_points_elsewhere(box: Box):

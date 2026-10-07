@@ -76,7 +76,8 @@ def _run(argv: list[str], env: dict[str, str] | None = None) -> subprocess.Compl
 
 
 def _git_proc(*args: str) -> subprocess.CompletedProcess[str]:
-    return _run(["git", "-C", str(_REPO_ROOT), *args])
+    # #1057: no optional locks, so `git status` cannot refresh .git/index in a dry run.
+    return _run(["git", "--no-optional-locks", "-C", str(_REPO_ROOT), *args])
 
 
 def _git(*args: str, strip: bool = True) -> str:
@@ -377,7 +378,15 @@ def receipt_problems(env: Path, scripts: Path) -> list[str]:
     receipt = env / "uv-receipt.toml"
     if not receipt.is_file():
         return [f"no uv-receipt.toml in {env}"]
-    tool = tomllib.loads(receipt.read_text(encoding="utf-8")).get("tool", {})
+    try:
+        tool = tomllib.loads(receipt.read_text(encoding="utf-8")).get("tool", {})
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        # #1057: a damaged receipt is drift to report, as `_dist_text` does, not a crash.
+        if isinstance(exc, OSError):
+            why = exc.strerror or repr(exc)
+        else:
+            why = "not UTF-8" if isinstance(exc, UnicodeDecodeError) else f"not TOML: {exc}"
+        return [f"receipt: uv-receipt.toml cannot be read ({why})"]
     problems: list[str] = []
     reqs = [r for r in tool.get("requirements", []) if r.get("name") == _TOOL]
     source = reqs[0].get("directory") if reqs else None
