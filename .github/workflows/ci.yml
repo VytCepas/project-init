@@ -94,14 +94,24 @@ jobs:
           python-version: "3.11"
 
       - name: Install shfmt
+        # The build for this runner's arch: the amd64 one segfaults under emulation on arm64 (PI-1088).
         run: |
+          set -eu
+          version="3.8.0"
+          case "$(uname -m)" in
+            x86_64|amd64)  arch=amd64 ;;
+            arm64|aarch64) arch=arm64 ;;
+            *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
+          esac
+          asset="shfmt_v${version}_linux_${arch}"
+          base="https://github.com/mvdan/sh/releases/download/v${version}"
           mkdir -p "$HOME/.local/bin"
           tmp="$(mktemp -d)"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o "$tmp/shfmt_v3.8.0_linux_amd64"
-          curl -sSfL https://github.com/mvdan/sh/releases/download/v3.8.0/sha256sums.txt -o "$tmp/sha256sums.txt"
-          ( cd "$tmp" && grep 'shfmt_v3.8.0_linux_amd64$' sha256sums.txt | sha256sum -c - )
-          chmod +x "$tmp/shfmt_v3.8.0_linux_amd64"
-          mv "$tmp/shfmt_v3.8.0_linux_amd64" "$HOME/.local/bin/shfmt"
+          curl -sSfL "$base/$asset" -o "$tmp/$asset"
+          curl -sSfL "$base/sha256sums.txt" -o "$tmp/sha256sums.txt"
+          ( cd "$tmp" && grep " $asset\$" sha256sums.txt | sha256sum -c - )
+          chmod +x "$tmp/$asset"
+          mv "$tmp/$asset" "$HOME/.local/bin/shfmt"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install Bun
@@ -148,6 +158,8 @@ jobs:
       - name: Install wheel into a fresh venv and run scaffolder
         run: |
           set -euo pipefail
+          # A self-hosted runner keeps /tmp between jobs; start from nothing (PI-1088).
+          rm -rf /tmp/smoke-venv /tmp/smoke-target
           uv venv /tmp/smoke-venv
           # shellcheck disable=SC1091
           source /tmp/smoke-venv/bin/activate
