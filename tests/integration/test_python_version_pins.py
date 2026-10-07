@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 import project_init.wizard_prompts as _wiz
+from project_init.variables import SUPPORTED_PYTHON_VERSIONS
 
 _BASE = (
     "--non-interactive",
@@ -328,3 +329,18 @@ def test_upgrade_never_contends_for_an_unmanaged_pin(tmp_path: Path):
     assert rc == 0
     assert (target / ".python-version").read_text().strip() == "3.12"
     assert not (target / ".python-version.new").exists()
+
+
+@pytest.mark.parametrize("version", SUPPORTED_PYTHON_VERSIONS)
+def test_fresh_render_passes_its_own_ruff_check_at_each_pin(tmp_path: Path, version: str):
+    """#1092: ruff's UP rules follow requires-python, so the shipped conftest must lint clean at every pin."""
+    assert _scaffold(tmp_path, "--python-version", version).returncode == 0
+    result = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "--no-cache", "."],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert result.returncode == 0, f"pin {version}:\n{result.stdout}\n{result.stderr}"
