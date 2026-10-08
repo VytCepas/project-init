@@ -510,9 +510,19 @@ def _read_word(command: str, i: int) -> tuple[_Word, int] | None:
             quoted.append((i, j + 1))
             plain = False
             i = j + 1
-        elif ch == "`" or command.startswith(("$'", '$"'), i):
-            # `$'…'` has escape rules of its own: `echo $'\'' ; <verb> ; echo
-            # $'\''` RAN the verb where POSIX quoting reads it as arguments.
+        elif command.startswith("$'", i):
+            # `$'…'` has escape rules of its own (`\'` does not close it): `echo
+            # $'\'' ; <verb> ; echo $'\''` RAN the verb where POSIX quoting reads
+            # it as arguments. Read with those rules, it is a quoted word (#1057).
+            j = i + 2
+            while j < n and command[j] != "'":
+                j += 2 if command[j] == "\\" else 1
+            if j >= n:
+                return None
+            quoted.append((i, j + 1))
+            plain = False
+            i = j + 1
+        elif ch == "`" or command.startswith('$"', i):
             return None
         else:
             plain = plain and ch != "$"
