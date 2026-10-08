@@ -277,6 +277,10 @@ def _no_port_root(monkeypatch: pytest.MonkeyPatch) -> None:
 # before the prose exemption; the last one is a commit message that says never
 # to run the thing it names.
 PROSE = [
+    # #1057: an ANSI-C quoted pattern is as inert as a single-quoted one.
+    "rg $'terraform destroy' docs/",
+    "git grep $'terraform destroy'",
+    "echo $'terraform destroy'",
     'git commit -m "docs: never run terraform destroy on prod"',
     'git commit -m "fix: stop calling bq rm in the cleanup"',
     "grep -rn 'terraform destroy' docs/",
@@ -327,6 +331,10 @@ PROSE = [
 # The rest pin the fail-closed design: an unknown head gets no exemption, and
 # the exemption is subtractive, so a second statement is untouched.
 PROSE_EVASION = [
+    # #1057: reading `$'…'` as a quoted word must not hide a verb after it.
+    "echo $'a' ; terraform destroy",
+    "rg $'x\\'y' ; terraform destroy",
+    "sh -c $'terraform destroy'",
     'sh -c "terraform destroy"',
     "bash -c 'kubectl delete namespace prod'",
     'eval "terraform destroy"',
