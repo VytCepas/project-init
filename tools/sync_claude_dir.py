@@ -40,6 +40,15 @@ MIRRORED = (
     "docs/CODE_MAP.md",
 )
 
+# Committed `.agents/` entries that are NOT mirrored, each because nothing in
+# Claude Code reads it: an approval gate reads these from the default branch on
+# GitHub, so a `.claude/` copy would be a second register that nothing checks.
+NOT_MIRRORED = (
+    "ship.conf",
+    "protected-paths.tsv",
+    "required-checks.tsv",
+)
+
 # Volatile artifacts that must never enter the committed mirror.
 _IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc")
 
