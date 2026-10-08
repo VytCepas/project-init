@@ -1,0 +1,68 @@
+# protected-paths.tsv — the paths only the maintainer may merge. An approval gate reads this register from the
+# default branch: a PR touching any path below is queued for the maintainer's approval; a PR touching none may be
+# merged unattended once its required checks are green for its exact head (.agents/required-checks.tsv).
+#
+# FORMAT  glob <TAB> class <TAB> reason. Globs are repo-relative and case-insensitive; `**` crosses directories,
+# `*` and `?` do not. Always protected whatever this file says: this register, .agents/ship.conf and .github/**.
+# A rename is judged on both of its paths, so moving a file into or out of a glob is protected.
+#
+# WHAT IS PROTECTED: a path whose change could weaken a guard or reach a user's machine unreviewed — the hooks
+# and guards shipped into other repos (templates/ and their plugins/ copies), installers, this repo's own
+# governance, the config that decides whether a merge is green, and release/version tooling. Ordinary source
+# (src/), tests and docs are not: a change there is still held to every required check.
+# .github/CODEOWNERS is generated from this file: uv run python tools/gen_codeowners.py --write
+glob	class	reason
+CLAUDE.md	governance	the canonical agent instructions for this repo
+AGENTS.md	governance	redirects every agent to CLAUDE.md
+.agents/**	governance	this repo's agent config: guard hooks, hook wiring, lifecycle scripts that push and merge, skills, the gate manifest
+.claude/**	governance	the generated mirror of .agents/ that Claude Code actually loads
+.claude-plugin/**	installer	the plugin marketplace manifest: what every install of the plugins fetches
+plugins/**	hook	the plugin payloads (guard hooks, their wiring, skills) installed into Claude Code on users' machines, and their version locks
+templates/**/hooks/**	hook	every hook shipped into scaffolded projects: prod_guard, package_guard, the lifecycle and graphify guards, git hooks
+templates/**/scripts/**	hook	scripts shipped into scaffolded projects: lifecycle push/merge scripts, hook installers, governance and memory gates
+templates/**/skills/**	instructions	agent instructions shipped into every project and synced into plugins/; github_workflow and start_task carry the merge lifecycle
+templates/**/rules/**	instructions	agent rules loaded into every scaffolded project's sessions
+templates/base/AGENTS.md.tmpl	instructions	the canonical instructions of every scaffolded project
+templates/base/CLAUDE.md.tmpl	instructions	the Claude Code entry point of every scaffolded project
+templates/antigravity/dot_agents/AGENTS.md.tmpl	instructions	the Antigravity surface's instructions
+templates/base/dot_agents/project-init.md.tmpl	instructions	workflow and lifecycle rules of every scaffolded project
+templates/base/dot_agents/agents/**	instructions	subagent specs shipped into every project, the code reviewer included
+templates/base/dot_agents/settings.json.tmpl	hook	wires the shipped guards to Claude Code events
+templates/codex/dot_codex/**	hook	wires the shipped guards for Codex
+templates/**/dot_github/**	ci-gate	workflows, CODEOWNERS and issue/PR forms shipped into every project: what gates its merges
+templates/base/justfile.tmpl	ci-gate	the command surface the scaffolded CI and git hooks run
+templates/base/dot_gitleaks.toml	ci-gate	the shipped secret-scan config: an allowlist entry silences a finding
+templates/base/conftest.py.tmpl	ci-gate	test collection config of every scaffolded Python project
+templates/base/pyproject.toml.tmpl	ci-gate	tool config (ruff, pytest, coverage floor) of every scaffolded Python project
+templates/base/ruff.toml.tmpl	ci-gate	the shipped lint gate
+templates/base/mypy.ini.tmpl	ci-gate	the shipped strict typecheck gate
+templates/base/biome.json.tmpl	ci-gate	the shipped JS/TS lint gate
+templates/base/eslint.config.mjs.tmpl	ci-gate	the shipped JS/TS lint gate
+templates/base/dot_golangci.yml.tmpl	ci-gate	the shipped Go lint gate
+templates/base/clippy.toml.tmpl	ci-gate	the shipped Rust lint gate
+templates/base/deny.toml.tmpl	ci-gate	the shipped Rust dependency and licence gate
+templates/base/renovate.json.tmpl	ci-gate	the shipped automated-update policy: which bumps merge without review
+templates/base/deploy/**	deploy	which environments of a scaffolded project deploy ungated
+templates/base/dot_devcontainer/**	installer	runs on container creation in every scaffolded project
+templates/presets/**	hook	the presets decide which overlays, the lifecycle guards included, a project gets by default
+install.sh	installer	the curl | bash bootstrap users run
+tools/box_install.py	installer	installs this checkout as the machine's project-init tool
+tools/sync_plugin.py	installer	builds the plugin payloads from templates/ and relocks their versions
+tools/sync_agents_from_templates.py	installer	declares which .agents/ files must equal their templates, and writes them
+tools/sync_claude_dir.py	installer	writes the .claude/ mirror Claude Code loads
+tools/gen_codeowners.py	ci-gate	derives .github/CODEOWNERS from this register
+tools/pinned_third_party.toml	installer	pinned versions of the third-party tools the scaffold installs
+tools/check_third_party_updates.py	ci-gate	run by a scheduled workflow with write permission
+tools/propose_third_party_bumps.sh	ci-gate	run by a scheduled workflow with write permission; opens bump PRs
+tools/approve_pending_bump_runs.sh	approval	approves queued workflow runs on bot PRs
+.githooks/**	ci-gate	this repo's pre-commit and pre-push gates
+justfile	ci-gate	the command surface CI and the git hooks run
+pyproject.toml	release	package version, dependencies, wheel contents, and the ruff/pytest/coverage config CI enforces
+uv.lock	release	the resolved dependencies every install gets
+mypy.ini	ci-gate	the strict typecheck gate
+conftest.py	ci-gate	root test collection config: can skip or deselect any test
+tests/conftest.py	ci-gate	test collection config: can skip or deselect any test
+.gitleaks.toml	ci-gate	the secret-scan config: an allowlist entry silences a finding
+.gitattributes	ci-gate	can mark a path binary or generated, hiding its diff from review
+renovate.json	ci-gate	the automated-update policy for this repo
+cliff.toml	release	the changelog generator for releases
