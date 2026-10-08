@@ -65,6 +65,8 @@ This installs [`uv`](https://docs.astral.sh/uv/) if missing, clones the repo to 
 
 It refuses any ref whose `prod_guard.py` lacks the symlink refusal (PI-903), which covers every release up to v1.2.2. If the latest release is one of them, the installer stops before checkout and tells you to re-run with `PROJECT_INIT_REF=main`.
 
+This check is static: it exists to turn away old releases that lack the refusal, not to vet a ref. It does not defend against a ref deliberately crafted to pass it; anyone who can publish such a ref already controls what you install, so pin a ref you trust.
+
 Pin a specific version, or opt into the unreleased development head:
 
 ```bash

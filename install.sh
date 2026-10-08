@@ -105,6 +105,9 @@ resolve_ref() {
 # called. Comments and triple-quoted strings are skipped, so the word alone, a
 # dead branch or an unused helper do not pass (PI-1045 review). Static on
 # purpose: nothing from an unverified ref runs.
+# Guarantee: a ref carrying the old (v1.2.2 and older) guard is refused. Not a
+# guarantee: a ref crafted to satisfy this pattern while still misbehaving; that
+# takes control of the ref already, which this check does not defend against (#1055).
 has_symlink_refusal() {
   awk '
     function indent(s) { match(s, /^ */); return RLENGTH }
