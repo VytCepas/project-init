@@ -72,7 +72,11 @@ def test_mirror_set_tracks_the_gitignore_allowlist():
         if ln.startswith(".agents/") and ln.endswith("/*") and ln != ".agents/*"
     }
     committed = unignored - reignored_dirs
-    assert set(sync_claude_dir.MIRRORED) == committed
+    # Declared exceptions are committed but deliberately not mirrored; each must
+    # still be a committed entry, so a stale exception fails here too.
+    not_mirrored = set(sync_claude_dir.NOT_MIRRORED)
+    assert not_mirrored <= committed
+    assert set(sync_claude_dir.MIRRORED) == committed - not_mirrored
 
 
 def test_claude_settings_points_at_canonical_agents_hooks():
