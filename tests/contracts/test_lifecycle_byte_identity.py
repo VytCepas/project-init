@@ -361,6 +361,8 @@ _ADDED_SINCE_BASELINE = {
     # PI-665: diagram skill (collaborative Mermaid-first diagramming);
     # INDEX/README/project-init.md rows already excluded above
     ".agents/skills/diagram/SKILL.md",
+    # #1011: add_command no longer claims other agents ignore the skills it writes
+    ".agents/skills/add_command/SKILL.md",
     # PI-747: verify-test-strength skill (mutation-feedback loop)
     ".agents/skills/verify-test-strength/SKILL.md",
     # PI-671: local_ci skill (Actions billing-lockout escape hatch)

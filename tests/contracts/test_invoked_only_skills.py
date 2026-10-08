@@ -26,6 +26,7 @@ from project_init.scaffold import _rendered_bytes
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _FALLBACK_SKILLS = _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "skills"
+CODEX_POLICY_LINE = "allow_implicit_invocation: false"
 _DEMOTED = [h for h, outcome, _ in sync_plugin.HARNESS_INVOCATION if outcome != "honoured"]
 
 
@@ -92,6 +93,24 @@ class TestFrontmatterReading:
         what they may write. Marking it would hide a skill that is meant to be
         found."""
         assert not sync_plugin.invoked_only(_FALLBACK_SKILLS / "add_command" / "SKILL.md")
+
+
+class TestAddCommandTeachesTheOtherHarnesses:
+    """#1011: the skill that teaches users to write skills must not say other
+    agents ignore them, and must cover Codex's policy file for a user-only one."""
+
+    _TEXT = (_FALLBACK_SKILLS / "add_command" / "SKILL.md").read_text(encoding="utf-8")
+
+    def test_no_claim_that_other_agents_do_not_consume_the_output(self):
+        assert "Other agents do not consume" not in self._TEXT
+
+    def test_a_user_only_skill_gets_the_codex_policy_file(self):
+        assert "agents/openai.yaml" in self._TEXT
+        assert CODEX_POLICY_LINE in self._TEXT
+
+    def test_names_the_harnesses_that_still_list_it(self):
+        for harness in ("Amp", "Antigravity", "Junie"):
+            assert harness in self._TEXT
 
 
 class TestEmission:
