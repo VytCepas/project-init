@@ -31,7 +31,8 @@ _UV_STUB = r"""#!/usr/bin/env bash
 printf '%s\n' "$*" >> "$STUB_UV_LOG"
 case "$1 $2" in
   "tool dir") if [ "${3:-}" = --bin ]; then echo "$STUB_BIN_DIR"; else echo "$STUB_TOOL_DIR"; fi ;;
-  "tool install") [ -z "${STUB_LAYOUT:-}" ] || cp -R "$STUB_LAYOUT/." "$STUB_TOOL_DIR/project-init/" ;;
+  "tool install") [ -z "${STUB_UV_FAIL:-}" ] || exit 3
+                  [ -z "${STUB_LAYOUT:-}" ] || cp -R "$STUB_LAYOUT/." "$STUB_TOOL_DIR/project-init/" ;;
   "python find") cat "${@: -1}/.stub-python" 2>/dev/null || exit 2 ;;
 esac
 exit 0
@@ -83,6 +84,31 @@ def _git(cwd: Path, *args: str) -> str:
     return subprocess.run(
         ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
     ).stdout.strip()
+
+
+_TAGS = ("  FAIL: ", "  WARN: ")
+
+
+def _fails(out: str) -> list[str]:
+    """The reason of each `  FAIL:` or `  WARN:` line: the box deploy's line shape."""
+    return [row[8:] for row in out.splitlines() if row[:8] in _TAGS]
+
+
+def _fix_after(out: str, reason_start: str) -> str:
+    """The `  fix:` command printed right under the FAIL or WARN line that starts so."""
+    rows = out.splitlines()
+    idx = next(i for i, r in enumerate(rows) if r[:8] in _TAGS and r[8:].startswith(reason_start))
+    assert rows[idx + 1].startswith("  fix: "), rows[idx : idx + 2]
+    return rows[idx + 1][7:]
+
+
+def _every_fail_has_its_fix(out: str) -> bool:
+    rows = out.splitlines()
+    return all(
+        i + 1 < len(rows) and rows[i + 1].startswith("  fix: ")
+        for i, r in enumerate(rows)
+        if r[:8] in _TAGS
+    )
 
 
 class Box:
@@ -281,7 +307,7 @@ def test_dirty_listing_keeps_the_porcelain_status_column(box: Box):
     result = box.run("--apply")
     assert result.returncode == 1
     # ` M README.md`, not `M README.md`: the first line keeps its leading space.
-    assert "unreviewed:\n       M README.md" in result.stderr, result.stderr
+    assert "unreviewed\n  fix: " in result.stderr and "\n       M README.md\n" in result.stderr
     _no_install(box)
 
 
@@ -326,7 +352,7 @@ def test_apply_refuses_an_edit_git_status_skips(box: Box, label: str):
         _git(box.repo, "update-index", flag, "templates/base/hook.sh")
     (box.repo / "templates/base/hook.sh").write_text("#!/usr/bin/env bash\necho unreviewed\n")
     assert _git(box.repo, "status", "--porcelain", "--untracked-files=all") == ""
-    shown = f"one call per flag:\n      {label}: templates/base/hook.sh"
+    shown = f"\n      {label}: templates/base/hook.sh\n"
     result = box.run("--apply")
     assert result.returncode == 1
     assert "files git status skips would be installed unreviewed" in result.stderr
@@ -335,9 +361,9 @@ def test_apply_refuses_an_edit_git_status_skips(box: Box, label: str):
     dry = box.run()
     assert dry.returncode == 1
     assert "--apply would refuse" in dry.stdout and shown in dry.stdout, dry.stdout
-    # The commands the refusal names clear the flags, and status then sees the edit.
-    for flag in _HIDING[label]:
-        _git(box.repo, "update-index", f"--no-{flag[2:]}", "--", "templates/base/hook.sh")
+    # The command the refusal prints, run as printed, clears the flags; status then sees the edit.
+    fix = _fix_after(result.stderr, "files git status skips")
+    subprocess.run(["sh", "-c", fix], check=True, capture_output=True)
     after = box.run("--apply")
     assert "git status skips" not in after.stderr and "M templates/base/hook.sh" in after.stderr
     _no_install(box)
@@ -490,7 +516,6 @@ def test_apply_refuses_crlf_from_a_local_eol_override(box: Box):
 
 # Every place an ignore rule can live. Each hides the file from git status.
 _IGNORE_FILES = (".gitignore", "templates/.gitignore", ".git/info/exclude")
-_CLEAN = "git clean -fdX -- src/project_init templates schemas"
 
 
 def _ignore(box: Box, rules: str, where: str = ".gitignore") -> None:
@@ -520,9 +545,10 @@ def test_apply_refuses_an_ignored_file_the_wheel_packages(box: Box, where: str):
     _no_install(box)
     dry = box.run()
     assert dry.returncode == 1 and "templates/base/extra.local" in dry.stdout, dry.stdout
-    # The command the refusal names removes it, and the dry run then proceeds.
-    assert f"`{_CLEAN}`" in dry.stdout
-    subprocess.run(_CLEAN.split(), cwd=box.repo, check=True, capture_output=True)
+    # The command the refusal prints, run as printed, removes it; the dry run then proceeds.
+    fix = _fix_after(dry.stdout, "ignored files the wheel packages")
+    assert " clean -fdX -- src/project_init templates schemas" in fix
+    subprocess.run(["sh", "-c", fix], check=True, capture_output=True)
     after = box.run()
     assert after.returncode == 0 and "--apply would proceed" in after.stdout, after.stdout
 
@@ -566,6 +592,47 @@ def test_dry_run_reports_a_checkout_behind_origin_as_apply_does(box: Box):
     applied = box.run("--apply")
     assert applied.returncode == 1 and want in applied.stderr, applied.stderr
     _no_install(box)
+
+
+def test_behind_origin_prints_a_fix_that_makes_the_dry_run_proceed(box: Box):
+    _advance_origin(box)
+    dry = box.run()
+    assert _fails(dry.stdout) == ["not in sync with origin/main (ahead 0, behind 1)"], dry.stdout
+    fix = _fix_after(dry.stdout, "not in sync")
+    assert fix.endswith("pull --ff-only origin main"), fix
+    subprocess.run(["sh", "-c", fix], check=True, capture_output=True)
+    assert box.run().returncode == 0
+
+
+@pytest.mark.parametrize("setup", ["off-main", "dirty", "behind", "no-origin", "session"])
+def test_every_refusal_is_a_fail_line_then_its_fix_line(box: Box, setup: str):
+    # the box deploy's line shape, on stdout for the dry run and stderr for --apply.
+    if setup == "off-main":
+        _git(box.repo, "switch", "-q", "-c", "feat/x")
+    elif setup == "dirty":
+        (box.repo / "README.md").write_text("edited\n")
+    elif setup == "behind":
+        _advance_origin(box)
+    elif setup == "no-origin":
+        _git(box.repo, "remote", "set-url", "origin", str(box.tmp / "unreachable.git"))
+    env = {"CLAUDECODE": "1"} if setup == "session" else {}
+    applied = box.run("--apply", **env)
+    assert _fails(applied.stderr), applied.stderr
+    assert _every_fail_has_its_fix(applied.stderr), applied.stderr
+    assert applied.stderr.splitlines()[0] == "  note: refusing --apply:"
+    dry = box.run(**env)
+    assert _fails(dry.stdout), dry.stdout
+    assert _every_fail_has_its_fix(dry.stdout), dry.stdout
+
+
+def test_a_failed_uv_install_is_a_fail_line_with_a_fix(box: Box):
+    box.env["STUB_UV_FAIL"] = "1"
+    result = box.run("--apply")
+    assert result.returncode == 1
+    assert any(
+        "tool install --reinstall" in r and "failed (rc=" in r for r in _fails(result.stderr)
+    )
+    assert _every_fail_has_its_fix(result.stderr), result.stderr
 
 
 def test_dry_run_says_sync_is_unverified_when_the_fetch_fails(box: Box):
