@@ -290,6 +290,19 @@ class TestLintMemoryScript:
         # bare names / prose words must not trip the path heuristic
         assert "prose" not in result.stderr
 
+    def test_lint_has_no_early_exit_grep_pipe(self):
+        """`cmd | grep -q` under `set -o pipefail` is a race: grep exits on its first
+        match, SIGPIPEs the writer, and the match reads as a failure. It made the
+        starter lint fail ~1% of runs under load (`missing required field 'name'`).
+        Pin the whole script, since the race is not reproducible on demand."""
+        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        offenders = [
+            line.strip()
+            for line in script.read_text(encoding="utf-8").splitlines()
+            if re.search(r"\|\s*grep\s+-\w*[ql]", line) and not line.lstrip().startswith("#")
+        ]
+        assert not offenders, offenders
+
     def test_lint_warns_on_stale_files_when_configured(self):
         """LINT_MEMORY_STALE_DAYS flags committed facts older than the cutoff —
         deterministic git-age staleness (#497). A future cutoff flags everything."""
