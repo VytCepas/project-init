@@ -575,8 +575,8 @@ def _template_job_ids() -> set[str]:
     return set(re.findall(r"^  ([a-z][a-z0-9_-]*):\s*$", body, flags=re.MULTILINE))
 
 
-def _scaffold_every_job(target: Path, language: str) -> dict:
-    """Render ci.yml with every job-gating flag on, so no job escapes the check."""
+def _render_every_job(target: Path, language: str) -> Path:
+    """Scaffold with every job-gating flag on, so no job escapes the check."""
     flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
     variables = fallback_variables(
         language=language,
@@ -587,7 +587,24 @@ def _scaffold_every_job(target: Path, language: str) -> dict:
         **flags,
     )
     scaffold(target, fallback_preset(), variables)
-    return load_workflow(target)
+    return target
+
+
+def _scaffold_every_job(target: Path, language: str) -> dict:
+    return load_workflow(_render_every_job(target, language))
+
+
+def _runs_on_ci_variable_workflows() -> set[str]:
+    """Template workflows with a `runs-on` that follows `vars.CI_RUNS_ON`.
+
+    Those are the jobs that land on a small self-hosted runner, so a hang holds it.
+    """
+    root = Path(__file__).resolve().parents[2] / "templates"
+    found = set()
+    for path in root.glob("*/dot_github/workflows/*.yml*"):
+        if re.search(r"^\s*runs-on:.*CI_RUNS_ON", path.read_text(encoding="utf-8"), re.MULTILINE):
+            found.add(path.name.removesuffix(".tmpl"))
+    return found
 
 
 class TestCiJobBounds:
@@ -616,6 +633,29 @@ class TestCiJobBounds:
             rendered |= set(job_names(_scaffold_every_job(tmp_path / language, language)))
         missing = _template_job_ids() - rendered
         assert not missing, f"template jobs never rendered by the timeout check: {sorted(missing)}"
+
+    def test_every_runner_variable_job_in_every_workflow_is_bounded(self, tmp_path: Path):
+        """Not just ci.yml: any job that follows CI_RUNS_ON can hold the small runner."""
+        names = _runs_on_ci_variable_workflows()
+        assert {"ci.yml", "validate-pr.yml"} <= names, f"scope derivation broke: {sorted(names)}"
+        target = _render_every_job(tmp_path / "p", "python")
+        for name in sorted(names):
+            wf = load_workflow(target, name)
+            for job_name in job_names(wf):
+                if "CI_RUNS_ON" not in str(job(wf, job_name).get("runs-on", "")):
+                    continue
+                minutes = job(wf, job_name).get("timeout-minutes")
+                assert isinstance(minutes, int) and 0 < minutes < _GITHUB_DEFAULT_TIMEOUT_MINUTES, (
+                    f"{name} job `{job_name}`: timeout-minutes {minutes!r}"
+                )
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_ci_never_overrides_the_worker_count(self, tmp_path: Path, language: str):
+        """The recipe owns the mutmut worker count; a CI-side override re-opens the incident."""
+        wf = _scaffold_every_job(tmp_path / language, language)
+        assert "MUTMUT_MAX_CHILDREN" not in json.dumps(wf), (
+            "ci.yml sets MUTMUT_MAX_CHILDREN (env at any level, or inside a run command)"
+        )
 
     def test_no_ci_step_invokes_mutmut_directly(self, tmp_path: Path):
         """Every `mutmut run` goes through `just test-mutation`, the one definition."""
