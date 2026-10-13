@@ -700,6 +700,45 @@ class TestCiJobBounds:
         runs = [line for line in log.read_text().splitlines() if "mutmut run" in line]
         assert runs == [f"run --with mutmut mutmut run --max-children {expected}"], runs
 
+    @pytest.mark.parametrize("lifecycle_tier", [None, "none"])
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_runner_guide_names_only_what_this_scaffold_has(
+        self, tmp_path: Path, language: str, lifecycle_tier: str | None
+    ):
+        """The guide's tuning advice must exist in the repo it ships in.
+
+        It once told Node/Go/Rust repos about `just test-mutation` and
+        `MUTMUT_MAX_CHILDREN`, which only Python scaffolds have.
+        """
+        flags = {x: "true" if x == language else "" for x in ("python", "node", "go", "rust")}
+        tier = {"lifecycle_tier": lifecycle_tier} if lifecycle_tier else {}
+        scaffold(
+            tmp_path, fallback_preset(), fallback_variables(language=language, **tier, **flags)
+        )
+        guide_path = tmp_path / _RUNNER_GUIDE
+        guide = guide_path.read_text(encoding="utf-8")
+        recipes = set(_JUST_RECIPE.findall((tmp_path / "justfile").read_text(encoding="utf-8")))
+        named = set(_GUIDE_RECIPE.findall(guide))
+        assert "ci" in named, f"scope derivation broke: guide names {sorted(named)}"
+        assert named <= recipes, f"guide names missing recipes: {sorted(named - recipes)}"
+        rest = "\n".join(
+            p.read_text(encoding="utf-8", errors="ignore")
+            for p in tmp_path.rglob("*")
+            if p.is_file() and p != guide_path
+        )
+        knobs = set(_GUIDE_ENV_VAR.findall(guide))
+        assert "CI_RUNS_ON" in knobs, f"scope derivation broke: guide names {sorted(knobs)}"
+        dangling = sorted(k for k in knobs if k not in rest)
+        assert not dangling, f"guide names variables nothing in the scaffold reads: {dangling}"
+
+
+_RUNNER_GUIDE = Path(".agents") / "docs" / "guides" / "self-hosted-ci-runner.md"
+# A justfile recipe header (`name args...:`), not an assignment (`name := ...`).
+_JUST_RECIPE = re.compile(r"^@?([A-Za-z_][A-Za-z0-9_-]*)[^:\n]*:(?!=)", re.MULTILINE)
+# `just <recipe>` at a code-line start or inside backticks; prose "just a" is not a command.
+_GUIDE_RECIPE = re.compile(r"(?:^|`)just ([a-z][a-z0-9_-]*)", re.MULTILINE)
+_GUIDE_ENV_VAR = re.compile(r"`([A-Z][A-Z0-9]*_[A-Z0-9_]+)")
+
 
 class TestVulnerabilityScanGate:
     """PI-568: dependency vulnerability (CVE/advisory) scan per language,
