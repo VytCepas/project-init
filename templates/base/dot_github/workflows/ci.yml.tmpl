@@ -48,6 +48,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Job timeouts: GitHub's default is 360 min, and a hung nightly held a single
+# self-hosted runner that long while deploys queued. Each bound is 1.5x the job's
+# slowest completed run (success or failure, minutes, noted per job) across four
+# scaffolded repos' Actions history, 2026-07-07..10-13, on hosted runners and
+# 1-CPU/1-GiB self-hosted ones, rounded up to 10. Outgrow one? Raise it.
 jobs:
 {{#if python}}
   # PI-214: derive the test matrix from requires-python at runtime, so the
@@ -60,6 +65,7 @@ jobs:
   python-matrix:
     name: Resolve Python matrix
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 10  # slowest 4.3
     outputs:
       versions: ${{ steps.resolve.outputs.versions }}
     steps:
@@ -143,6 +149,7 @@ jobs:
   lint-and-test:
     name: Lint and test
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 50  # slowest 31.2
 {{#if python}}
     needs: python-matrix
     strategy:
@@ -629,6 +636,7 @@ jobs:
   integration-tests:
     name: Integration tests
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 10  # slowest 1.6
     needs: lint-and-test
     # Optional: Only run on main branch or when tests change significantly
     # if: github.ref == 'refs/heads/main' || contains(github.event.pull_request.files[*].name, 'tests/')
@@ -677,9 +685,13 @@ jobs:
   # deterministic pure-logic modules — skip I/O-heavy code, hooks, template
   # renderers) in your own pyproject.toml; mutmut reads config from there,
   # not a standalone file like ruff.toml/mypy.ini.
+  # Its 76.6-min slowest ran mutmut's default worker count; the recipe runs 1,
+  # which is slower on a multi-CPU runner. A large mutation set raises the
+  # recipe's MUTMUT_MAX_CHILDREN default or this bound, after measuring.
   mutation-tests:
     name: Mutation tests (mutmut)
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 120  # slowest 76.6
     # Nightly cron only — not the weekly Scorecard one (see `on.schedule`).
     if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'
     steps:
@@ -709,10 +721,17 @@ jobs:
           fi
       - if: steps.pyproject.outputs.exists == 'true'
         run: uv sync --group dev
-      - if: steps.pyproject.outputs.exists == 'true'
-        run: uv run --with mutmut mutmut run
-      - if: steps.pyproject.outputs.exists == 'true'
-        run: uv run --with mutmut mutmut export-cicd-stats
+      - name: Install just
+        if: steps.pyproject.outputs.exists == 'true'
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: "1.57.0"
+      # The justfile recipe, not a copy of its commands: the worker count is
+      # defined once there. A bare `mutmut run` here forked os.cpu_count()
+      # workers (the host's count inside a container) and hung a 1-GiB runner.
+      - name: Mutation run (just test-mutation)
+        if: steps.pyproject.outputs.exists == 'true'
+        run: just test-mutation
       - name: Enforce mutation score gate (>= 80% killed)
         if: steps.pyproject.outputs.exists == 'true'
         run: |
@@ -742,6 +761,7 @@ jobs:
   build-image:
     name: Build image (build-once)
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 30  # UNMEASURED: no scaffolded repo renders it yet
     needs: lint-and-test
     permissions:
       contents: read
@@ -819,6 +839,7 @@ jobs:
   dockerfile-lint:
     name: Lint Dockerfile (hadolint)
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 10  # UNMEASURED: no scaffolded repo renders it yet
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Lint Dockerfile (hadolint)
@@ -832,6 +853,7 @@ jobs:
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 10  # slowest 2.3
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -937,6 +959,7 @@ jobs:
   semgrep:
     name: Semgrep (semantic security scan)
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 20  # slowest 11.3
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -977,6 +1000,7 @@ jobs:
   license-scan:
     name: Dependency license scan
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 20  # slowest 6.9
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
@@ -1103,6 +1127,7 @@ jobs:
   fuzz:
     name: Fuzz / property tests
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 20  # slowest 9.7
     # Nightly cron only — not the weekly Scorecard one (see `on.schedule`).
     if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'
     steps:
@@ -1236,6 +1261,7 @@ jobs:
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-24.04  # pinned: OSSF scorecard-action requires GitHub-hosted runners
+    timeout-minutes: 10  # slowest 1.0
     # Weekly cron only — not the nightly one (see `on.schedule`). Skipped (not
     # failed) when CI_RUNS_ON routes CI to a self-hosted runner: it can never start there.
     if: vars.CI_RUNS_ON == '' && github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'
@@ -1281,6 +1307,7 @@ jobs:
   ci-gate:
     name: CI gate
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}  # must follow the variable: it is the REQUIRED check — pinned, it can't start during a billing lockout and blocks the merge
+    timeout-minutes: 10  # slowest 0.7
     needs: [lint-and-test, secret-scan{{#if governance}}, governance{{/if governance}}]
     if: always()
     steps:
@@ -1306,6 +1333,7 @@ jobs:
   governance:
     name: AI governance gate
     runs-on: ${{ vars.CI_RUNS_ON || 'ubuntu-24.04' }}
+    timeout-minutes: 10  # slowest 0.8
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Validate system cards

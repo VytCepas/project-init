@@ -8,7 +8,10 @@ template files render empty and are skipped by the engine.
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -16,7 +19,15 @@ import pytest
 
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
-from tests.workflow import job, load_workflow, needs, steps
+from tests.workflow import (
+    job,
+    job_names,
+    job_runs_command,
+    load_workflow,
+    needs,
+    run_commands,
+    steps,
+)
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
@@ -515,10 +526,13 @@ class TestCiQualityGates:
         """PI-563: mutmut graduated from a commented placeholder to a real,
         active job — but it must stay non-blocking (schedule-only, excluded
         from ci-gate's needs) until a baseline mutation score is established."""
-        assert "mutation-tests:" in self.ci
-        assert "mutmut run" in self.ci
-        assert "export-cicd-stats" in self.ci
         wf = load_workflow(self.target)
+        # The run goes through the recipe (which carries `mutmut run` and
+        # export-cicd-stats); a substring check on ci.yml matched a comment.
+        assert job_runs_command(job(wf, "mutation-tests"), "just test-mutation")
+        justfile = (self.target / "justfile").read_text()
+        assert "mutmut run" in justfile
+        assert "export-cicd-stats" in justfile
         assert "schedule" in str(job(wf, "mutation-tests").get("if", ""))
         assert "mutation-tests" not in needs(wf, "ci-gate"), "mutation-tests must stay non-blocking"
 
@@ -540,6 +554,111 @@ class TestCiQualityGates:
         # scorecard job's ("mirroring how semgrep/mutmut were introduced").
         # Assert the command, not the mention.
         assert "mutmut run" not in ci
+
+
+_TEMPLATE_CI = (
+    Path(__file__).resolve().parents[2]
+    / "templates"
+    / "base"
+    / "dot_github"
+    / "workflows"
+    / "ci.yml.tmpl"
+)
+# GitHub's own default job timeout: a hung job holds its runner this long.
+_GITHUB_DEFAULT_TIMEOUT_MINUTES = 360
+
+
+def _template_job_ids() -> set[str]:
+    """Every job id in the CI template, whatever flag gates its rendering."""
+    text = _TEMPLATE_CI.read_text(encoding="utf-8")
+    body = text.split("\njobs:\n", 1)[1]
+    return set(re.findall(r"^  ([a-z][a-z0-9_-]*):\s*$", body, flags=re.MULTILINE))
+
+
+def _scaffold_every_job(target: Path, language: str) -> dict:
+    """Render ci.yml with every job-gating flag on, so no job escapes the check."""
+    flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
+    variables = fallback_variables(
+        language=language,
+        delivery="service",
+        delivery_service="true",
+        not_delivery_service="",
+        governance="true",
+        **flags,
+    )
+    scaffold(target, fallback_preset(), variables)
+    return load_workflow(target)
+
+
+class TestCiJobBounds:
+    """A hung CI job must free its runner, and mutmut must not fork past the recipe.
+
+    Incident: a nightly `mutmut run` with no --max-children forked
+    os.cpu_count() workers (the HOST's count inside a 1-CPU/1-GiB runner
+    container), was OOM-killed, and held the runner 3h under GitHub's 360-min
+    default while deploys queued behind it.
+    """
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_every_job_has_a_timeout_below_the_default(self, tmp_path: Path, language: str):
+        wf = _scaffold_every_job(tmp_path / language, language)
+        for name in job_names(wf):
+            minutes = job(wf, name).get("timeout-minutes")
+            assert isinstance(minutes, int), (
+                f"job `{name}` has no integer timeout-minutes: {minutes!r}"
+            )
+            assert 0 < minutes < _GITHUB_DEFAULT_TIMEOUT_MINUTES, f"job `{name}`: {minutes} min"
+
+    def test_the_timeout_check_reaches_every_template_job(self, tmp_path: Path):
+        """Derive the scope: a job gated on a flag no combo renders would skip the check."""
+        rendered: set[str] = set()
+        for language in ("python", "node", "go", "rust"):
+            rendered |= set(job_names(_scaffold_every_job(tmp_path / language, language)))
+        missing = _template_job_ids() - rendered
+        assert not missing, f"template jobs never rendered by the timeout check: {sorted(missing)}"
+
+    def test_no_ci_step_invokes_mutmut_directly(self, tmp_path: Path):
+        """Every `mutmut run` goes through `just test-mutation`, the one definition."""
+        wf = _scaffold_every_job(tmp_path / "p", "python")
+        for name in job_names(wf):
+            for cmd in run_commands(job(wf, name)):
+                assert not re.search(r"\bmutmut\s+run\b", cmd), (
+                    f"job `{name}` runs mutmut itself: {cmd!r}"
+                )
+        assert job_runs_command(job(wf, "mutation-tests"), "just test-mutation")
+
+    @pytest.mark.skipif(
+        shutil.which("just") is None and not os.environ.get("CI"), reason="needs just"
+    )
+    @pytest.mark.parametrize(("env_value", "expected"), [(None, "1"), ("3", "3")])
+    def test_mutation_recipe_bounds_workers(
+        self, tmp_target: Path, env_value: str | None, expected: str
+    ):
+        """Run the recipe against a stub `uv` and read the argv mutmut would get."""
+        target = _scaffold_language(tmp_target, "python")
+        stub_dir = target.parent / "stub-bin"
+        stub_dir.mkdir()
+        log = target.parent / "uv.log"
+        uv = stub_dir / "uv"
+        uv.write_text('#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$UV_LOG"\n', encoding="utf-8")
+        uv.chmod(0o755)
+        env = {k: v for k, v in os.environ.items() if k != "MUTMUT_MAX_CHILDREN"}
+        env["PATH"] = f"{stub_dir}{os.pathsep}{env['PATH']}"
+        env["UV_LOG"] = str(log)
+        if env_value is not None:
+            env["MUTMUT_MAX_CHILDREN"] = env_value
+        just = shutil.which("just") or "just"
+        result = subprocess.run(
+            [just, "test-mutation"],
+            cwd=target,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        runs = [line for line in log.read_text().splitlines() if "mutmut run" in line]
+        assert runs == [f"run --with mutmut mutmut run --max-children {expected}"], runs
 
 
 class TestVulnerabilityScanGate:

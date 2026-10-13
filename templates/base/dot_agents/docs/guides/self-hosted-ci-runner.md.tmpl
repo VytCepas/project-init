@@ -92,6 +92,12 @@ error.
 **Single runner = sequential CI.** One runner executes jobs one at a time
 (~15–20 min for a full pipeline). Register a second runner to restore
 parallelism.
+
+**A hung job holds that runner.** Every `ci.yml` job carries a measured
+`timeout-minutes` (GitHub's default is 360). Container CPU limits do not change
+the CPU count tools see, so anything sized by it oversubscribes a small runner:
+`just test-mutation` runs one mutmut worker unless `MUTMUT_MAX_CHILDREN` says
+otherwise.
 {{#if lifecycle}}The lifecycle scripts' CI wait defaults to 900s — set `PI_CI_TIMEOUT`
 (seconds) in the environment where you run `finish_pr.sh` / `monitor_pr.sh`
 (e.g. `PI_CI_TIMEOUT=1800`) so the merge flow survives sequential runs.
