@@ -1719,7 +1719,7 @@ _ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
     (
         ("conftest.py",),
         "test-contract",
-        "Test contract: hermetic HOME fixture + summary line (PI-1044)",
+        "Test contract: hermetic HOME, summary line, `-n auto` worker cap (PI-1044)",
     ),
 )
 

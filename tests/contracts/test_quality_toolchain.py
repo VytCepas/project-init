@@ -8,7 +8,10 @@ template files render empty and are skipped by the engine.
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -16,7 +19,15 @@ import pytest
 
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
-from tests.workflow import job, load_workflow, needs, steps
+from tests.workflow import (
+    job,
+    job_names,
+    job_runs_command,
+    load_workflow,
+    needs,
+    run_commands,
+    steps,
+)
 
 
 def _scaffold_language(target: Path, language: str) -> Path:
@@ -515,10 +526,13 @@ class TestCiQualityGates:
         """PI-563: mutmut graduated from a commented placeholder to a real,
         active job — but it must stay non-blocking (schedule-only, excluded
         from ci-gate's needs) until a baseline mutation score is established."""
-        assert "mutation-tests:" in self.ci
-        assert "mutmut run" in self.ci
-        assert "export-cicd-stats" in self.ci
         wf = load_workflow(self.target)
+        # The run goes through the recipe (which carries `mutmut run` and
+        # export-cicd-stats); a substring check on ci.yml matched a comment.
+        assert job_runs_command(job(wf, "mutation-tests"), "just test-mutation")
+        justfile = (self.target / "justfile").read_text()
+        assert "mutmut run" in justfile
+        assert "export-cicd-stats" in justfile
         assert "schedule" in str(job(wf, "mutation-tests").get("if", ""))
         assert "mutation-tests" not in needs(wf, "ci-gate"), "mutation-tests must stay non-blocking"
 
@@ -540,6 +554,190 @@ class TestCiQualityGates:
         # scorecard job's ("mirroring how semgrep/mutmut were introduced").
         # Assert the command, not the mention.
         assert "mutmut run" not in ci
+
+
+_TEMPLATE_CI = (
+    Path(__file__).resolve().parents[2]
+    / "templates"
+    / "base"
+    / "dot_github"
+    / "workflows"
+    / "ci.yml.tmpl"
+)
+# GitHub's own default job timeout: a hung job holds its runner this long.
+_GITHUB_DEFAULT_TIMEOUT_MINUTES = 360
+
+
+def _template_job_ids() -> set[str]:
+    """Every job id in the CI template, whatever flag gates its rendering."""
+    text = _TEMPLATE_CI.read_text(encoding="utf-8")
+    body = text.split("\njobs:\n", 1)[1]
+    return set(re.findall(r"^  ([a-z][a-z0-9_-]*):\s*$", body, flags=re.MULTILINE))
+
+
+def _render_every_job(target: Path, language: str) -> Path:
+    """Scaffold with every job-gating flag on, so no job escapes the check."""
+    flags = {lang: "true" if lang == language else "" for lang in ("python", "node", "go", "rust")}
+    variables = fallback_variables(
+        language=language,
+        delivery="service",
+        delivery_service="true",
+        not_delivery_service="",
+        governance="true",
+        **flags,
+    )
+    scaffold(target, fallback_preset(), variables)
+    return target
+
+
+def _scaffold_every_job(target: Path, language: str) -> dict:
+    return load_workflow(_render_every_job(target, language))
+
+
+def _runs_on_ci_variable_workflows() -> set[str]:
+    """Template workflows with a `runs-on` that follows `vars.CI_RUNS_ON`.
+
+    Those are the jobs that land on a small self-hosted runner, so a hang holds it.
+    """
+    root = Path(__file__).resolve().parents[2] / "templates"
+    found = set()
+    for path in root.glob("*/dot_github/workflows/*.yml*"):
+        if re.search(r"^\s*runs-on:.*CI_RUNS_ON", path.read_text(encoding="utf-8"), re.MULTILINE):
+            found.add(path.name.removesuffix(".tmpl"))
+    return found
+
+
+class TestCiJobBounds:
+    """A hung CI job must free its runner, and mutmut must not fork past the recipe.
+
+    Incident: a nightly `mutmut run` with no --max-children forked
+    os.cpu_count() workers (the HOST's count inside a 1-CPU/1-GiB runner
+    container), was OOM-killed, and held the runner 3h under GitHub's 360-min
+    default while deploys queued behind it.
+    """
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_every_job_has_a_timeout_below_the_default(self, tmp_path: Path, language: str):
+        wf = _scaffold_every_job(tmp_path / language, language)
+        for name in job_names(wf):
+            minutes = job(wf, name).get("timeout-minutes")
+            assert isinstance(minutes, int), (
+                f"job `{name}` has no integer timeout-minutes: {minutes!r}"
+            )
+            assert 0 < minutes < _GITHUB_DEFAULT_TIMEOUT_MINUTES, f"job `{name}`: {minutes} min"
+
+    def test_the_timeout_check_reaches_every_template_job(self, tmp_path: Path):
+        """Derive the scope: a job gated on a flag no combo renders would skip the check."""
+        rendered: set[str] = set()
+        for language in ("python", "node", "go", "rust"):
+            rendered |= set(job_names(_scaffold_every_job(tmp_path / language, language)))
+        missing = _template_job_ids() - rendered
+        assert not missing, f"template jobs never rendered by the timeout check: {sorted(missing)}"
+
+    def test_every_runner_variable_job_in_every_workflow_is_bounded(self, tmp_path: Path):
+        """Not just ci.yml: any job that follows CI_RUNS_ON can hold the small runner."""
+        names = _runs_on_ci_variable_workflows()
+        assert {"ci.yml", "validate-pr.yml"} <= names, f"scope derivation broke: {sorted(names)}"
+        target = _render_every_job(tmp_path / "p", "python")
+        for name in sorted(names):
+            wf = load_workflow(target, name)
+            for job_name in job_names(wf):
+                if "CI_RUNS_ON" not in str(job(wf, job_name).get("runs-on", "")):
+                    continue
+                minutes = job(wf, job_name).get("timeout-minutes")
+                assert isinstance(minutes, int) and 0 < minutes < _GITHUB_DEFAULT_TIMEOUT_MINUTES, (
+                    f"{name} job `{job_name}`: timeout-minutes {minutes!r}"
+                )
+
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_ci_never_overrides_the_worker_count(self, tmp_path: Path, language: str):
+        """The recipe owns the mutmut worker count; a CI-side override re-opens the incident."""
+        wf = _scaffold_every_job(tmp_path / language, language)
+        assert "MUTMUT_MAX_CHILDREN" not in json.dumps(wf), (
+            "ci.yml sets MUTMUT_MAX_CHILDREN (env at any level, or inside a run command)"
+        )
+
+    def test_no_ci_step_invokes_mutmut_directly(self, tmp_path: Path):
+        """Every `mutmut run` goes through `just test-mutation`, the one definition."""
+        wf = _scaffold_every_job(tmp_path / "p", "python")
+        for name in job_names(wf):
+            for cmd in run_commands(job(wf, name)):
+                assert not re.search(r"\bmutmut\s+run\b", cmd), (
+                    f"job `{name}` runs mutmut itself: {cmd!r}"
+                )
+        assert job_runs_command(job(wf, "mutation-tests"), "just test-mutation")
+
+    @pytest.mark.skipif(
+        shutil.which("just") is None and not os.environ.get("CI"), reason="needs just"
+    )
+    @pytest.mark.parametrize(("env_value", "expected"), [(None, "1"), ("3", "3")])
+    def test_mutation_recipe_bounds_workers(
+        self, tmp_target: Path, env_value: str | None, expected: str
+    ):
+        """Run the recipe against a stub `uv` and read the argv mutmut would get."""
+        target = _scaffold_language(tmp_target, "python")
+        stub_dir = target.parent / "stub-bin"
+        stub_dir.mkdir()
+        log = target.parent / "uv.log"
+        uv = stub_dir / "uv"
+        uv.write_text('#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$UV_LOG"\n', encoding="utf-8")
+        uv.chmod(0o755)
+        env = {k: v for k, v in os.environ.items() if k != "MUTMUT_MAX_CHILDREN"}
+        env["PATH"] = f"{stub_dir}{os.pathsep}{env['PATH']}"
+        env["UV_LOG"] = str(log)
+        if env_value is not None:
+            env["MUTMUT_MAX_CHILDREN"] = env_value
+        just = shutil.which("just") or "just"
+        result = subprocess.run(
+            [just, "test-mutation"],
+            cwd=target,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        runs = [line for line in log.read_text().splitlines() if "mutmut run" in line]
+        assert runs == [f"run --with mutmut mutmut run --max-children {expected}"], runs
+
+    @pytest.mark.parametrize("lifecycle_tier", [None, "none"])
+    @pytest.mark.parametrize("language", ["python", "node", "go", "rust"])
+    def test_runner_guide_names_only_what_this_scaffold_has(
+        self, tmp_path: Path, language: str, lifecycle_tier: str | None
+    ):
+        """The guide's tuning advice must exist in the repo it ships in.
+
+        It once told Node/Go/Rust repos about `just test-mutation` and
+        `MUTMUT_MAX_CHILDREN`, which only Python scaffolds have.
+        """
+        flags = {x: "true" if x == language else "" for x in ("python", "node", "go", "rust")}
+        tier = {"lifecycle_tier": lifecycle_tier} if lifecycle_tier else {}
+        scaffold(
+            tmp_path, fallback_preset(), fallback_variables(language=language, **tier, **flags)
+        )
+        guide_path = tmp_path / _RUNNER_GUIDE
+        guide = guide_path.read_text(encoding="utf-8")
+        recipes = set(_JUST_RECIPE.findall((tmp_path / "justfile").read_text(encoding="utf-8")))
+        named = set(_GUIDE_RECIPE.findall(guide))
+        assert "ci" in named, f"scope derivation broke: guide names {sorted(named)}"
+        assert named <= recipes, f"guide names missing recipes: {sorted(named - recipes)}"
+        rest = "\n".join(
+            p.read_text(encoding="utf-8", errors="ignore")
+            for p in tmp_path.rglob("*")
+            if p.is_file() and p != guide_path
+        )
+        knobs = set(_GUIDE_ENV_VAR.findall(guide))
+        assert "CI_RUNS_ON" in knobs, f"scope derivation broke: guide names {sorted(knobs)}"
+        dangling = sorted(k for k in knobs if k not in rest)
+        assert not dangling, f"guide names variables nothing in the scaffold reads: {dangling}"
+
+
+_RUNNER_GUIDE = Path(".agents") / "docs" / "guides" / "self-hosted-ci-runner.md"
+# A justfile recipe header (`name args...:`), not an assignment (`name := ...`).
+_JUST_RECIPE = re.compile(r"^@?([A-Za-z_][A-Za-z0-9_-]*)[^:\n]*:(?!=)", re.MULTILINE)
+# `just <recipe>` at a code-line start or inside backticks; prose "just a" is not a command.
+_GUIDE_RECIPE = re.compile(r"(?:^|`)just ([a-z][a-z0-9_-]*)", re.MULTILINE)
+_GUIDE_ENV_VAR = re.compile(r"`([A-Z][A-Z0-9]*_[A-Z0-9_]+)")
 
 
 class TestVulnerabilityScanGate:

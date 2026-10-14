@@ -48,6 +48,13 @@ as failed, a skip as neither), the line a fleet runner adds up, printed after
 pytest's own final summary line so a reader taking "the last line" gets it.
 pytest's own exit code is unchanged: 0 all passed, 1 a test failed, 5 nothing
 collected.
+
+Also: ``pytest -n auto`` starts no more workers than this process's cgroup has
+CPUs and memory for. xdist's answer is the CPU count, which in a runner
+container is the HOST's: 8 workers in a 1-CPU/1-GiB runner were OOM-killed and
+every run failed with "node down" (PR #1104). Without cgroup v2 files (macOS,
+cgroup v1) the count is xdist's; a number in PYTEST_XDIST_AUTO_NUM_WORKERS, or
+an explicit ``-n N``, is never changed.
 """
 
 from __future__ import annotations
@@ -285,4 +292,77 @@ def pytest_sessionfinish(session: pytest.Session) -> Generator[None, object, obj
         name = _suite_name(session.config)
         terminalreporter.write_line(f"{name}: {passed} passed, {failed} failed")
     return result
+
+
+# The cgroup v2 files the worker cap reads (PR #1104). Module globals so a test can
+# point them at a fake tree.
+_CGROUP_ROOT = Path("/sys/fs/cgroup")
+_PROC_SELF_CGROUP = Path("/proc/self/cgroup")
+# One worker's memory: about 2x the 237 MB peak RSS of one process running a
+# scaffolded repo's whole suite with coverage. A heavier suite sets a count instead.
+_WORKER_BYTES = 512 * 1024 * 1024
+
+
+def _cgroup_read(path: Path) -> str | None:
+    """The file's text, or None when it cannot be read: that file then sets no limit."""
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except (OSError, ValueError):  # ValueError: a cgroup name that is not UTF-8
+        return None
+
+
+def _as_int(text: str | None) -> int | None:
+    """``int(text)``, or None where int() refuses it, exactly as xdist parses its variable."""
+    try:
+        return int(text or "")
+    except ValueError:
+        return None
+
+
+def _cgroup_cpus(cpu_max: str | None) -> int | None:
+    """Whole CPUs a ``cpu.max`` (``<quota> <period>``) grants, at least 1; None if unlimited."""
+    quota, _, period = (cpu_max or "").partition(" ")
+    whole, per = _as_int(quota), _as_int(period)
+    if whole is None or not per:  # "max <period>", or a value no kernel writes
+        return None
+    return max(1, whole // per)
+
+
+def _cgroup_limits(root: Path, proc: Path) -> tuple[int | None, int | None]:
+    """The tightest CPU count and memory bytes from this process's cgroup up to *root*."""
+    own = (_cgroup_read(proc) or "").splitlines()
+    path = next((line[3:] or "/" for line in own if line.startswith("0::")), None)
+    if path is None:  # no cgroup v2 entry: cgroup v1, or not Linux
+        return None, None
+    level = root / path.lstrip("/")
+    levels = [level, *(p for p in level.parents if p == root or root in p.parents)]
+    cpus = [_cgroup_cpus(_cgroup_read(p / "cpu.max")) for p in levels]
+    memory = [_as_int(_cgroup_read(p / "memory.max")) for p in levels]  # "max": None
+    return (
+        min((c for c in cpus if c is not None), default=None),
+        min((m for m in memory if m is not None), default=None),
+    )
+
+
+def _worker_cap(workers: int, cpus: int | None, memory: int | None) -> int:
+    """*workers* lowered to what *cpus* and *memory* hold, never below one."""
+    if cpus is not None:
+        workers = min(workers, cpus)
+    if memory is not None:
+        workers = min(workers, memory // _WORKER_BYTES)
+    return max(1, workers)
+
+
+@pytest.hookimpl(wrapper=True, optionalhook=True)
+def pytest_xdist_auto_num_workers() -> Generator[None, int, int]:
+    """Hold ``-n auto`` to the CPUs and memory the cgroup grants, not the host's CPU count.
+
+    A PYTEST_XDIST_AUTO_NUM_WORKERS that xdist takes as the count (int() parses it)
+    stands. Anything else xdist ignores, so the cap still applies. ``optionalhook``:
+    under ``-p no:xdist`` this hook has no spec, and pytest would reject the file.
+    """
+    workers = yield
+    if _as_int(os.environ.get("PYTEST_XDIST_AUTO_NUM_WORKERS")) is not None:
+        return workers
+    return _worker_cap(workers, *_cgroup_limits(_CGROUP_ROOT, _PROC_SELF_CGROUP))
 {{/if python}}

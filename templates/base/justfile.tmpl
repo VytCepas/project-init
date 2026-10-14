@@ -62,9 +62,12 @@ test-cov:
 # mutation testing on core logic (slow; requires [tool.mutmut] source_paths
 # in your own pyproject.toml, scoped to deterministic pure-logic modules —
 # skip I/O-heavy code, hooks, template renderers). CI runs this nightly.
+# Workers default to 1: mutmut forks os.cpu_count() workers, which a container
+# reports as the HOST's count — 8 forks in a 1-CPU/1-GiB runner OOM-killed and
+# then hung for 3h. Raise it per run: MUTMUT_MAX_CHILDREN=4 just test-mutation.
 [doc("mutation testing on core logic")]
 test-mutation:
-    uv run --with mutmut mutmut run
+    uv run --with mutmut mutmut run --max-children "${MUTMUT_MAX_CHILDREN:-1}"
     uv run --with mutmut mutmut export-cicd-stats
 
 # dependency vulnerability scan against known CVEs/advisories (PI-568).

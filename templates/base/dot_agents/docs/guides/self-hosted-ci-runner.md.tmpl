@@ -97,6 +97,14 @@ parallelism.
 (e.g. `PI_CI_TIMEOUT=1800`) so the merge flow survives sequential runs.
 {{/if lifecycle}}
 
+**A hung job holds that runner.** Every `ci.yml` job carries a `timeout-minutes`
+(GitHub's default is 360). Container CPU limits do not change the CPU count tools
+see, so anything sized by it oversubscribes a small runner.
+{{#if python}}`just test-mutation` runs one mutmut worker unless `MUTMUT_MAX_CHILDREN` is
+set for that run. `pytest -n auto` starts no more workers than the runner's cgroup
+has CPUs and memory for (512 MiB each; the root `conftest.py`); a heavier suite
+sets `PYTEST_XDIST_AUTO_NUM_WORKERS` or passes `-n N`.
+{{/if python}}
 ## Trust model — read before enabling
 
 - Use this only on **private repos with trusted collaborators**. A

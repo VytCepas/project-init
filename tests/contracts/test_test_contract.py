@@ -355,6 +355,142 @@ def test_skipped():
 """
 
 
+# The worker cap (PR #1104), asked through the whole `-n auto` hook chain of a
+# scaffolded repo: xdist's own hook, the root conftest's wrapper, and a tryfirst
+# plugin answering what xdist answered on the runner that failed (8). Memory cases
+# sit on both sides of a 512 MiB multiple as literals, never as `_WORKER_BYTES * n`.
+_PLANTED_WORKER_CAP = """\
+from pathlib import Path
+
+import pytest
+
+RUNNER = {"cpu.max": "100000 100000", "memory.max": "1073741824"}
+TOP = "0::/\\n"
+CASES = [
+    ("runner", RUNNER, TOP, 1),
+    ("unlimited", {"cpu.max": "max 100000", "memory.max": "max"}, TOP, 8),
+    ("half-cpu", {"cpu.max": "50000 100000"}, TOP, 1),
+    ("one-and-a-half-cpus", {"cpu.max": "150000 100000"}, TOP, 1),
+    ("two-cpus", {"cpu.max": "200000 100000"}, TOP, 2),
+    ("512MiB-less-1", {"memory.max": "536870911"}, TOP, 1),
+    ("1GiB-less-1", {"memory.max": "1073741823"}, TOP, 1),
+    ("1GiB", {"memory.max": "1073741824"}, TOP, 2),
+    ("1.5GiB-less-1", {"memory.max": "1610612735"}, TOP, 2),
+    ("1.5GiB", {"memory.max": "1610612736"}, TOP, 3),
+    ("2GiB", {"memory.max": "2147483648"}, TOP, 4),
+    ("ancestor", {"a/cpu.max": "200000 100000", "a/b/cpu.max": "max 100000"}, "0::/a/b\\n", 2),
+    ("cpu-child-tighter", {"cpu.max": "400000 100000", "a/cpu.max": "100000 100000"}, "0::/a\\n", 1),
+    ("cpu-parent-tighter", {"cpu.max": "100000 100000", "a/cpu.max": "400000 100000"}, "0::/a\\n", 1),
+    ("mem-child-tighter", {"memory.max": "2147483648", "a/memory.max": "1073741824"}, "0::/a\\n", 2),
+    ("mem-parent-tighter", {"memory.max": "1073741824", "a/memory.max": "2147483648"}, "0::/a\\n", 2),
+    ("never-raises-cpus", {"cpu.max": "1600000 100000"}, TOP, 8),
+    ("never-raises-memory", {"memory.max": "17179869184"}, TOP, 8),
+    ("garbage", {"cpu.max": "abc 100000", "memory.max": "lots"}, TOP, 8),
+    ("zero-period", {"cpu.max": "100000 0"}, TOP, 8),
+    ("no-period", {"cpu.max": "100000"}, TOP, 8),
+    ("above-the-root", {"../cpu.max": "100000 100000"}, TOP, 8),
+    ("cgroup-v1", RUNNER, "12:memory:/docker/abc\\n4:cpu,cpuacct:/docker/abc\\n", 8),
+    ("not-utf8", RUNNER, b"0::/caf\\xe9.scope\\n", 8),
+    ("no-proc-file", RUNNER, None, 8),
+]
+
+
+class EightCpus:
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_xdist_auto_num_workers(self):
+        return 8
+
+
+def root_conftest(config):
+    want = (config.rootpath / "conftest.py").resolve()
+    for plugin in config.pluginmanager.get_plugins():
+        if Path(getattr(plugin, "__file__", None) or "-").resolve() == want:
+            return plugin
+    raise AssertionError("the root conftest is not registered")
+
+
+@pytest.fixture
+def auto(pytestconfig, tmp_path, monkeypatch):
+    hook = pytestconfig.hook.pytest_xdist_auto_num_workers
+    assert hook.spec is not None, "xdist is not loaded, so this run proves nothing"
+    module = root_conftest(pytestconfig)
+    monkeypatch.delenv("PYTEST_XDIST_AUTO_NUM_WORKERS", raising=False)
+
+    def ask(files, own=TOP, xdist_says=8):
+        root = tmp_path / "cgroup"
+        root.mkdir()
+        for rel, text in files.items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text + "\\n")
+        proc = tmp_path / "proc-self-cgroup"
+        if own is not None:
+            proc.write_bytes(own if isinstance(own, bytes) else own.encode())
+        monkeypatch.setattr(module, "_CGROUP_ROOT", root)
+        monkeypatch.setattr(module, "_PROC_SELF_CGROUP", proc)
+        plugin = EightCpus() if xdist_says == 8 else None
+        if plugin is not None:
+            pytestconfig.pluginmanager.register(plugin, "planted-eight-cpus")
+        try:
+            return hook(config=pytestconfig)
+        finally:
+            if plugin is not None:
+                pytestconfig.pluginmanager.unregister(plugin)
+
+    return ask
+
+
+@pytest.mark.parametrize(("files", "own", "workers"), [c[1:] for c in CASES], ids=[c[0] for c in CASES])
+def test_auto(auto, files, own, workers):
+    assert auto(files, own) == workers
+
+
+def test_an_explicit_count_stands(auto, monkeypatch):
+    monkeypatch.setenv("PYTEST_XDIST_AUTO_NUM_WORKERS", "6")
+    assert auto(RUNNER, xdist_says=None) == 6
+
+
+@pytest.mark.parametrize("value", ["", "abc", "auto"])
+def test_a_count_xdist_ignores_is_still_capped(auto, monkeypatch, value):
+    monkeypatch.setenv("PYTEST_XDIST_AUTO_NUM_WORKERS", value)
+    assert auto(RUNNER) == 1
+
+
+def test_the_kernels_files_are_read_by_default(pytestconfig):
+    module = root_conftest(pytestconfig)
+    assert module._CGROUP_ROOT == Path("/sys/fs/cgroup")
+    assert module._PROC_SELF_CGROUP == Path("/proc/self/cgroup")
+"""
+# CASES, the explicit count, three ignored counts, the default paths.
+_WORKER_CAP_TESTS = 25 + 1 + 3 + 1
+
+# A `-p` plugin, so it is registered before the root conftest: it points the
+# conftest at a fake cgroup the moment pytest registers it, answers 8 as xdist did
+# on the runner, and prints the count xdist's own (tryfirst) pytest_cmdline_main
+# settled on before ending the run ahead of collection.
+_WORKER_PROBE = """\
+from pathlib import Path
+
+import pytest
+
+ROOT, PROC = Path({root!r}), Path({proc!r})
+
+
+def pytest_plugin_registered(plugin):
+    if Path(getattr(plugin, "__file__", None) or "-").name == "conftest.py":
+        plugin._CGROUP_ROOT, plugin._PROC_SELF_CGROUP = ROOT, PROC
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_xdist_auto_num_workers():
+    return 8
+
+
+def pytest_cmdline_main(config):
+    print(f"numprocesses={{config.option.numprocesses}}")
+    return 0
+"""
+
+
 def _python_scaffold(target: Path) -> Path:
     variables = make_variables()
     created = scaffold(target, load_preset("core"), variables)
@@ -756,6 +892,69 @@ class TestSummaryLine:
         result = _pytest(target, tmp_path)
         assert result.returncode == 5
         assert _last_line(result.stdout) == ("my-project", 0, 0), result.stdout
+
+
+def _startup_workers(target: Path, tmp: Path) -> list[str]:
+    """What `pytest -n auto` settles on in *target* at startup, on the 1-CPU/1-GiB runner."""
+    cgroup, proc = tmp / "cgroup", tmp / "proc-self-cgroup"
+    cgroup.mkdir(parents=True)
+    (cgroup / "cpu.max").write_text("100000 100000\n")
+    (cgroup / "memory.max").write_text("1073741824\n")
+    proc.write_text("0::/\n")
+    probe_dir = tmp / "probe"
+    probe_dir.mkdir()
+    probe = _WORKER_PROBE.format(root=str(cgroup), proc=str(proc))
+    (probe_dir / "worker_probe.py").write_text(probe)
+    result = _pytest(target, tmp, "-p", "worker_probe", "-n", "auto", PYTHONPATH=str(probe_dir))
+    assert result.returncode == 0, result.stdout + result.stderr
+    return [line for line in result.stdout.splitlines() if line.startswith("numprocesses=")]
+
+
+class TestXdistWorkerCap:
+    """`pytest -n auto` in a scaffolded repo starts no more workers than the cgroup
+    holds (PR #1104): xdist asked os.cpu_count(), the HOST's 8 inside a 1-CPU/1-GiB
+    runner container, and the workers were OOM-killed ("node down")."""
+
+    def test_auto_is_held_to_the_cgroup(self, tmp_path: Path) -> None:
+        pytest.importorskip("xdist")
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_worker_cap.py", _PLANTED_WORKER_CAP)
+        result = _pytest(target, tmp_path)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", _WORKER_CAP_TESTS, 0), result.stdout
+
+    def test_the_cap_is_registered_when_xdist_asks_at_startup(self, tmp_path: Path) -> None:
+        """Through xdist's own caller, not a test calling the hook after startup:
+        a cap registered any later than the root conftest would miss it."""
+        pytest.importorskip("xdist")
+        target = _python_scaffold(tmp_path / "p")
+        assert _startup_workers(target, tmp_path) == ["numprocesses=1"]
+
+    def test_a_run_without_xdist_still_loads_the_conftest(self, tmp_path: Path) -> None:
+        """`-p no:xdist` leaves the hook without a spec; pytest must not reject the file."""
+        target = _python_scaffold(tmp_path / "p")
+        _plant(target, "test_ok.py", "def test_ok():\n    assert True\n")
+        result = _pytest(target, tmp_path, "-p", "no:xdist")
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert _last_line(result.stdout) == ("my-project", 1, 0), result.stdout
+
+    def test_upgrade_brings_the_cap_to_a_repo_scaffolded_before_it(self, tmp_path: Path) -> None:
+        """A governed repo gets the cap from `project-init upgrade --apply`: its root
+        conftest is the pre-cap render, recorded as the base, and is otherwise untouched."""
+        pytest.importorskip("xdist")
+        target = tmp_path / "p"
+        variables = make_variables()
+        created = scaffold(target, memory_preset("obsidian-only"), variables, strict=True)
+        conftest = target / "conftest.py"
+        before_cap = conftest.read_text().split("\n\n\n# The cgroup v2 files")[0] + "\n"
+        assert "pytest_xdist_auto_num_workers" not in before_cap
+        conftest.write_text(before_cap)
+        write_scaffold_record(target, "obsidian-only", variables, created)
+        # An unmanaged pin parks the #847 python-pin proposal, as TestUpgradePath does.
+        (target / ".python-version").write_text("3.11\n")
+        assert _startup_workers(target, tmp_path / "before") == ["numprocesses=8"]
+        assert run_upgrade(target, apply=True) == 0
+        assert _startup_workers(target, tmp_path / "after") == ["numprocesses=1"]
 
 
 def _uv_stub(bin_dir: Path) -> None:
