@@ -137,6 +137,7 @@ _ALWAYS_OVERWRITE = {"README.md"}
 _GOVERNANCE_USER_FILES = frozenset(
     {
         ".agents/governance/SYSTEM_CARD.md",
+        ".agents/governance/NO_AI_SYSTEM.md",
         ".agents/governance/ai-declarations.md",
         ".agents/governance/config.json",
     }

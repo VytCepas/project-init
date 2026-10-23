@@ -655,6 +655,7 @@ This gallery shows what each preset actually scaffolds into your project directo
 ./.agents/governance/approved-tools.md
 ./.agents/governance/config.example.json
 ./.agents/governance/data-handling.md
+./.agents/governance/examples/NO_AI_SYSTEM.template.md
 ./.agents/governance/examples/SYSTEM_CARD.example.md
 ./.agents/governance/examples/SYSTEM_CARD.template.md
 ./.agents/hooks/README.md
@@ -734,6 +735,7 @@ This gallery shows what each preset actually scaffolds into your project directo
 ./.agents/governance/approved-tools.md
 ./.agents/governance/config.example.json
 ./.agents/governance/data-handling.md
+./.agents/governance/examples/NO_AI_SYSTEM.template.md
 ./.agents/governance/examples/SYSTEM_CARD.example.md
 ./.agents/governance/examples/SYSTEM_CARD.template.md
 ./.agents/hooks/README.md

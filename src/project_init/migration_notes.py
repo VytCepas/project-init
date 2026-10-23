@@ -15,6 +15,34 @@ from project_init.scaffold import parse_version as _parse  # canonical (2026-07 
 # version -> {"summary": str, "action_required": str | None}
 # Order here is irrelevant — notes are sliced and sorted by parsed version.
 MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
+    "1.2.3": {
+        "summary": (
+            "The governance gate no longer passes on silence. With `--governance` "
+            "(or the `governed` preset) a repo that had no real "
+            "`.agents/governance/**/SYSTEM_CARD.md` printed 'nothing to check "
+            "(pass)' and exited 0, so 'this repo ships no AI system' and 'nobody "
+            "declared anything' were indistinguishable. The gate now passes only "
+            "when every real SYSTEM_CARD.md validates, or when there is no card "
+            "AND `.agents/governance/NO_AI_SYSTEM.md` carries a `reason` and a "
+            "`declared_on` date. No card and no declaration fails; a card and a "
+            "declaration together fail as a contradiction. A copy-me template "
+            "ships at `.agents/governance/examples/NO_AI_SYSTEM.template.md`."
+        ),
+        "action_required": (
+            "Only repos with governance enabled and no real SYSTEM_CARD.md: after "
+            "upgrading, the `governance` CI job (and the `CI gate` that needs it) "
+            "goes red until the repo declares something. Pick one. (1) It ships an "
+            "AI system: copy `.agents/governance/examples/SYSTEM_CARD.template.md` "
+            "to `.agents/governance/SYSTEM_CARD.md` and fill it in. (2) It ships "
+            "none: create `.agents/governance/NO_AI_SYSTEM.md` holding a "
+            "`reason: <why>` line and a `declared_on: <YYYY-MM-DD>` line between "
+            "two `---` fences (template: "
+            "`.agents/governance/examples/NO_AI_SYSTEM.template.md`, which an "
+            "upgrade adds once you accept new files). Check locally with "
+            "`bash .agents/scripts/governance_gate.sh`. A repo with a valid card, "
+            "or without governance enabled, needs nothing."
+        ),
+    },
     "1.2.2": {
         "summary": (
             "Fixes three defects in how additive changes reach existing "

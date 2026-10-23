@@ -301,6 +301,7 @@ def _choose_governance_interactive() -> bool:
         "  [dim]ai-code-provenance.md[/dim]   [dim]# attribution + licence checks[/dim]\n"
         "  [dim]NIST_RMF_CROSSWALK.md[/dim]   [dim]# maps to Govern/Map/Measure/Manage[/dim]\n"
         "  [dim]examples/SYSTEM_CARD[/dim]    [dim]# system-card template + filled example[/dim]\n"
+        "  [dim]examples/NO_AI_SYSTEM[/dim]   [dim]# template: this repo ships no AI system[/dim]\n"
         "  [dim]ai-bom.generated.md[/dim]     [dim]# AI bill of materials (AIBOM), "
         "regenerated each run[/dim]\n"
         "  [dim]governance_gate.py[/dim]      [dim]# presence-triggered CI gate (in the merge gate)[/dim]\n\n"
@@ -308,8 +309,8 @@ def _choose_governance_interactive() -> bool:
         'sign-off" for reviewers, customers, and regulators.\n'
         "[cyan]Adopts:[/cyan] NIST AI RMF, ISO/IEC 42001, EU AI Act, OWASP LLM/Agentic "
         "Top 10 — referenced, not re-authored.\n"
-        "[cyan]Gate:[/cyan] validates every real SYSTEM_CARD.md and fails on missing/"
-        "placeholder fields — inert until you write a card.\n"
+        "[cyan]Gate:[/cyan] CI stays red until you write a valid SYSTEM_CARD.md or a "
+        "dated NO_AI_SYSTEM.md declaring the repo ships no AI system.\n"
         "[cyan]Note:[/cyan] most projects are not AI products — keep this off unless "
         "yours calls an LLM API over data.\n"
         "[dim]Default: off — decline and nothing is added.[/dim]"

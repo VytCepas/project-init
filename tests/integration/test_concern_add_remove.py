@@ -249,6 +249,17 @@ class TestPurgeExport:
         apply_concern(target, "governance", enable=False, apply=True, purge=True)
         assert not leftover.exists()  # purge cleans it despite the no-op toggle
 
+    def test_purge_cleans_a_no_ai_declaration_too(self, tmp_path: Path):
+        # The declaration is governance source data like a card: a plain remove
+        # keeps it, --purge deletes it (and the gate that read it is gone).
+        target = _scaffold(tmp_path / "p", governance=True)
+        declaration = target / ".agents/governance/NO_AI_SYSTEM.md"
+        declaration.write_text("---\nreason: x\ndeclared_on: 2026-01-01\n---\n")
+        apply_concern(target, "governance", enable=False, apply=True)
+        assert declaration.is_file()
+        apply_concern(target, "governance", enable=False, apply=True, purge=True)
+        assert not declaration.exists()
+
 
 class TestReportTruncationMarker:
     def test_file_list_marks_whats_beyond_the_cap(self):

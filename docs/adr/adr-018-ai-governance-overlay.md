@@ -1,6 +1,6 @@
 # ADR-018: AI-governance overlay — governance-as-code, system card + AIBOM + CI gate
 
-- Status: Accepted
+- Status: Accepted (amended 2026-10-23: the gate no longer passes on silence — see Amendment)
 - Date: 2026-06-23
 - Implements: epic #276 (AI governance & secure-usage standards layer), Bucket 1
   — subs #410 (foundation), #411 (usage-track docs), #412 (product track)
@@ -86,9 +86,10 @@ missing/placeholder fields; out-of-range `role`/`classification`/`allowed`/
 `.agents/governance/`, is missing, or is still a placeholder; a `last_reviewed`
 that is in the future or older than the staleness window (180-day default,
 overridable only via a flat `staleness_days` in `.agents/governance/config.json`,
-which is user-created — the overlay ships `config.example.json` only). **No real
+which is user-created — the overlay ships `config.example.json` only). ~~**No real
 card ⇒ pass**, so a fresh project (shipping only the example/template) is a
-genuine opt-in. The CI `governance` job is the enforcement boundary; any local
+genuine opt-in.~~ **Amended 2026-10-23** — see Amendment: silence no longer
+passes. The CI `governance` job is the enforcement boundary; any local
 hook is best-effort (matches ADR-007's "git+CI is the boundary").
 
 ### 5. User-owned governance files are intrinsically preserved
@@ -100,6 +101,31 @@ Rendering globs would miss a project that adopts governance after its initial
 scaffold, because `config.yaml` is not re-rendered once it carries a record
 (Codex review on PR #416). The generated `ai-bom.generated.md` is deliberately excluded so it
 keeps refreshing.
+
+## Amendment (2026-10-23): silence does not pass
+
+"No real card ⇒ pass" made two different repos indistinguishable: one that ships
+no AI system, and one whose team forgot to declare anything. The opt-in is the
+`--governance` flag, not the absence of a file, so once governance is enabled the
+gate passes only when (a) every real `SYSTEM_CARD.md` validates, or (b) there is
+no card **and** `.agents/governance/NO_AI_SYSTEM.md` declares, with a `reason`
+and a `declared_on` date (real ISO date, not in the future), that the repo ships
+no AI system. No card and no declaration fails, naming both ways out; a card
+together with a declaration fails as a contradiction. A missing
+`.agents/governance/` directory is silence too, not an exemption.
+
+The declaration is a flat-scalar file like the card (same parser, no new
+dependency) at one fixed repo-level path, and a copy-me template sits beside the
+card templates in `examples/`. It does not expire: the card's 180-day window
+exists because a card describes a system that changes, whereas a declaration is a
+dated statement whose recheck is its owner's; a recurring red on the honest
+majority would train teams to rubber-stamp it. The gate cannot detect that a
+model call was added after the declaration — detecting AI usage in code stays
+out of scope (bounded gate, above).
+
+Upgrade path: the change reaches existing repos through the packaged
+`migration_notes` entry, printed by `project-init upgrade` with the exact file to
+add, and through the gate's own failure message.
 
 ## Rejected / out of scope
 
