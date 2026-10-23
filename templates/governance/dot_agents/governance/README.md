@@ -56,9 +56,10 @@ case that is true, and the gate passes on exactly that:
 | This repo… | Write | The gate then |
 |---|---|---|
 | builds, operates or ships an AI system | `SYSTEM_CARD.md` (from `examples/SYSTEM_CARD.template.md`) and a filled `ai-declarations.md` | validates the card; fails on any violation |
-| ships **no** AI system | `NO_AI_SYSTEM.md` (from `examples/NO_AI_SYSTEM.template.md`): a `reason` and a `declared_on` date | passes; fails if either field is missing, a placeholder, or the date is not a real, non-future ISO date |
+| ships **no** AI system | `NO_AI_SYSTEM.md` (from `examples/NO_AI_SYSTEM.template.md`): a `reason` and a `declared_on` date | passes; fails if either field is missing, a placeholder, a YAML null (`~`, `null`), a block indicator (`\|`, `>`) or a non-answer (`TODO`, `n/a`), if the `reason` is too short to be a sentence, or if the date is not a real ISO date that is neither in the future nor older than the gate |
 | neither of the above written | nothing | **fails** and names both options |
 | both a card and `NO_AI_SYSTEM.md` | — | **fails**: a repo ships an AI system or it does not |
+| a `NO_AI_SYSTEM.md` anywhere but `.agents/governance/` | — | **fails** as misfiled: the gate reads only the root file, so a copy elsewhere would otherwise pass unseen |
 
 `NO_AI_SYSTEM.md` is a dated statement, not a detector: the gate cannot see that
 a model call was added later. When that happens, delete the declaration and write

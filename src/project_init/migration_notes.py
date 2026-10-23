@@ -23,7 +23,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "(pass)' and exited 0, so 'this repo ships no AI system' and 'nobody "
             "declared anything' were indistinguishable. The gate now passes only "
             "when every real SYSTEM_CARD.md validates, or when there is no card "
-            "AND `.agents/governance/NO_AI_SYSTEM.md` carries a `reason` and a "
+            "AND `.agents/governance/NO_AI_SYSTEM.md` carries a real `reason` and a "
             "`declared_on` date. No card and no declaration fails; a card and a "
             "declaration together fail as a contradiction. A copy-me template "
             "ships at `.agents/governance/examples/NO_AI_SYSTEM.template.md`."

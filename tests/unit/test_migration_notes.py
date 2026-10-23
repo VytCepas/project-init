@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from project_init import __version__
 from project_init.migration_notes import MIGRATION_NOTES, notes_for_span
+from project_init.scaffold import parse_version
 
 
 def _versions(prev: str | None, current: str | None) -> list[str]:
@@ -46,3 +48,20 @@ def test_every_entry_has_a_summary():
     for version, entry in MIGRATION_NOTES.items():
         assert entry.get("summary"), f"{version} needs a summary"
         assert "action_required" in entry  # explicit None is fine, missing is not
+
+
+def test_no_note_is_keyed_beyond_a_possible_next_release():
+    # Notes are keyed by hand before the release number exists. A key that the
+    # next release can never reach (a typo, a skipped minor) is a note that never
+    # shows; a key at or below the package version has already been reached.
+    cur = parse_version(__version__)
+    assert cur is not None
+    major, minor, patch = cur
+    reachable = {(major, minor, patch + 1), (major, minor + 1, 0), (major + 1, 0, 0)}
+    for version in MIGRATION_NOTES:
+        key = parse_version(version)
+        assert key is not None, f"{version!r} is not a parseable version"
+        assert key <= cur or key in reachable, (
+            f"{version} is neither released ({__version__}) nor a next release "
+            f"({sorted('.'.join(map(str, r)) for r in reachable)}): re-key it"
+        )

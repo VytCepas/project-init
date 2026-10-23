@@ -187,9 +187,11 @@ def _build_parser() -> argparse.ArgumentParser:
             "Scaffold the opt-in AI-governance overlay (ADR-018): governance-as-"
             "code. Ships an AI usage policy, approved-tools / data-handling / "
             "code-provenance docs, a NIST RMF crosswalk, a system-card template + "
-            "example, a generated AIBOM, and a presence-triggered CI gate "
-            "(governance_gate.py, wired into the merge gate) — adopting NIST AI "
-            "RMF / EU AI Act conventions. Off by default."
+            "example, a generated AIBOM, and a CI gate (governance_gate.py, "
+            "wired into the merge gate) that never passes on silence: it stays "
+            "red until a real SYSTEM_CARD.md or a dated NO_AI_SYSTEM.md "
+            "declaration exists — adopting NIST AI RMF / EU AI Act conventions. "
+            "Off by default."
         ),
     )
     p.add_argument(

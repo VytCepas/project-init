@@ -114,6 +114,16 @@ no AI system. No card and no declaration fails, naming both ways out; a card
 together with a declaration fails as a contradiction. A missing
 `.agents/governance/` directory is silence too, not an exemption.
 
+A declaration has to be a statement, not a stub: the parser is flat-scalar, so
+`reason: ~`, `reason: null` and a bare block indicator (`|`, `>`) are blank, as
+are non-answers (`TODO`, `n/a`, `-`), a `reason` too short to be a sentence, a
+`declared_on` older than the gate itself (this ADR's date), and a leading `---`
+with no closing fence. The file is read at exactly one path, so a
+`NO_AI_SYSTEM.md` anywhere else under `.agents/governance/` (outside
+`examples/`) fails as misfiled rather than passing unseen beside a card. These
+checks turn away blanks and sentinels; the gate still cannot judge whether the
+statement is true.
+
 The declaration is a flat-scalar file like the card (same parser, no new
 dependency) at one fixed repo-level path, and a copy-me template sits beside the
 card templates in `examples/`. It does not expire: the card's 180-day window

@@ -11,7 +11,13 @@ passes only when ONE of these holds, and exits non-zero otherwise:
 
 A card AND a declaration together contradict each other and fail. No card and
 no declaration fails too: "nothing to declare" and "forgot to declare" must not
-look the same.
+look the same. A declaration filed anywhere but the governance root is never
+read, so it fails as misfiled rather than passing unseen.
+
+A declaration is a deliberate statement, not a stub: ``reason`` must be a real
+sentence (not blank, a YAML null such as ``~``/``null``, a block indicator such
+as ``|``/``>``, or a non-answer such as ``TODO``/``n/a``) and ``declared_on`` a
+real date between the day this gate shipped and today.
 
 Deterministic, stdlib-only. Invoked via ``_py.sh`` by ``governance_gate.sh`` and
 the CI ``governance`` job. Both manifests are flat ``key: value`` scalars only —
@@ -46,6 +52,15 @@ REQUIRED = (
 # Repo-level, so a single fixed path — unlike cards, it is not searched for.
 DECLARATION_FILE = "NO_AI_SYSTEM.md"
 DECLARATION_REQUIRED = ("reason", "declared_on")
+# A declaration answers this gate, so it cannot predate it: ADR-018 was accepted
+# 2026-06-23 (a contract test keeps this equal to that ADR's date). This only turns
+# away sentinel dates (0001-01-01, 1970-01-01); the gate cannot judge whether the
+# statement is true.
+DECLARATION_FLOOR = date(2026, 6, 23)
+MIN_REASON_CHARS = 10
+# Non-answers that carry no information but are not template placeholders. A value
+# with no letter or digit in it (``~``, ``|``, ``>``, ``-``, ``...``) is blank too.
+_STUB_WORDS = frozenset({"null", "none", "nil", "todo", "tbd", "tba", "fixme", "n/a", "na", "xxx"})
 ROLES = {"provider", "deployer"}
 CLASSIFICATIONS = {"prohibited", "high", "limited", "minimal"}
 ALLOWED_VALUES = {"true", "false"}
@@ -77,16 +92,24 @@ def is_placeholder(value: str) -> bool:
     return not v or v.startswith("<") or "REPLACE" in v or v.upper() == "PLACEHOLDER"
 
 
-def find_cards(gov_dir: Path) -> list[Path]:
-    """Real system cards (named SYSTEM_CARD.md), excluding the shipped examples/.
+def _outside_examples(gov_dir: Path, name: str) -> list[Path]:
+    """Files called *name* under *gov_dir*, minus the top-level ``examples/``.
 
-    Only the top-level ``.agents/governance/examples/`` is excluded — a card
-    stored under a deeper directory that happens to be named ``examples`` is
-    still a real card.
+    Only the top-level ``.agents/governance/examples/`` is excluded — a file
+    stored under a deeper directory that happens to be named ``examples`` still
+    counts.
     """
-    return [
-        p for p in gov_dir.rglob("SYSTEM_CARD.md") if p.relative_to(gov_dir).parts[0] != "examples"
-    ]
+    return [p for p in gov_dir.rglob(name) if p.relative_to(gov_dir).parts[0] != "examples"]
+
+
+def find_cards(gov_dir: Path) -> list[Path]:
+    """Real system cards (named SYSTEM_CARD.md), excluding the shipped examples/."""
+    return _outside_examples(gov_dir, "SYSTEM_CARD.md")
+
+
+def find_misfiled_declarations(gov_dir: Path) -> list[Path]:
+    """``NO_AI_SYSTEM.md`` files the gate never reads: any but the governance root's."""
+    return [p for p in _outside_examples(gov_dir, DECLARATION_FILE) if p.parent != gov_dir]
 
 
 def staleness_days(gov_dir: Path) -> int:
@@ -183,17 +206,54 @@ def validate_card(card: Path, root: Path, gov_dir: Path, max_age: int) -> list[s
     return errs
 
 
+def is_blank_declaration_value(value: str) -> bool:
+    """True for a value that says nothing: missing, a template placeholder, YAML
+    null or a block indicator (``~``, ``null``, ``|``, ``>``), or a stub (``TODO``)."""
+    v = (value or "").strip()
+    if is_placeholder(v) or not re.search(r"[^\W_]", v):
+        return True
+    return v.strip(".!?:;,").lower() in _STUB_WORDS
+
+
+def _frontmatter_unclosed(text: str) -> bool:
+    """A leading ``---`` fence with no second one: the whole body would read as keys."""
+    lines = text.splitlines()
+    return (
+        bool(lines) and lines[0].strip() == "---" and all(ln.strip() != "---" for ln in lines[1:])
+    )
+
+
+def _check_declared_on(value: str) -> list[str]:
+    """A real ISO date, not in the future, not before the gate existed."""
+    age, errs = _date_age("declared_on", value)
+    if age is not None and age > (date.today() - DECLARATION_FLOOR).days:
+        return [
+            f"declared_on {value} is before this gate existed ({DECLARATION_FLOOR.isoformat()}); "
+            "date the declaration the day it was written"
+        ]
+    return errs
+
+
 def validate_declaration(declaration: Path) -> list[str]:
-    """A ``NO_AI_SYSTEM.md`` must carry a real reason and a valid, non-future date."""
-    fm = parse_frontmatter(declaration.read_text(encoding="utf-8"))
-    errs = [
-        f"missing/placeholder field: {k}"
-        for k in DECLARATION_REQUIRED
-        if is_placeholder(fm.get(k, ""))
-    ]
+    """A ``NO_AI_SYSTEM.md`` must carry a real reason and a valid, plausible date."""
+    text = declaration.read_text(encoding="utf-8")
+    fm = parse_frontmatter(text)
+    errs = []
+    if _frontmatter_unclosed(text):
+        errs.append("frontmatter opens with '---' but is never closed by a second '---' line")
+    for k in DECLARATION_REQUIRED:
+        v = fm.get(k, "")
+        if is_blank_declaration_value(v):
+            errs.append(f"missing/placeholder field: {k}" + (f" (got {v!r})" if v else ""))
+    reason = fm.get("reason", "")
+    if not is_blank_declaration_value(reason) and len(reason) < MIN_REASON_CHARS:
+        errs.append(
+            f"reason is too short to explain anything ({len(reason)} chars; "
+            f"at least {MIN_REASON_CHARS}): {reason!r}"
+        )
     declared_on = fm.get("declared_on", "")
-    if declared_on and not is_placeholder(declared_on):
-        errs += _date_age("declared_on", declared_on)[1]
+    if not is_blank_declaration_value(declared_on):
+        errs += _check_declared_on(declared_on)
     return errs
 
 
@@ -225,15 +285,13 @@ def _report(rel: Path, errs: list[str]) -> bool:
     return False
 
 
-def _check_declaration(root: Path, declaration: Path) -> int:
-    """The no-card path: pass only on a valid, dated declaration."""
+def _check_declaration(root: Path, declaration: Path) -> bool:
+    """The no-card path: report the declaration; True when it failed."""
     if _report(declaration.relative_to(root), validate_declaration(declaration)):
-        print(f"\ngovernance gate failed — fix {DECLARATION_FILE} above.")
-        return 1
+        return True
     fm = parse_frontmatter(declaration.read_text(encoding="utf-8"))
     print(f"  declared no AI system on {fm['declared_on']}: {fm['reason']}")
-    print("governance gate passed (declared: no AI system).")
-    return 0
+    return False
 
 
 def _contradiction(root: Path, declaration: Path, cards: list[Path]) -> list[str]:
@@ -245,29 +303,49 @@ def _contradiction(root: Path, declaration: Path, cards: list[Path]) -> list[str
     ]
 
 
+def _misfiled(root: Path, gov_dir: Path) -> bool:
+    """Report every declaration the gate would never read; True when any exists."""
+    failed = False
+    for stray in sorted(find_misfiled_declarations(gov_dir)):
+        failed |= _report(
+            stray.relative_to(root),
+            [
+                f"misfiled declaration: the gate reads only .agents/governance/{DECLARATION_FILE}, "
+                "so this copy counts for nothing. Move it there, or delete it."
+            ],
+        )
+    return failed
+
+
 def main(argv: list[str]) -> int:
     root = Path(argv[1]).resolve() if len(argv) > 1 else Path.cwd()
     gov_dir = root / ".agents" / "governance"
     # A missing governance dir is not an exemption: with no card and no
     # declaration nothing is declared, so it falls through to the failure below.
-    cards = find_cards(gov_dir) if gov_dir.is_dir() else []
+    present = gov_dir.is_dir()
+    cards = find_cards(gov_dir) if present else []
     declaration = gov_dir / DECLARATION_FILE
     declared = declaration.is_file()
+    failed = _misfiled(root, gov_dir) if present else False
     if not cards and not declared:
         print(_silence_message())
         return 1
-    if not cards:
-        return _check_declaration(root, declaration)
-    failed = False
-    if declared:
-        failed = _report(declaration.relative_to(root), _contradiction(root, declaration, cards))
-    max_age = staleness_days(gov_dir)
-    for card in sorted(cards):
-        failed |= _report(card.relative_to(root), validate_card(card, root, gov_dir, max_age))
+    if cards:
+        if declared:
+            failed |= _report(
+                declaration.relative_to(root), _contradiction(root, declaration, cards)
+            )
+        max_age = staleness_days(gov_dir)
+        for card in sorted(cards):
+            failed |= _report(card.relative_to(root), validate_card(card, root, gov_dir, max_age))
+    else:
+        failed |= _check_declaration(root, declaration)
     if failed:
         print("\ngovernance gate failed — fix the problems above.")
         return 1
-    print("governance gate passed.")
+    print(
+        "governance gate passed." if cards else "governance gate passed (declared: no AI system)."
+    )
     return 0
 
 
