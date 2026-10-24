@@ -416,6 +416,7 @@ class TestUpgradeApply:
             target,
             lambda m: m.__setitem__("justfile", hashlib.sha256(old_render).hexdigest()),
         )
+        _set_base(target, "justfile", old_render.decode())  # a real old render's base (#1109)
 
         rc = main(["upgrade", str(target), "--apply"])
         assert rc == 0
@@ -446,6 +447,7 @@ class TestUpgradeApply:
             target,
             lambda m: m.__setitem__(rel, hashlib.sha256(old_render).hexdigest()),
         )
+        _set_base(target, rel, old_render.decode())  # a real old render's base (#1109)
 
         rc = main(["upgrade", str(target), "--apply"])
         assert rc == 0
@@ -523,6 +525,7 @@ class TestUpgradeApply:
             target,
             lambda m: m.__setitem__("justfile", hashlib.sha256(b"old\n").hexdigest()),
         )
+        _set_base(target, "justfile", "old\n")  # a real old render's base (#1109)
 
         rc = main(["upgrade", str(target), "--apply"])
         assert rc == 0
@@ -1046,11 +1049,13 @@ class TestThreeWayMergeApply:
 def _make_changed_justfile(target: Path, old: bytes = b"# old render\n") -> bytes:
     """Turn justfile into a `changed` file (drifted, unedited) and return *old*.
 
-    Writes *old* and patches the recorded hash to match, so upgrade sees a file
-    the templates moved past but the user never touched.
+    Writes *old* and patches the recorded hash and base to match, so upgrade sees
+    a file the templates moved past but the user never touched (a base left at
+    the newer render would mark it user-edited, #1109).
     """
     (target / "justfile").write_bytes(old)
     _patch_manifest(target, lambda m: m.__setitem__("justfile", hashlib.sha256(old).hexdigest()))
+    _set_base(target, "justfile", old.decode())
     return old
 
 
