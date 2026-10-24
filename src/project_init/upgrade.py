@@ -12,7 +12,9 @@ compared against the project:
 - file missing from the project          -> new (restored on ``--apply``)
 - project file matches the new render    -> unchanged
 - differs, but matches the recorded hash -> changed (applied on ``--apply``;
-  the user never edited it, so overwriting loses nothing)
+  the user never edited it, so overwriting loses nothing) — unless the file
+  also differs from its recorded base render, which marks it user-edited
+  whatever the hash says (a hash can be re-recorded over a local edit, #1109)
 - differs from the recorded hash too     -> the user edited it; a 3-way merge
   (base render / current file / new render) runs via ``git merge-file`` with a
   pure-Python fallback (#240). Non-overlapping user+upstream edits auto-merge
@@ -1134,6 +1136,16 @@ def _classify_conflict(
     (report.merged if clean else report.conflicts).append(rel)
 
 
+def _differs_from_base(rel: Path, base: dict[str, str], current: bytes) -> bool:
+    """True when *rel* has a recorded base render and the file no longer matches it.
+
+    The base is the text this tool last rendered, so it outranks a manifest hash
+    that can be re-recorded over a local edit (#1109). No base entry -> False.
+    """
+    base_text = base.get(rel.as_posix())
+    return base_text is not None and _decode(current) != base_text
+
+
 def compute_drift(
     target: Path,
     staging: Path,
@@ -1167,7 +1179,11 @@ def compute_drift(
         if current == new_bytes:
             continue
         recorded = manifest.get(rel.as_posix())
-        if recorded is not None and _hash_bytes(current) == recorded:
+        if (
+            recorded is not None
+            and _hash_bytes(current) == recorded
+            and not _differs_from_base(rel, base, current)
+        ):
             report.changed.append(rel)
             report.diffs[rel] = _unified_diff(rel, current, new_bytes)
         else:
