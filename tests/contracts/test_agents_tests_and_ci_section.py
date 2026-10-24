@@ -50,6 +50,8 @@ class TestTestsAndCiSection:
         assert "(.agents/docs/guides/self-hosted-ci-runner.md)" in where
         assert "mutation tests" in s["Not per-PR"]
         assert "403" in s["Not per-PR"]
+        assert "gh workflow run ci.yml --ref <branch> -f cadence=nightly" in s["Not per-PR"]
+        assert "has no" not in s["Not per-PR"]
         assert (
             "refusing to allow a GitHub App" in s["Workflow files need the `workflows` permission"]
         )
