@@ -280,11 +280,11 @@ def _choose_governance_interactive() -> bool:
     """Explain the AI-governance overlay, then ask (ADR-018, #410).
 
     States what the overlay ships — governance-as-code (AUP + approved-tools/
-    data-handling docs, a system card + AIBOM, a presence-triggered CI gate that
-    adopts NIST AI RMF / EU AI Act conventions) — so the user makes an informed
-    choice or declines; declining leaves a clean project. Passing --governance
-    pre-accepts via the flag and skips this. Most projects are not AI products,
-    so it is strictly opt-in and off by default.
+    data-handling docs, a system card + AIBOM, a CI gate that never passes on
+    silence and adopts NIST AI RMF / EU AI Act conventions) — so the user makes
+    an informed choice or declines; declining leaves a clean project. Passing
+    --governance pre-accepts via the flag and skips this. Most projects are not
+    AI products, so it is strictly opt-in and off by default.
     """
     from rich.panel import Panel
     from rich.prompt import Confirm
@@ -301,15 +301,16 @@ def _choose_governance_interactive() -> bool:
         "  [dim]ai-code-provenance.md[/dim]   [dim]# attribution + licence checks[/dim]\n"
         "  [dim]NIST_RMF_CROSSWALK.md[/dim]   [dim]# maps to Govern/Map/Measure/Manage[/dim]\n"
         "  [dim]examples/SYSTEM_CARD[/dim]    [dim]# system-card template + filled example[/dim]\n"
+        "  [dim]examples/NO_AI_SYSTEM[/dim]   [dim]# template: this repo ships no AI system[/dim]\n"
         "  [dim]ai-bom.generated.md[/dim]     [dim]# AI bill of materials (AIBOM), "
         "regenerated each run[/dim]\n"
-        "  [dim]governance_gate.py[/dim]      [dim]# presence-triggered CI gate (in the merge gate)[/dim]\n\n"
+        "  [dim]governance_gate.py[/dim]      [dim]# CI gate, red until declared (in the merge gate)[/dim]\n\n"
         '[cyan]Helps:[/cyan] answer "what AI runs here, on what data, under whose '
         'sign-off" for reviewers, customers, and regulators.\n'
         "[cyan]Adopts:[/cyan] NIST AI RMF, ISO/IEC 42001, EU AI Act, OWASP LLM/Agentic "
         "Top 10 — referenced, not re-authored.\n"
-        "[cyan]Gate:[/cyan] validates every real SYSTEM_CARD.md and fails on missing/"
-        "placeholder fields — inert until you write a card.\n"
+        "[cyan]Gate:[/cyan] CI stays red until you write a valid SYSTEM_CARD.md or a "
+        "dated NO_AI_SYSTEM.md declaring the repo ships no AI system.\n"
         "[cyan]Note:[/cyan] most projects are not AI products — keep this off unless "
         "yours calls an LLM API over data.\n"
         "[dim]Default: off — decline and nothing is added.[/dim]"

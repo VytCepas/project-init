@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # governance_gate.sh — ADR-018 governance gate (#412).
-# Validates every real .agents/governance/**/SYSTEM_CARD.md (the shipped
-# examples/ are excluded) and exits non-zero on any violation. No real card =>
-# pass. CI-first: the `governance` CI job is the enforcement boundary; this
-# script is what that job runs and what you can run locally.
+# Passes only when (a) every real .agents/governance/**/SYSTEM_CARD.md (the
+# shipped examples/ are excluded) validates, or (b) there is no card and
+# .agents/governance/NO_AI_SYSTEM.md declares, with a reason and a date, that
+# this repo ships no AI system. No card and no declaration => FAIL; a card and
+# a declaration together => FAIL. CI-first: the `governance` CI job is the
+# enforcement boundary; this script is what that job runs and what you can run
+# locally.
 case "${1-}" in
 -h | --help) # the header above is the help; nothing else runs (#992)
   sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"

@@ -119,6 +119,20 @@ class TestRemove:
         out = capsys.readouterr().out
         assert "another forge" in out
 
+    def test_add_governance_says_the_gate_is_red_until_declared(self, tmp_path: Path, capsys):
+        # Adding the concern turns the governance CI job red; the output must say
+        # which two files turn it green, not leave that to be discovered in CI.
+        target = _scaffold(tmp_path / "p")
+        apply_concern(target, "governance", enable=True, apply=True)
+        out = " ".join(capsys.readouterr().out.split())
+        for needle in ("SYSTEM_CARD.md", "NO_AI_SYSTEM.md", "governance_gate.sh"):
+            assert needle in out, needle
+
+    def test_remove_governance_does_not_print_the_gate_advisory(self, tmp_path: Path, capsys):
+        target = _scaffold(tmp_path / "p", governance=True)
+        apply_concern(target, "governance", enable=False, apply=True)
+        assert "NO_AI_SYSTEM.md" not in capsys.readouterr().out
+
     def test_remove_already_absent_is_noop(self, tmp_path: Path, capsys):
         target = _scaffold(tmp_path / "p")
         rc = apply_concern(target, "governance", enable=False, apply=True)
@@ -248,6 +262,17 @@ class TestPurgeExport:
         assert leftover.is_file()  # plain remove keeps the user file
         apply_concern(target, "governance", enable=False, apply=True, purge=True)
         assert not leftover.exists()  # purge cleans it despite the no-op toggle
+
+    def test_purge_cleans_a_no_ai_declaration_too(self, tmp_path: Path):
+        # The declaration is governance source data like a card: a plain remove
+        # keeps it, --purge deletes it (and the gate that read it is gone).
+        target = _scaffold(tmp_path / "p", governance=True)
+        declaration = target / ".agents/governance/NO_AI_SYSTEM.md"
+        declaration.write_text("---\nreason: x\ndeclared_on: 2026-01-01\n---\n")
+        apply_concern(target, "governance", enable=False, apply=True)
+        assert declaration.is_file()
+        apply_concern(target, "governance", enable=False, apply=True, purge=True)
+        assert not declaration.exists()
 
 
 class TestReportTruncationMarker:

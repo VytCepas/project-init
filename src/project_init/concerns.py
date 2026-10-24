@@ -118,7 +118,17 @@ def _mutate(variables: dict[str, str], concern: str, *, enable: bool, value: str
 
 
 def _advisory(concern: str, *, enable: bool) -> str | None:
-    """A one-line note printed after certain toggles (lifecycle blast radius)."""
+    """A note printed after certain toggles (lifecycle blast radius, the governance gate)."""
+    if concern == "governance" and enable:
+        return (
+            "The governance gate never passes on silence: its CI job stays red until the "
+            "repo has a real .agents/governance/SYSTEM_CARD.md (it ships an AI system: copy "
+            ".agents/governance/examples/SYSTEM_CARD.template.md) or a filled "
+            ".agents/governance/NO_AI_SYSTEM.md (it ships none: copy "
+            ".agents/governance/examples/NO_AI_SYSTEM.template.md, set reason and "
+            "declared_on). Already have one? Nothing to do. Check with "
+            "`bash .agents/scripts/governance_gate.sh`."
+        )
     if concern == "lifecycle" and not enable:
         return (
             "Removed project-init's GitHub-lifecycle wiring (hooks, scripts, "
