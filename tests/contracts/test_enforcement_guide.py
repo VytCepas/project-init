@@ -71,7 +71,9 @@ class TestEnforcementGuide:
 
     def test_agents_md_stays_under_word_budget(self, tmp_path: Path):
         """Regression guard for the always-loaded tier (pre-trim: ~1270 words
-        on a multi-agent scaffold). WS12 will formalize this as a lint."""
+        on a multi-agent scaffold). WS12 will formalize this as a lint. Raised from
+        1000 to 1300 for the Tests and CI section (#1107), measured at 1253 words
+        with it (998 before): the section is the cost, the cap still catches regrowth."""
         target = _scaffold_multi_agent(tmp_path / "p")
         words = len((target / "AGENTS.md").read_text().split())
-        assert words < 1000, f"AGENTS.md grew back to {words} words"
+        assert words < 1300, f"AGENTS.md grew back to {words} words"
