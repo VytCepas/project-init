@@ -74,9 +74,12 @@ test-mutation:
 # complements package_guard.py, which only blocks installing a package that
 # doesn't exist or looks typosquatted — this catches a real, correctly-
 # spelled dependency with a known vulnerability already in the lockfile.
+# It audits the exported lock, never an environment: `uv run --with pip-audit`
+# scanned pip-audit's own dependencies too, and a stale certifi there held a
+# project with none red for a week (PI-1111).
 [doc("dependency vulnerability scan against known CVEs/advisories (PI-568).")]
 audit:
-    sh -c 'if [ -f pyproject.toml ] || [ -f requirements.txt ] || [ -f uv.lock ]; then uv run --with pip-audit pip-audit; else echo "No Python dependency manifest yet — nothing to audit."; fi'
+    sh -c 'if [ -f pyproject.toml ] || [ -f uv.lock ]; then f="$(mktemp)" && uv export --all-extras --all-groups --no-emit-workspace --no-hashes -q > "$f" && uvx pip-audit --disable-pip --no-deps -r "$f"; rc=$?; rm -f "$f"; exit "$rc"; elif [ -f requirements.txt ]; then uvx pip-audit -r requirements.txt; else echo "No Python dependency manifest yet — nothing to audit."; fi'
 
 # generate a CycloneDX SBOM of the runtime dependency tree (#574). release.yml
 # attaches this to GitHub Releases; run locally on demand. --no-dev so it
