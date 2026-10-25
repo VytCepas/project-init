@@ -69,9 +69,13 @@ docs:
 # NOT synced by `lint-and-test`'s `uv sync --group dev`. Without --all-extras the
 # gate would run in an env where those packages aren't even installed and report
 # clean while a docs-extra CVE ships — a gate that can't fire (#637 review).
+#
+# Since PI-1111 it audits the exported lock (every extra and group, so the docs
+# extra above is still in scope) instead of an environment: `--with pip-audit`
+# also scanned pip-audit's own dependencies.
 [doc("scan dependencies for known CVEs (#637)")]
 audit:
-    uv run --all-extras --with pip-audit pip-audit
+    sh -c 'f="$(mktemp)" && uv export --all-extras --all-groups --no-emit-workspace --no-hashes -q > "$f" && uvx pip-audit --disable-pip --no-deps -r "$f"; rc=$?; rm -f "$f"; exit "$rc"'
 
 # dependency license compliance scan (#579) — fail on copyleft (GPL/AGPL; also
 # LGPL, since --partial-match is substring-based). Advisory in CI (not in
