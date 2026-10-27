@@ -5,7 +5,7 @@
 # Declares to every layer ABOVE this repo — a root orchestrator, a global agent
 # environment, any hook that would otherwise write a machine-wide log — that this
 # project governs itself.
-#   repo    — this repo wins on PROJECT matters — workflow, conventions, branch
+#   project — this repo wins on PROJECT matters — workflow, conventions, branch
 #             naming, tooling, task tracking — and the ambient layer stands down
 #             for those (what a scaffold always emits). THE STAND-DOWN IS SCOPED:
 #             safety and verification posture (destructive-command refusal,
@@ -15,14 +15,16 @@
 #             would delete them rather than replace them. AGENTS.md's "Key rules
 #             for agents" states the same scope in the surface an agent actually
 #             loads — the two must not drift apart (#968).
-#   ambient — opt out: let the global layer keep acting here
+#   user    — opt out: let the global layer keep acting here
 # Deliberately NOT `governance:` — that name is already a project-init boolean
 # (the AI-governance overlay gate, ADR-018), and overloading it collides in both
 # the wizard and the schema.
+# The key is `scope:`. The older spelling, `context: repo|ambient`,
+# means the same (repo = project, ambient = user) and stays readable.
 # A reader also treats the PRESENCE of .agents/ as the marker, so deleting this
 # line does not hand the repo back to the ambient layer — it only removes the
 # explicit declaration a reader can act on.
-context: repo
+scope: project
 
 project:
   name: "{{project_name}}"

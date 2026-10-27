@@ -2,8 +2,10 @@
 
 `.agents/config.yaml` is never re-rendered wholesale on upgrade (it holds
 hand-edited fields), so the template line alone would only ever mark *new*
-projects. `upgrade` splices `context: repo` in — idempotently, and without ever
-overwriting an owner who deliberately opted out with `context: ambient`.
+projects. `upgrade` splices `scope: project` in (harbor#966; the legacy
+`context:` key is read, never written) — idempotently, and without ever
+overwriting an owner who deliberately opted out with `context: ambient` or
+`scope: user`.
 
 harbor#4 H1 / harbor CONTRACTS/marker.md: the marker is what tells a root
 orchestrator or a global agent environment to stand down inside a governed repo.
@@ -11,6 +13,8 @@ An unmarked repo is one the layer above keeps acting in.
 """
 
 from __future__ import annotations
+
+import re
 
 import pytest
 import yaml
@@ -36,13 +40,25 @@ def _with_record(body: str) -> str:
 
 
 def test_backfill_adds_the_marker_to_a_pre_901_config() -> None:
-    assert "\ncontext: repo\n" in _ensure_context_key(_PRE_901)
+    assert "\nscope: project\n" in _ensure_context_key(_PRE_901)
 
 
-def test_backfill_puts_context_above_project() -> None:
+def test_backfill_writes_scope_never_context() -> None:
+    out = _ensure_context_key(_PRE_901)
+    assert yaml.safe_load(out)["scope"] == "project"
+    assert "context" not in yaml.safe_load(out)
+
+
+@pytest.mark.parametrize("line", ["context: repo", "scope: project", "scope: user"])
+def test_backfill_leaves_either_spelling_of_the_marker_alone(line: str) -> None:
+    text = f"{line}\n{_PRE_901}"
+    assert _ensure_context_key(text) == text
+
+
+def test_backfill_puts_scope_above_project() -> None:
     # Template order: the marker is the first key a reader meets.
     out = _ensure_context_key(_PRE_901)
-    assert out.index("\ncontext:") < out.index("\nproject:")
+    assert out.index("\nscope:") < out.index("\nproject:")
 
 
 def test_backfill_is_idempotent() -> None:
@@ -54,25 +70,25 @@ def test_backfill_never_revokes_a_deliberate_opt_out() -> None:
     # `ambient` is the owner saying "keep acting here". An upgrade that reset it
     # to `repo` would silently revoke that decision — and the failure is
     # invisible, because both values are valid.
-    opted_out = _ensure_context_key(_PRE_901).replace("context: repo", "context: ambient")
+    opted_out = _ensure_context_key(_PRE_901).replace("scope: project", "scope: user")
     out = _ensure_context_key(opted_out)
-    assert out.count("context:") == 1
-    assert "context: ambient" in out
+    assert len(re.findall(r"(?m)^scope:", out)) == 1
+    assert yaml.safe_load(out)["scope"] == "user"
 
 
 def test_backfill_leaves_the_scaffold_record_intact() -> None:
     out = _ensure_context_key(_with_record(_PRE_901))
     assert out.count(_RECORD_MARKER) == 1
-    assert out.index("\ncontext:") < out.index(_RECORD_MARKER)
+    assert out.index("\nscope:") < out.index(_RECORD_MARKER)
 
 
 def test_a_commented_out_marker_does_not_count_as_present() -> None:
-    # `# context: repo` in a comment is documentation, not a declaration. If the
+    # `# scope: project` in a comment is documentation, not a declaration. If the
     # presence check matched it the splice would no-op and the repo would stay
     # unmarked while looking marked to a human reading the file.
-    commented = "# context: repo\n" + _PRE_901
+    commented = "# scope: project\n" + _PRE_901
     out = _ensure_context_key(commented)
-    assert "\ncontext: repo\n" in out
+    assert "\nscope: project\n" in out
 
 
 @pytest.mark.parametrize(
@@ -107,7 +123,7 @@ def test_backfill_reaches_a_config_with_no_project_key() -> None:
     # (PI-880): with nothing to anchor on, prepend rather than silently drop.
     out = _ensure_context_key("language: python\n")
     assert out.startswith("# Detect-and-defer")
-    assert "\ncontext: repo\n" in out
+    assert "\nscope: project\n" in out
 
 
 def test_backfilled_comment_states_the_same_scope_as_a_fresh_scaffold() -> None:

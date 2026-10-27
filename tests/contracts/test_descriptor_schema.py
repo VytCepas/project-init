@@ -175,12 +175,13 @@ class TestContractVersionAndBlocks:
         # must stay valid until `upgrade` back-fills them), so schema validation
         # alone would pass with the key dropped from the template entirely.
         config = _render_full(tmp_path)
-        assert config["context"] == "repo"
+        assert config["scope"] == "project"
+        assert "context" not in config, "the legacy key is read, never written (harbor#966)"
 
     def test_agents_md_states_the_precedence_the_marker_declares(self, tmp_path: Path):
         """#968 — the layer that must HONOUR the precedence is told it exists.
 
-        `context: repo` was announced to the wrong reader: a marker-walking hook
+        `scope: project` was announced to the wrong reader: a marker-walking hook
         reads config.yaml, but a model reads AGENTS.md, and AGENTS.md said
         nothing. Measured before this: `grep -rni ambient templates/` hit only
         config.yaml.tmpl and prod_guard.py — zero hits in either instruction
@@ -196,7 +197,7 @@ class TestContractVersionAndBlocks:
         rules = agents_md.split("## Key rules for agents", 1)
         assert len(rules) == 2, "the rules section is gone — this test's anchor moved"
         rules_body = rules[1].split("\n## ", 1)[0]
-        assert "context: repo" in rules_body
+        assert "scope: project" in rules_body
         assert "ambient" in rules_body.lower()
 
     def test_the_stand_down_is_declared_scoped_not_total(self, tmp_path: Path):
