@@ -41,10 +41,20 @@ class TestScaffoldedArtifacts:
         assert script.is_file()
         assert script.stat().st_mode & 0o111  # executable
 
-    def test_agents_md_points_at_code_map(self, tmp_path: Path):
-        target = tmp_path / "p"
-        _scaffold(target, "python")
-        assert "CODE_MAP.md" in (target / "AGENTS.md").read_text()
+    def test_agents_md_names_the_map_only_once_it_exists(self, tmp_path: Path):
+        """A scaffold never writes CODE_MAP.md, so it names the recipe that makes it;
+        a project that already holds the map is pointed at the file (harbor#967)."""
+        fresh = tmp_path / "fresh"
+        _scaffold(fresh, "python")
+        text = (fresh / "AGENTS.md").read_text()
+        assert "CODE_MAP.md" not in text
+        assert "`just code-map`" in text
+
+        held = tmp_path / "held"
+        (held / ".agents" / "docs").mkdir(parents=True)
+        (held / ".agents" / "docs" / "CODE_MAP.md").write_text("# map\n")
+        _scaffold(held, "python")
+        assert "`.agents/docs/CODE_MAP.md`" in (held / "AGENTS.md").read_text()
 
     def test_justfile_has_code_map_recipe(self, tmp_path: Path):
         target = tmp_path / "p"

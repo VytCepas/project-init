@@ -268,6 +268,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #   • token_efficiency skill (PI-647) — new default-on skill with token-frugal
 #     working habits; INDEX/AGENTS.md/justfile rows already excluded above
 _ADDED_SINCE_BASELINE = {
+    # harbor#967: the base layer gained a README skeleton, a new file, so the
+    # baseline (captured before it) cannot hold it.
+    "README.md",
     # PR #1027 (no issue): CLAUDE.md now IMPORTS AGENTS.md with a bare `@AGENTS.md` line
     # instead of linking to it in prose. Claude Code expands only `@path`, so
     # the link form left the canonical instructions unread while CLAUDE.md went
