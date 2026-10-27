@@ -13,6 +13,11 @@ import pytest
 # inherit this env too).
 os.environ.setdefault("PROJECT_INIT_BOX_PROFILE", "/nonexistent/box-profile.toml")
 
+# Same for harbor's naming lint (harbor#967): a checkout of harbor beside the
+# developer's repos must not decide whether a test name is accepted. Set but
+# empty means "do not look"; a test that wants a verdict points it at a stub.
+os.environ["PROJECT_INIT_LINT_NAME"] = ""
+
 _PATH_MARKERS = {
     "unit": "unit",
     "contracts": "contract",
