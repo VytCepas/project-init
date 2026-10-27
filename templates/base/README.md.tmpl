@@ -1,0 +1,32 @@
+# {{project_name}}
+
+{{project_description}}
+
+A newcomer should be able to answer four questions from this page alone. The
+four sections below are required: fill each in, and keep its heading.
+
+## What this is
+
+<!-- One paragraph: what this project does, who uses it, and what it is not. -->
+
+{{project_description}}
+
+## Where the code lives
+
+<!-- List the top-level directories and what each holds, one line each. Name only
+     directories that exist. -->
+
+Agent and project configuration is under [`.agents/`](.agents/). Agents start at
+[`AGENTS.md`](AGENTS.md).
+
+## How to run the tests
+
+{{#if has_just}}Run `just test-quick` while editing and `just test` before pushing. `just --list`
+shows every recipe.
+{{/if has_just}}{{#if no_just}}<!-- No test command is set up yet. Add one and name it here, with the command for a
+     single quick run and the command for the full suite. -->
+{{/if no_just}}
+## Where decisions are
+
+Architecture decisions are recorded as ADRs under [`.agents/docs/adr/`](.agents/docs/adr/).
+Development guides are in [`.agents/docs/`](.agents/docs/).

@@ -1017,6 +1017,49 @@ def _apply_preset_vars(variables: dict[str, str], preset: dict[str, Any]) -> dic
     return merged
 
 
+# Harness directory each non-Claude surface gets (surfaces.SURFACES / the
+# per-agent overlays). antigravity lives in `.agents/`, which always exists, and
+# ollama has no directory, so neither is listed.
+_SURFACE_DIRS = {
+    "codex": ".codex/",
+    "cursor": ".cursor/",
+    "amp": ".amp/",
+    "junie": ".junie/",
+    "vscode": ".vscode/",
+}
+
+
+def _presence_flags(root: Path, variables: dict[str, str]) -> dict[str, str]:
+    """Gate flags for what the rendered instructions may name (harbor#967).
+
+    AGENTS.md used to name `just`, `CODE_MAP.md` and every harness directory
+    whatever the repo held. A path an agent is told to open that is not there is
+    a defect nobody sees until an agent trips on it, so the names the file uses
+    are decided here from the project, not from the template's assumptions.
+    *root* is the real project (``detect_root`` on upgrade, which renders into a
+    staging dir).
+    """
+    # The justfile recipes only exist where a justfile does: one already in the
+    # project, or the one this run writes for a language that has a template.
+    has_just = bool(
+        variables.get("lint_command")
+        and (variables.get("justfile") or (root / "justfile").is_file())
+    )
+    # The map is generated on demand (`just code-map`), never written by a
+    # scaffold, so the path is named only once it exists.
+    has_code_map = (root / ".agents" / "docs" / "CODE_MAP.md").is_file()
+    can_make_code_map = bool(has_just and variables.get("python"))
+    agents = [a.strip() for a in variables.get("agents", "").split(",")]
+    dirs = ", ".join(f"`{_SURFACE_DIRS[a]}`" for a in agents if a in _SURFACE_DIRS)
+    return {
+        "has_just": "true" if has_just else "",
+        "no_just": "" if has_just else "true",
+        "has_code_map": "true" if has_code_map else "",
+        "code_map_makeable": "true" if can_make_code_map and not has_code_map else "",
+        "surface_dirs": dirs,
+    }
+
+
 def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
     target: Path,
     preset: dict[str, Any],
@@ -1071,6 +1114,7 @@ def scaffold(  # noqa: PLR0913 — orthogonal engine knobs, all keyword-only
 
     layers: list[str] = preset["layers"]
     variables = _apply_preset_vars(variables, preset)
+    variables = {**variables, **_presence_flags(detect_root or target, variables)}
     created: list[Path] = []
     staged: list[Path] = []
     written: set[Path] = set()  # paths this run has emitted (later layers may overwrite)
