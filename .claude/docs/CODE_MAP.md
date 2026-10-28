@@ -106,6 +106,15 @@ Curated per-version upgrade notes surfaced by `project-init upgrade` (#244).
 
 - `def notes_for_span` — Return ``[(version, entry)]`` for the span, newest version first.
 
+### `project_init/naming.py`
+
+Check a name at its birth against harbor's naming standard (harbor#967).
+
+- `class NameVerdict` — What the standard said about one name.
+- `def find_lint_name` — Locate harbor's lint-name.sh, or None when harbor is not on this box.
+- `def check_name` — Ask ``lint-name.sh --check <surface> <name>``; never raise on a missing or broken harbor.
+- `def name_error` — Why the standard refuses *name*, or None when it passes or cannot be asked.
+
 ### `project_init/platform_guard.py`
 
 Refuse a native Windows shell before anything runs (#1070, ADR-030).

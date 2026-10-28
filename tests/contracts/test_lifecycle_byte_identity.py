@@ -286,6 +286,9 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     token-frugal working habits; same --no-plugin/plugin split as
 #     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
+    # harbor#967: the base layer gained a README skeleton, a new file, so the
+    # baseline (captured before it) cannot hold it.
+    "README.md",
     # PR #1027 (no issue): CLAUDE.md now IMPORTS AGENTS.md with a bare `@AGENTS.md` line
     # instead of linking to it in prose. Claude Code expands only `@path`, so
     # the link form left the canonical instructions unread while CLAUDE.md went

@@ -21,6 +21,7 @@ from project_init.console import (
     render_presets,
 )
 from project_init.mcps import MCP_CATALOG, PLAYWRIGHT_MCP
+from project_init.naming import check_name
 from project_init.scaffold import load_preset, memory_tier
 from project_init.variables import (
     _AGENT_SURFACES,
@@ -95,6 +96,10 @@ def _prompt_validated(label: str, *, default: str, flag: str, allow_empty: bool 
         value = _prompt(label, default=default)
         err = _text_field_error(flag, value, allow_empty=allow_empty)
         if err is None:
+            if flag == "name" and check_name(value).unavailable:
+                console.print(
+                    "[dim]Name not checked against the naming standard: harbor not found.[/dim]"
+                )
             return value
         console.print(f"[red]{err}[/red]")
 

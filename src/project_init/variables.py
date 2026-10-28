@@ -970,4 +970,10 @@ def _text_field_error(flag: str, value: str, *, allow_empty: bool = False) -> st
             f"{flag} must not contain double-quotes, backslashes, newlines, or "
             "control/line-separator characters (they corrupt the generated config.yaml)"
         )
+    # harbor#967: a name is judged by the standard's own lint, never by a rule
+    # copied here. Advisory when harbor is absent (name_error returns None).
+    if flag == "name":
+        from project_init.naming import name_error
+
+        return name_error(value)
     return None

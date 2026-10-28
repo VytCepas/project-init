@@ -5,6 +5,11 @@
   "description": "JSON schema for the cross-project memory descriptor contract (.agents/config.yaml).",
   "type": "object",
   "properties": {
+    "scope": {
+      "type": "string",
+      "enum": ["project", "user"],
+      "description": "Detect-and-defer boundary marker under its standard name. 'project' = this project governs itself and an ambient/global agent layer stands down for project matters; 'user' = the owner opted out and the global layer keeps acting here. Same meaning as the legacy 'context' key (project = repo, user = ambient), which stays valid and readable; project-init writes 'scope' and never 'context'. Like 'context' it is not in 'required': a reader that finds neither falls back to the presence of .agents/ itself, never to 'user'."
+    },
     "context": {
       "type": "string",
       "enum": ["repo", "ambient"],

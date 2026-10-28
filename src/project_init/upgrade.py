@@ -1374,26 +1374,30 @@ def _ensure_ci_block(text: str) -> str:
 # on PR #971, not by a test, which is why one exists now.
 _CONTEXT_BLOCK = (
     "# Detect-and-defer boundary marker (PI-901; the ambient-layer marker\n"
-    "# contract). repo = this project governs itself on PROJECT matters —\n"
+    "# contract). project = this project governs itself on PROJECT matters —\n"
     "# workflow, conventions, tooling — and an ambient/global agent layer stands\n"
     "# down for those. SCOPED, NOT TOTAL: its safety and verification rules still\n"
     "# apply wherever AGENTS.md is silent, because a scaffold does not restate\n"
     "# them and an unscoped stand-down would delete rather than replace them.\n"
-    "# ambient = opt out. Not `governance:` — that name is already a boolean.\n"
-    "context: repo\n"
+    "# user = opt out. Not `governance:` — that name is already a boolean.\n"
+    "# `scope:` is the key; the older `context: repo|ambient` means\n"
+    "# the same and stays readable.\n"
+    "scope: project\n"
     "\n"
 )
 
-# The template renders `context:` immediately above `project:`, and `project:` is
+# The template renders `scope:` immediately above `project:`, and `project:` is
 # the one top-level key present in EVERY config ever emitted (it predates the
 # descriptor contract itself). That is deliberate: the `ci:` splice anchored on a
 # key younger than the configs it had to reach and silently no-opped exactly when
 # it was needed (PI-880).
 _CONTEXT_ANCHOR_RE = re.compile(r"(?m)^project:")
 
-# Every spelling of a top-level `context` key that YAML accepts. A bare
-# `^context:` misses `context : ambient` and `"context": ambient` — both valid —
-# and the splice would then insert a SECOND logical `context` key. Duplicate-key-
+# Every spelling of a top-level marker key that YAML accepts, under either name:
+# `scope` or the legacy `context`. A bare `^context:` misses
+# `context : ambient` and `"context": ambient` — both valid — and the splice
+# would then insert a SECOND logical marker key, or add `scope: project` to a
+# repo whose `context: ambient` opt-out the upgrade must not override. Duplicate-key-
 # tolerant readers keep whichever comes last (the inserted `repo`), silently
 # revoking the opt-out; stricter ones reject the descriptor outright (PR #902
 # review). Still anchored at column 0: `context` is top-level, and one indented
@@ -1401,7 +1405,9 @@ _CONTEXT_ANCHOR_RE = re.compile(r"(?m)^project:")
 # KEEP IN STEP with the ambient layer's own marker reader, which reads the
 # same key — a spelling the writer preserves but the reader misses is an
 # opt-out that survives upgrade and is then ignored.
-_CONTEXT_KEY_RE = re.compile(r"""(?m)^(?:context|"context"|'context')[ \t]*:""")
+_CONTEXT_KEY_RE = re.compile(
+    r"""(?m)^(?:context|"context"|'context'|scope|"scope"|'scope')[ \t]*:"""
+)
 
 
 def _ensure_context_key(text: str) -> str:
@@ -1411,8 +1417,9 @@ def _ensure_context_key(text: str) -> str:
     alone would only ever reach *fresh* scaffolds — every already-scaffolded
     project would stay unmarked and the layer above it could not tell that the
     repo governs itself. Idempotent, and it never rewrites an existing value:
-    ``context: ambient`` is the owner's deliberate opt-out and an upgrade that
-    reset it to ``repo`` would silently revoke a decision.
+    ``context: ambient`` (or ``scope: user``) is the owner's deliberate opt-out
+    and an upgrade that reset it would silently revoke a decision. A config on
+    the legacy ``context:`` key is left on it: both spellings are read.
     """
     head, sep, tail = text.partition(_RECORD_MARKER)
     if _CONTEXT_KEY_RE.search(head):
