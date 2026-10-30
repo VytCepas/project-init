@@ -84,7 +84,7 @@ uv tool install git+https://github.com/VytCepas/project-init@main
 including the PI-903 symlink-refusal check — run. Pin a tag only if you have
 verified it carries that refusal (v1.3.0 or newer); v1.2.2 and older do not.
 
-Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
+Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/main/docs/decisions/0008-distribution-channel.md) (git channel), [ADR-011](https://github.com/VytCepas/project-init/blob/main/docs/decisions/0011-pypi-trusted-publishing.md) (PyPI via trusted publishing).
 
 ### Platform requirements
 
@@ -92,7 +92,7 @@ Distribution rationale: [ADR-008](https://github.com/VytCepas/project-init/blob/
 filesystem (`~/...`), never across `/mnt/c/...`. A native Windows shell (Git
 Bash, MSYS2, Cygwin: `uname -s` starting with `MINGW`, `MSYS` or `CYGWIN`) is
 refused by `install.sh`, by `project-init` itself and by the scaffolded
-SessionStart hook, each naming WSL2 (#1070, [ADR-030](https://github.com/VytCepas/project-init/blob/main/docs/adr/adr-030-macos-linux-wsl2-only.md)).
+SessionStart hook, each naming WSL2 (#1070, [ADR-030](https://github.com/VytCepas/project-init/blob/main/docs/decisions/0030-macos-linux-wsl2-only.md)).
 The scaffolded hooks and lifecycle scripts are bash, with a single bash-3.2
 portability floor (epic #359).
 
@@ -503,7 +503,7 @@ four-category comparison and the moat, see
 
 ## Further reading
 
-- [Using project-init in Your Project](https://github.com/VytCepas/project-init/blob/main/docs/guides/using-project-init.md) — full workflow, day-to-day usage, customization, and troubleshooting
+- [Using project-init in Your Project](https://github.com/VytCepas/project-init/blob/main/docs/guides/using-scaffolder.md) — full workflow, day-to-day usage, customization, and troubleshooting
 - [Template System](https://github.com/VytCepas/project-init/blob/main/docs/development/template-system.md) — how layers and variables work
 - [Contributing](https://github.com/VytCepas/project-init/blob/main/docs/development/contributing.md) — how to contribute to project-init itself
 

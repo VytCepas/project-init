@@ -2,7 +2,7 @@
 
 Turns the token counts a :class:`~tools.benchmark.record.RunRecord` captured
 (#271) into a dollar figure, using a **vendored, static, model-keyed** price
-table (``model_prices.json``) — no network call (CLAUDE.md / ADR-001). The four
+table (``model-prices.json``) — no network call (CLAUDE.md / ADR-001). The four
 token classes are priced independently so prompt-cache economics show up
 honestly: cache reads are ~0.1x input, cache-creation writes ~1.25x input.
 
@@ -18,7 +18,7 @@ from pathlib import Path
 
 from tools.benchmark.record import RunRecord
 
-_DEFAULT_PRICES = Path(__file__).resolve().parent / "model_prices.json"
+_DEFAULT_PRICES = Path(__file__).resolve().parent / "model-prices.json"
 
 # RunRecord token field → litellm per-token cost key.
 _TOKEN_COST_KEYS = (

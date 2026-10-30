@@ -11,16 +11,17 @@ uv run pytest -m smoke          # packaging smoke checks
 uv run pytest --tb=short -q     # CI-style output
 ```
 
-Tests are grouped by directory and auto-marked in `tests/conftest.py`.
+Tests live in `tests/<family>/<tier>/test_<aspect>.py` (harbor naming standard): the family is the
+function under test, the tier is the kind of test. Tiers are auto-marked in `tests/conftest.py`.
 
 ## Suite layout
 
-| Directory | Marker | Purpose |
+| Tier directory | Marker | Purpose |
 |---|---|---|
-| `tests/unit/` | `unit` | Small checks for preset parsing, MCP formatting, and direct render behavior. |
-| `tests/contracts/` | `contract` | Scaffolded file layout, template content, strict rendering, and agent instruction contracts. |
-| `tests/integration/` | `integration` | CLI calls, scaffolded hooks/scripts, git-backed memory linting, and fake-`gh` workflow behavior. |
-| `tests/smoke/` | `smoke` | Installed wheel/package smoke tests. |
+| `tests/<family>/unit/` | `unit` | Small checks for preset parsing, MCP formatting, and direct render behavior. |
+| `tests/<family>/contracts/` | `contract` | Scaffolded file layout, template content, strict rendering, and agent instruction contracts. |
+| `tests/<family>/integration/` | `integration` | CLI calls, scaffolded hooks/scripts, git-backed memory linting, and fake-`gh` workflow behavior. |
+| `tests/<family>/smoke/` | `smoke` | Installed wheel/package smoke tests. |
 
 
 ## What To Test
@@ -44,10 +45,10 @@ if the script can be executed cheaply.
 
 Place new tests by intent, not by implementation file:
 
-- Pure helper or parser behavior: `tests/unit/`
-- A promised scaffolded file, setting, or instruction: `tests/contracts/`
-- A subprocess, hook, shell script, CLI, or git interaction: `tests/integration/`
-- Build/install/package verification: `tests/smoke/`
+- Pure helper or parser behavior: `tests/<family>/unit/`
+- A promised scaffolded file, setting, or instruction: `tests/<family>/contracts/`
+- A subprocess, hook, shell script, CLI, or git interaction: `tests/<family>/integration/`
+- Build/install/package verification: `tests/<family>/smoke/`
 
 Any change to `templates/` should have a corresponding contract or integration
 test. Use integration coverage when a generated script can be run without real

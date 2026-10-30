@@ -11,7 +11,7 @@ uv tool install project-init   # or one-off: uvx project-init .
 
 New here? Start with:
 
-- **[Using project-init](guides/using-project-init.md)** — install, wizard, day-to-day usage
+- **[Using project-init](guides/using-scaffolder.md)** — install, wizard, day-to-day usage
 - **[Positioning](positioning.md)** — how it compares to other scaffolders and plugins
 - **[README on GitHub](https://github.com/VytCepas/project-init#readme)** — full flag reference and agent-support tiers
 
@@ -19,9 +19,9 @@ New here? Start with:
 
 | Path | Purpose |
 |---|---|
-| [`adr/`](adr/adr-001-scaffolder-design.md) | Architecture Decision Records — why decisions were made |
+| [`decisions/`](decisions/0001-scaffolder-design.md) | Architecture Decision Records — why decisions were made |
 | [`development/`](development/contributing.md) | Contributing, standards, testing, template system |
-| [`guides/`](guides/using-project-init.md) | How-to guides for users and contributors |
+| [`guides/`](guides/using-scaffolder.md) | How-to guides for users and contributors |
 
 For active agent workflow rules, start with `CLAUDE.md` in the repo (AGENTS.md
 redirects there); `.github/copilot-instructions.md` covers GitHub Issues, PR

@@ -1,0 +1,353 @@
+# exemptions.tsv (harbor#950) — every name a naming rule does not judge, and why. There are no inline ignores.
+#
+# WHY THIS FILE EXISTS. A rule that reddens a whole tree on arrival gets switched off, and a
+# disabled rule protects nothing (CONSTITUTION §2.11). So the names that predate the standard are
+# enumerated here, generated from each rule's own first scan of the tree, and new names are bound
+# from birth. The list is decided by a person and checked, never judged at runtime.
+#
+# standard_version: 2.0.0
+#
+# KIND
+#   tool-required  a name a tool we do not own looks up (D-1); never expires. The reason names
+#                  the tool.
+#   world-name     a name the world gave the thing: one row per vendored tree (D-52); never expires
+#   legacy         a name from before the standard. Generated from the first scan (harbor#950,
+#                  `bin/lint-name.sh --gen exemptions`), and ONLY SHRINKS: a row that no longer
+#                  exempts anything is name.exemption-stale, a row added after the base is
+#                  name.exemption-grow. Expires on remove_by; an expired row exempts nothing.
+#                  remove_by is the date of the rename wave that retires the row (harbor#961),
+#                  one batch a week, so the list never expires on one day; the reason names it.
+#
+# SUBJECT  a repo-relative path, a <register>:<name> such as env:HELM_ROOT, a directory prefix
+#          ending in /, or **/<basename> for that basename at any depth (a .tmpl beside it too;
+#          * in a basename matches within one segment).
+# RULE     one rule id; * (every rule) only on a tool-required or world-name row.
+#          No row may name standards/naming/, standards/naming.md, bin/lint-name.sh or
+#          fixtures/naming/: the registry cannot exempt itself (name.exemption-self), and the
+#          lint never applies a row to them.
+#
+# COLUMNS  id <TAB> rule <TAB> subject <TAB> kind <TAB> remove_by <TAB> reason
+id	rule	subject	kind	remove_by	reason
+tool-0001	name.case	**/CLAUDE.md	tool-required	never	Claude Code reads CLAUDE.md by name
+tool-0002	name.case	**/CLAUDE.local.md	tool-required	never	Claude Code reads CLAUDE.local.md by name
+tool-0003	name.case	**/AGENTS.md	tool-required	never	the agents.md convention reads AGENTS.md by name
+tool-0004	name.case	**/SKILL.md	tool-required	never	Claude Code reads a skill's SKILL.md by name
+tool-0005	name.case	**/MEMORY.md	tool-required	never	Claude Code auto-memory reads MEMORY.md by name
+tool-0006	name.case	**/CODEOWNERS	tool-required	never	GitHub reads CODEOWNERS by name
+tool-0007	name.case	**/SECURITY.md	tool-required	never	GitHub community files
+tool-0008	name.case	**/CONTRIBUTING.md	tool-required	never	GitHub community files
+tool-0009	name.case	**/CODE_OF_CONDUCT.md	tool-required	never	GitHub community files
+tool-0010	name.separator	**/CODE_OF_CONDUCT.md	tool-required	never	GitHub community files
+tool-0011	name.case	**/SUPPORT.md	tool-required	never	GitHub community files
+tool-0012	name.case	**/FUNDING.yml	tool-required	never	GitHub community files
+tool-0013	name.case	**/ISSUE_TEMPLATE	tool-required	never	GitHub reads .github/ISSUE_TEMPLATE/ by name
+tool-0014	name.separator	**/ISSUE_TEMPLATE	tool-required	never	GitHub reads .github/ISSUE_TEMPLATE/ by name
+tool-0015	name.case	**/PULL_REQUEST_TEMPLATE.md	tool-required	never	GitHub reads the PR template by name
+tool-0016	name.separator	**/PULL_REQUEST_TEMPLATE.md	tool-required	never	GitHub reads the PR template by name
+tool-0017	name.case	**/Makefile	tool-required	never	make reads Makefile by name
+tool-0018	name.case	**/Dockerfile	tool-required	never	docker reads Dockerfile by name
+tool-0019	name.case	**/README.md	tool-required	never	D-1: README, LICENSE and CHANGELOG stay uppercase by convention
+tool-0020	name.case	**/LICENSE	tool-required	never	D-1: README, LICENSE and CHANGELOG stay uppercase by convention
+tool-0021	name.case	**/CHANGELOG.md	tool-required	never	D-1: README, LICENSE and CHANGELOG stay uppercase by convention
+tool-0022	name.abbreviation	**/commit-msg	tool-required	never	git runs the commit-msg hook by name
+tool-0024	name.separator	**/dot_*	tool-required	never	D-56: the scaffolder's template engine reads the dot_ prefix as a leading dot
+tool-0026	name.skill-dir	skills/review-fanout	tool-required	never	Claude Code's Skill tool still resolves the old name review-fanout through this alias stub until 2026-11-15 (renames.tsv rename-0029); the row goes with the stub
+tool-0023	name.extension	**/com.*.plist	tool-required	never	launchd defines the label, so a plist name carries the id's dots: com.harbor.<id>.plist (§6.3)
+world-0001	*	vendor/	world-name	never	D-52: a vendored upstream tree keeps the upstream's names; our wrappers follow the standard
+legacy-0003	name.abbreviation	bin/docs-gen.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0004	name.abbreviation	bin/floor-equiv.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0005	name.abbreviation	bin/gcloud-creds	legacy	2027-02-08	first scan, harbor#950; W4 PATH
+legacy-0006	name.abbreviation	bin/status-gen.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0008	name.abbreviation	env:FLOOR_OBS_GUARDS	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0009	name.abbreviation	env:FLOOR_OBS_SHAPES	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0010	name.abbreviation	env:FLOOR_OBS_SUBJECT	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0011	name.abbreviation	env:FLOOR_OBS_TOOLS	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0012	name.abbreviation	env:FLOOR_OBS_VERDICTS	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0013	name.abbreviation	env:FLOOR_SEG_CMD	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0014	name.abbreviation	env:HELM_OBS_DISABLE	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0016	name.abbreviation	skills/platform-signals/references/vocab-map.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0017	name.abbreviation	skills/topology/bin/report-gen.sh	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0020	name.abbreviation	tests/cli/gcloud-creds-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-0022	name.abbreviation	tests/obs	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-0024	name.alias	.claude/inject.d	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0025	name.alias	contracts/box-profile.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0026	name.alias	contracts/helm-state.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0029	name.alias	contracts/pilot.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0030	name.alias	DEAD-ENDS.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0031	name.alias	DOCTRINE	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0049	name.alias	FLOOR.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0051	name.alias	HANDOFF.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0052	name.alias	bin/failure-capture.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0053	name.alias	bin/floor-deny.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0054	name.alias	bin/floor-equiv.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0055	name.alias	bin/floor-hook.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0056	name.alias	bin/floor-install.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0057	name.alias	bin/floor-normalize.awk	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0058	name.alias	bin/floor-observe.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0059	name.alias	bin/floor-uninstall.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0060	name.alias	bin/floor-verify.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0061	name.alias	bin/guard-apiroute.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0062	name.alias	bin/guard-bash.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0063	name.alias	bin/guard-cloud.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0064	name.alias	bin/guard-deliverables.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0065	name.alias	bin/guard-destroy.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0066	name.alias	bin/guard-egress.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0067	name.alias	bin/guard-integrity.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0068	name.alias	bin/guard-lib.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0069	name.alias	bin/guard-selfedit.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0070	name.alias	bin/guard-stop.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0071	name.alias	bin/harbor-clean.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0074	name.alias	bin/judge-run.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0075	name.alias	bin/prod-guard-ambient.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0076	name.alias	bin/prod-guard-install.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0077	name.alias	bin/pulse-notify.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0078	name.alias	bin/pulse.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0079	name.alias	commands/harbor-context.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0080	name.alias	commands/harbor-merge.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0081	name.alias	commands/harbor-skills.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0085	name.alias	env:BOX_SKILLS	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0086	name.alias	env:FLOOR_AWK	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0087	name.alias	env:FLOOR_COLLAPSE_AWK	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0088	name.alias	env:FLOOR_FIX	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0089	name.alias	env:FLOOR_GREP	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0090	name.alias	env:FLOOR_IN	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0091	name.alias	env:FLOOR_INSTR_SURFACES	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0092	name.alias	env:FLOOR_JQ	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0093	name.alias	env:FLOOR_MAX_NORM	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0094	name.alias	env:FLOOR_OBS_GUARDS	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0095	name.alias	env:FLOOR_OBS_SHAPES	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0096	name.alias	env:FLOOR_OBS_SUBJECT	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0097	name.alias	env:FLOOR_OBS_TOOLS	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0098	name.alias	env:FLOOR_OBS_VERDICTS	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0099	name.alias	env:FLOOR_OPTS	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0100	name.alias	env:FLOOR_SEGS	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0101	name.alias	env:FLOOR_SEG_CMD	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0102	name.alias	env:FLOOR_SHADOWED	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0103	name.alias	env:FLOOR_TOOL	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0104	name.alias	env:FLOOR_WIRED	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0105	name.alias	env:GADS_ALLOWLIST	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0106	name.alias	env:GADS_ALLOW_ANY_CUSTOMER	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0107	name.alias	env:GADS_QUOTA_PROJECT	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0114	name.alias	env:HELM_CRED_OCC	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0115	name.alias	env:HELM_DESTROY_POSTURE	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0116	name.alias	env:HELM_DISABLE_FLOOR	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0117	name.alias	env:HELM_DRIFT_REF	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0118	name.alias	env:HELM_FLOOR_SHADOW	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0119	name.alias	env:HELM_LIVE_DIR	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0120	name.alias	env:HELM_OBS_DISABLE	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0121	name.alias	env:HELM_SANDBOX_DIR	legacy	2027-02-08	first scan, harbor#950; W5 state, env and launchd
+legacy-0123	name.alias	fixtures/inject	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-0126	name.alias	inject.d	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0127	name.alias	inject.d/box	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0128	name.alias	context-rules/user/browser-route-harbor-chrome.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0134	name.alias	skills/test-strength/targets/floor	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0135	name.alias	skills/test-strength/targets/floor.target	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0142	name.alias	tests/floor	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-0164	name.alias	tests/hooks/inject-notes-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-0179	name.case	APPROACH.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0180	name.case	BOUNDARY.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0181	name.case	CHECKS.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0182	name.case	CITATIONS.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0183	name.case	CONSTITUTION.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0185	name.case	CONTRACTS	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0188	name.case	DEAD-ENDS.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0189	name.case	DOCTRINE	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0190	name.case	EVALS-DATA	legacy	2026-11-23	first scan, harbor#950; W1 eval data (root)
+legacy-0502	name.case	EVALS.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0503	name.case	FLOOR.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0505	name.case	HANDOFF.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0506	name.case	PLAN.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0507	name.case	PROVENANCE.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0511	name.case	SEC-0.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0512	name.case	STATUS.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-0520	name.case	skills/UNIFICATION.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0521	name.case	skills/ad-inventory/EVALS	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0522	name.case	skills/ad-inventory/EVALS/R2-lens-or-glossary.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0523	name.case	skills/ad-inventory/EVALS/R9-isolation.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0524	name.case	skills/casefile/EVALS	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0525	name.case	skills/casefile/EVALS/R1-does-it-fire.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0526	name.case	skills/casefile/EVALS/SIM	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0527	name.case	skills/casefile/EVALS/SIM/RESULTS.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0535	name.date	EVALS-DATA/ecc-2026-09-07	legacy	2026-11-23	first scan, harbor#950; W1 eval data (root)
+legacy-0544	name.env	env:BOX_SKILLS	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0545	name.env	env:FLEET_CACHE	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0546	name.env	env:FLEET_MAX_AGE	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0547	name.env	env:FLOOR_AWK	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0548	name.env	env:FLOOR_COLLAPSE_AWK	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0549	name.env	env:FLOOR_FIX	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0550	name.env	env:FLOOR_GREP	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0551	name.env	env:FLOOR_IN	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0552	name.env	env:FLOOR_INSTR_SURFACES	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0553	name.env	env:FLOOR_JQ	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0554	name.env	env:FLOOR_MAX_NORM	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0555	name.env	env:FLOOR_OBS_GUARDS	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0556	name.env	env:FLOOR_OBS_SHAPES	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0557	name.env	env:FLOOR_OBS_SUBJECT	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0558	name.env	env:FLOOR_OBS_TOOLS	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0559	name.env	env:FLOOR_OBS_VERDICTS	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0560	name.env	env:FLOOR_OPTS	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0561	name.env	env:FLOOR_SEGS	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0562	name.env	env:FLOOR_SEG_CMD	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0563	name.env	env:FLOOR_SHADOWED	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0564	name.env	env:FLOOR_TOOL	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0565	name.env	env:FLOOR_WIRED	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0566	name.env	env:GADS_ALLOWLIST	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0567	name.env	env:GADS_ALLOW_ANY_CUSTOMER	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0568	name.env	env:GADS_QUOTA_PROJECT	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0663	name.env	env:HARBOR_RUNNER	legacy	2027-02-22	first scan, harbor#950; W5 state, env and launchd
+legacy-0688	name.env	env:HELM_CRED_OCC	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0689	name.env	env:HELM_DESTROY_POSTURE	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0690	name.env	env:HELM_DISABLE_FLOOR	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0691	name.env	env:HELM_DRIFT_REF	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0692	name.env	env:HELM_FLOOR_SHADOW	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0693	name.env	env:HELM_LIVE_DIR	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0694	name.env	env:HELM_OBS_DISABLE	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0695	name.env	env:HELM_SANDBOX_DIR	legacy	2027-02-15	first scan, harbor#950; W5 state, env and launchd
+legacy-0698	name.extension	skills/test-strength/targets/casefile.target	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0699	name.extension	skills/test-strength/targets/floor.target	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0700	name.extension	skills/test-strength/targets/platform.target	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0701	name.extension	skills/test-strength/targets/prove-engine.target	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0702	name.extension	skills/test-strength/targets/topology-structure.target	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0703	name.extension	skills/test-strength/targets/topology-trigger.target	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0704	name.extension	skills/test-strength/targets/topology.target	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-0764	name.extension	tests/skills/skill-gates.maps-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-0767	name.family	bin/annotate-web.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0769	name.family	bin/browser-agent.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0774	name.family	bin/browser.sh	legacy	2027-01-25	first scan, harbor#950; W3 bin
+legacy-0775	name.family	bin/cite-verify.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0776	name.family	bin/cited-paths.awk	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0777	name.family	bin/constitution-install.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0781	name.family	bin/deliver-drive.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0783	name.family	bin/docs-gen.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0785	name.family	bin/failure-capture.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0787	name.family	bin/findings-run.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0788	name.family	bin/findings.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0789	name.family	bin/fleet-glyph.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0790	name.family	bin/fleet-sessions.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0791	name.family	bin/fleet-snapshot-refresh.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0792	name.family	bin/floor-deny.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0793	name.family	bin/floor-equiv.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0794	name.family	bin/floor-hook.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0795	name.family	bin/floor-install.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0796	name.family	bin/floor-normalize.awk	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0797	name.family	bin/floor-observe.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0798	name.family	bin/floor-uninstall.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0799	name.family	bin/floor-verify.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0800	name.family	bin/freshness.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0801	name.family	bin/gcloud-wrapper.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0802	name.family	bin/govern-hook.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0803	name.family	bin/govern-token.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0804	name.family	bin/guard-apiroute.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0805	name.family	bin/guard-bash.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0806	name.family	bin/guard-cloud.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0807	name.family	bin/guard-deliverables.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0808	name.family	bin/guard-destroy.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0809	name.family	bin/guard-egress.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0810	name.family	bin/guard-integrity.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0811	name.family	bin/guard-lib.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0812	name.family	bin/guard-selfedit.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0813	name.family	bin/guard-stop.sh	legacy	2027-02-22	first scan, harbor#950; W6 admission
+legacy-0814	name.family	bin/harbor-clean.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0816	name.family	bin/idea.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0819	name.family	bin/install-drift.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0820	name.family	bin/install-lib.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0821	name.family	bin/install-stamp.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0824	name.family	bin/judge-run.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0826	name.family	bin/log-lib.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0827	name.family	bin/main-tip-verdict.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0829	name.family	bin/merge-check.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0830	name.family	bin/merged-check.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0833	name.family	bin/observe-report.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0834	name.family	bin/pass-score.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0835	name.family	bin/pin-instructions.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0837	name.family	bin/port-paths.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0839	name.family	bin/prod-guard-ambient.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0840	name.family	bin/prod-guard-install.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0841	name.family	bin/pulse-notify.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0842	name.family	bin/pulse.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0843	name.family	bin/reference-check.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0844	name.family	bin/renew-check.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0848	name.family	bin/report-contract.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0849	name.family	bin/restore.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0850	name.family	bin/roots.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0852	name.family	bin/runner-switch.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0853	name.family	bin/runtime-install.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0854	name.family	bin/sandbox-make.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0855	name.family	bin/save-log-token.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0856	name.family	bin/sec0-harden.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0858	name.family	bin/shim-install.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0860	name.family	bin/skills-install.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0861	name.family	bin/store-check.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0862	name.family	bin/subagent-glyph.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0863	name.family	bin/suite-run.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0864	name.family	bin/suite-select.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0866	name.family	bin/usage-aggregate.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0867	name.family	bin/visual-check.mjs	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0868	name.family	bin/visual-check.sh	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0872	name.family	bin/wrapper-falsify.py	legacy	2027-02-01	first scan, harbor#950; W3 bin
+legacy-0882	name.separator	EVALS-DATA/e10inject/raw_a	legacy	2026-11-30	first scan, harbor#950; W1 eval data e10inject
+legacy-0966	name.separator	EVALS-DATA/e5trap/raw_a	legacy	2026-12-14	first scan, harbor#950; W1 eval data e5trap
+legacy-0971	name.separator	EVALS-DATA/e5trap/raw_b	legacy	2026-12-14	first scan, harbor#950; W1 eval data e5trap
+legacy-1008	name.separator	EVALS-DATA/e5trap/raw_c	legacy	2026-12-14	first scan, harbor#950; W1 eval data e5trap
+legacy-1027	name.separator	EVALS-DATA/e5trap/raw_d	legacy	2026-12-14	first scan, harbor#950; W1 eval data e5trap
+legacy-1040	name.separator	EVALS-DATA/e5trap/raw_e	legacy	2026-12-14	first scan, harbor#950; W1 eval data e5trap
+legacy-1074	name.separator	EVALS-DATA/e7scale/raw_a	legacy	2026-12-21	first scan, harbor#950; W1 eval data e7scale
+legacy-1099	name.separator	EVALS-DATA/e7scale/raw_b	legacy	2026-12-21	first scan, harbor#950; W1 eval data e7scale
+legacy-1131	name.separator	EVALS-DATA/e8dilute/raw_a	legacy	2026-12-28	first scan, harbor#950; W1 eval data e8dilute
+legacy-1160	name.separator	EVALS-DATA/e9ablate/raw_b	legacy	2027-01-04	first scan, harbor#950; W1 eval data e9ablate
+legacy-1209	name.separator	EVALS-DATA/e9ablate/raw_c	legacy	2027-01-04	first scan, harbor#950; W1 eval data e9ablate
+legacy-1248	name.skill-dir	skills/ad-inventory	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-1249	name.skill-dir	skills/atlas	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-1250	name.skill-dir	skills/browser	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-1251	name.skill-dir	skills/casefile	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-1253	name.skill-dir	skills/deliverable-contract	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-1255	name.skill-dir	skills/flow	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-1256	name.skill-dir	skills/learning-artifact	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-1258	name.skill-dir	skills/platform-signals	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-1261	name.skill-dir	skills/topology	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+legacy-1262	name.test-path	tests/checks	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1297	name.test-path	tests/cli	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1309	name.test-path	tests/cli/gcloud-creds-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1310	name.test-path	tests/cli/gcx-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1315	name.test-path	tests/cli/secret-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1316	name.test-path	tests/floor	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1332	name.test-path	tests/guards	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1340	name.test-path	tests/guards/cloud-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1345	name.test-path	tests/hooks	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1356	name.test-path	tests/hooks/inject-notes-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1365	name.test-path	tests/install	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1383	name.test-path	tests/lib	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1393	name.test-path	tests/obs	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1409	name.test-path	tests/skills	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1416	name.test-path	tests/skills/skill-gates-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1417	name.test-path	tests/skills/skill-gates.maps-test.sh	legacy	2027-01-25	first scan, harbor#950; W2 tests
+legacy-1418	name.word	context-rules/harbor/constitution-edit-is-undeployed.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1419	name.word	context-rules/harbor/merge-governance.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1420	name.word	context-rules/harbor/post-merge-state.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1421	name.word	SEC-0.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1434	name.word	context-rules/user/subagent-contract.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1435	name.word	context-rules/user/post-compaction-carry.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1436	name.word	context-rules/user/external-content-is-data.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1437	name.word	context-rules/user/repo-skills-pointer.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1438	name.word	context-rules/user/access-route-pointer.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1439	name.word	context-rules/user/project-pointer.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1440	name.word	context-rules/user/variable-is-one-argument.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1441	name.word	context-rules/user/browser-route-harbor-chrome.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1442	name.word	context-rules/user/browser-route-reminder.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1443	name.word	inject.d/box/70-measurement-skills-are-hidden.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1444	name.word	inject.d/box/75-client-work-is-a-measurement-change.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1445	name.word	context-rules/user/large-tool-result.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1446	name.word	context-rules/user/tool-failure-is-not-a-result.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1447	name.word	context-rules/user/unbounded-wait-loop.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1448	name.word	context-rules/user/repo-tier-not-loaded.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1449	name.word	context-rules/user/agent-model-required.md	legacy	2026-11-16	first scan, harbor#950; W1 docs
+legacy-1463	name.word	skills/casefile/EVALS/SIM/04-promotion-closing.md	legacy	2027-03-01	first scan, harbor#950; skills (D-35)
+tool-0025	name.case	**/NOTICE	tool-required	never	Apache 2.0 NOTICE file: like LICENSE, it has no extension and keeps its name (sitting B Q11)
+world-0002	name.case	fixtures/memory/corpus/	world-name	never	the fixture imitates a real memory store whose directory names are what the tests read (sitting B Q11)
+world-0003	name.separator	fixtures/memory/corpus/	world-name	never	the fixture imitates a real memory store; a note with a space in its name is a case the tests cover (sitting B Q11)
+world-0004	name.abbreviation	fixtures/lint-module/	world-name	never	the fixture trees are the inputs of the module lint, and their package is named pkg on purpose (sitting B Q11)
+world-0005	name.alias	rule:admission.floor-fail-closed	world-name	never	D-19: a rule id is permanent once published, so it keeps the word it was born with (sitting B Q11)
+world-0006	name.alias	rule:admission.floor-integrity	world-name	never	D-19: a rule id is permanent once published, so it keeps the word it was born with (sitting B Q11)
+world-0007	name.alias	rule:admission.merge-backstop-box	world-name	never	D-19: a rule id is permanent once published, so it keeps the word it was born with (sitting B Q11)
+world-0008	name.alias	rule:admission.prod-guard-ambient	world-name	never	D-19: a rule id is permanent once published, so it keeps the word it was born with (sitting B Q11)
+world-0009	name.abbreviation	rule:admission.extract-over-cfg-ancestor	world-name	never	D-19: a rule id is permanent once published, so it keeps the word it was born with (sitting B Q11)

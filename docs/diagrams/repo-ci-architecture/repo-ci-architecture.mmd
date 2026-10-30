@@ -45,7 +45,7 @@ flowchart TB
 
     subgraph SELFCHECK["Self-consistency contract"]
         MIRROR["tools/sync_claude_dir.py\n.agents/ (canonical) -> .claude/ (committed mirror,\nClaude Code only reads .claude/)"]
-        TEST["tests/contracts/test_claude_dir_sync.py\nbyte-compares fresh sync vs committed .claude/\nchecks MIRRORED set == .gitignore allowlist\nchecks hook paths point at .agents/hooks/"]
+        TEST["tests/agent/contracts/test_claude_dir_sync.py\nbyte-compares fresh sync vs committed .claude/\nchecks MIRRORED set == .gitignore allowlist\nchecks hook paths point at .agents/hooks/"]
         JUST -->|"just sync-claude"| MIRROR
         CI -->|"lint-and-test runs"| TEST
         TEST -.->|"fails if drifted"| DEV

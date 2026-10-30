@@ -9,7 +9,7 @@ effort: high
 ---
 
 Run a live end-to-end test of the **project-init scaffolder**. Deterministic pytest
-coverage (`tests/smoke/test_packaging.py`, the `wheel-smoke` CI job, ~70 contract tests)
+coverage (`tests/deploy/smoke/test_packaging.py`, the `wheel-smoke` CI job, ~70 contract tests)
 already proves files land with the right exec bits. This command tests what those can't:
 whether a **scaffolded project actually works in real use** — do its hooks fire, do
 lifecycle scripts run, does `just ci` pass, would an agent landing in the project find

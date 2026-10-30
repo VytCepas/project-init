@@ -44,7 +44,7 @@ trees, from the actual standards:
   / `score` fields, as plain JSONL.
 - **Cost** → litellm's `model_prices_and_context_window.json` (standalone **MIT**
   data file: `input_cost_per_token`, `output_cost_per_token`, cache fields), vendored
-  locally as `tools/benchmark/model_prices.json`.
+  locally as `tools/benchmark/model-prices.json`.
 - **Pareto frontier** → ~15-line skyline sweep (no `paretoset`/`pymoo`).
 
 > If we later accept a heavier dependency for a richer scorer ecosystem, Inspect
@@ -154,7 +154,7 @@ whether the heavier preset is still on the frontier.
 |---|---|
 | Harness CLI (#271) | `tools/benchmark/` |
 | Task specs | `tools/benchmark/tasks/` (`tomllib`-parsed) |
-| Vendored price table | `tools/benchmark/model_prices.json` (MIT; pin commit, refresh deliberately) |
+| Vendored price table | `tools/benchmark/model-prices.json` (MIT; pin commit, refresh deliberately) |
 | Raw per-run results | JSONL under `tools/benchmark/results/` (gitignored; a sample may be committed) |
 | This methodology | `docs/development/measurement-methodology.md` |
 

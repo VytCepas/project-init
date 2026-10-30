@@ -1,7 +1,7 @@
 # Design note — agentic-OS root layer (#479)
 
 One-page sketch of the cross-project layer that sits *above* `project_init`.
-Decision recorded in [ADR-025](../adr/adr-025-agentic-os-root-layer.md);
+Decision recorded in [ADR-025](../adr/0025-agentic-os-root-layer.md);
 this note is the buildable picture for when it is greenlit. **Not built yet.**
 
 ## Shape (one diagram)

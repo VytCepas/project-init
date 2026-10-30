@@ -7,8 +7,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Re-exported for backward compat (importers of project_init.__main__).
-from project_init.box_profile import load_box_profile
 from project_init.cli_output import (
     _MEMORY_NEXT_STEPS as _MEMORY_NEXT_STEPS,
 )
@@ -77,6 +75,9 @@ from project_init.cli_parser import (
 from project_init.console import (
     scaffolding,
 )
+
+# Re-exported for backward compat (importers of project_init.__main__).
+from project_init.host_profile import load_box_profile
 from project_init.scaffold import (
     TemplateRenderError,
     list_presets,
@@ -345,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
     clean exit 130 instead of a raw traceback (2026-07 review). A native
     Windows shell is refused first, naming WSL2 (#1070).
     """
-    from project_init.platform_guard import REFUSAL_EXIT, native_windows_shell, refusal
+    from project_init.platform_admission_hook import REFUSAL_EXIT, native_windows_shell, refusal
 
     native = native_windows_shell()
     if native is not None:  # #1070: WSL2 only, refused before anything runs
@@ -567,6 +568,7 @@ def _cli(argv: list[str]) -> int:
         with scaffolding():
             created = scaffold(target, preset, variables, strict=args.strict, conflicts=conflicts)
         _record_scaffold(target, preset, variables, created)
+        _seed_naming_baseline(target, created)
     except TemplateRenderError as e:
         sys.stderr.write(f"error: {e}\n")
         return 2
@@ -582,6 +584,19 @@ def _cli(argv: list[str]) -> int:
     _maybe_bootstrap(args, inputs, target)
     _emit_scaffold_output(args, target, created, preset, variables, inputs, conflicts)
     return 0
+
+
+def _seed_naming_baseline(target: Path, created: list[Path]) -> None:
+    """Baseline the template's own naming findings so a fresh scaffold's gate is green."""
+    from project_init import naming_gate
+
+    if naming_gate.BASELINE_REL not in created:
+        return  # not written this run: the owner's baseline stands
+    ok, msg = naming_gate.seed_baseline(target)
+    if not ok:
+        sys.stderr.write(
+            f"note: naming baseline not seeded: {msg}\n  run `sh gates/naming-check.sh --seed`\n"
+        )
 
 
 if __name__ == "__main__":

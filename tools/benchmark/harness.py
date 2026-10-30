@@ -451,7 +451,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     run.add_argument("--out", help="output JSONL (default: tools/benchmark/results/records.jsonl)")
     run.add_argument(
-        "--prices", help="price table JSON (default: tools/benchmark/model_prices.json)"
+        "--prices", help="price table JSON (default: tools/benchmark/model-prices.json)"
     )
     run.set_defaults(func=_cmd_run)
 
@@ -465,7 +465,7 @@ def main(argv: list[str] | None = None) -> int:
     rec.add_argument("--run-index", type=int, default=0, dest="run_index")
     rec.add_argument("--out", help="output JSONL (default: tools/benchmark/results/records.jsonl)")
     rec.add_argument(
-        "--prices", help="price table JSON (default: tools/benchmark/model_prices.json)"
+        "--prices", help="price table JSON (default: tools/benchmark/model-prices.json)"
     )
     rec.set_defaults(func=_cmd_record_from)
 

@@ -31,7 +31,7 @@ COMMANDS_DIR="$CLAUDE_CONFIG_DIR_RESOLVED/commands"
 REQUESTED_REF="${PROJECT_INIT_REF:-}"
 # The guard every scaffold copies. A ref whose copy lacks the symlink refusal
 # (PI-903, #904; v1.2.2 and older) is refused before checkout (PI-1045).
-GUARD_FILE="templates/base/dot_agents/hooks/prod_guard.py"
+YARD_ADMISSION_HOOK_FILE="templates/base/dot_agents/hooks/prod_guard.py"
 
 say() { printf '\033[1;36m[project-init]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[project-init]\033[0m %s\n' "$*" >&2; }
@@ -164,8 +164,8 @@ has_symlink_refusal() {
 # an existing /project-init already scaffolds from (PI-1045). Sets VERIFIED.
 verify_guard() {
   local content
-  content="$(git -C "$INSTALL_DIR" show "$1:$GUARD_FILE" 2>/dev/null)" ||
-    die "cannot read $GUARD_FILE at $2, so its symlink refusal cannot be checked — refusing to install"
+  content="$(git -C "$INSTALL_DIR" show "$1:$YARD_ADMISSION_HOOK_FILE" 2>/dev/null)" ||
+    die "cannot read $YARD_ADMISSION_HOOK_FILE at $2, so its symlink refusal cannot be checked — refusing to install"
   if printf '%s\n' "$content" | has_symlink_refusal; then
     VERIFIED="$(git -C "$INSTALL_DIR" rev-parse "$1^{commit}")" && return 0
   fi
@@ -183,7 +183,7 @@ $dirty
   $KEPT"
 }
 
-# Read pyproject.toml's hatch wheel layout the way tools/box_install.py's
+# Read pyproject.toml's hatch wheel layout the way tools/host_install.py's
 # wheel_layout() does: `packages` (tree paths copied as-is) plus the keys of
 # `force-include` (tree paths whose whole subtree ships). TOML text read with
 # awk, not python — install.sh must not execute repo code before the guard
@@ -208,7 +208,7 @@ packaged_paths() {
 # an existing clone that acquired one under a force-included path — a stray
 # templates/*.local next to templates/ — passes verify_checkout clean while
 # /project-init would scaffold its unreviewed bytes into every project it
-# touches. Same check tools/box_install.py's ignored_problems() runs for
+# touches. Same check tools/host_install.py's ignored_problems() runs for
 # `just install`, ported to shell for the same reason packaged_paths is
 # (project-init#1047).
 refuse_ignored() {
@@ -280,7 +280,7 @@ committed_lf_paths() {
 # newline is a known, conservative exception — sed's `s/$/\r/` appends `\r`
 # there too, so such a file always refuses under an autocrlf checkout (see
 # test_crlf_checkout_of_a_trailing_newline_file_is_not_refused and its
-# no-trailing-newline counterpart). Same two-stage check tools/box_install.py's
+# no-trailing-newline counterpart). Same two-stage check tools/host_install.py's
 # check() runs before calling a file modified (#1047 review round 4; shared
 # helper #1060; object-store confirmation #1064).
 refuse_edited_paths() {
@@ -313,7 +313,7 @@ refuse_edited_paths() {
       fi
       cmp -s "$blob_tmp" "$INSTALL_DIR/$path" && continue
       # A committed eol=lf pins this path to LF on any checkout: an injected CRLF
-      # there is still an edit, matching tools/box_install.py's modified_paths()
+      # there is still an edit, matching tools/host_install.py's modified_paths()
       # (#1064 review; committed policy only, #1068 review).
       case $'\n'"$pinned_lf"$'\n' in
       *$'\n'"$path"$'\n'*)
@@ -361,8 +361,8 @@ verify_checkout() {
     die "$INSTALL_DIR is at $head, not the verified $ref_label ($VERIFIED): it holds commits that were not checked. See: git -C $INSTALL_DIR log $VERIFIED..HEAD
   $KEPT"
   refuse_dirty
-  has_symlink_refusal 2>/dev/null <"$INSTALL_DIR/$GUARD_FILE" ||
-    die "$INSTALL_DIR/$GUARD_FILE on disk has no symlink refusal, though git reports the tree clean (a skip-worktree or assume-unchanged edit?).
+  has_symlink_refusal 2>/dev/null <"$INSTALL_DIR/$YARD_ADMISSION_HOOK_FILE" ||
+    die "$INSTALL_DIR/$YARD_ADMISSION_HOOK_FILE on disk has no symlink refusal, though git reports the tree clean (a skip-worktree or assume-unchanged edit?).
   $KEPT"
   # ls-files -v tags a plain entry H; S is skip-worktree, lower case assume-unchanged.
   hidden="$(git -C "$INSTALL_DIR" ls-files -v | awk '$1 != "H"')" ||

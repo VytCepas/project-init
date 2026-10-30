@@ -107,7 +107,7 @@ sync-claude:
 
 # semi-scaffold: sync this repo's own .agents/ shared set from templates/
 # (dogfood; PI-685). Run after template changes to shared files, then
-# `just sync-claude`. CI enforces via tests/contracts/test_agents_template_sync.py.
+# `just sync-claude`. CI enforces via tests/agent/contracts/test_agents_template_sync.py.
 [doc("sync this repo's own .agents/ shared set from templates/ (semi-scaffold; PI-685)")]
 sync-agents:
     uv run python tools/sync_agents_from_templates.py
@@ -121,7 +121,7 @@ code-map:
 
 # Install this checkout as the machine's `project-init` uv tool (PI-1046). A dry
 # run by default. --apply installs from a clean main in sync with origin/main;
-# --check diffs the installed build against HEAD. Logic: tools/box_install.py.
+# --check diffs the installed build against HEAD. Logic: tools/host_install.py.
 # --no-python-downloads: `uv run` would otherwise fetch the .python-version interpreter.
 # --no-project: the script is stdlib only, and a project run syncs .venv first
 # (creates it, installs, reaches the index), which a dry run must not do.
@@ -129,7 +129,7 @@ code-map:
 [doc("install this checkout as a uv tool: dry run by default, --apply, --check (PI-1046)")]
 [positional-arguments]
 install *ARGS:
-    uv run --no-python-downloads --no-project --python '>=3.11' python tools/box_install.py "$@"
+    uv run --no-python-downloads --no-project --python '>=3.11' python tools/host_install.py "$@"
 
 # advisory: show drift between personal ~/.claude/skills copies and their
 # template source (PI-681). Not a gate — the personal dir is outside VCS.

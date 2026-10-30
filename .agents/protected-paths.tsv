@@ -10,7 +10,7 @@
 # and guards shipped into other repos (templates/ and their plugins/ copies), installers, this repo's own
 # governance, the config that decides whether a merge is green, and release/version tooling. Ordinary source
 # (src/), tests and docs are not: a change there is still held to every required check.
-# .github/CODEOWNERS is generated from this file: uv run python tools/gen_codeowners.py --write
+# .github/CODEOWNERS is generated from this file: uv run python tools/generate_codeowners.py --write
 glob	class	reason
 CLAUDE.md	governance	the canonical agent instructions for this repo
 AGENTS.md	governance	redirects every agent to CLAUDE.md
@@ -46,15 +46,15 @@ templates/base/deploy/**	deploy	which environments of a scaffolded project deplo
 templates/base/dot_devcontainer/**	installer	runs on container creation in every scaffolded project
 templates/presets/**	hook	the presets decide which overlays, the lifecycle guards included, a project gets by default
 install.sh	installer	the curl | bash bootstrap users run
-tools/box_install.py	installer	installs this checkout as the machine's project-init tool
+tools/host_install.py	installer	installs this checkout as the machine's project-init tool
 tools/sync_plugin.py	installer	builds the plugin payloads from templates/ and relocks their versions
 tools/sync_agents_from_templates.py	installer	declares which .agents/ files must equal their templates, and writes them
 tools/sync_claude_dir.py	installer	writes the .claude/ mirror Claude Code loads
-tools/gen_codeowners.py	ci-gate	derives .github/CODEOWNERS from this register
-tools/pinned_third_party.toml	installer	pinned versions of the third-party tools the scaffold installs
-tools/check_third_party_updates.py	ci-gate	run by a scheduled workflow with write permission
-tools/propose_third_party_bumps.sh	ci-gate	run by a scheduled workflow with write permission; opens bump PRs
-tools/approve_pending_bump_runs.sh	approval	approves queued workflow runs on bot PRs
+tools/generate_codeowners.py	ci-gate	derives .github/CODEOWNERS from this register
+tools/pinned-third-party.toml	installer	pinned versions of the third-party tools the scaffold installs
+tools/check-third-party-updates.py	ci-gate	run by a scheduled workflow with write permission
+tools/propose-third-party-bumps.sh	ci-gate	run by a scheduled workflow with write permission; opens bump PRs
+tools/approve-pending-bump-runs.sh	approval	approves queued workflow runs on bot PRs
 .githooks/**	ci-gate	this repo's pre-commit and pre-push gates
 justfile	ci-gate	the command surface CI and the git hooks run
 pyproject.toml	release	package version, dependencies, wheel contents, and the ruff/pytest/coverage config CI enforces

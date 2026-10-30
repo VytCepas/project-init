@@ -1,9 +1,9 @@
 # Memory descriptor (cross-project introspection)
 
-**Status:** Accepted — implements #498, extends [ADR-024](../adr/adr-024-memory-tier-model.md).
+**Status:** Accepted — implements #498, extends [ADR-024](../decisions/0024-memory-tier-model.md).
 
 Every scaffolded project records a **stable, machine-readable memory descriptor**
-so a root orchestrator ([ADR-025](../adr/adr-025-agentic-os-root-layer.md)) and
+so a root orchestrator ([ADR-025](../decisions/0025-agentic-os-root-layer.md)) and
 cross-project skills can introspect any child *identically* and degrade by tier —
 "if a graph exists, query it; else grep". This is the per-project half of the
 Agentic-OS contract; the cross-project aggregation shape is ADR-025's concern,
@@ -96,6 +96,6 @@ descriptor = json.loads(m.group(1)) if m else {}
 tier, stack = descriptor.get("memory_tier"), descriptor.get("memory_stack")
 ```
 
-A future root layer ([ADR-025](../adr/adr-025-agentic-os-root-layer.md)) walks its
+A future root layer ([ADR-025](../decisions/0025-agentic-os-root-layer.md)) walks its
 registry of child projects, reads each descriptor, and builds a cross-project view
 — but that aggregation shape is defined by ADR-025, not here.

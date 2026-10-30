@@ -1,10 +1,10 @@
 # Org fork lifecycle runbook
 
 > **Status: validated end-to-end (#257).** Every stage's mechanics now ship; the
-> path is exercised by `tests/integration/test_org_lifecycle.py`. This owns the
+> path is exercised by `tests/session/integration/test_org_lifecycle.py`. This owns the
 > epic's "three-case model usable end-to-end" criterion (#253).
 
-For *why* the model is shaped this way, see [ADR-013](../adr/adr-013-distribution-governance-model.md)
+For *why* the model is shaped this way, see [ADR-013](../adr/0013-distribution-governance-model.md)
 and the [Enterprise GitHub support matrix](../development/enterprise-github-support-matrix.md).
 This runbook covers the **`org`** profile; `individual` and `standalone` users do
 not need a fork.
@@ -89,7 +89,7 @@ projects pin to the fork's version, not upstream's.
 
 ## Validation (end-to-end)
 
-`tests/integration/test_org_lifecycle.py` scaffolds with `--profile org` and
+`tests/session/integration/test_org_lifecycle.py` scaffolds with `--profile org` and
 asserts the recorded profile/enforcement/host, the host-adaptive delivery, the
 no-egress mode, and the enforcement scripts are all coherent — confirming the
 three-case model is usable end-to-end (epic #253).
