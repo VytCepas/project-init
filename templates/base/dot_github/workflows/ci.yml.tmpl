@@ -479,7 +479,7 @@ jobs:
           find .agents -name '*.sh' -exec shellcheck -S error -x {} +
           find .agents -name '*.sh' -exec shfmt -d -i 2 {} +
 
-      # The naming ratchet (harbor#967) is part of `just lint` for python/node/rust;
+      # The naming ratchet is part of `just lint` for python/node/rust;
       # the go job lints through the action above, so it runs the gate explicitly.
       # No `just` needed: the script and its vendored package are in the repo.
       - name: Naming gate
