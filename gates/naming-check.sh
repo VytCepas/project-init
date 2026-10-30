@@ -1,1 +1,0 @@
-../templates/base/gates/naming-check.sh

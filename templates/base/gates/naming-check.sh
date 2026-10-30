@@ -23,8 +23,14 @@
 # WHAT IS JUDGED is the working tree as git would commit it (tracked plus untracked-not-ignored),
 # read through a throwaway index, so an uncommitted scaffold is judged and nothing is staged.
 # Outside a git repository a throwaway git dir lists the same tree.
+#
+# ANOTHER ROOT. NAMING_ROOT=<dir> judges <dir>, with <dir>'s naming-exemptions.tsv and baseline,
+# while the judge stays the one beside this script. Unset, the root is this script's own repo.
 set -eu
-ROOT=$(cd "$(dirname "$0")/.." && pwd)
+PKG_HOME=$(cd "$(dirname "$0")/.." && pwd)
+[ -z "${NAMING_ROOT:-}" ] || [ -d "$NAMING_ROOT" ] || { printf 'naming-check: NAMING_ROOT is not a directory: %s\n' "$NAMING_ROOT" >&2; exit 2; }
+ROOT=$(cd "${NAMING_ROOT:-$PKG_HOME}" && pwd)
+VENDOR="$PKG_HOME/vendor/naming"
 cd "$ROOT"
 BASELINE="${NAMING_BASELINE:-gates/naming.baseline}"
 EXEMPTIONS="naming-exemptions.tsv"
@@ -40,12 +46,12 @@ unchecked() { printf 'naming-check: UNCHECKED, %s\n' "$1" >&2; exit 3; }
 T=$(mktemp -d "${TMPDIR:-/tmp}/naming-check.XXXXXX")
 trap 'rm -rf "$T"' EXIT INT TERM HUP
 
-if [ -f vendor/naming/lint-name.sh ] && [ -d vendor/naming/registry ]; then
-  LINT=vendor/naming/lint-name.sh
-  REGSRC=vendor/naming/registry
-  if [ -f vendor/naming/standard-vendor.sh ] && [ -f vendor/naming/MANIFEST.tsv ]; then
+if [ -f "$VENDOR/lint-name.sh" ] && [ -d "$VENDOR/registry" ]; then
+  LINT="$VENDOR/lint-name.sh"
+  REGSRC="$VENDOR/registry"
+  if [ -f "$VENDOR/standard-vendor.sh" ] && [ -f "$VENDOR/MANIFEST.tsv" ]; then
     vrc=0
-    sh vendor/naming/standard-vendor.sh --check --offline "$ROOT" > "$T/vendor.out" 2>&1 || vrc=$?
+    sh "$VENDOR/standard-vendor.sh" --check --offline "$PKG_HOME" > "$T/vendor.out" 2>&1 || vrc=$?
     if [ "$vrc" -ne 0 ]; then
       cat "$T/vendor.out" >&2
       [ "$vrc" -eq 3 ] && unchecked "the vendored package cannot be verified against its manifest"
@@ -56,7 +62,7 @@ if [ -f vendor/naming/lint-name.sh ] && [ -d vendor/naming/registry ]; then
 else
   SRC="${NAMING_SOURCE:-}"
   [ -n "$SRC" ] && [ -f "$SRC/bin/lint-name.sh" ] && [ -d "$SRC/standards/naming" ] ||
-    unchecked "no vendor/naming/ in this repo and no standard checkout (vendor it: sh <standard checkout>/bin/standard-vendor.sh $ROOT, or set NAMING_SOURCE)"
+    unchecked "no vendor/naming/ in this repo and no standard checkout (vendor it: sh <standard checkout>/bin/standard-vendor.sh $PKG_HOME, or set NAMING_SOURCE)"
   LINT="$SRC/bin/lint-name.sh"
   REGSRC="$SRC/standards/naming"
 fi

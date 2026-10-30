@@ -189,6 +189,48 @@ class TestRatchet:
         assert "naming-check:" in r.stdout + r.stderr
 
 
+class TestAnotherRoot:
+    """NAMING_ROOT judges another tree with its own exemptions and baseline, the judge staying put."""
+
+    def _other(self, tmp_path: Path) -> tuple[Path, Path]:
+        other = tmp_path / "other"
+        other.mkdir()
+        (other / "notes.md").write_text("x\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=other, check=True)
+        baseline = tmp_path / "other.baseline"
+        baseline.write_text("", encoding="utf-8")
+        return other, baseline
+
+    def test_judges_that_root_red_then_green(self, repo: Path, tmp_path: Path):
+        other, baseline = self._other(tmp_path)
+        env = {"NAMING_ROOT": str(other), "NAMING_BASELINE": str(baseline)}
+        green = _gate(repo, **env)
+        assert green.returncode == 0, green.stdout + green.stderr
+        assert "0 finding(s) now" in green.stdout, "the gate's own tree is not what was judged"
+        (other / _PLANTED).write_text("x\n", encoding="utf-8")
+        red = _gate(repo, **env)
+        assert red.returncode == 1, red.stdout + red.stderr
+        assert _PLANTED in red.stdout
+        (other / _PLANTED).unlink()
+        assert _gate(repo, **env).returncode == 0
+
+    def test_reads_that_roots_exemptions(self, repo: Path, tmp_path: Path):
+        other, baseline = self._other(tmp_path)
+        (other / _PLANTED).write_text("x\n", encoding="utf-8")
+        (other / "naming-exemptions.tsv").write_text(
+            f"o-0001\tname.case\t{_PLANTED}\tworld-name\tnever\tthe other root owns it\n"
+            f"o-0002\tname.separator\t{_PLANTED}\tworld-name\tnever\tthe same name\n",
+            encoding="utf-8",
+        )
+        r = _gate(repo, NAMING_ROOT=str(other), NAMING_BASELINE=str(baseline))
+        assert r.returncode == 0, r.stdout + r.stderr
+
+    def test_a_root_that_is_not_a_directory_is_a_usage_error(self, repo: Path, tmp_path: Path):
+        r = _gate(repo, NAMING_ROOT=str(tmp_path / "absent"))
+        assert r.returncode == 2, r.stdout + r.stderr
+        assert "NAMING_ROOT" in r.stderr
+
+
 class TestUnchecked:
     def test_no_vendored_package_and_no_source_checkout_is_unchecked_exit_3(
         self, repo: Path, tmp_path: Path
