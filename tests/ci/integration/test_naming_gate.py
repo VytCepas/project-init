@@ -178,6 +178,16 @@ class TestRatchet:
         r = _gate(repo)
         assert r.returncode == 0, r.stdout + r.stderr
 
+    def test_an_exemptions_file_with_no_rows_still_reaches_the_verdict(self, repo: Path):
+        # grep -v over a header-only file matches nothing and exits 1; under `set -e` that must not end the gate.
+        (repo / "naming-exemptions.tsv").write_text(
+            "# repo-owned exemptions\nid\trule\tsubject\tkind\tremove_by\treason\n",
+            encoding="utf-8",
+        )
+        r = _gate(repo)
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert "naming-check:" in r.stdout + r.stderr
+
 
 class TestUnchecked:
     def test_no_vendored_package_and_no_source_checkout_is_unchecked_exit_3(
