@@ -1,14 +1,15 @@
 #!/usr/bin/env sh
-# naming-check.sh -- harbor's naming standard over this repo, as a ratchet.
+# naming-check.sh -- the naming standard over this repo, as a ratchet.
 #
 #   sh gates/naming-check.sh          judge the tree; exit 0 clean, 1 red, 3 UNCHECKED
 #   sh gates/naming-check.sh --seed   write gates/naming.baseline from today's findings
 #                                     (adoption only: refuses a baseline that already has rows)
 #
-# THE JUDGE is harbor's lint-name.sh. This repo carries it vendored in vendor/naming/
-# (refresh: `sh <harbor>/bin/standard-vendor.sh .`), so CI needs no harbor checkout. With no
-# vendored package the gate falls back to a harbor checkout ($HARBOR_REPO, else $PORT_ROOT/harbor,
-# else ~/port/harbor). With neither it says UNCHECKED and exits 3: never a silent pass.
+# THE JUDGE is the standard's lint-name.sh. This repo carries it vendored in vendor/naming/
+# (refresh: `sh <standard checkout>/bin/standard-vendor.sh .`), so CI needs no checkout. With no
+# vendored package the gate falls back to a checkout of the standard's source named by
+# $NAMING_SOURCE (a directory holding bin/lint-name.sh and standards/naming/). With neither it
+# says UNCHECKED and exits 3: never a silent pass.
 #
 # THE RATCHET. gates/naming.baseline holds one finding per line (`rule TAB subject`):
 #   NEW    a finding not in the baseline                   -> red: fix the name
@@ -17,7 +18,7 @@
 #
 # EXEMPTIONS. A name the standard must not judge is a row in naming-exemptions.tsv at the repo
 # root (same columns as the vendored registry/exemptions.tsv), appended to a temporary copy of
-# the registry. Rules that judge the registry itself are dropped: harbor owns those.
+# the registry. Rules that judge the registry itself are dropped: the standard's owner judges those.
 #
 # WHAT IS JUDGED is the working tree as git would commit it (tracked plus untracked-not-ignored),
 # read through a throwaway index, so an uncommitted scaffold is judged and nothing is staged.
@@ -48,16 +49,16 @@ if [ -f vendor/naming/lint-name.sh ] && [ -d vendor/naming/registry ]; then
     if [ "$vrc" -ne 0 ]; then
       cat "$T/vendor.out" >&2
       [ "$vrc" -eq 3 ] && unchecked "the vendored package cannot be verified against its manifest"
-      printf 'naming-check: RED, vendor/naming/ differs from its MANIFEST.tsv. Restore it or re-vendor: sh <harbor>/bin/standard-vendor.sh .\n' >&2
+      printf 'naming-check: RED, vendor/naming/ differs from its MANIFEST.tsv. Restore it or re-vendor: sh <standard checkout>/bin/standard-vendor.sh .\n' >&2
       exit 1
     fi
   fi
 else
-  HARBOR="${HARBOR_REPO:-${PORT_ROOT:-$HOME/port}/harbor}"
-  [ -f "$HARBOR/bin/lint-name.sh" ] && [ -d "$HARBOR/standards/naming" ] ||
-    unchecked "no vendor/naming/ in this repo and no harbor checkout at $HARBOR (vendor it: sh <harbor>/bin/standard-vendor.sh $ROOT, or set HARBOR_REPO)"
-  LINT="$HARBOR/bin/lint-name.sh"
-  REGSRC="$HARBOR/standards/naming"
+  SRC="${NAMING_SOURCE:-}"
+  [ -n "$SRC" ] && [ -f "$SRC/bin/lint-name.sh" ] && [ -d "$SRC/standards/naming" ] ||
+    unchecked "no vendor/naming/ in this repo and no standard checkout (vendor it: sh <standard checkout>/bin/standard-vendor.sh $ROOT, or set NAMING_SOURCE)"
+  LINT="$SRC/bin/lint-name.sh"
+  REGSRC="$SRC/standards/naming"
 fi
 
 cp -R "$REGSRC" "$T/registry"

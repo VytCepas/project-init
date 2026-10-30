@@ -180,11 +180,11 @@ class TestRatchet:
 
 
 class TestUnchecked:
-    def test_no_vendored_package_and_no_harbor_is_unchecked_exit_3(
+    def test_no_vendored_package_and_no_source_checkout_is_unchecked_exit_3(
         self, repo: Path, tmp_path: Path
     ):
         shutil.rmtree(repo / "vendor")
-        r = _gate(repo, HARBOR_REPO=str(tmp_path / "no-harbor"))
+        r = _gate(repo, NAMING_SOURCE=str(tmp_path / "no-source"))
         assert r.returncode == 3, r.stdout + r.stderr
         assert "UNCHECKED" in r.stderr
 

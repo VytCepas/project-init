@@ -233,7 +233,7 @@ from pathlib import Path
 import pytest
 
 from project_init.scaffold import load_preset, overlay_layers, scaffold
-from tests.helpers import make_variables
+from tests.helpers import make_variables, naming_gate_paths
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "lifecycle_baseline"
 
@@ -433,6 +433,8 @@ _ADDED_SINCE_BASELINE = {
     # Hosted-pinned jobs skip when CI_RUNS_ON is set (deliberate if: guard).
     ".github/workflows/review-status.yml",
 }
+# The naming gate (gates/, vendor/naming/) postdates the captured baseline.
+_ADDED_SINCE_BASELINE |= naming_gate_paths()
 
 
 def _manifest(target: Path) -> dict[str, str]:

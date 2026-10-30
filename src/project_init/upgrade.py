@@ -1735,9 +1735,9 @@ _ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
     (
         ("gates",),
         "naming-gate",
-        "Naming standard gate: ratchet script + seeded baseline (harbor#967)",
+        "Naming standard gate: ratchet script + seeded baseline ",
     ),
-    (("vendor", "naming"), "naming-gate", "Naming standard gate: vendored harbor package"),
+    (("vendor", "naming"), "naming-gate", "Naming standard gate: vendored package"),
     ((".github",), "github", "GitHub repo config (templates, CODEOWNERS, …)"),
     ((".agents", "skills"), "claude-skills", "Claude Code skills"),
     ((".agents", "hooks"), "claude-hooks", "Claude Code hooks"),

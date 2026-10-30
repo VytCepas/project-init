@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from project_init import naming_gate
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 from tools.sync_agents_from_templates import strip_conditional_wrapper
@@ -118,6 +119,12 @@ class TestScaffoldShipsItOnlyWherePythonRuns:
         assert not (target / ".agents" / "scripts" / "check_test_contract.py").exists()
 
 
+def _seed_naming(target: Path) -> None:
+    """Baseline the scaffold's naming findings, as the CLI does, so `just lint` starts green."""
+    ok, msg = naming_gate.seed_baseline(target)
+    assert ok, msg
+
+
 class TestScaffoldRunsIt:
     """A scaffolded Python repo's `just lint` runs the check (fails red on a plant)."""
 
@@ -148,6 +155,7 @@ class TestScaffoldRunsIt:
         (target / "tests").mkdir(exist_ok=True)
         planted = target / "tests" / "test_planted.py"
         planted.write_text("def test_x(proc):\n    assert proc.returncode == 1\n")
+        _seed_naming(target)
         green = self._lint(target, tmp_path)
         assert green.returncode == 0, green.stdout + green.stderr
         planted.write_text("def test_x(proc):\n    assert proc.returncode != 0\n")
@@ -216,6 +224,7 @@ class TestDiscoveryCheck:
         scaffold(target, load_preset("core"), make_variables())
         (target / "tests").mkdir(exist_ok=True)
         (target / "tests" / "test_ok.py").write_text("def test_ok():\n    assert True\n")
+        _seed_naming(target)
         green = TestScaffoldRunsIt._lint(target, tmp_path)
         assert green.returncode == 0, green.stdout + green.stderr
         (target / "tests" / "check_x.py").write_text("def test_x():\n    assert False\n")

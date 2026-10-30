@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from tests.helpers import is_posix_sh_scaffold_path, make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _TEMPLATES = _REPO_ROOT / "templates"
@@ -33,16 +33,9 @@ _JQ_ALLOWED = {"models.sh"}
 _IF_GUARD = re.compile(r"^\{\{#if [^}]+\}\}")
 
 
-# POSIX `sh` by decision, not bash: the naming gate and harbor's vendored package it runs
-# (`vendor/naming/`, byte-identical to harbor's, pinned by MANIFEST.tsv) must run under a bare
-# /bin/sh with BSD userland, because a client CI may have no bash >= 3.2 guarantees at all.
-# They are held to the stricter contract below instead of the bash denylist.
-_POSIX_SH_DIRS = (("base", "gates"), ("base", "vendor", "naming"))
-
-
 def _is_posix_sh_template(p: Path) -> bool:
-    parts = p.relative_to(_TEMPLATES).parts
-    return any(parts[: len(d)] == d for d in _POSIX_SH_DIRS)
+    # templates/<layer>/<scaffolded path>
+    return is_posix_sh_scaffold_path("/".join(p.relative_to(_TEMPLATES).parts[1:]))
 
 
 def _shell_templates() -> list[Path]:

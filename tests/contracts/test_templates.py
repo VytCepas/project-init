@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from project_init.scaffold import scaffold
-from tests.helpers import fallback_preset, fallback_variables
+from tests.helpers import VENDORED_VERBATIM_PREFIX, fallback_preset, fallback_variables
 
 
 class TestNodeTemplate:
@@ -101,7 +101,11 @@ class TestTemplateIdentifiers:
 
     def test_no_hardcoded_owner_in_any_template_file(self):
         for f in self.target.rglob("*"):
-            if f.is_file():
+            # The vendored naming package is the standard's own bytes, pinned by its
+            # MANIFEST: it names its origin and editing it breaks the pin.
+            if f.is_file() and not f.relative_to(self.target).as_posix().startswith(
+                VENDORED_VERBATIM_PREFIX
+            ):
                 try:
                     text = f.read_text(encoding="utf-8", errors="ignore")
                     assert "VytCepas" not in text, f"VytCepas found in {f}"

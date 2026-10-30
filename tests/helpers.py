@@ -196,3 +196,28 @@ def fallback_preset(name: str = "obsidian-only") -> dict:
     # lifecycle_fallback overlays so the copied lifecycle hooks/skills are present.
     extra = overlay_layers([], no_plugin=True, memory_stack=stack, lifecycle=True)
     return {**preset, "layers": [*preset["layers"], *extra]}
+
+
+# Scaffolded paths that are POSIX `sh` by decision, not bash: the naming gate and the
+# standard's vendored package (byte-identical to its source, pinned by MANIFEST.tsv). They
+# must run under a bare /bin/sh with BSD userland, so they are held to an `env sh` shebang
+# and `sh -n` instead of the bash denylist, and the vendored files are exempt from the
+# prose scans (they name their own origin and owner, and editing them breaks the pin).
+POSIX_SH_SCAFFOLD_PREFIXES = ("gates/", "vendor/naming/")
+VENDORED_VERBATIM_PREFIX = "vendor/naming/"
+
+
+def is_posix_sh_scaffold_path(rel: str) -> bool:
+    """True for a scaffolded path (``gates/x.sh``) that is POSIX sh by decision."""
+    return rel.startswith(POSIX_SH_SCAFFOLD_PREFIXES)
+
+
+def naming_gate_paths() -> set[str]:
+    """Every scaffolded path the naming gate adds (the gate, its baseline, the vendored package)."""
+    base = Path(__file__).resolve().parents[1] / "templates" / "base"
+    return {
+        p.relative_to(base).as_posix()
+        for d in ("gates", "vendor/naming")
+        for p in (base / d).rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts
+    }

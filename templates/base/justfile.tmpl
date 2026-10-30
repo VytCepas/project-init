@@ -106,11 +106,11 @@ license:
 fuzz:
     uv run --with hypothesis --with pytest-xdist pytest -n auto --tb=short -q
 
-# harbor's naming standard over this repo, as a ratchet: new findings fail, a fixed
+# the naming standard over this repo, as a ratchet: new findings fail, a fixed
 # finding must be deleted from gates/naming.baseline. Judges with the vendored package in
-# vendor/naming/ (no harbor checkout needed); UNCHECKED exits 3, never a pass. Guarded so
+# vendor/naming/ (no checkout of the standard needed); UNCHECKED exits 3, never a pass. Guarded so
 # an upgrade that declined the `naming-gate` addition group keeps a working `just lint`.
-[doc("naming standard ratchet (gates/naming-check.sh; harbor#967)")]
+[doc("naming standard ratchet (gates/naming-check.sh)")]
 naming:
     sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
 
@@ -234,11 +234,11 @@ fuzz:
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
-# harbor's naming standard over this repo, as a ratchet: new findings fail, a fixed
+# the naming standard over this repo, as a ratchet: new findings fail, a fixed
 # finding must be deleted from gates/naming.baseline. Judges with the vendored package in
-# vendor/naming/ (no harbor checkout needed); UNCHECKED exits 3, never a pass. Guarded so
+# vendor/naming/ (no checkout of the standard needed); UNCHECKED exits 3, never a pass. Guarded so
 # an upgrade that declined the `naming-gate` addition group keeps a working `just lint`.
-[doc("naming standard ratchet (gates/naming-check.sh; harbor#967)")]
+[doc("naming standard ratchet (gates/naming-check.sh)")]
 naming:
     sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
 
@@ -362,11 +362,11 @@ fuzz:
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
-# harbor's naming standard over this repo, as a ratchet: new findings fail, a fixed
+# the naming standard over this repo, as a ratchet: new findings fail, a fixed
 # finding must be deleted from gates/naming.baseline. Judges with the vendored package in
-# vendor/naming/ (no harbor checkout needed); UNCHECKED exits 3, never a pass. Guarded so
+# vendor/naming/ (no checkout of the standard needed); UNCHECKED exits 3, never a pass. Guarded so
 # an upgrade that declined the `naming-gate` addition group keeps a working `just lint`.
-[doc("naming standard ratchet (gates/naming-check.sh; harbor#967)")]
+[doc("naming standard ratchet (gates/naming-check.sh)")]
 naming:
     sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
 
@@ -497,11 +497,11 @@ fuzz:
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
-# harbor's naming standard over this repo, as a ratchet: new findings fail, a fixed
+# the naming standard over this repo, as a ratchet: new findings fail, a fixed
 # finding must be deleted from gates/naming.baseline. Judges with the vendored package in
-# vendor/naming/ (no harbor checkout needed); UNCHECKED exits 3, never a pass. Guarded so
+# vendor/naming/ (no checkout of the standard needed); UNCHECKED exits 3, never a pass. Guarded so
 # an upgrade that declined the `naming-gate` addition group keeps a working `just lint`.
-[doc("naming standard ratchet (gates/naming-check.sh; harbor#967)")]
+[doc("naming standard ratchet (gates/naming-check.sh)")]
 naming:
     sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
 
