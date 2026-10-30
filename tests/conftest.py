@@ -74,7 +74,7 @@ def tmp_target(tmp_path: Path) -> Path:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Apply suite-category markers based on the tests/<category>/ layout."""
+    """Apply suite-category markers based on the tests/<family>/<category>/ layout."""
     tests_root = Path(__file__).parent
     for item in items:
         try:
@@ -82,6 +82,6 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         except ValueError:
             continue
 
-        marker_name = _PATH_MARKERS.get(rel_path.parts[0])
+        marker_name = _PATH_MARKERS.get(rel_path.parts[1] if len(rel_path.parts) > 2 else "")
         if marker_name:
             item.add_marker(getattr(pytest.mark, marker_name))
