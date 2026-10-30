@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from tests.helpers import is_posix_sh_scaffold_path, make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _TEMPLATES = _REPO_ROOT / "templates"
@@ -33,10 +33,15 @@ _JQ_ALLOWED = {"models.sh"}
 _IF_GUARD = re.compile(r"^\{\{#if [^}]+\}\}")
 
 
+def _is_posix_sh_template(p: Path) -> bool:
+    # templates/<layer>/<scaffolded path>
+    return is_posix_sh_scaffold_path("/".join(p.relative_to(_TEMPLATES).parts[1:]))
+
+
 def _shell_templates() -> list[Path]:
     out: set[Path] = set()
     for pattern in ("*.sh", "*.sh.tmpl"):
-        out.update(_TEMPLATES.rglob(pattern))
+        out.update(p for p in _TEMPLATES.rglob(pattern) if not _is_posix_sh_template(p))
     # Extensionless git hooks (commit-msg, pre-commit) are bash too — as is the
     # templated pre-push.tmpl (#476: a hook whose rendered name has no extension)
     # — so the denylist catches them in `uv run pytest`, not only the CI jobs.
@@ -76,6 +81,24 @@ def test_templates_discovered():
     # pre-push became pre-push.tmpl (#476): main/master block always renders,
     # the lifecycle branch-prefix rule is gated.
     assert {"pre_commit_gate.sh", "_py.sh", "pre-push.tmpl"} <= names
+
+
+_POSIX_SH_TEMPLATES = sorted(p for p in _TEMPLATES.rglob("*.sh") if _is_posix_sh_template(p))
+
+
+def test_posix_sh_templates_discovered():
+    names = {p.name for p in _POSIX_SH_TEMPLATES}
+    assert {"naming-check.sh", "lint-name.sh", "standard-vendor.sh"} <= names
+
+
+@pytest.mark.parametrize("tmpl", _POSIX_SH_TEMPLATES, ids=_id)
+def test_posix_sh_template_is_env_sh_and_runs_under_sh_n(tmpl: Path):
+    first = tmpl.read_text().splitlines()[0]
+    assert first == "#!/usr/bin/env sh", f"{_id(tmpl)}: bad shebang {first!r}"
+    import subprocess
+
+    r = subprocess.run(["sh", "-n", str(tmpl)], capture_output=True, text=True, check=False)
+    assert r.returncode == 0, f"{_id(tmpl)} does not parse under sh: {r.stderr}"
 
 
 @pytest.mark.parametrize("tmpl", _SHELL_TEMPLATES, ids=_id)

@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from project_init.scaffold import load_preset, scaffold
-from tests.helpers import make_variables
+from tests.helpers import is_posix_sh_scaffold_path, make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -48,6 +48,8 @@ def test_no_external_jq_in_scaffolded_scripts(scaffolded: Path):
 
 def test_all_scaffolded_shell_scripts_use_env_bash(scaffolded: Path):
     for sh in scaffolded.rglob("*.sh"):
+        if is_posix_sh_scaffold_path(sh.relative_to(scaffolded).as_posix()):
+            continue  # POSIX sh by decision; tests/check/unit/test_shell_portability.py holds it to env sh
         first = sh.read_text().splitlines()[0]
         assert first == "#!/usr/bin/env bash", f"{sh}: non-portable shebang {first!r}"
 
@@ -63,7 +65,13 @@ def _shell_templates() -> list[Path]:
     out: list[Path] = []
     for pattern in ("*.sh", "*.sh.tmpl"):
         out += (_REPO_ROOT / "templates").rglob(pattern)
-    return sorted(out)
+    return sorted(
+        p
+        for p in out
+        if not is_posix_sh_scaffold_path(
+            "/".join(p.relative_to(_REPO_ROOT / "templates").parts[1:])
+        )
+    )
 
 
 @pytest.mark.parametrize("tmpl", _shell_templates(), ids=lambda p: str(p.name))

@@ -71,12 +71,20 @@ _PRIVATE_NAMES = ["harbor"]
 
 _SKIP_SUFFIXES = {".pyc", ".png", ".svg", ".ico", ".lock"}
 
+# The naming standard's vendored package ships verbatim: its bytes are pinned by its own
+# MANIFEST.tsv, so it cannot be reworded, and it names its origin throughout. It is skipped
+# here as a visible decision, and test_the_verbatim_exemption_is_exactly_the_pinned_package
+# below stops the skip from covering anything the manifest does not pin.
+_VERBATIM_DIR = "templates/base/vendor/naming"
+
 
 def _shipped_paths() -> list[Path]:
     out: list[Path] = []
     for d in _SHIPPED_DIRS:
         for p in sorted((_REPO_ROOT / d).rglob("*")):
             if not p.is_file() or p.suffix in _SKIP_SUFFIXES or "__pycache__" in p.parts:
+                continue
+            if p.relative_to(_REPO_ROOT).as_posix().startswith(_VERBATIM_DIR + "/"):
                 continue
             out.append(p)
     out.extend(_REPO_ROOT / f for f in _SHIPPED_FILES)
@@ -223,3 +231,24 @@ def test_the_reasoning_those_comments_carried_is_still_there():
         "KEEP IN STEP",
     ):
         assert kept in guard, f"the cleanup removed reasoning, not just a citation: {kept!r}"
+
+
+def test_the_verbatim_exemption_is_exactly_the_pinned_package():
+    """The skip above covers only files the vendored MANIFEST pins, byte for byte."""
+    import hashlib
+
+    root = _REPO_ROOT / _VERBATIM_DIR
+    rows = [
+        ln.split("\t")
+        for ln in (root / "MANIFEST.tsv").read_text(encoding="utf-8").splitlines()
+        if ln and not ln.startswith("#")
+    ]
+    pinned = {r[0]: r[1] for r in rows}
+    on_disk = {
+        p.relative_to(root).as_posix()
+        for p in root.rglob("*")
+        if p.is_file() and p.name != "MANIFEST.tsv" and "__pycache__" not in p.parts
+    }
+    assert on_disk == set(pinned), f"unpinned or missing: {sorted(on_disk ^ set(pinned))}"
+    for rel, sha in pinned.items():
+        assert hashlib.sha256((root / rel).read_bytes()).hexdigest() == sha, f"{rel} edited"

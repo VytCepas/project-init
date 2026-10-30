@@ -568,6 +568,7 @@ def _cli(argv: list[str]) -> int:
         with scaffolding():
             created = scaffold(target, preset, variables, strict=args.strict, conflicts=conflicts)
         _record_scaffold(target, preset, variables, created)
+        _seed_naming_baseline(target, created)
     except TemplateRenderError as e:
         sys.stderr.write(f"error: {e}\n")
         return 2
@@ -583,6 +584,19 @@ def _cli(argv: list[str]) -> int:
     _maybe_bootstrap(args, inputs, target)
     _emit_scaffold_output(args, target, created, preset, variables, inputs, conflicts)
     return 0
+
+
+def _seed_naming_baseline(target: Path, created: list[Path]) -> None:
+    """Baseline the template's own naming findings so a fresh scaffold's gate is green."""
+    from project_init import naming_gate
+
+    if naming_gate.BASELINE_REL not in created:
+        return  # not written this run: the owner's baseline stands
+    ok, msg = naming_gate.seed_baseline(target)
+    if not ok:
+        sys.stderr.write(
+            f"note: naming baseline not seeded: {msg}\n  run `sh gates/naming-check.sh --seed`\n"
+        )
 
 
 if __name__ == "__main__":

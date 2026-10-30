@@ -30,6 +30,7 @@ from pathlib import Path
 
 import pytest
 
+from project_init import naming_gate
 from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
@@ -50,6 +51,10 @@ def _require_just() -> None:
 def _scaffold(target: Path, language: str) -> None:
     flags = {"language": language, "python": "", language: "true"}
     scaffold(target, load_preset("core"), make_variables(**flags))
+    # The CLI baselines the template's own naming findings right after scaffolding
+    # (harbor#967); without that step `just lint`'s naming gate is rightly red.
+    ok, msg = naming_gate.seed_baseline(target)
+    assert ok, msg
 
 
 def _run(target: Path, *recipe: str) -> subprocess.CompletedProcess[str]:

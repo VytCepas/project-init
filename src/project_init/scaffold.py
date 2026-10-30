@@ -142,6 +142,10 @@ _GOVERNANCE_USER_FILES = frozenset(
         ".agents/governance/config.json",
     }
 )
+# Seed-once, owner-owned (harbor#967): the naming gate's ratchet baseline is written
+# when absent, then seeded from the repo's own findings and only ever shrunk by hand.
+# A re-scaffold and an upgrade never compare it to the pristine render.
+SEED_ONCE_FILES = frozenset({"gates/naming.baseline"})
 # The owner-edited record file. On a re-scaffold it is preserved (not re-rendered)
 # once it carries the scaffold record, so hand-edits — preserve list, project_key,
 # declined_additions, safety.allow — survive (#296); write_scaffold_record then
@@ -619,7 +623,7 @@ def _should_preserve(rel_path: Path, target: Path, preserve_globs: list[str] | N
         return True
     if rel_path.name in _ALWAYS_OVERWRITE:
         return False
-    if rel_path.as_posix() in _GOVERNANCE_USER_FILES:
+    if rel_path.as_posix() in _GOVERNANCE_USER_FILES | SEED_ONCE_FILES:
         return True
     # A re-scaffold must not clobber a hand-edited config.yaml that already
     # carries a scaffold record (#296); write_scaffold_record updates the record

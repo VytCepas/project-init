@@ -115,6 +115,12 @@ Check a name at its birth against harbor's naming standard (harbor#967).
 - `def check_name` — Ask ``lint-name.sh --check <surface> <name>``; never raise on a missing or broken harbor.
 - `def name_error` — Why the standard refuses *name*, or None when it passes or cannot be asked.
 
+### `project_init/naming_gate.py`
+
+Seed the scaffolded naming gate's ratchet baseline (harbor#967).
+
+- `def seed_baseline` — Run ``sh gates/naming-check.sh --seed`` in *target*; return ``(ok, message)``.
+
 ### `project_init/platform_admission_hook.py`
 
 Refuse a native Windows shell before anything runs (#1070, ADR-030).
