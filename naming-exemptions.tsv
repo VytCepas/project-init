@@ -1,0 +1,20 @@
+# naming-exemptions.tsv (harbor#967) — the names in this repo harbor's naming lint does not judge, and why.
+#
+# Rows are appended to harbor's standards/naming/exemptions.tsv before the lint runs; same columns, same kinds
+# (tool-required, world-name, legacy). A legacy row expires on remove_by and the list only shrinks.
+#
+# COLUMNS  id <TAB> rule <TAB> subject <TAB> kind <TAB> remove_by <TAB> reason
+id	rule	subject	kind	remove_by	reason
+yard-0001	*	.agents/	tool-required	-	project-init's own dogfood of the tree it scaffolds: harnesses read .agents/ by name, and its names change with the template, together with an upgrade path for scaffolded repos
+yard-0002	*	.claude/	tool-required	-	Claude Code reads .claude/ by name; it is the generated mirror of .agents/ (tools/sync_claude_dir.py)
+yard-0003	*	templates/	tool-required	-	the scaffold: every path here is a file name written into scaffolded repos, recorded in their .agents/.upgrade-base.json and wired in their settings and in harbor's admission (github_command_guard); renaming one needs an upgrade migration, not a rename
+yard-0004	*	plugins/	tool-required	-	the marketplace payload: plugin ids (project-init-lifecycle, project-init-workflow) and skill names are what users install and type, and harbor's admission checks the plugin id
+yard-0005	name.alias	src/project_init	tool-required	-	the import name of the PyPI package project-init, published on an index and pinned by users
+yard-0006	name.separator	src/project_init	tool-required	-	Python import names are snake case; the package is project_init
+yard-0007	name.extension	**/*.mmd	world-name	-	Mermaid's own extension; the diagram skill and the staleness hooks read .mmd by name
+yard-0008	name.case	CITATION.cff	tool-required	-	GitHub reads CITATION.cff by name and upper case
+yard-0009	name.extension	CITATION.cff	tool-required	-	GitHub reads CITATION.cff by name
+yard-0010	name.extension	mypy.ini	tool-required	-	mypy reads mypy.ini by name
+yard-0011	name.separator	tools/approve_pending_bump_runs.sh	legacy	2026-12-01	shim at the old name: .github/workflows/third-party-updates.yml still calls it until the workflow patch lands (harbor#967)
+yard-0012	name.separator	tools/propose_third_party_bumps.sh	legacy	2026-12-01	shim at the old name: .github/workflows/third-party-updates.yml still calls it until the workflow patch lands (harbor#967)
+yard-0013	name.separator	tools/check_third_party_updates.py	legacy	2026-12-01	shim at the old name: .github/workflows/third-party-updates.yml still calls it until the workflow patch lands (harbor#967)

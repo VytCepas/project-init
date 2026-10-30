@@ -22,41 +22,41 @@ nav:
   - Home: README.md
   - Positioning: positioning.md
   - Guide:
-    - Using project-init: guides/using-project-init.md
+    - Using project-init: guides/using-scaffolder.md
     - Preset gallery: guides/preset-gallery.md
     - Org fork lifecycle (runbook): guides/org-fork-lifecycle.md
     - Phone / remote access: development/mobile-remote-access.md
   - Architecture Decisions:
-    - Scaffolder design: adr/adr-001-scaffolder-design.md
-    - dot_ prefix convention: adr/adr-002-dotglob-template-convention.md
-    - GitHub-native workflow: adr/adr-003-github-native-workflow.md
-    - Obsidian + docs integration: adr/adr-004-obsidian-docs-integration.md
-    - PR & board lifecycle: adr/adr-005-github-pr-board-workflow.md
-    - Conventional commit titles: adr/adr-006-conventional-commit-titles.md
-    - Security enforcement layers: adr/adr-007-security-enforcement-layers.md
-    - Distribution channel: adr/adr-008-distribution-channel.md
-    - Graphify memory preset: adr/adr-009-graphify-memory-preset.md
-    - Plugin marketplace dual-ship: adr/adr-010-plugin-marketplace-dual-ship.md
-    - PyPI trusted publishing: adr/adr-011-pypi-trusted-publishing.md
-    - Prod-safety guard: adr/adr-012-prod-safety-guard.md
-    - Distribution & governance model: adr/adr-013-distribution-governance-model.md
-    - Environment promotion chains (superseded): adr/adr-014-environment-promotion-chains.md
-    - Env & deploy model: adr/adr-015-env-deploy-model.md
-    - Model-agnostic switching (CCR): adr/adr-016-model-agnostic-switching.md
-    - Per-surface config generator: adr/adr-017-per-surface-config-generator.md
-    - AI-governance overlay: adr/adr-018-ai-governance-overlay.md
-    - Local observability overlay: adr/adr-019-local-observability-overlay.md
-    - Memory backend decomposition: adr/adr-020-memory-backend-decomposition.md
-    - Quality vs lifecycle tier boundary: adr/adr-021-quality-vs-lifecycle-tier-boundary.md
-    - Toolchain gate map: adr/adr-022-toolchain-gate-map.md
-    - Wizard explanation standard: adr/adr-023-wizard-explanation-standard.md
-    - Memory tier model: adr/adr-024-memory-tier-model.md
-    - Agentic-OS root layer: adr/adr-025-agentic-os-root-layer.md
-    - Tier-3 RAG engine (cocoindex): adr/adr-026-tier3-rag-engine-cocoindex.md
-    - Claude config projection (.claude mirror): adr/adr-027-claude-config-projection.md
-    - Session-scoped reminder injection: adr/adr-028-session-scoped-reminder-injection.md
-    - Gateway wizard (six-ask default path): adr/adr-029-gateway-wizard.md
-    - macOS and Linux only, WSL2 for Windows: adr/adr-030-macos-linux-wsl2-only.md
+    - Scaffolder design: decisions/0001-scaffolder-design.md
+    - dot_ prefix convention: decisions/0002-dotglob-template-convention.md
+    - GitHub-native workflow: decisions/0003-github-native-workflow.md
+    - Obsidian + docs integration: decisions/0004-obsidian-docs-integration.md
+    - PR & board lifecycle: decisions/0005-github-pr-board-workflow.md
+    - Conventional commit titles: decisions/0006-conventional-commit-titles.md
+    - Security enforcement layers: decisions/0007-security-enforcement-layers.md
+    - Distribution channel: decisions/0008-distribution-channel.md
+    - Graphify memory preset: decisions/0009-graphify-memory-preset.md
+    - Plugin marketplace dual-ship: decisions/0010-plugin-marketplace-dual-ship.md
+    - PyPI trusted publishing: decisions/0011-pypi-trusted-publishing.md
+    - Prod-safety guard: decisions/0012-prod-safety-admission-hook.md
+    - Distribution & governance model: decisions/0013-distribution-governance-model.md
+    - Environment promotion chains (superseded): decisions/0014-environment-promotion-chains.md
+    - Env & deploy model: decisions/0015-env-deploy-model.md
+    - Model-agnostic switching (CCR): decisions/0016-model-agnostic-switching.md
+    - Per-surface config generator: decisions/0017-per-surface-config-generator.md
+    - AI-governance overlay: decisions/0018-ai-governance-overlay.md
+    - Local observability overlay: decisions/0019-local-observability-overlay.md
+    - Memory backend decomposition: decisions/0020-memory-backend-decomposition.md
+    - Quality vs lifecycle tier boundary: decisions/0021-quality-vs-lifecycle-tier-boundary.md
+    - Toolchain gate map: decisions/0022-toolchain-gate-map.md
+    - Wizard explanation standard: decisions/0023-wizard-explanation-standard.md
+    - Memory tier model: decisions/0024-memory-tier-model.md
+    - Agentic-OS root layer: decisions/0025-agentic-os-root-layer.md
+    - Tier-3 RAG engine (cocoindex): decisions/0026-tier3-rag-engine-cocoindex.md
+    - Claude config projection (.claude mirror): decisions/0027-claude-config-projection.md
+    - Session-scoped reminder injection: decisions/0028-session-scoped-reminder-injection.md
+    - Gateway wizard (six-ask default path): decisions/0029-gateway-wizard.md
+    - macOS and Linux only, WSL2 for Windows: decisions/0030-macos-linux-wsl2-only.md
   - Development:
     - Template system: development/template-system.md
     - Memory descriptor: development/memory-descriptor.md
@@ -72,4 +72,4 @@ nav:
   - Research:
     - Model-agnostic switching: research/model-agnostic-switching.md
   - Reviews:
-    - 2026-07 Project Review: reviews/2026-07-project-review.md
+    - 2026-07 Project Review: reviews/2026-07-06-project-review.md

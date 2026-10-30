@@ -104,7 +104,7 @@ it entirely, and the durable control is a GTM-side permission. And **the
 false-positive rate of the new rules is unmeasured, not zero** — `bq` and
 `dbt` traffic is too rare in this repo's corpus to establish a rate. What is
 measured is that the rules fire zero times on the known-good corpus in
-`tests/contracts/test_prod_guard.py`, which grew a negative case for every
+`tests/admission/contracts/test_prod_admission_hook.py`, which grew a negative case for every
 rule added.
 
 ## Update (PI-893)

@@ -93,7 +93,7 @@ document the guard explicitly as advisory steering with git hooks + CI as the re
 boundary (which ADR-007 already says — the guard's marketing overshoots it).
 
 ### M5 — two tests fail on any machine without `gh` installed
-`tests/integration/test_issue_metadata_workflow.py:148,202` invoke the scaffolded
+`tests/ci/integration/test_issue_metadata_workflow.py:148,202` invoke the scaffolded
 `create_issue.sh`, which hard-requires `gh` (`templates/lifecycle/dot_agents/scripts/create_issue.sh:17`)
 *before* parsing `--help` or validating flags. No skip guard. Secondary defect: `--help`
 should not require the tool to be installed — move arg parsing ahead of the `gh` check.
@@ -188,7 +188,7 @@ should not require the tool to be installed — move arg parsing ahead of the `g
   CLAUDE.md drifted.
 - `tools/sync_plugin.py` has no argument parsing — `sync_plugin.py --help` silently runs
   the sync.
-- `tools/check_third_party_updates.py` `apply()` writes the manifest before the `used_in`
+- `tools/check-third-party-updates.py` `apply()` writes the manifest before the `used_in`
   files — a mid-way failure leaves a partial lockstep bump.
 - Dead code: `CACHE_PATH` in both copies of `dag_workflow.py`; `MCP_ONLY_TARGETS` in
   `surfaces.py:225` duplicates `planned_files` and is referenced nowhere.

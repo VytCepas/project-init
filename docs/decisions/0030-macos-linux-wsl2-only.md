@@ -5,13 +5,13 @@
 - Implements: [#1070](https://github.com/VytCepas/project-init/issues/1070)
 - Relates to: [harbor#831](https://github.com/VytCepas/harbor/issues/831) (the cross-repo
   epic) and harbor's `CONTRACTS/platforms.md` (the shared contract)
-- Supersedes in part: [ADR-027](adr-027-claude-config-projection.md), its Windows rationale only
+- Supersedes in part: [ADR-027](0027-claude-config-projection.md), its Windows rationale only
 
 ## Context
 
 PI-463 made native Windows a supported target: hooks ran through Git Bash, a
 `windows-portability` CI job exercised them on `windows-latest`, and the
-scaffolded `conftest.py`, `prod_guard.py` and `tools/box_install.py` carried
+scaffolded `conftest.py`, `prod_guard.py` and `tools/host_install.py` carried
 Windows-only branches. ADR-027 cited native-Windows users as one of two reasons
 the committed `.claude/` projection must be plain files rather than a symlink.
 
@@ -31,7 +31,7 @@ macOS and Linux, and on Windows only inside WSL2. It reverses harbor#615.
 - **The Windows-only code goes:** the `windows-portability` CI job, the
   USERPROFILE/HOMEDRIVE/HOMEPATH/APPDATA/LOCALAPPDATA redirect in the
   scaffolded `conftest.py`, `prod_guard.py`'s off-POSIX branch, and
-  `box_install.py`'s `os.name == "nt"` and copied-entrypoint branches.
+  `host_install.py`'s `os.name == "nt"` and copied-entrypoint branches.
 
 ## What this supersedes in ADR-027
 

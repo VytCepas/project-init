@@ -6,7 +6,7 @@ project runs — both in the **scaffolded output** (what a generated project get
 
 Consult on demand; the per-turn rules stay in `CLAUDE.md`. When you add,
 promote, demote, or drop a gate, update this file **and** the workflow in the same PR — a
-contract test (`tests/contracts/test_quality_gate_policy.py`) fails CI if the repo's
+contract test (`tests/ci/contracts/test_quality_gate_policy.py`) fails CI if the repo's
 required-check set drifts from the marker below.
 
 ## Model: one thing gates, many inform

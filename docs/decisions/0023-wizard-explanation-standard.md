@@ -44,7 +44,7 @@ not second-class.
 
 ## Enforcement — a non-vacuous coverage test
 
-`tests/contracts/test_wizard_explanations.py`:
+`tests/session/contracts/test_wizard_explanations.py`:
 
 - **Enumeration from the real registry.** `WIZARD_CONCERN_FLAGS` (concern →
   CLI-flag `dest`) and `WIZARD_MECHANICAL_FLAGS` (identity / distribution /

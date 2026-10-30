@@ -43,7 +43,7 @@ anyone noticed, because nothing about the state looks like failure (#939).
 
 The fallback is deliberately not a hard failure: a missing secret must not
 turn the weekly check into a red build. It emits a `::warning::`, and a
-best-effort recovery step (`tools/approve_pending_bump_runs.sh`) approves what
+best-effort recovery step (`tools/approve-pending-bump-runs.sh`) approves what
 it can. **It cannot approve everything** — the endpoint refuses runs it did not
 queue, including the `pull_request_review` run that gates `review/decision`:
 
