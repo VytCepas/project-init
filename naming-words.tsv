@@ -1,0 +1,19 @@
+id	note
+amp	tool: the Amp coding agent, a harness project-init scaffolds for (templates/amp)
+antigravity	tool: Google's Antigravity agent IDE, a harness project-init scaffolds for (templates/antigravity)
+autofix	technical: a linter applying its own fixes (ruff --fix); the post-edit lint hook must not autofix mid-edit
+clippy	tool: the Rust linter, configured by clippy.toml
+decomposition	English
+deduplication	English
+golangci	tool: golangci-lint, the Go linter, configured by .golangci.yml
+graphify	tool: the code knowledge-graph tool behind the obsidian-graphify memory preset
+interoperability	English
+junie	tool: JetBrains' Junie agent, a harness project-init scaffolds for (templates/junie)
+mcps	technical: the --mcps CLI flag, the MCP servers a scaffold installs; the module and its test carry the flag's name
+nist	world name: the US standards body whose AI RMF the governance crosswalk maps
+noop	technical: a no-op, here the benchmark's context-loading probe task
+org	technical: GitHub's organization account, the --profile org distribution profile
+rerecorded	English: recorded again
+rustfmt	tool: the Rust formatter, configured by rustfmt.toml
+typecheck	technical: the just typecheck recipe every scaffold ships
+upgrading	English
