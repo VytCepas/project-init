@@ -72,6 +72,10 @@ _ALLOWED = {
     # config to port before removing. Prose only: this module declares no path
     # any code resolves, so exempting it cannot hide a functional regression.
     "src/project_init/migration_notes.py",
+    # The changelog is generated from the release notes, which name the old
+    # broken paths verbatim when they record the PI-869, PI-872 and PI-877
+    # fixes. Prose only: it declares no path any code resolves.
+    "CHANGELOG.md",
 }
 
 
