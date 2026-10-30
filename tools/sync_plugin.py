@@ -60,7 +60,7 @@ JUNIE_SKILLS = REPO_ROOT / "templates" / "junie" / "dot_junie" / "skills"
 # version silently serves the stale copy (PI-845 shipped that way for months;
 # #857 fixed it twice by hand). Lives OUTSIDE the plugin dirs so it is not part
 # of either shipped payload. update_payload_locks() refuses to relock a changed
-# payload under an unchanged version; tests/contracts/test_plugin_marketplace.py
+# payload under an unchanged version; tests/deploy/contracts/test_plugin_marketplace.py
 # fails if a lock drifts from the tree.
 _PAYLOAD_LOCKS = REPO_ROOT / "plugins" / "payload-locks.json"
 _VERSIONED_PLUGINS = (WORKFLOW_PLUGIN, LIFECYCLE_PLUGIN)

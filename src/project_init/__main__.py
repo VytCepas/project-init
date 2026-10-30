@@ -7,8 +7,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Re-exported for backward compat (importers of project_init.__main__).
-from project_init.box_profile import load_box_profile
 from project_init.cli_output import (
     _MEMORY_NEXT_STEPS as _MEMORY_NEXT_STEPS,
 )
@@ -77,6 +75,9 @@ from project_init.cli_parser import (
 from project_init.console import (
     scaffolding,
 )
+
+# Re-exported for backward compat (importers of project_init.__main__).
+from project_init.host_profile import load_box_profile
 from project_init.scaffold import (
     TemplateRenderError,
     list_presets,
@@ -345,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
     clean exit 130 instead of a raw traceback (2026-07 review). A native
     Windows shell is refused first, naming WSL2 (#1070).
     """
-    from project_init.platform_guard import REFUSAL_EXIT, native_windows_shell, refusal
+    from project_init.platform_admission_hook import REFUSAL_EXIT, native_windows_shell, refusal
 
     native = native_windows_shell()
     if native is not None:  # #1070: WSL2 only, refused before anything runs

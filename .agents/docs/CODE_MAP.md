@@ -23,13 +23,6 @@ Post-scaffold bootstrap (#887): optionally initialize the environment.
 - `def run_bootstrap` — Initialize the scaffolded project in *target*; return per-step outcomes.
 - `def print_bootstrap_report` — Render the bootstrap outcome — one line per step, failures loud.
 
-### `project_init/box_profile.py`
-
-Harbor box-profile seam (BOX-1): advisory wizard defaults from the box.
-
-- `class BoxProfile` — A successfully-parsed box profile (already contract-validated).
-- `def load_box_profile` — Read the box profile; every failure path is silent and returns None.
-
 ### `project_init/capabilities.py`
 
 Deterministic capabilities inventory (PI-374, ADR-017).
@@ -91,6 +84,13 @@ Deterministic AIBOM generation for the governance overlay (ADR-018, #412).
 - `def render_aibom` — Build the AIBOM markdown from the recorded selection + emitted overlays.
 - `def emit` — Write ``.agents/governance/ai-bom.generated.md``.
 
+### `project_init/host_profile.py`
+
+Harbor box-profile seam (BOX-1): advisory wizard defaults from the box.
+
+- `class BoxProfile` — A successfully-parsed box profile (already contract-validated).
+- `def load_box_profile` — Read the box profile; every failure path is silent and returns None.
+
 ### `project_init/mcps.py`
 
 MCP catalog and emit helpers for the project-init wizard.
@@ -115,7 +115,7 @@ Check a name at its birth against harbor's naming standard (harbor#967).
 - `def check_name` — Ask ``lint-name.sh --check <surface> <name>``; never raise on a missing or broken harbor.
 - `def name_error` — Why the standard refuses *name*, or None when it passes or cannot be asked.
 
-### `project_init/platform_guard.py`
+### `project_init/platform_admission_hook.py`
 
 Refuse a native Windows shell before anything runs (#1070, ADR-030).
 

@@ -13,13 +13,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from project_init.box_profile import BoxProfile
 from project_init.cli_output import _presets_payload
 from project_init.console import (
     console,
     option_line,
     render_presets,
 )
+from project_init.host_profile import BoxProfile
 from project_init.mcps import MCP_CATALOG, PLAYWRIGHT_MCP
 from project_init.naming import check_name
 from project_init.scaffold import load_preset, memory_tier

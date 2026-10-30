@@ -2,7 +2,7 @@
 #
 # These sit on the *request path* of a scaffolded project (CCR proxies model
 # traffic), so we never bump them blindly. The scheduled "third-party-updates"
-# workflow runs tools/check_third_party_updates.py to detect newer releases,
+# workflow runs tools/check-third-party-updates.py to detect newer releases,
 # security-scans the candidate, and opens a PR proposing the bump — never
 # auto-merged. Downstream projects inherit the vetted pin via upgrade-as-PR
 # (PI-241). Add a [tools.<id>] block to bring another external tool under this.
@@ -19,7 +19,7 @@ pinned = "2.0.0"
 hold_at = "3.0.0"
 hold_reason = "3.x rewrites the user's Claude Code settings and needs the #870 rework (#1005)"
 # The shell variable carrying this version in each used_in file (kept in lockstep
-# with `pinned` by `check_third_party_updates.py apply`).
+# with `pinned` by `check-third-party-updates.py apply`).
 version_var = "CCR_VERSION"
 used_in = ["templates/multi_model/dot_agents/scripts/setup_models.sh"]
 changelog = "https://github.com/musistudio/claude-code-router/releases"

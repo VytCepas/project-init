@@ -27,7 +27,7 @@ the `rich` report is #275.
 | `latency.py` | per-step latency + P50/P99 aggregation over repeats (#272) |
 | `scoring.py` | `score` — deterministic success + first_try + rework_cycles from the `[check]` specs (#273) |
 | `report.py` | the `rich` cost–benefit verdict: bare-vs-scaffolded deltas, Pareto flag, diminishing returns, overhead (#275) |
-| `model_prices.json` | vendored, litellm-shaped price table for the $ axis (#272) |
+| `model-prices.json` | vendored, litellm-shaped price table for the $ axis (#272) |
 | `results/` | raw per-run JSONL (gitignored) |
 
 ## Running it
@@ -64,7 +64,7 @@ code reads `RunRecord`, never raw transcripts.
 
 ## Cost & latency (#272)
 
-- **Cost** is derived from `model_prices.json` × the four captured token classes
+- **Cost** is derived from `model-prices.json` × the four captured token classes
   (input, output, cache-read, cache-creation priced independently, so prompt-cache
   economics show up honestly). `cost_usd` is filled on every record the CLI emits;
   an unpriced model leaves it `null` with a warning rather than guessing.
