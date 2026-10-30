@@ -19,6 +19,14 @@ lint:
     uv run ruff format --check .
     uv run python .agents/scripts/check_test_contract.py exit-codes tests
     uv run python .agents/scripts/check_test_contract.py discovery tests
+    just naming
+
+# the naming standard over this repo's own tree, as a ratchet (harbor#967). gates/naming-check.sh
+# and vendor/naming are symlinks to the gate and judge every scaffold ships (templates/base), so the
+# root runs the same files; naming-exemptions.tsv and gates/naming.baseline are the root's own.
+[doc("naming standard ratchet over this repo's own tree (gates/naming-check.sh)")]
+naming:
+    sh gates/naming-check.sh
 
 # auto-format
 format:
