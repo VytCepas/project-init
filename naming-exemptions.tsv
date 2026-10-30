@@ -18,3 +18,4 @@ yard-0010	name.extension	mypy.ini	tool-required	-	mypy reads mypy.ini by name
 yard-0011	name.separator	tools/approve_pending_bump_runs.sh	legacy	2026-12-01	shim at the old name: .github/workflows/third-party-updates.yml still calls it until the workflow patch lands (harbor#967)
 yard-0012	name.separator	tools/propose_third_party_bumps.sh	legacy	2026-12-01	shim at the old name: .github/workflows/third-party-updates.yml still calls it until the workflow patch lands (harbor#967)
 yard-0013	name.separator	tools/check_third_party_updates.py	legacy	2026-12-01	shim at the old name: .github/workflows/third-party-updates.yml still calls it until the workflow patch lands (harbor#967)
+yard-0014	name.env	env:HARBOR_PLAN_REPO	tool-required	-	named in templates/base/vendor/naming/library-log.sh, a verbatim copy of harbor's library pinned by MANIFEST.tsv; editing it breaks the pin, and the variable is harbor's own override
