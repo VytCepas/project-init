@@ -62,6 +62,7 @@ from project_init.scaffold import (
     _PRESERVE_DIRS,
     _RECORD_MARKER,
     CONTRACT_VERSION,
+    SEED_ONCE_FILES,
     _generate_claude_projection,
     _matches_preserve_glob,
     _new_sibling,
@@ -1162,8 +1163,10 @@ def compute_drift(
     for rel in sorted(rendered):
         if rel == _CONFIG_REL or _is_preserved(rel, preserve_globs):
             continue
-        new_bytes = (staging / rel).read_bytes()
         dest = target / rel
+        if rel.as_posix() in SEED_ONCE_FILES and dest.exists():
+            continue  # seeded once, then the owner's (never drift against the pristine render)
+        new_bytes = (staging / rel).read_bytes()
         if not dest.exists():
             report.new.append(rel)
             continue
@@ -1577,6 +1580,7 @@ def apply_drift(
         if decoded is not None:
             base[rel.as_posix()] = decoded
     write_base(target, base)
+    _seed_naming_baseline(target, staging, report)
 
 
 def _print_clean_or_all_skipped(console: Console, report: DriftReport) -> None:
@@ -1728,6 +1732,12 @@ _ADDITION_GROUP_RULES: tuple[tuple[tuple[str, ...], str, str], ...] = (
     ((".devcontainer",), "devcontainer", "Dev container (Codespaces / remote agents)"),
     ((".vscode",), "vscode", "Shared VS Code config"),
     ((".github", "workflows"), "github-workflows", "CI / CD workflows"),
+    (
+        ("gates",),
+        "naming-gate",
+        "Naming standard gate: ratchet script + seeded baseline (harbor#967)",
+    ),
+    (("vendor", "naming"), "naming-gate", "Naming standard gate: vendored harbor package"),
     ((".github",), "github", "GitHub repo config (templates, CODEOWNERS, …)"),
     ((".agents", "skills"), "claude-skills", "Claude Code skills"),
     ((".agents", "hooks"), "claude-hooks", "Claude Code hooks"),
@@ -2186,6 +2196,31 @@ def adopt_base(
         if stale.exists():
             print(f"  note: {stale.relative_to(target)} is left over from an earlier conflict")
     return 0
+
+
+def _seed_naming_baseline(target: Path, staging: Path, report: DriftReport) -> None:
+    """Seed the naming gate's baseline from the upgraded repo's current findings.
+
+    Runs only when this upgrade just added the baseline (still the pristine
+    render), so an owner's hand-trimmed baseline is never overwritten and the gate
+    is not red on day one. The script itself refuses a baseline that has rows.
+    """
+    from project_init import naming_gate
+
+    rel = naming_gate.BASELINE_REL
+    dest = target / rel
+    if rel not in report.new or not dest.is_file():
+        return
+    if dest.read_bytes() != (staging / rel).read_bytes():
+        return
+    ok, msg = naming_gate.seed_baseline(target)
+    if ok:
+        sys.stdout.write(f"{msg}\n")
+    else:
+        sys.stderr.write(
+            f"note: naming baseline NOT seeded: {msg}\n"
+            "  The gate stays red/UNCHECKED until `sh gates/naming-check.sh --seed` succeeds.\n"
+        )
 
 
 def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
