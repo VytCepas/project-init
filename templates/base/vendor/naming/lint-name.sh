@@ -10,7 +10,8 @@
 #                                                 `path.test` is the test surface under its second name and `case` is
 #                                                 path judged for name.case alone (surfaces.tsv, view); `repo-kind`
 #                                                 takes a directory: its .agents/config.yaml names the kind, and the
-#                                                 entries repo-kinds.tsv requires of it must be there
+#                                                 entries repo-kinds.tsv requires of it must be there; `overlay` takes a
+#                                                 directory and judges the repo overlay at its root (below)
 #   sh bin/lint-name.sh --self-test               every fail fixture goes red, every pass stays green, every rule
 #                                                 goes red on every surface controls.tsv declares for it, and every
 #                                                 grammar surface's example survives parse then render unchanged
@@ -31,6 +32,9 @@
 #   --today YYYY-MM-DD  the date alias and exemption expiry is judged against (default: today in UTC, D-51)
 #   --exemptions-base <file>   the base exemptions.tsv for name.exemption-grow (default: read from git)
 #   HARBOR_SCOPE_PRIVATE=<dir>  the private layer whose terms.tsv overlays client and system terms (D-85; default: $PORT_ROOT/harbor-private)
+#   <root>/naming-words.tsv, <root>/naming-families.tsv   the repo overlay (harbor#967): a repo's own words and families,
+#                               in words.tsv's and terms.tsv's row shape, read from the judged root and never from a root
+#                               that holds standards/naming/ (standards/naming.md §14)
 #
 #   exit (D-49) 0 pass, warn and shadow findings allowed · 1 a block finding, or a failed self-test · 2 usage · 3 unchecked
 #   LINT_REDLOG=<file> appends the id of every rule that goes red, as bin/lint-conventions.sh does.
@@ -52,6 +56,7 @@ set -eu
 case "$0" in */*) HERE="${0%/*}" ;; *) HERE=. ;; esac
 HERE="$(CDPATH='' cd -- "$HERE" && pwd)"
 SELF="$HERE/${0##*/}"
+# shellcheck disable=SC2034 # LOG_FD: read by library-log.sh
 LOG_FD=2   # stdout carries --check, --format findings and --gen output; the log goes to stderr
 . "$HERE/library-log.sh"
 log_init lint-name
@@ -151,6 +156,21 @@ if [ "$ACTION" != self-test ]; then
     PACKT="$PACKT${PACKT:+ }$_pt"
   done
 fi
+# The repo overlay (harbor#967): a repo outside harbor registers its own words and families at the root it is judged
+# from, so it stops exempting its domain names and core stays free of them. A root holding standards/naming/ registers
+# there instead: its overlay is refused, never read. Absent is fine; present but unreadable is UNCHECKED.
+OVDIR="$ROOT"
+if [ "$ACTION" = check ] && [ "$SURFACE" = overlay ]; then
+  case "$NAME" in /*) OVDIR="$NAME" ;; *) OVDIR="$ROOT/$NAME" ;; esac
+  [ -d "$OVDIR" ] || { log_fail "no such directory: $NAME"; log_fix "sh $SELF --check overlay <dir>, the root whose naming-words.tsv and naming-families.tsv are judged"; log_end || :; exit 2; }
+fi
+OVHOME=0; [ ! -f "$OVDIR/standards/naming/registers.tsv" ] || OVHOME=1
+OVW=""; OVF=""
+for _ov in naming-words.tsv naming-families.tsv; do
+  [ -e "$OVDIR/$_ov" ] || continue
+  { [ -f "$OVDIR/$_ov" ] && [ -r "$OVDIR/$_ov" ]; } || { log_fail "the repo overlay $OVDIR/$_ov is not a readable file — nothing was judged"; log_fix "ls -l $OVDIR/$_ov"; log_end || :; exit "$UNCHECKED"; }
+  if [ "$_ov" = naming-words.tsv ]; then OVW="$OVDIR/$_ov"; else OVF="$OVDIR/$_ov"; fi
+done
 REL_REG="${REG#"$ROOT"/}"
 # THE FILES THIS RUN READS ARE registers.tsv's `file` column (harbor#950), not a list written here: terms.tsv
 # first, because every other file's classes are checked against it, then each named file once in row order.
@@ -242,10 +262,40 @@ function alias_check(subj, W, from, n, ctx,   a, k, j, m, ok) {
   }
 }
 # A word of a name is known when it is a term, a word of a multi-word term, an alias (judged by its own rule),
-# a registered word, or a private-overlay term. KW is empty only if words.tsv is absent, and then nothing is flagged.
-function wordknown(w,   k, j, nwk, WK) {
-  if (!NKW_LOADED) { for (k in T) { nwk = split(k, WK, "-"); for (j = 1; j <= nwk; j++) TW[WK[j]] = 1 }; NKW_LOADED = 1 }
-  return (length(w) < 2) || (w in KW) || (w in T) || (w in TW) || (w in AL) || (w in OVT) || (!HAVEWORDS)
+# a registered word, a private-overlay term or a repo-overlay word or family. KW is empty only if words.tsv is absent,
+# and then nothing is flagged.
+function twload(   k, j, nwk, WK) {   # TW: the words of every term; TWC: of the core terms only
+  if (!NKW_LOADED) { for (k in T) { nwk = split(k, WK, "-"); for (j = 1; j <= nwk; j++) { TW[WK[j]] = 1; if (!(k in OVT)) TWC[WK[j]] = 1 } }; NKW_LOADED = 1 }
+}
+function wordknown(w) {
+  twload()
+  return (length(w) < 2) || (w in KW) || (w in T) || (w in TW) || (w in AL) || (w in OVT) || (w in RW) || (!HAVEWORDS)
+}
+# A core term: one terms.tsv names, not the private overlay, so a repo overlay is judged the same on every box.
+function coreterm(w) { return (w in T) && !(w in OVT) }
+# One row of the repo overlay (harbor#967), at f line FNR: registers the row, or emits why it does not.
+function overlay_row(f, ofn, ofam,   id, sj, i, cl, st, df) {
+  id = $1; sj = "overlay:" ofn ":" id
+  if (NF != HDR[f]) { emitb("name.overlay-shape", "overlay:" ofn ":line" FNR, ofn " line " FNR " has " NF " columns, the header has " HDR[f]); return }
+  if (id !~ /^[a-z][a-z0-9]*$/) { emitb("name.overlay-shape", sj, ofn " line " FNR ": " q(id) " is not one lowercase word, so no name could carry it (§6.3)"); return }
+  if (id in RSEEN) { emitb("name.overlay-shape", sj, ofn " line " FNR " repeats " q(id) " of " RSEEN[id] ": one row per word"); return }
+  RSEEN[id] = ofn " line " FNR
+  if (id in AL) { emitb("name.overlay-shadow", sj, q(id) " is a harbor " AKD[id] " alias" (ATERM[id] == "-" ? "" : " of " q(ATERM[id])) ": an overlay cannot register it (aliases.tsv)"); return }
+  twload()
+  if (ofam) {
+    cl = col(f, "class"); st = col(f, "stability"); df = col(f, "definition")
+    if (cl != "family") { emitb("name.overlay-shape", sj, ofn " line " FNR ": class " q(cl) " is not family: the overlay adds families only"); return }
+    if (st != "experimental" && st != "stable" && st != "deprecated") { emitb("name.overlay-shape", sj, ofn " line " FNR ": stability " q(st) " is not experimental, stable or deprecated (D-19)"); return }
+    if (df == "" || df == "-") { emitb("name.overlay-shape", sj, ofn " line " FNR ": a family says what it holds: the definition is empty"); return }
+    # a word harbor parses into a slot keeps that one meaning: a family that is also a verb, a domain or a system is two parses (§3)
+    for (i = 1; i <= 4; i++) if (coreterm(id) && ((OGRAM[i] SUBSEP id) in IS)) {
+      emitb("name.overlay-shadow", sj, q(id) " is a harbor " OGRAM[i] (OGRAM[i] == "family" ? ": the overlay cannot redefine it, use it as it is" : ": a family of the same word would parse two ways (§3)")); return }
+    IS["family", id] = 1; RW[id] = 1; return
+  }
+  if (coreterm(id)) { emitb("name.overlay-shadow", sj, q(id) " is already a harbor term (terms.tsv): delete the row"); return }
+  if (id in KW) { emitb("name.overlay-shadow", sj, q(id) " is already in the harbor words.tsv: delete the row"); return }
+  if (id in TWC) { emitb("name.overlay-shadow", sj, q(id) " is already a word of a harbor term (terms.tsv): delete the row"); return }
+  RW[id] = 1
 }
 # The words of one name: the date prefix and a decision-record number are not words (§6.3).
 function word_check(subj, W, n, path,   i, start) {
@@ -652,6 +702,7 @@ BEGIN {
   for (i in L) CLASS[L[i]] = 1
   split("codename legacy banned abbreviation spelling", L, " "); for (i in L) AKIND[L[i]] = 1
   split("tool-required world-name legacy", L, " "); for (i in L) EKIND[L[i]] = 1
+  split("family verb domain system", OGRAM, " ")   # the classes a name slot parses (slotclass); a repo family takes none of them
   TODAYN = jdn(today)
   if (exbase != "") {
     while ((getline l < exbase) > 0) {
@@ -685,6 +736,22 @@ FILENAME != recfile {
       emitb("name.registry-shape", "private-term:" $1, REL[f] " line " FNR ": class " q(PC[i]) " is not client or system: the overlay adds only those (D-85)"); next }
     OVT[$1] = REL[f]
   }
+  else if ((ovw != "" && f == ovw) || (ovf != "" && f == ovf)) {
+    # The repo overlay (harbor#967), in the row shape of words.tsv and terms.tsv. Every finding is block and none is
+    # exempted, as for the private overlay: a malformed or shadowing overlay must not read as clean.
+    ofn = base(f); ofam = (f == ovf)
+    if (ovhome) { emitb("name.overlay-shape", "overlay:" ofn, ofn " sits beside standards/naming/: this tree registers its words and families there, so the overlay was not read (harbor#967)"); next }
+    if (FNR == 1 && index($0, "\357\273\277") == 1) { $0 = substr($0, length("\357\273\277") + 1); emitb("name.overlay-shape", "overlay:" ofn ":bom", ofn " starts with a byte-order mark: save it as plain UTF-8") }
+    if (sub(/\r$/, "")) { $0 = $0; emitb("name.overlay-shape", "overlay:" ofn ":crlf", ofn " has CRLF line endings: save it with LF") }
+    if ($0 ~ /^#/ || $0 ~ /^[ \t]*$/) next
+    if (!(f in HDR)) {
+      HDR[f] = NF; for (i = 1; i <= NF; i++) COL[f, $i] = i
+      if ($0 != (ofam ? THDR : WHDR)) { OBAD[f] = 1; emitb("name.overlay-shape", "overlay:" ofn ":header", ofn ": the header row is not the one of " (ofam ? "terms.tsv" : "words.tsv") ", " q(ofam ? THDR : WHDR) ", so no row was read") }
+      next
+    }
+    if (!(f in OBAD)) overlay_row(f, ofn, ofam)
+    next
+  }
   else if (FNR == 1) {
     NREG++; REGF[NREG] = f; SHORT[f] = base(f); REL[f] = (index(f, root "/") == 1) ? substr(f, length(root) + 2) : f
     if (index($0, "# " SHORT[f]) != 1) shape(f, "line 1 is not `# " SHORT[f] " …`, the house header (§4)")
@@ -696,7 +763,7 @@ FILENAME != recfile {
     next
   }
   if ($0 ~ /^[ \t]*$/) next
-  if (!(f in HDR)) { if (SHORT[f] == "terms.tsv") THDR = $0; HDR[f] = NF; HDR1[f] = $1; for (i = 1; i <= NF; i++) { COL[f, $i] = i; field_check("column:" SHORT[f] ":" $i, $i) }; next }
+  if (!(f in HDR)) { if (SHORT[f] == "terms.tsv") THDR = $0; if (SHORT[f] == "words.tsv") WHDR = $0; HDR[f] = NF; HDR1[f] = $1; for (i = 1; i <= NF; i++) { COL[f, $i] = i; field_check("column:" SHORT[f] ":" $i, $i) }; next }
   if (NF != HDR[f]) shape(f, "line " FNR " has " NF " columns, the header has " HDR[f])
   sh = SHORT[f]; reg = sh; sub(/s?\.tsv$/, "", reg); sub(/ie$/, "y", reg)
   id = $1
@@ -930,7 +997,9 @@ judge() { # <mode> <records> [nolegacy] -> the judge's output
   fi
   # shellcheck disable=SC2046 # one path per registry file, none with spaces by construction
   awk -v mode="$1" -v surface="$SURFACE" -v today="$TODAY" -v exbase="$_ex" -v recfile="$2" -v root="$ROOT" \
-      -v nolegacy="${3:-0}" -v files="$FILES" -v unlisted="$UNLISTED" -v priv="$PRIV" -v packt="$PACKT" "$JUDGE" $(for _f in $FILES; do reg_file "$_f"; printf ' '; done) ${PRIV:+"$PRIV"} $PACKT "$2"
+      -v nolegacy="${3:-0}" -v files="$FILES" -v unlisted="$UNLISTED" -v priv="$PRIV" -v packt="$PACKT" \
+      -v ovw="$OVW" -v ovf="$OVF" -v ovhome="$OVHOME" \
+      "$JUDGE" $(for _f in $FILES; do reg_file "$_f"; printf ' '; done) ${PRIV:+"$PRIV"} $PACKT ${OVW:+"$OVW"} ${OVF:+"$OVF"} "$2"
 }
 
 # ── what a whole-tree or --changed run judges ────────────────────────────────
@@ -1277,11 +1346,12 @@ gen() { # <view> -> writes under build/, prints the path
 # The derivation (harbor#1259): the judge renders each grammar, so a grammar cell that cannot be compiled is refused here.
 validators_to() { # <file> -> writes the validators; nonzero when a grammar cannot be rendered
   awk -F'\t' '/^#/ || !H[FILENAME]++ { next } $6 != "-" && $6 != "" { print "V\t" $1 }' "$(reg_file surfaces.tsv)" > "$T/vrec"
-  # Core registers only: the private and pack overlays would make build/validators.txt differ between boxes, and a
-  # validator is the shape the public standard gives. A private system prefix is then a vocabulary question for the lint.
-  _vp="$PRIV"; _vk2="$PACKT"; PRIV=""; PACKT=""
+  # Core registers only: the private, pack and repo overlays would make build/validators.txt differ between boxes and
+  # repos, and a validator is the shape the public standard gives. A private system prefix is then a vocabulary question
+  # for the lint, and a repo family never reaches a view (harbor#967).
+  _vp="$PRIV"; _vk2="$PACKT"; _vow="$OVW"; _vof="$OVF"; PRIV=""; PACKT=""; OVW=""; OVF=""
   judge validators "$T/vrec" > "$T/vout" || unchecked
-  PRIV="$_vp"; PACKT="$_vk2"
+  PRIV="$_vp"; PACKT="$_vk2"; OVW="$_vow"; OVF="$_vof"
   _vbad=0
   while IFS='	' read -r _vk _vs _vst _vwhy; do
     [ "$_vk" = V ] || continue

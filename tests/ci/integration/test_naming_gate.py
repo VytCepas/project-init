@@ -153,6 +153,24 @@ class TestRatchet:
         )
         assert _gate(repo).returncode == 0
 
+    def test_upgrade_carry_drops_a_stale_row_outside_any_rename_but_adds_no_new(self, repo: Path):
+        # A newer vendored judge resolves findings at paths no upgrade renamed: their rows go
+        # STALE, and an upgrade that kept them would leave the repo's own gate red.
+        from project_init import naming_gate
+
+        base = repo / "gates/naming.baseline"
+        gone = "name.word-unregistered\tno/such/path.md"
+        base.write_text(base.read_text(encoding="utf-8") + f"{gone}\n", encoding="utf-8")
+        (repo / _PLANTED).write_text("x\n", encoding="utf-8")
+        assert _gate(repo).returncode == 1
+        ok, msg = naming_gate.carry_renames(repo, [])
+        assert ok, msg
+        assert gone not in base.read_text(encoding="utf-8")
+        still = _gate(repo)
+        assert still.returncode == 1 and _PLANTED in still.stdout, "a NEW finding stays red"
+        (repo / _PLANTED).unlink()
+        assert _gate(repo).returncode == 0
+
     def test_a_missing_baseline_is_red_not_a_pass(self, repo: Path):
         (repo / "gates/naming.baseline").unlink()
         r = _gate(repo)

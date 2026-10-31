@@ -72,9 +72,10 @@ def carry_renames(target: Path, renames: list[tuple[str, str]]) -> tuple[bool, s
 
     The upgrade moved these files, so the owner's baseline names findings at paths that
     no longer exist (STALE, red) and the moved files are judged afresh at their new
-    names (NEW, red). Only those two are touched: a STALE line under an old path is
-    dropped, and a NEW finding under a new path is added. Every other line the gate
-    reports stays the owner's to fix. Returns ``(ok, message)``.
+    names (NEW, red). Every STALE line is dropped: it is a finding that no longer occurs,
+    whether a rename or the upgrade's newer vendored judge resolved it, and the gate only
+    ever asks for it to go. A NEW finding is added only under a new path; every other NEW
+    stays the owner's to fix. Returns ``(ok, message)``.
     """
     baseline = target / BASELINE_REL
     if not baseline.is_file() or not (target / SCRIPT_REL).is_file():
@@ -86,8 +87,8 @@ def carry_renames(target: Path, renames: list[tuple[str, str]]) -> tuple[bool, s
     if proc.returncode not in (0, 1):
         return False, _last_line(proc)
     found = _gate_sections(proc.stdout)
-    olds, news = [o for o, _ in renames], [n for _, n in renames]
-    drop = {ln for ln in found["STALE"] if _under(ln.split("\t", 1)[-1], olds)}
+    news = [n for _, n in renames]
+    drop = set(found["STALE"])
     add = [ln for ln in found["NEW"] if _under(ln.split("\t", 1)[-1], news)]
     if not drop and not add:
         return True, "naming baseline: nothing to carry"

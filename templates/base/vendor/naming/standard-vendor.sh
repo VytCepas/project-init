@@ -22,6 +22,7 @@ LC_ALL=C; export LC_ALL
 case "$0" in */*) SRC="${0%/*}" ;; *) SRC=. ;; esac
 SRC="$(CDPATH= cd -- "$SRC" && pwd -P)"
 . "$SRC/library-log.sh"
+# shellcheck disable=SC2034 # LOG_FD: read by library-log.sh
 LOG_FD=2; log_init standard-vendor
 
 usage() { awk 'NR < 2 { next } !/^#/ { exit } { sub(/^# ?/, ""); print }' "$SRC/standard-vendor.sh"; }
