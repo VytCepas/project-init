@@ -188,6 +188,21 @@ class TestRatchet:
         assert r.returncode == 0, r.stdout + r.stderr
         assert "naming-check:" in r.stdout + r.stderr
 
+    def test_the_box_private_term_overlay_is_not_read(self, repo: Path, tmp_path: Path):
+        # CI has no private overlay; a word it registers on the box must not hide a NEW name there.
+        private = tmp_path / "private"
+        private.mkdir()
+        cols = (
+            "id\tclass\tpref\tbroader\tvsm\tstability\tsuccessor\tsrc\talt\tdepends_on\tdefinition"
+        )
+        row = "zzqterm\tclient\tzzqterm\t-\t-\tstable\t-\t-\t-\t-\ta fixture client"
+        (private / "terms.tsv").write_text(f"# fixture overlay\n{cols}\n{row}\n", encoding="utf-8")
+        planted = repo / "zzqterm-notes.md"
+        planted.write_text("x\n", encoding="utf-8")
+        r = _gate(repo, HARBOR_SCOPE_PRIVATE=str(private))
+        assert r.returncode == 1, r.stdout + r.stderr
+        assert "zzqterm-notes.md" in r.stdout
+
 
 class TestAnotherRoot:
     """NAMING_ROOT judges another tree with its own exemptions and baseline, the judge staying put."""

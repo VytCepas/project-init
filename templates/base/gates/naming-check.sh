@@ -81,7 +81,12 @@ fi
 GIT_INDEX_FILE="$T/index"; export GIT_INDEX_FILE
 git add -A -- . > /dev/null 2>&1 || unchecked "could not read the working tree through git"
 rc=0
-sh "$LINT" --root "$ROOT" --registry "$T/registry" --format findings > "$T/out" 2> "$T/err" || rc=$?
+# Hermetic: a clean environment and an empty HOME, so the judge reads no term overlay or pack terms from the box
+# (CI has neither) and a baseline seeded here is the one CI judges against.
+mkdir "$T/home"
+set -- PATH="$PATH" HOME="$T/home" TMPDIR="${TMPDIR:-/tmp}" GIT_INDEX_FILE="$GIT_INDEX_FILE"
+[ -z "${GIT_DIR:-}" ] || set -- "$@" GIT_DIR="$GIT_DIR" GIT_WORK_TREE="$GIT_WORK_TREE"
+env -i "$@" sh "$LINT" --root "$ROOT" --registry "$T/registry" --format findings > "$T/out" 2> "$T/err" || rc=$?
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE
 if [ "$rc" -gt 1 ]; then
   cat "$T/err" >&2
