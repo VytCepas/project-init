@@ -24,7 +24,7 @@ _HOOK_DIRS = (
     _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "hooks",
     _REPO_ROOT / "plugins" / "project-init-workflow" / "hooks",
 )
-_ALWAYS_ON = ("pre_commit_gate.sh", "session_setup.sh")
+_ALWAYS_ON = ("pre-commit-gate.sh", "session-setup.sh")
 
 # bash-4+ builtins absent from macOS's stock bash 3.2 (shell policy: floor 3.2).
 _BASH4_BUILTINS = ("mapfile", "readarray", "declare -A")
@@ -52,7 +52,7 @@ def test_no_bash4_builtins(name: str, builtin: str):
 def test_session_setup_fingerprint_is_shasum_aware():
     """The bootstrap fingerprint must not assume GNU sha256sum exists, and must
     stay defined on a host with neither hasher (POSIX cksum fallback)."""
-    for path in _hook_files("session_setup.sh"):
+    for path in _hook_files("session-setup.sh"):
         text = path.read_text()
         assert "command -v sha256sum" in text, f"{path}: must probe for sha256sum"
         assert "command -v shasum" in text, f"{path}: must probe for shasum"
@@ -65,7 +65,7 @@ def test_session_setup_syncs_dev_group_without_masking():
     scaffolds `dev` as a PEP 735 dependency-group, so `--extra dev` errors), and
     must NOT mask the failure behind `2>/dev/null || uv sync` — a degraded,
     dev-less sync reported as success would cache the stamp and never retry."""
-    for path in _hook_files("session_setup.sh"):
+    for path in _hook_files("session-setup.sh"):
         code = _code_lines(path.read_text())
         assert "uv sync --group dev" in code, f"{path}: must sync the dev group"
         assert "--extra dev" not in code, f"{path}: --extra dev errors on a PEP 735 group"
@@ -77,7 +77,7 @@ def test_session_setup_syncs_dev_group_without_masking():
 
 def test_commit_gate_builds_arrays_portably():
     """Staged-file lists are read with a while-loop, not mapfile."""
-    for path in _hook_files("pre_commit_gate.sh"):
+    for path in _hook_files("pre-commit-gate.sh"):
         code = _code_lines(path.read_text())
         assert "while IFS= read -r" in code, f"{path}: expected portable read loop"
         assert "STAGED_PY+=(" in code and "STAGED_JS+=(" in code
@@ -130,7 +130,7 @@ def test_lint_hooks_do_not_leak_ruff_stdout():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[3] / "templates" / "fallback" / "dot_agents" / "hooks"
-    for name in ("pre_commit_gate.sh", "post_edit_lint.sh"):
+    for name in ("pre-commit-gate.sh", "post-edit-lint.sh"):
         for line in (root / name).read_text().splitlines():
             s = line.strip()
             if ("ruff check --fix" in s or "ruff format" in s) and s.endswith("|| true"):

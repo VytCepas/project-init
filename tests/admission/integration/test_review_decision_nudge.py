@@ -1,4 +1,4 @@
-"""PI-939: monitor_pr.sh re-triggers a stale `review/decision` itself.
+"""PI-939: watch-pr.sh re-triggers a stale `review/decision` itself.
 
 `review/decision` is a commit status computed by a workflow, and the two events
 that should refresh it both fail to:
@@ -95,7 +95,7 @@ def _run_monitor(tmp_target: Path, tmp_path: Path, *, already_pass: bool = False
     if already_pass:
         env["PI_TEST_DECISION_ALREADY_PASS"] = "1"
     result = subprocess.run(
-        ["bash", str(tmp_target / _SCRIPTS / "monitor_pr.sh"), "1", "--merge"],
+        ["bash", str(tmp_target / _SCRIPTS / "watch-pr.sh"), "1", "--merge"],
         capture_output=True,
         text=True,
         cwd=tmp_target,

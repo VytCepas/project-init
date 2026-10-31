@@ -18,7 +18,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/_py.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/pre_edit_issue_guard.py",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/python-resolve.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/admission_issue_edit.py",
             "timeout": 10
           }
         ]
@@ -30,7 +30,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/workflow_state_reminder.sh",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/workflow-state-reminder.sh",
             "timeout": 10
           }
         ]

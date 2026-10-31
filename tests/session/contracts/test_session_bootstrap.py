@@ -20,14 +20,14 @@ def _scaffold(target: Path, **overrides: str) -> Path:
 class TestSessionStartHook:
     def test_hook_scaffolded_executable_and_wired(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
-        hook = target / ".agents" / "hooks" / "session_setup.sh"
+        hook = target / ".agents" / "hooks" / "session-setup.sh"
         assert hook.exists()
         assert os.access(hook, os.X_OK), "shell hooks must carry the executable bit"
 
         settings = json.loads((target / ".agents" / "settings.json").read_text())
         session_start = settings["hooks"]["SessionStart"]
         commands = [h["command"] for entry in session_start for h in entry["hooks"]]
-        assert any("session_setup.sh" in c for c in commands)
+        assert any("session-setup.sh" in c for c in commands)
 
     def test_stamp_is_gitignored(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
@@ -36,7 +36,7 @@ class TestSessionStartHook:
     def test_hook_never_blocks_the_session(self, tmp_path: Path):
         """No `set -e`, and the script's only exit paths are code 0."""
         target = _scaffold(tmp_path / "p")
-        script = (target / ".agents" / "hooks" / "session_setup.sh").read_text()
+        script = (target / ".agents" / "hooks" / "session-setup.sh").read_text()
         assert "set -uo pipefail" in script
         assert "set -euo" not in script
 
@@ -69,7 +69,7 @@ class TestDevcontainerOverlay:
         assert marker in script
         assert absent not in script
         assert "just.systems/install.sh" in script, "just is always installed"
-        assert "session_setup.sh" in script, "must reuse the SessionStart bootstrap"
+        assert "session-setup.sh" in script, "must reuse the SessionStart bootstrap"
 
     def test_go_uses_official_feature(self, tmp_path: Path):
         target = _scaffold(

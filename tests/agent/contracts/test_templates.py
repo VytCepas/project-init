@@ -54,7 +54,7 @@ class TestNodeTemplate:
         assert "npx " not in content
 
     def test_hooks_use_bunx_not_node_modules(self):
-        for hook in ["post_edit_lint.sh", "pre_commit_gate.sh"]:
+        for hook in ["post-edit-lint.sh", "pre-commit-gate.sh"]:
             content = (self.target / ".agents" / "hooks" / hook).read_text()
             assert "node_modules/.bin/eslint" not in content
             assert "bunx eslint" in content
@@ -221,7 +221,7 @@ class TestScaffoldGitHubFiles:
 
     def test_board_automation_reads_project_number_from_config(self):
         """PI #556: the board number is read from .agents/config.yaml (the single
-        source of truth shared with create_issue.sh / setup_github.sh), not a
+        source of truth shared with create-issue.sh / setup-github.sh), not a
         hardcoded `PROJECT_NUMBER: 1` that drifts from a real (non-#1) board."""
         content = (self.target / ".github" / "workflows" / "board-automation.yml").read_text()
         assert "github_project_number" in content
@@ -230,9 +230,9 @@ class TestScaffoldGitHubFiles:
         assert "PROJECT_NUMBER: 1" not in content
 
     def test_setup_github_reads_project_number_from_config(self):
-        """PI #556: setup_github.sh resolves the board number from config.yaml
+        """PI #556: setup-github.sh resolves the board number from config.yaml
         too, so all three consumers agree."""
-        content = (self.target / ".agents" / "scripts" / "setup_github.sh").read_text()
+        content = (self.target / ".agents" / "scripts" / "setup-github.sh").read_text()
         assert "github_project_number" in content
 
     def test_gitleaks_config_shipped(self):
@@ -301,8 +301,8 @@ class TestScaffoldGitHubFiles:
         assert "type(PROJECT-123): description" in content
         assert "[#N][type] description" not in content
         assert "PR title must start with" not in content
-        # Review cycle protocol moved to github_workflow skill — file now points to it
-        assert "github_workflow" in content
+        # Review cycle protocol moved to github-workflow skill — file now points to it
+        assert "github-workflow" in content
 
     def test_gemini_md_not_created(self):
         # PI-450: GEMINI.md was a pure redirect to AGENTS.md. Antigravity (the
@@ -311,7 +311,7 @@ class TestScaffoldGitHubFiles:
         assert not (self.target / "GEMINI.md").exists()
 
     def test_monitor_pr_can_merge_when_clean(self):
-        script = self.target / ".agents" / "scripts" / "monitor_pr.sh"
+        script = self.target / ".agents" / "scripts" / "watch-pr.sh"
         assert script.is_file()
         content = script.read_text()
         assert "--merge" in content
@@ -322,7 +322,7 @@ class TestScaffoldGitHubFiles:
     def test_monitor_pr_ci_wait_is_bounded(self):
         """PI-186: the CI-wait loop must time out and fail closed, not hang
         forever on a required check that never registers."""
-        content = (self.target / ".agents" / "scripts" / "monitor_pr.sh").read_text()
+        content = (self.target / ".agents" / "scripts" / "watch-pr.sh").read_text()
         assert "CI_TIMEOUT=" in content, "CI_TIMEOUT must be assigned a value"
         # Assert the real bounding logic, not just the variable names — the loop
         # must compare elapsed vs timeout and increment elapsed, so the test fails
@@ -338,21 +338,21 @@ class TestScaffoldGitHubFiles:
         assert "--no-review" in content
 
     def test_finish_pr_wraps_push_ready_monitor_flow(self):
-        # finish_pr.sh is a shim; the chain logic lives in dag_workflow.py.
-        script = self.target / ".agents" / "scripts" / "finish_pr.sh"
+        # finish-pr.sh is a shim; the chain logic lives in dag_workflow.py.
+        script = self.target / ".agents" / "scripts" / "finish-pr.sh"
         assert script.is_file()
-        assert script.stat().st_mode & 0o111, "finish_pr.sh must be executable"
+        assert script.stat().st_mode & 0o111, "finish-pr.sh must be executable"
         shim = script.read_text()
         assert "dag_workflow.py" in shim and "finish" in shim
         dag = (self.target / ".agents" / "hooks" / "dag_workflow.py").read_text()
-        assert "monitor_pr.sh" in dag
+        assert "watch-pr.sh" in dag
         assert "cmd_push" in dag and "cmd_promote" in dag
         assert "--review-cycle" in dag
 
     def test_create_nojira_pr_wraps_branch_push_pr_flow(self):
-        script = self.target / ".agents" / "scripts" / "create_nojira_pr.sh"
+        script = self.target / ".agents" / "scripts" / "create-pr-without-issue.sh"
         assert script.is_file()
-        assert script.stat().st_mode & 0o111, "create_nojira_pr.sh must be executable"
+        assert script.stat().st_mode & 0o111, "create-pr-without-issue.sh must be executable"
         shim = script.read_text()
         assert "dag_workflow.py" in shim and "create-pr-nojira" in shim
         dag = (self.target / ".agents" / "hooks" / "dag_workflow.py").read_text()

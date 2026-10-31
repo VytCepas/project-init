@@ -1,4 +1,4 @@
-"""PI-825: `setup_github.sh` must UPDATE an existing ruleset, not only create one.
+"""PI-825: `setup-github.sh` must UPDATE an existing ruleset, not only create one.
 
 The script POSTed a new `project-init-baseline` ruleset and, if one already existed,
 merely warned. So a stale ruleset kept blocking every PR forever, and re-running the
@@ -39,7 +39,7 @@ def _setup_script(tmp_path: Path) -> Path:
     # the ruleset code at all.
     cfg = target / ".agents" / "config.yaml"
     cfg.write_text(cfg.read_text().replace("profile: individual", "profile: org"))
-    return target / ".agents" / "scripts" / "setup_github.sh"
+    return target / ".agents" / "scripts" / "setup-github.sh"
 
 
 def test_an_existing_ruleset_is_updated_not_just_warned_about(tmp_path: Path):
@@ -67,6 +67,6 @@ def test_an_existing_ruleset_is_updated_not_just_warned_about(tmp_path: Path):
 
     log = calls.read_text()
     assert "rulesets/42" in log and "-X PUT" in log, (
-        "an existing ruleset was never updated — re-running setup_github.sh cannot "
+        "an existing ruleset was never updated — re-running setup-github.sh cannot "
         f"fix a stale ruleset, so the remedy is a dead end:\n{log}"
     )

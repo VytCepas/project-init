@@ -19,7 +19,7 @@ sentence (not blank, a YAML null such as ``~``/``null``, a block indicator such
 as ``|``/``>``, or a non-answer such as ``TODO``/``n/a``) and ``declared_on`` a
 real date between the day this gate shipped and today.
 
-Deterministic, stdlib-only. Invoked via ``_py.sh`` by ``governance_gate.sh`` and
+Deterministic, stdlib-only. Invoked via ``python-resolve.sh`` by ``governance-gate.sh`` and
 the CI ``governance`` job. Both manifests are flat ``key: value`` scalars only —
 no PyYAML, no nesting.
 """
@@ -263,10 +263,10 @@ def _silence_message() -> str:
         "governance gate failed: governance is enabled but this repo declares nothing — "
         "no real SYSTEM_CARD.md and no NO_AI_SYSTEM.md. Satisfy the gate one of two ways:\n"
         "  1. It ships an AI system: copy "
-        ".agents/governance/examples/SYSTEM_CARD.template.md to "
+        ".agents/governance/examples/system-card-template.md to "
         ".agents/governance/SYSTEM_CARD.md and fill it in.\n"
         f"  2. It ships no AI system: create .agents/governance/{DECLARATION_FILE} "
-        "(template: .agents/governance/examples/NO_AI_SYSTEM.template.md) holding\n"
+        "(template: .agents/governance/examples/no-ai-system-template.md) holding\n"
         "       ---\n"
         "       reason: <why this repo ships no AI system>\n"
         "       declared_on: <YYYY-MM-DD>\n"

@@ -1,4 +1,4 @@
-"""PI-653 (epic #641): monitor_pr.sh review-wait frames only on state change.
+"""PI-653 (epic #641): watch-pr.sh review-wait frames only on state change.
 
 The review-wait poll loop previously echoed an identical
 `[Ns/360s] reviewDecision: REVIEW_REQUIRED` frame every 30s into the agent's
@@ -46,7 +46,7 @@ esac
 
 def test_review_wait_frames_only_on_decision_change(tmp_target: Path, tmp_path: Path):
     scaffold(tmp_target, fallback_preset(), fallback_variables())
-    script = tmp_target / ".agents" / "scripts" / "monitor_pr.sh"
+    script = tmp_target / ".agents" / "scripts" / "watch-pr.sh"
     assert script.is_file()
 
     stub_bin = tmp_path / "stub-bin"

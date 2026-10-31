@@ -27,7 +27,7 @@ def test_manifest_pin_matches_installer_version():
     mod = _load_module()
     pinned = mod.load_manifest()["ccr"]["pinned"]
     installer = (
-        REPO_ROOT / "templates" / "multi_model" / "dot_agents" / "scripts" / "setup_models.sh"
+        REPO_ROOT / "templates" / "multi-model" / "dot_agents" / "scripts" / "setup_models.sh"
     ).read_text(encoding="utf-8")
     assert f'CCR_VERSION="{pinned}"' in installer, (
         f"manifest pins ccr at {pinned} but setup_models.sh disagrees — run "
@@ -80,7 +80,7 @@ def test_router_hold_and_installer_refusal_name_the_same_boundary():
     assert mod.held(ccr["pinned"], ccr) is None, "the pin itself is inside the held range"
 
     installer = (
-        REPO_ROOT / "templates" / "multi_model" / "dot_agents" / "scripts" / "setup_models.sh"
+        REPO_ROOT / "templates" / "multi-model" / "dot_agents" / "scripts" / "setup_models.sh"
     ).read_text(encoding="utf-8")
     major = ccr["hold_at"].split(".")[0]
     assert f"CCR_FIRST_UNSUPPORTED_MAJOR={major}\n" in installer
@@ -103,7 +103,7 @@ def test_claude_code_is_installed_unpinned_by_design():
     )
 
     installer = (
-        REPO_ROOT / "templates" / "multi_model" / "dot_agents" / "scripts" / "setup_models.sh"
+        REPO_ROOT / "templates" / "multi-model" / "dot_agents" / "scripts" / "setup_models.sh"
     ).read_text(encoding="utf-8")
     assert 'CLAUDE_PKG="@anthropic-ai/claude-code"' in installer
     assert "CLAUDE_VERSION" not in installer, "a version pin appeared without a manifest entry"

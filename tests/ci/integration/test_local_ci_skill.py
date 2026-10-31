@@ -1,8 +1,8 @@
-"""PI-671: the local_ci skill + monitor_pr.sh billing-lockout hint.
+"""PI-671: the local-ci skill + watch-pr.sh billing-lockout hint.
 
 When a private repo exhausts its Actions minutes, jobs fail at start
 (`startup_failure`) and required checks never register. The skill diagnoses
-the lockout and routes to the CI_RUNS_ON escape hatch (#670); monitor_pr.sh's
+the lockout and routes to the CI_RUNS_ON escape hatch (#670); watch-pr.sh's
 CI-timeout path points at the skill so the user isn't left rediscovering it.
 """
 
@@ -38,8 +38,8 @@ esac
 class TestLocalCiSkill:
     def test_present_with_the_method(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        content = (tmp_target / ".agents" / "skills" / "local_ci" / "SKILL.md").read_text()
-        assert "name: local_ci" in content
+        content = (tmp_target / ".agents" / "skills" / "local-ci" / "SKILL.md").read_text()
+        assert "name: local-ci" in content
         assert "user-invocable: true" in content
         # Diagnosis before action.
         assert "startup_failure" in content
@@ -57,16 +57,16 @@ class TestLocalCiSkill:
     def test_listed_in_skill_tables(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         for rel in (
-            ".agents/skills/INDEX.md",
+            ".agents/skills/index.md",
             ".agents/skills/README.md",
             ".agents/project-init.md",
         ):
-            assert "local_ci" in (tmp_target / rel).read_text(), rel
+            assert "local-ci" in (tmp_target / rel).read_text(), rel
 
 
 class TestMonitorLockoutHint:
     def _run_monitor(self, tmp_target: Path, tmp_path: Path, run_list_json: str) -> str:
-        script = tmp_target / ".agents" / "scripts" / "monitor_pr.sh"
+        script = tmp_target / ".agents" / "scripts" / "watch-pr.sh"
         stub_bin = tmp_path / "stub-bin"
         stub_bin.mkdir(exist_ok=True)
         gh = stub_bin / "gh"
@@ -96,13 +96,13 @@ class TestMonitorLockoutHint:
     def test_hint_on_startup_failure(self, tmp_target: Path, tmp_path: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         out = self._run_monitor(tmp_target, tmp_path, '"startup_failure"\n"success"\n')
-        assert "local_ci" in out
+        assert "local-ci" in out
         assert "ci-local-on" in out
 
     def test_no_hint_on_healthy_runs(self, tmp_target: Path, tmp_path: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         out = self._run_monitor(tmp_target, tmp_path, '"success"\n"success"\n')
-        assert "local_ci" not in out
+        assert "local-ci" not in out
         # The pre-existing timeout guidance is intact.
         assert "did not settle" in out
 

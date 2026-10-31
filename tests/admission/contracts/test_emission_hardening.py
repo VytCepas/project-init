@@ -68,7 +68,7 @@ def test_is_sibling_recognizes_new_suffixes():
     assert _is_sibling(Path(".cursor/mcp.json.new"))
     assert _is_sibling(Path("a/b.json.new.3"))
     assert not _is_sibling(Path(".cursor/mcp.json"))
-    assert not _is_sibling(Path("CODE_MAP.md"))
+    assert not _is_sibling(Path("code-map.md"))
 
 
 def test_new_siblings_not_recorded_in_manifest(tmp_path: Path):

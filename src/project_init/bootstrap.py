@@ -76,16 +76,16 @@ def _git_init(target: Path) -> BootstrapStep:
     # Force the initial branch to `main` regardless of the user's
     # init.defaultBranch — a fresh `git init` otherwise yields `master` on an
     # unconfigured machine, but the rendered lifecycle targets main (base_branch,
-    # setup_github.sh's branches/main/protection). symbolic-ref repoints the
+    # setup-github.sh's branches/main/protection). symbolic-ref repoints the
     # unborn HEAD across all git versions (no `-b`, which needs git 2.28+).
     _run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], target)
     return BootstrapStep("git init", _DONE, "")
 
 
 def _install_hooks(target: Path) -> BootstrapStep:
-    script = target / ".agents" / "scripts" / "install_hooks.sh"
+    script = target / ".agents" / "scripts" / "install-hooks.sh"
     if not script.exists():
-        return BootstrapStep("install hooks", _SKIPPED, "no install_hooks.sh (lifecycle off)")
+        return BootstrapStep("install hooks", _SKIPPED, "no install-hooks.sh (lifecycle off)")
     if not _has_git(target):
         return BootstrapStep("install hooks", _SKIPPED, "no git repository")
     ok, msg = _run(["bash", str(script)], target)

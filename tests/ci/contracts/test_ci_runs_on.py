@@ -260,9 +260,9 @@ class TestShfmtInstallIsHostSafe:
 
 
 def _required_contexts(setup_github: str) -> set[str]:
-    """Every status-check context setup_github.sh makes required (protection + ruleset)."""
+    """Every status-check context setup-github.sh makes required (protection + ruleset)."""
     block = re.search(r'"contexts": \[(.*?)\]', setup_github, re.S)
-    assert block, "setup_github.sh: no branch-protection contexts list"
+    assert block, "setup-github.sh: no branch-protection contexts list"
     found = set(re.findall(r'"([^"]+)"', block.group(1)))
     found |= set(re.findall(r'\{ "context": "([^"]+)" \}', setup_github))
     return found
@@ -270,14 +270,14 @@ def _required_contexts(setup_github: str) -> set[str]:
 
 @pytest.mark.parametrize("language", ["python", "node"])
 def test_every_job_a_required_check_depends_on_reads_the_variable(tmp_path: Path, language: str):
-    """PI-1086: the set is derived from setup_github.sh's required contexts, never listed
+    """PI-1086: the set is derived from setup-github.sh's required contexts, never listed
     here, and walked through `needs:` — a pinned job anywhere under a required check
     cannot start during a billing lockout, and the merge stays blocked."""
     target = tmp_path / "p"
     argv = [sys.executable, "-m", "project_init", str(target), "--non-interactive"]
     argv += ["--preset", "core", "--name", "p", "--description", "t", "--language", language]
     subprocess.run([*argv, "--no-plugin", "--strict"], check=True, capture_output=True)
-    required = _required_contexts((target / ".agents/scripts/setup_github.sh").read_text())
+    required = _required_contexts((target / ".agents/scripts/setup-github.sh").read_text())
     assert len(required) >= 2, required
     gating: dict[str, str] = {}
     for wf in sorted((target / ".github" / "workflows").glob("*.yml")):

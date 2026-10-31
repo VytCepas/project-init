@@ -1,10 +1,10 @@
-"""PI-946: the optional `_usage_log.sh` include must not kill its hook.
+"""PI-946: the optional `usage-log.sh` include must not kill its hook.
 
 `.` is a POSIX SPECIAL BUILTIN. When it fails, a non-interactive shell under
 `set -e` exits immediately — before an `&&` short-circuit or a trailing
 `|| true` is considered. So the shipped idiom
 
-    . "$(dirname "$0")/_usage_log.sh" 2>/dev/null &&
+    . "$(dirname "$0")/usage-log.sh" 2>/dev/null &&
       usage_log … </dev/null || true
 
 read as "optional" and was not: on macOS bash 3.2 the hook died at that line
@@ -33,15 +33,15 @@ _BASE_HOOKS = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks"
 
 # Every hook that sources the optional helper, across both fallback layers.
 _SOURCING_HOOKS = [
-    _FALLBACK_HOOKS / "post_edit_lint.sh",
-    _FALLBACK_HOOKS / "pre_commit_gate.sh",
-    _FALLBACK_HOOKS / "session_setup.sh",
+    _FALLBACK_HOOKS / "post-edit-lint.sh",
+    _FALLBACK_HOOKS / "pre-commit-gate.sh",
+    _FALLBACK_HOOKS / "session-setup.sh",
     _REPO_ROOT
     / "templates"
-    / "lifecycle_fallback"
+    / "lifecycle-fallback"
     / "dot_agents"
     / "hooks"
-    / "workflow_state_reminder.sh",
+    / "workflow-state-reminder.sh",
 ]
 
 
@@ -50,7 +50,7 @@ def test_the_fragile_idiom_is_gone(hook: Path):
     """The single strongest regression guard here, and the one that works on
     every platform: the shape that caused the bug must not reappear."""
     body = hook.read_text(encoding="utf-8")
-    assert '_usage_log.sh" 2>/dev/null &&' not in body, (
+    assert 'usage-log.sh" 2>/dev/null &&' not in body, (
         "a failed `.` exits a `set -e` shell despite the `&&`/`|| true` — see PI-946"
     )
 
@@ -58,7 +58,7 @@ def test_the_fragile_idiom_is_gone(hook: Path):
 @pytest.mark.parametrize("hook", _SOURCING_HOOKS, ids=lambda p: p.name)
 def test_the_include_is_readability_tested_and_errexit_is_restored(hook: Path):
     body = hook.read_text(encoding="utf-8")
-    assert '[ -r "$(dirname "$0")/_usage_log.sh" ]' in body, "include is sourced untested"
+    assert '[ -r "$(dirname "$0")/usage-log.sh" ]' in body, "include is sourced untested"
     assert "case $- in *e*)" in body, "errexit state is not saved"
     assert "set +e" in body, "errexit is not disabled across the source"
     # BOTH directions. A one-way restore keeps an errexit that the INCLUDE
@@ -81,7 +81,7 @@ def test_the_url_redaction_does_not_escape_its_replacement():
     that were never in the operator's command, written into a log people read
     to reconstruct what happened.
     """
-    body = (_FALLBACK_HOOKS / "_usage_log.sh").read_text(encoding="utf-8")
+    body = (_FALLBACK_HOOKS / "usage-log.sh").read_text(encoding="utf-8")
     assert "://***@}" in body, "the replacement half should use plain slashes"
     assert "/:\\/\\/***@}" not in body, (
         "escaped slashes in the replacement corrupt logs on bash 3.2"
@@ -89,15 +89,15 @@ def test_the_url_redaction_does_not_escape_its_replacement():
 
 
 def _run_hook_with_include(tmp_path: Path, state: str) -> int:
-    """Run the real post_edit_lint.sh with the include in *state*."""
+    """Run the real post-edit-lint.sh with the include in *state*."""
     hooks = tmp_path / ".agents" / "hooks"
     hooks.mkdir(parents=True, exist_ok=True)
-    shutil.copy(_FALLBACK_HOOKS / "post_edit_lint.sh", hooks / "post_edit_lint.sh")
-    shutil.copy(_BASE_HOOKS / "_py.sh", hooks / "_py.sh")
-    include = hooks / "_usage_log.sh"
+    shutil.copy(_FALLBACK_HOOKS / "post-edit-lint.sh", hooks / "post-edit-lint.sh")
+    shutil.copy(_BASE_HOOKS / "python-resolve.sh", hooks / "python-resolve.sh")
+    include = hooks / "usage-log.sh"
 
     if state == "present":
-        shutil.copy(_FALLBACK_HOOKS / "_usage_log.sh", include)
+        shutil.copy(_FALLBACK_HOOKS / "usage-log.sh", include)
     elif state == "empty":
         include.write_text("")
     elif state == "corrupt":
@@ -113,7 +113,7 @@ def _run_hook_with_include(tmp_path: Path, state: str) -> int:
     target.write_text("x: int = 1\n")
 
     return subprocess.run(
-        ["bash", str(hooks / "post_edit_lint.sh")],
+        ["bash", str(hooks / "post-edit-lint.sh")],
         input=json.dumps({"tool_input": {"file_path": str(target)}}),
         capture_output=True,
         text=True,
@@ -138,7 +138,7 @@ def test_an_include_that_enables_errexit_does_not_leak_it(tmp_path: Path):
 
     A one-way `if [ "$_pi_errexit" = 1 ]; then set -e; fi` puts back an errexit
     that was on, and silently keeps one the INCLUDE switched on. That breaks
-    `session_setup.sh`, which runs `set -uo pipefail` deliberately WITHOUT
+    `session-setup.sh`, which runs `set -uo pipefail` deliberately WITHOUT
     `-e` because its fingerprint pipeline returns nonzero routinely — it
     probes manifests that need not exist. A leaked errexit exits the hook
     before bootstrap.
@@ -147,7 +147,7 @@ def test_an_include_that_enables_errexit_does_not_leak_it(tmp_path: Path):
     than against the hook itself: the failure is about shell option state, and
     a scaffolded bootstrap would drown it in unrelated work.
     """
-    include = tmp_path / "_usage_log.sh"
+    include = tmp_path / "usage-log.sh"
     include.write_text("set -e\nusage_log() { :; }\n")
 
     snippet = (
@@ -157,7 +157,7 @@ def test_an_include_that_enables_errexit_does_not_leak_it(tmp_path: Path):
         f'[ -r "{include}" ] && . "{include}"\n'
         'if [ "$_pi_errexit" = 1 ]; then set -e; else set +e; fi\n'
     )
-    # `set -uo pipefail` with NO -e is session_setup.sh's deliberate frame.
+    # `set -uo pipefail` with NO -e is session-setup.sh's deliberate frame.
     script = (
         "set -uo pipefail\n"
         + snippet
@@ -176,10 +176,10 @@ def test_an_include_that_enables_errexit_does_not_leak_it(tmp_path: Path):
 
 def test_the_hook_that_runs_without_errexit_still_does(tmp_path: Path):
     """The same property, asserted on the shipped file rather than a snippet:
-    session_setup.sh must not have quietly acquired `set -e`."""
-    body = (_FALLBACK_HOOKS / "session_setup.sh").read_text(encoding="utf-8")
+    session-setup.sh must not have quietly acquired `set -e`."""
+    body = (_FALLBACK_HOOKS / "session-setup.sh").read_text(encoding="utf-8")
     set_lines = [ln for ln in body.splitlines() if ln.startswith("set -")]
     assert set_lines, "no `set` line at all"
     assert not any("e" in ln.split("#")[0].split()[1].lstrip("-") for ln in set_lines[:1]), (
-        f"session_setup.sh opted out of errexit on purpose; found {set_lines[0]!r}"
+        f"session-setup.sh opted out of errexit on purpose; found {set_lines[0]!r}"
     )

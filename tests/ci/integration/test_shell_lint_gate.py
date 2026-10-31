@@ -7,8 +7,8 @@ installed unconditionally in CI, so a single un-formatted emitted script turns a
 brand-new project red on its first push — regardless of language or whether the
 user has added a pyproject yet.
 
-The failure that motivated this guard: `setup_env_protection.sh` and
-`whats_deployed.sh` (emitted only for a service + deploy-target scaffold, a combo
+The failure that motivated this guard: `setup-environment-protection.sh` and
+`what-is-deployed.sh` (emitted only for a service + deploy-target scaffold, a combo
 no other lint test exercised) shipped un-`shfmt`-formatted. Contract tests that
 merely assert the justfile *contains* the `shfmt` string never ran the tool on
 the emitted output. This one does.
@@ -50,7 +50,7 @@ def _require(tool: str | None, name: str) -> str:
 def _service_deploy_lifecycle(target: Path) -> Path:
     """A service + deploy + lifecycle scaffold — the widest emitted-script set.
 
-    deploy!=none adds setup_env_protection.sh + whats_deployed.sh; the lifecycle
+    deploy!=none adds setup-environment-protection.sh + what-is-deployed.sh; the lifecycle
     overlay adds the DAG guard/workflow scripts. Together they cover the scripts
     the narrower per-feature tests each miss.
     """
@@ -89,7 +89,7 @@ def test_emitted_claude_scripts_are_shfmt_clean(tmp_target: Path):
     # Guard against the scaffold silently emitting nothing and the test passing
     # vacuously — the deploy-gated scripts must be present to be checked.
     names = {p.name for p in scripts}
-    assert {"setup_env_protection.sh", "whats_deployed.sh"} <= names, names
+    assert {"setup-environment-protection.sh", "what-is-deployed.sh"} <= names, names
 
     dirty = []
     for p in scripts:

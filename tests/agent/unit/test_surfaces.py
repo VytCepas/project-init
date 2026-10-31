@@ -68,7 +68,7 @@ def test_cursor_hooks_use_camelcase_events_and_adapter():
     # PI-385: beforeSubmitPrompt dropped (no command; different deny shape).
     assert "beforeSubmitPrompt" not in cfg["hooks"]
     cmd = cfg["hooks"]["beforeShellExecution"][0]["command"]
-    assert "agent_guard_adapter.py cursor" in cmd
+    assert "admission_agent_adapter.py cursor" in cmd
     # PI-537 #4: resolve from the git root so the hook fires from any subdir.
     assert "git rev-parse --show-toplevel" in cmd
 
@@ -78,7 +78,7 @@ def test_antigravity_hooks_safety_gate_pretooluse():
     assert "safety-gate" in cfg
     assert "PreToolUse" in cfg["safety-gate"]
     cmd = cfg["safety-gate"]["PreToolUse"][0]["hooks"][0]["command"]
-    assert "agent_guard_adapter.py antigravity" in cmd
+    assert "admission_agent_adapter.py antigravity" in cmd
     assert "git rev-parse --show-toplevel" in cmd  # PI-537 #4
 
 

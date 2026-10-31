@@ -1,8 +1,8 @@
-"""PI-837: a known-dead check must not deadlock monitor_pr.sh --merge.
+"""PI-837: a known-dead check must not deadlock watch-pr.sh --merge.
 
 During a GitHub Actions billing lockout, GitHub-hosted jobs (deliberately kept
 off the self-hosted runner because they carry a PAT) die permanently as
-zero-step startup failures. monitor_pr.sh hard-failed on ANY failed check, so
+zero-step startup failures. watch-pr.sh hard-failed on ANY failed check, so
 one dead check blocked every PR's merge path while real CI was green.
 
 `monitor_ignore_checks` in .agents/config.yaml (env override:
@@ -108,7 +108,7 @@ def _run_monitor(
     env.pop("PI_MONITOR_IGNORE_CHECKS", None)
     env.update(extra_env or {})
     return subprocess.run(
-        ["bash", str(tmp_target / _SCRIPTS / "monitor_pr.sh"), "1", "--merge"],
+        ["bash", str(tmp_target / _SCRIPTS / "watch-pr.sh"), "1", "--merge"],
         capture_output=True,
         text=True,
         cwd=tmp_target,
@@ -170,7 +170,7 @@ def test_scaffold_renders_the_key_and_gh_host_reads_it(tmp_target: Path):
     scaffold(tmp_target, fallback_preset(), fallback_variables())
     _set_ignore_list(tmp_target, '["board-sync", "other"]')
     result = subprocess.run(
-        ["bash", "-c", ". .agents/scripts/gh_host.sh; monitor_ignore_checks"],
+        ["bash", "-c", ". .agents/scripts/gh-host.sh; monitor_ignore_checks"],
         capture_output=True,
         text=True,
         cwd=tmp_target,

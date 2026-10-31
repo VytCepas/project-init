@@ -75,5 +75,5 @@ def test_no_plugin_scaffold_keeps_the_full_projection(tmp_path: Path):
     _scaffold(tmp_path, "--no-plugin")
     projected = {d.name for d in (tmp_path / ".claude" / "skills").iterdir() if d.is_dir()}
     # Without plugins the copies are Claude's only delivery mechanism.
-    assert "github_workflow" in projected
-    assert "save_memory" in projected
+    assert "github-workflow" in projected
+    assert "save-memory" in projected

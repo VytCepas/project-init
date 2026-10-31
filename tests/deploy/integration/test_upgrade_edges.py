@@ -216,7 +216,7 @@ class TestLegacyUnmanagedContentIsCarried:
 
         run_upgrade(target, apply=True, accept_new=["all"])
 
-        adr = target / ".agents" / "docs" / "adr" / "adr-003-our-own.md"
+        adr = target / ".agents" / "docs" / "decisions" / "adr-003-our-own.md"
         mem = target / ".agents" / "memory" / "MEMORY.md"
         assert adr.is_file(), "the upgrade deleted a project-authored ADR"
         assert mem.is_file(), "the upgrade deleted the project's memory tier"

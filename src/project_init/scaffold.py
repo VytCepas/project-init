@@ -433,7 +433,7 @@ def overlay_layers(  # noqa: PLR0913 — one parameter per independent overlay s
     plugins are off, then the GitHub-lifecycle overlay (#476/ADR-021): the
     ``lifecycle`` layer (scripts, the DAG library, board/wiki/validation
     workflows, issue/PR templates — scaffolded in both plugin and no-plugin
-    modes) plus ``lifecycle_fallback`` (the lifecycle guard hooks + skills,
+    modes) plus ``lifecycle-fallback`` (the lifecycle guard hooks + skills,
     copied only with --no-plugin; in plugin mode they ship as the separate
     ``project-init-lifecycle`` plugin). Then the per-agent overlays (PI-137)
     and the opt-in ``multi_model`` (ADR-016, #351), ``governance`` (ADR-018,
@@ -454,10 +454,10 @@ def overlay_layers(  # noqa: PLR0913 — one parameter per independent overlay s
     if lifecycle:
         extra = [*extra, "lifecycle"]
         if no_plugin:
-            extra = [*extra, "lifecycle_fallback"]
+            extra = [*extra, "lifecycle-fallback"]
     extra = [*extra, *(a for a in _AGENT_LAYERS if a in chosen)]
     if multi_model:
-        extra = [*extra, "multi_model"]
+        extra = [*extra, "multi-model"]
     if governance:
         extra = [*extra, "governance"]
     if observability:
@@ -1036,7 +1036,7 @@ _SURFACE_DIRS = {
 def _presence_flags(root: Path, variables: dict[str, str]) -> dict[str, str]:
     """Gate flags for what the rendered instructions may name (harbor#967).
 
-    AGENTS.md used to name `just`, `CODE_MAP.md` and every harness directory
+    AGENTS.md used to name `just`, `code-map.md` and every harness directory
     whatever the repo held. A path an agent is told to open that is not there is
     a defect nobody sees until an agent trips on it, so the names the file uses
     are decided here from the project, not from the template's assumptions.
@@ -1051,7 +1051,7 @@ def _presence_flags(root: Path, variables: dict[str, str]) -> dict[str, str]:
     )
     # The map is generated on demand (`just code-map`), never written by a
     # scaffold, so the path is named only once it exists.
-    has_code_map = (root / ".agents" / "docs" / "CODE_MAP.md").is_file()
+    has_code_map = (root / ".agents" / "docs" / "code-map.md").is_file()
     can_make_code_map = bool(has_just and variables.get("python"))
     agents = [a.strip() for a in variables.get("agents", "").split(",")]
     dirs = ", ".join(f"`{_SURFACE_DIRS[a]}`" for a in agents if a in _SURFACE_DIRS)
@@ -1273,23 +1273,23 @@ _PROJECTION_JUNK = frozenset({"__pycache__", "logs", ".local", ".cache"})
 # list to the actual plugins/*/skills payloads.
 PLUGIN_PROVIDED_SKILLS = frozenset(
     {
-        "add_adr",
-        "add_command",
-        "add_hook",
+        "add-decision-record",
+        "add-command",
+        "add-hook",
         "audit",
         "checkpoint",
-        "create_issue",
+        "create-issue",
         "diagram",
-        "github_workflow",
-        "local_ci",
-        "report_upstream_issue",
-        "request_review",
+        "github-workflow",
+        "local-ci",
+        "report-upstream-issue",
+        "request-review",
         "review",
-        "save_memory",
-        "session_summary",
-        "start_task",
+        "save-memory",
+        "session-summary",
+        "start-task",
         "status",
-        "token_efficiency",
+        "token-efficiency",
         "verify-test-strength",
     }
 )

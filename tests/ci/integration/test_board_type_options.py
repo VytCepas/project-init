@@ -1,11 +1,11 @@
 """#1016: the board's Type options and the labels board-automation maps to Type
-must be one vocabulary, and setup_github.sh must bring an EXISTING board up to it.
+must be one vocabulary, and setup-github.sh must bring an EXISTING board up to it.
 
-`spike` and `tech-debt` became type labels (#1015) while setup_github.sh still
+`spike` and `tech-debt` became type labels (#1015) while setup-github.sh still
 created the Type field with five options and skipped a field that already existed,
 so the board silently left those issues' Type blank.
 
-Both scripts are executed, not grepped: setup_github.sh runs end to end against a
+Both scripts are executed, not grepped: setup-github.sh runs end to end against a
 stubbed `gh` that records each GraphQL request, and board-automation's shipped
 `update_single_select` runs against a stubbed project.
 """
@@ -130,7 +130,7 @@ def _run_setup(
     gh.write_text(_GH_STUB)
     gh.chmod(0o755)
     proc = subprocess.run(
-        ["bash", str(target / ".agents" / "scripts" / "setup_github.sh")],
+        ["bash", str(target / ".agents" / "scripts" / "setup-github.sh")],
         capture_output=True,
         text=True,
         check=False,
@@ -303,7 +303,7 @@ def _type_field_name(path: Path) -> str:
 
 
 def test_both_templates_use_one_non_reserved_type_field_name(target: Path):
-    setup = _type_field_name(target / ".agents" / "scripts" / "setup_github.sh")
+    setup = _type_field_name(target / ".agents" / "scripts" / "setup-github.sh")
     workflow = _type_field_name(target / ".github" / "workflows" / "board-automation.yml")
     assert setup == workflow, (setup, workflow)
     assert setup.strip().lower() not in _RESERVED_FIELD_NAMES, setup

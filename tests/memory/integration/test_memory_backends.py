@@ -63,7 +63,7 @@ class TestMemoryPrecedence:
         target = tmp_path / "p"
         _scaffold(target, "--preset", "core", "--memory", "obsidian-graphify")
         assert _has_vault(target)
-        assert (target / ".agents" / "scripts" / "setup_graphify.sh").is_file()
+        assert (target / ".agents" / "scripts" / "setup-graphify.sh").is_file()
 
     def test_governed_preset_with_memory_none(self, tmp_path: Path):
         """Governance inheritance is independent of memory removal (#466)."""

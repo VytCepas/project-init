@@ -20,11 +20,11 @@ Use this table when adding new capabilities to this repo or its templates:
 | You want to… | Add a… | Where |
 |---|---|---|
 | Automate a repeatable multi-step workflow | **Skill** (`SKILL.md` with frontmatter) | `.agents/skills/<name>/SKILL.md` — register in `INDEX.md` |
-| Enforce a rule on every tool call or commit | **Hook** (bash/python script) | `.agents/hooks/` — wire in `settings.json`. Use the `add_hook` skill. |
-| Expose a shortcut as `/command` | **Skill** (`SKILL.md` with frontmatter) | `.agents/skills/<name>/SKILL.md` — register in `INDEX.md`. Use the `add_command` skill. |
+| Enforce a rule on every tool call or commit | **Hook** (bash/python script) | `.agents/hooks/` — wire in `settings.json`. Use the `add-hook` skill. |
+| Expose a shortcut as `/command` | **Skill** (`SKILL.md` with frontmatter) | `.agents/skills/<name>/SKILL.md` — register in `INDEX.md`. Use the `add-command` skill. |
 | Add a reusable sub-agent persona | **Agent spec** | `.agents/agents/<name>.md` |
 
-After creating a skill, add an entry to `.agents/skills/INDEX.md` so it is discoverable without reading every file.
+After creating a skill, add an entry to `.agents/skills/index.md` so it is discoverable without reading every file.
 
 ## The weekly third-party bump, and the one secret it wants
 
@@ -53,7 +53,7 @@ POST /actions/runs/{id}/approve
 ```
 
 For that one the remedy is a plain PR comment, which re-triggers
-`review-status.yml`; `monitor_pr.sh` now posts it automatically when the
+`review-status.yml`; `watch-pr.sh` now posts it automatically when the
 review gate has passed and the status has not caught up.
 
 The approval policy itself **is** readable and writable over REST, and the

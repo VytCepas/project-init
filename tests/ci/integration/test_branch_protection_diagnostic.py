@@ -60,7 +60,7 @@ def _require_jq() -> None:
 def _script(tmp_path: Path) -> Path:
     target = tmp_path / "proj"
     scaffold(target, memory_preset("obsidian-only"), make_variables(), strict=True)
-    return target / ".agents" / "scripts" / "check_branch_protection.sh"
+    return target / ".agents" / "scripts" / "check-branch-protection.sh"
 
 
 def _run(
@@ -113,7 +113,7 @@ def test_points_at_the_fix(tmp_path: Path):
         required=["CI gate", "Lint and test (3.12)"],
         rollup=[{"name": "CI gate"}],
     )
-    assert "setup_github.sh" in result.stderr, "the diagnosis must name the remedy"
+    assert "setup-github.sh" in result.stderr, "the diagnosis must name the remedy"
 
 
 def test_silent_when_every_required_check_reports(tmp_path: Path):
@@ -202,7 +202,7 @@ def test_a_pr_only_required_check_is_never_called_a_phantom(tmp_path: Path):
 
 
 def test_a_phantom_that_lives_only_in_a_ruleset_is_still_found(tmp_path: Path):
-    """setup_github.sh enforces via TWO layers: classic branch protection and (org
+    """setup-github.sh enforces via TWO layers: classic branch protection and (org
     profile) a `project-init-baseline` repository ruleset, each with its own
     required_status_checks. Reading only the classic layer told a PR blocked solely
     by a stale RULESET check that everything was fine — a false REASSURANCE, worse

@@ -16,10 +16,10 @@ from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _TEMPLATE_SKILLS = _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "skills"
-# Lifecycle skills moved to the lifecycle_fallback overlay (#476); agent surfaces
+# Lifecycle skills moved to the lifecycle-fallback overlay (#476); agent surfaces
 # carry the FULL set (core + lifecycle), synced together.
 _LIFECYCLE_FALLBACK_SKILLS = (
-    _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents" / "skills"
+    _REPO_ROOT / "templates" / "lifecycle-fallback" / "dot_agents" / "skills"
 )
 _CODEX_SKILLS = _REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
 _ANTIGRAVITY_SKILLS = _REPO_ROOT / "templates" / "antigravity" / "dot_agents" / "skills"
@@ -56,7 +56,7 @@ def _agent_skill_body(skills_dir: Path, name: str) -> bytes:
 
 def _canonical_skill_map() -> dict[str, Path]:
     """The full skill set the agent surfaces carry: core (fallback) + lifecycle
-    (lifecycle_fallback), synced together by `just sync-plugin` (#476), plus the
+    (lifecycle-fallback), synced together by `just sync-plugin` (#476), plus the
     base `plan` skill (PI-491). `plan` is a no-variable SKILL.md.tmpl, so its
     template bytes equal the rendered SKILL.md the surfaces ship."""
     out: dict[str, Path] = {}
@@ -165,7 +165,7 @@ class TestClaudeOnlyDefault:
         assert (target / ".agents").exists()
         assert not (target / ".codex").exists()
         assert not (target / ".gemini-extension").exists()
-        assert not (target / ".agents" / "hooks" / "agent_guard_adapter.py").exists()
+        assert not (target / ".agents" / "hooks" / "admission_agent_adapter.py").exists()
         assert not (target / ".agents" / "scripts" / "setup_gemini.sh").exists()
 
 
@@ -185,14 +185,14 @@ class TestCodexOverlay:
         config = json.loads((target / ".codex" / "hooks.json").read_text())
         (entry,) = config["hooks"]["PreToolUse"]
         command = entry["hooks"][0]["command"]
-        assert "agent_guard_adapter.py codex" in command
-        assert (target / ".agents" / "hooks" / "agent_guard_adapter.py").is_file()
+        assert "admission_agent_adapter.py codex" in command
+        assert (target / ".agents" / "hooks" / "admission_agent_adapter.py").is_file()
 
     def test_adapter_satisfies_scaffolded_ruff_gates(self, tmp_path: Path):
         """Multi-agent Python scaffolds lint .agents/** with S/BLE still active;
         the generated adapter must not fail the first commit/CI run."""
         target = _scaffold_agents(tmp_path / "p", "codex")
-        text = (target / ".agents" / "hooks" / "agent_guard_adapter.py").read_text()
+        text = (target / ".agents" / "hooks" / "admission_agent_adapter.py").read_text()
         assert "# noqa: S603" in text
         assert "except (OSError, subprocess.SubprocessError, json.JSONDecodeError)" in text
 
@@ -213,7 +213,7 @@ class TestAntigravityOverlay:
         target = _scaffold_agents(tmp_path / "p", "antigravity")
         config = json.loads((target / ".agents" / "hooks.json").read_text())
         entry = config["safety-gate"]["PreToolUse"][0]
-        assert "agent_guard_adapter.py antigravity" in entry["hooks"][0]["command"]
+        assert "admission_agent_adapter.py antigravity" in entry["hooks"][0]["command"]
 
     def test_no_dead_gemini_cli_artifacts(self, tmp_path: Path):
         target = _scaffold_agents(tmp_path / "p", "antigravity")
@@ -362,7 +362,7 @@ class TestAgentGuardAdapter:
     main` blocks unconditionally (no redirect script)."""
 
     def _run_adapter(self, target: Path, dialect: str, command: str) -> dict | None:
-        adapter = target / ".agents" / "hooks" / "agent_guard_adapter.py"
+        adapter = target / ".agents" / "hooks" / "admission_agent_adapter.py"
         # Each surface sends its own stdin shape (PI-385, confirmed from docs).
         surface_payloads = {
             "cursor": {"command": command},  # beforeShellExecution: top-level
@@ -409,7 +409,7 @@ class TestAgentGuardAdapter:
     def test_malformed_payload_is_fail_open(self, tmp_path: Path):
         """PI-385: non-dict JSON stdin must not crash the hook (stays fail-open)."""
         target = _scaffold_agents(tmp_path / "p", "codex")
-        adapter = target / ".agents" / "hooks" / "agent_guard_adapter.py"
+        adapter = target / ".agents" / "hooks" / "admission_agent_adapter.py"
         proc = subprocess.run(
             [sys.executable, str(adapter), "codex"],
             input="[]",
@@ -426,9 +426,9 @@ class TestAgentGuardAdapter:
         `test_shipped_python_templates_are_format_clean` runs `ruff format
         --check` over raw `templates/`, but ruff skips `.tmpl` files (wrong
         extension) — so a `.py.tmpl` that renders to malformed Python slips
-        through. `agent_guard_adapter.py.tmpl` did exactly that: its standalone
+        through. `admission_agent_adapter.py.tmpl` did exactly that: its standalone
         closing `{{/if multi_agent}}` carried a trailing newline the working
-        sibling `gen_code_map.py.tmpl` omits, so the rendered hook ended in a
+        sibling `generate-code-map.py.tmpl` omits, so the rendered hook ended in a
         blank line and failed `ruff format --check` on a fresh multi-agent
         scaffold. This checks the rendered output, not the template source.
         """

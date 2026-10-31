@@ -62,7 +62,7 @@ class TestREADMEExampleCommand:
         # Plugin-first default (PI-165): payload comes from the plugin, only
         # the script-library hook is copied.
         assert (target / ".agents" / "hooks" / "dag_workflow.py").is_file()
-        assert not (target / ".agents" / "hooks" / "post_edit_lint.sh").exists()
+        assert not (target / ".agents" / "hooks" / "post-edit-lint.sh").exists()
         assert (target / ".github" / "hooks" / "pre-commit").is_file()
 
 

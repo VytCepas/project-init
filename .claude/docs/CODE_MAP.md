@@ -72,7 +72,7 @@ Central rich styling for the interactive wizard.
 - `def claude_config_dir` — Claude Code's config directory: ``$CLAUDE_CONFIG_DIR`` if set, else ``~/.claude``.
 - `def check_plugin_enablement` — The project-init plugin(s) are declared, installed, and loadable.
 - `def check_git_hooks` — Git hooks are installed when a ``.github/hooks/`` source ships them.
-- `def check_python_available` — A Python 3 interpreter is resolvable, mirroring ``_py.sh``.
+- `def check_python_available` — A Python 3 interpreter is resolvable, mirroring ``python-resolve.sh``.
 - `def collect_checks` — Run every check against *target* and return the results in report order.
 - `def run_doctor` — Print the health-check report for *target*; return 1 if any check FAILs.
 
@@ -117,9 +117,10 @@ Check a name at its birth against harbor's naming standard (harbor#967).
 
 ### `project_init/naming_gate.py`
 
-Seed the scaffolded naming gate's ratchet baseline (harbor#967).
+Seed the scaffolded naming gate's ratchet baseline (naming standard, 1.2.3).
 
 - `def seed_baseline` — Run ``sh gates/naming-check.sh --seed`` in *target*; return ``(ok, message)``.
+- `def carry_renames` — Carry the baseline across paths an upgrade just renamed (naming standard, 1.2.3).
 
 ### `project_init/platform_admission_hook.py`
 
@@ -127,6 +128,13 @@ Refuse a native Windows shell before anything runs (#1070, ADR-030).
 
 - `def native_windows_shell` — Return the native Windows system name this process runs under, else None.
 - `def refusal` — The message naming WSL2 as the way in.
+
+### `project_init/renames.py`
+
+Scaffolded paths renamed to the naming standard (naming standard, 1.2.3), for the upgrade to migrate.
+
+- `def renamed` — Return *rel*'s path after the rename, or ``None`` when no row moves it.
+- `def rename_mentions` — Spell every renamed script or hook file name in *text* with its new name.
 
 ### `project_init/scaffold.py`
 
@@ -183,6 +191,7 @@ Per-surface agent-config generation (ADR-017, PI-366).
 `project-init upgrade` — re-render from recorded config with a drift report.
 
 - `def is_legacy_layout` — True when *target*'s record still lives at the pre-PI-606 ``.claude/`` path.
+- `def planned_renames` — The ``(old, new)`` rows whose old path still exists in *target*, in apply order.
 - `def scaffold_record_path` — Locate *target*'s scaffold record, tolerating the pre-PI-606 location.
 - `class UpgradeError` — Raised when the project cannot be upgraded (missing/invalid config).
 - `class DriftReport` — Outcome of comparing a fresh render against the scaffolded project.

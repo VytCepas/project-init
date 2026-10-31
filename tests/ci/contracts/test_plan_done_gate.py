@@ -1,12 +1,12 @@
-"""A scaffolded PLAN.md opens with the project's done-gate (#988, item 2).
+"""A scaffolded plan.md opens with the project's done-gate (#988, item 2).
 
 "Is this finished?" should be answered by a falsifier the repo itself states: a
 `Done when:` line, and the `probed by:` check that proves it. Before this, no
-template emitted a PLAN.md at all, so a scaffolded repo had nowhere to state one.
+template emitted a plan.md at all, so a scaffolded repo had nowhere to state one.
 
 Asserted on the RENDERED file from the real CLI, for every preset, and on the
 OPENING of the file rather than anywhere in it. A gate buried under other
-content is one a reader never sees, so "somewhere in PLAN.md" would pass the
+content is one a reader never sees, so "somewhere in plan.md" would pass the
 exact failure this exists to prevent.
 """
 
@@ -23,7 +23,7 @@ _PRESETS = sorted(p["name"] for p in list_presets())
 
 
 def _render_plan(target: Path, preset: str, language: str = "python") -> list[str]:
-    """Scaffold *preset* through the CLI and return PLAN.md's non-blank lines."""
+    """Scaffold *preset* through the CLI and return plan.md's non-blank lines."""
     rc = main(
         [
             str(target),
@@ -41,18 +41,18 @@ def _render_plan(target: Path, preset: str, language: str = "python") -> list[st
         ]
     )
     assert rc == 0, f"scaffold of {preset} exited {rc}"
-    plan = target / "PLAN.md"
-    assert plan.is_file(), f"{preset}: no PLAN.md was scaffolded"
+    plan = target / "plan.md"
+    assert plan.is_file(), f"{preset}: no plan.md was scaffolded"
     return [line for line in plan.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def _assert_opens_with_gate(lines: list[str], label: str) -> None:
-    # Checked first so a truncated or empty PLAN.md reports what is missing
+    # Checked first so a truncated or empty plan.md reports what is missing
     # rather than dying on an IndexError below (Copilot review).
-    assert len(lines) >= 3, f"{label}: PLAN.md has {len(lines)} non-blank line(s): {lines!r}"
-    assert lines[0] == "# Plan — gate-probe", f"{label}: PLAN.md lost its title: {lines[0]!r}"
+    assert len(lines) >= 3, f"{label}: plan.md has {len(lines)} non-blank line(s): {lines!r}"
+    assert lines[0] == "# Plan — gate-probe", f"{label}: plan.md lost its title: {lines[0]!r}"
     assert lines[1].startswith("Done when: "), (
-        f"{label}: PLAN.md must open with its `Done when:` line, got {lines[1]!r}"
+        f"{label}: plan.md must open with its `Done when:` line, got {lines[1]!r}"
     )
     assert lines[2].startswith("probed by: "), (
         f"{label}: the `Done when:` line must be followed by its `probed by:` probe, "

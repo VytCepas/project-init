@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# governance-gate.sh — ADR-018 governance gate (#412).
+# Passes only when (a) every real .agents/governance/**/SYSTEM_CARD.md (the
+# shipped examples/ are excluded) validates, or (b) there is no card and
+# .agents/governance/NO_AI_SYSTEM.md declares, with a reason and a date, that
+# this repo ships no AI system. No card and no declaration => FAIL; a card and
+# a declaration together => FAIL. CI-first: the `governance` CI job is the
+# enforcement boundary; this script is what that job runs and what you can run
+# locally.
+case "${1-}" in
+-h | --help) # the header above is the help; nothing else runs (#992)
+  sed -n '2,/^[^#]/s/^# \{0,1\}//p' "$0"
+  exit 0
+  ;;
+esac
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# Resolve Python through the canonical helper (PI-361). python-resolve.sh ships with the
+# base layer at .agents/hooks/python-resolve.sh.
+PY="$HERE/../hooks/python-resolve.sh"
+# Resolve the project root from THIS script's location (.agents/scripts/), not
+# `git rev-parse --show-toplevel`: the latter keys off the caller's CWD, so
+# running the gate from inside a different repo would validate that repo and
+# vacuously pass. The governance tree is always at <root>/.agents/governance,
+# i.e. two levels up from here — deterministic regardless of CWD.
+ROOT="$(cd "$HERE/../.." && pwd)"
+
+exec "$PY" "$HERE/governance_gate.py" "$ROOT"

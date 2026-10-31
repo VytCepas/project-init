@@ -51,7 +51,7 @@ class TestEnforcementGuide:
         guide = (target / _GUIDE).read_text()
         assert "Per-surface wiring matrix" in guide
         assert "Codex" in guide
-        assert "agent_guard_adapter.py" in guide
+        assert "admission_agent_adapter.py" in guide
         # Unselected surfaces render nothing.
         assert "Junie" not in guide
 

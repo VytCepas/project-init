@@ -428,7 +428,7 @@ covering *all* external tools project-init pins, not just CCR (see child issue
 ### Implementation gotchas (from repo memory)
 
 - Scripts must be `*.sh.tmpl` (not `.sh`) to render.
-- `add_command` has a 3rd **plugin copy** — sync via `tools/sync_plugin.py`.
+- `add-command` has a 3rd **plugin copy** — sync via `tools/sync_plugin.py`.
 - Only `.tmpl` files render `{{vars}}`; file-gating is whole-file `{{#if}}`.
 - No `pyyaml` in tests.
 

@@ -1,4 +1,4 @@
-"""ADR-019 / #406: guarded hook self-log (_usage_log.sh + prod_guard.py).
+"""ADR-019 / #406: guarded hook self-log (usage-log.sh + prod_guard.py).
 
 Shipped-always-dormant: the helper and the five always-on shell hooks carry the
 self-log, but it no-ops unless the overlay marker (.agents/observability/)
@@ -19,14 +19,14 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _FALLBACK_HOOKS = _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "hooks"
 _PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-workflow" / "hooks"
-# The lifecycle guard hooks moved to the lifecycle_fallback overlay + the
+# The lifecycle guard hooks moved to the lifecycle-fallback overlay + the
 # project-init-lifecycle plugin (#476).
-_LIFECYCLE_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents" / "hooks"
+_LIFECYCLE_FALLBACK_HOOKS = _REPO_ROOT / "templates" / "lifecycle-fallback" / "dot_agents" / "hooks"
 _LIFECYCLE_PLUGIN_HOOKS = _REPO_ROOT / "plugins" / "project-init-lifecycle" / "hooks"
-_LIFECYCLE_HOOK_NAMES = {"github_command_guard.sh", "workflow_state_reminder.sh"}
-_HELPER = _FALLBACK_HOOKS / "_usage_log.sh"
+_LIFECYCLE_HOOK_NAMES = {"github_command_guard.sh", "workflow-state-reminder.sh"}
+_HELPER = _FALLBACK_HOOKS / "usage-log.sh"
 _PROD_GUARD = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "prod_guard.py"
-_PACKAGE_GUARD = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "package_guard.py"
+_PACKAGE_GUARD = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "admission_package.py"
 _DAG_GUARD = _REPO_ROOT / "templates" / "lifecycle" / "dot_agents" / "hooks" / "dag_workflow.py"
 _USAGE_EVENT_SCHEMA = _REPO_ROOT / "schemas" / "usage-event.schema.json"
 
@@ -39,15 +39,15 @@ def _plugin_dir(hook: str) -> Path:
     return _LIFECYCLE_PLUGIN_HOOKS if hook in _LIFECYCLE_HOOK_NAMES else _PLUGIN_HOOKS
 
 
-# The always-on shell hooks that self-log via _usage_log.sh, with the
+# The always-on shell hooks that self-log via usage-log.sh, with the
 # (hook, event) each records. github_command_guard.sh is deliberately absent: it
 # `exec`s the guard, so it can't see the outcome — dag_workflow.py records the
 # event itself with the decision + command (see TestDagGuardSelfLog).
 _WIRED_HOOKS = {
-    "session_setup.sh": ("session_setup", "SessionStart"),
-    "pre_commit_gate.sh": ("pre_commit_gate", "PreToolUse"),
-    "post_edit_lint.sh": ("post_edit_lint", "PostToolUse"),
-    "workflow_state_reminder.sh": ("workflow_state_reminder", "UserPromptSubmit"),
+    "session-setup.sh": ("session_setup", "SessionStart"),
+    "pre-commit-gate.sh": ("pre_commit_gate", "PreToolUse"),
+    "post-edit-lint.sh": ("post_edit_lint", "PostToolUse"),
+    "workflow-state-reminder.sh": ("workflow_state_reminder", "UserPromptSubmit"),
 }
 
 
@@ -175,7 +175,7 @@ class TestHookWiring:
     @pytest.mark.parametrize("hook,expected", _WIRED_HOOKS.items())
     def test_fallback_hook_sources_and_calls(self, hook: str, expected: tuple[str, str]):
         text = (_source_dir(hook) / hook).read_text(encoding="utf-8")
-        assert "_usage_log.sh" in text, f"{hook} does not source the helper"
+        assert "usage-log.sh" in text, f"{hook} does not source the helper"
         name, event = expected
         assert f"usage_log {name} {event}" in text, f"{hook} missing usage_log call"
 
@@ -187,11 +187,11 @@ class TestHookWiring:
         rest in project-init-workflow (#476)."""
         plugin = _plugin_dir(hook) / hook
         assert plugin.is_file(), f"{hook} missing from plugin (run just sync-plugin)"
-        assert "_usage_log.sh" in plugin.read_text(encoding="utf-8")
+        assert "usage-log.sh" in plugin.read_text(encoding="utf-8")
 
     def test_helper_synced_to_plugin(self):
-        assert (_PLUGIN_HOOKS / "_usage_log.sh").is_file()
-        assert (_PLUGIN_HOOKS / "_usage_log.sh").read_bytes() == _HELPER.read_bytes()
+        assert (_PLUGIN_HOOKS / "usage-log.sh").is_file()
+        assert (_PLUGIN_HOOKS / "usage-log.sh").read_bytes() == _HELPER.read_bytes()
 
     def test_helper_never_reads_stdin_source(self):
         """No stdin-consuming construct in the helper (cat/read/$(<)/</dev/stdin).

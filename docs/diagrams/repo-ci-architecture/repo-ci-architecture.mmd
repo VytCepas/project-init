@@ -54,4 +54,4 @@ flowchart TB
     CI -->|"all required checks green"| MERGE{{"branch protection:\nci-gate + review approval\nrequired before merge"}}
     VALIDATE --> MERGE
     REVSTATUS --> MERGE
-    DAG -->|"gh pr merge intercepted\n(redirect to monitor_pr.sh --merge)"| MERGE
+    DAG -->|"gh pr merge intercepted\n(redirect to watch-pr.sh --merge)"| MERGE

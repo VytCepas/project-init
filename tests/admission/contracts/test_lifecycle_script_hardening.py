@@ -2,13 +2,13 @@
 
 Each assertion pins a specific defect fixed in the review:
 
-- ``start_issue.sh`` died silently on a nonexistent issue — under ``set -e``
+- ``start-issue.sh`` died silently on a nonexistent issue — under ``set -e``
   the command-substitution assignment killed the script (gh stderr discarded)
   before the "issue not found" branch could run.
-- ``create_issue.sh`` leaked its mktemp file on the could-not-add early return.
-- ``pre_commit_gate.sh`` fail-closed in uv projects that don't ship ruff: uv's
+- ``create-issue.sh`` leaked its mktemp file on the could-not-add early return.
+- ``pre-commit-gate.sh`` fail-closed in uv projects that don't ship ruff: uv's
   "Failed to spawn" error was captured as bogus "Python lint errors".
-- ``monitor_pr.sh`` printed "no reviewer has acted" (and hid the comments)
+- ``watch-pr.sh`` printed "no reviewer has acted" (and hid the comments)
   after breaking early on review activity; the ROOT copy also predated the
   template's ``--admin`` opt-in for BLOCKED merges and the order-independent
   flag parser.
@@ -24,6 +24,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from tools.sync_agents_from_templates import own_names
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _LIFECYCLE_SCRIPTS = _REPO_ROOT / "templates/lifecycle/dot_agents/scripts"
 _ROOT_SCRIPTS = _REPO_ROOT / ".agents/scripts"
@@ -31,7 +33,7 @@ _ROOT_SCRIPTS = _REPO_ROOT / ".agents/scripts"
 
 class TestStartIssueErrorPath:
     def test_issue_title_fetch_survives_set_e(self):
-        s = (_LIFECYCLE_SCRIPTS / "start_issue.sh").read_text()
+        s = (_LIFECYCLE_SCRIPTS / "start-issue.sh").read_text()
         m = re.search(r"^ISSUE_TITLE=\$\(gh issue view .*\)$", s, re.MULTILINE)
         assert m, "issue-title fetch line not found"
         assert "|| true" in m.group(0), (
@@ -42,7 +44,7 @@ class TestStartIssueErrorPath:
 
 class TestCreateIssueTempFile:
     def test_could_not_add_early_return_removes_temp_file(self):
-        s = (_LIFECYCLE_SCRIPTS / "create_issue.sh").read_text()
+        s = (_LIFECYCLE_SCRIPTS / "create-issue.sh").read_text()
         block = re.search(r"\n(.*\n)?\s*echo \"Warning: could not add", s)
         assert block, "could-not-add warning not found"
         assert 'rm -f "$pdata_file"' in block.group(0), (
@@ -54,8 +56,8 @@ class TestCreateIssueTempFile:
 class TestPreCommitGateFailOpen:
     def test_uv_branch_probes_ruff_before_linting(self):
         for rel in (
-            "templates/fallback/dot_agents/hooks/pre_commit_gate.sh",
-            "plugins/project-init-workflow/hooks/pre_commit_gate.sh",
+            "templates/fallback/dot_agents/hooks/pre-commit-gate.sh",
+            "plugins/project-init-workflow/hooks/pre-commit-gate.sh",
         ):
             s = (_REPO_ROOT / rel).read_text()
             assert "uv run ruff --version" in s, (
@@ -67,7 +69,7 @@ class TestPreCommitGateFailOpen:
 class TestMonitorPrReviewActivity:
     def test_early_break_surfaces_comments_not_false_timeout(self):
         for path in (
-            _LIFECYCLE_SCRIPTS / "monitor_pr.sh",
+            _LIFECYCLE_SCRIPTS / "watch-pr.sh",
             _ROOT_SCRIPTS / "monitor_pr.sh",
         ):
             s = path.read_text()
@@ -94,7 +96,7 @@ class TestRootMonitorPrBackport:
         s = (_ROOT_SCRIPTS / "monitor_pr.sh").read_text()
         assert 'MODE="${2:-}"' not in s, (
             "the positional parser rejected documented usage like "
-            "`monitor_pr.sh 12 --no-review` with 'Unknown option'"
+            "`watch-pr.sh 12 --no-review` with 'Unknown option'"
         )
         assert "--admin)" in s
         assert "--merge)" in s
@@ -160,7 +162,7 @@ class TestStartIssueWorktreeKey:
 
     def test_derivation_anchors_on_main_worktree(self):
         for path in (
-            _LIFECYCLE_SCRIPTS / "start_issue.sh",
+            _LIFECYCLE_SCRIPTS / "start-issue.sh",
             _ROOT_SCRIPTS / "start_issue.sh",
         ):
             s = path.read_text()
@@ -192,7 +194,7 @@ class TestStartIssueWorktreeKey:
         return m.group(0)
 
     def test_helper_returns_main_repo_name_from_linked_worktree(self, tmp_path):
-        helper = self._extract_helper(_LIFECYCLE_SCRIPTS / "start_issue.sh")
+        helper = self._extract_helper(_LIFECYCLE_SCRIPTS / "start-issue.sh")
         git_env = ["-c", "user.email=t@t", "-c", "user.name=t"]
         repo = tmp_path / "zarija"
         repo.mkdir()
@@ -226,7 +228,7 @@ class TestStartIssueWorktreeKey:
         """PR #702 review: with worktrees hanging off a bare repo
         (/srv/widget.git), the common dir IS the bare dir — dirname would
         derive the unrelated parent ('srv'), not the repo name ('widget')."""
-        helper = self._extract_helper(_LIFECYCLE_SCRIPTS / "start_issue.sh")
+        helper = self._extract_helper(_LIFECYCLE_SCRIPTS / "start-issue.sh")
         git_env = ["-c", "user.email=t@t", "-c", "user.name=t"]
         seed = tmp_path / "seed"
         seed.mkdir()
@@ -271,7 +273,7 @@ class TestStartIssueSeedCommit:
 
     def test_seed_compares_against_remote_base(self):
         for path in (
-            _LIFECYCLE_SCRIPTS / "start_issue.sh",
+            _LIFECYCLE_SCRIPTS / "start-issue.sh",
             _ROOT_SCRIPTS / "start_issue.sh",
         ):
             s = path.read_text()
@@ -283,7 +285,7 @@ class TestStartIssueSeedCommit:
 
     def test_pr_create_retries_once_after_seeding(self):
         for path in (
-            _LIFECYCLE_SCRIPTS / "start_issue.sh",
+            _LIFECYCLE_SCRIPTS / "start-issue.sh",
             _ROOT_SCRIPTS / "start_issue.sh",
         ):
             s = path.read_text()
@@ -294,7 +296,12 @@ class TestStartIssueSeedCommit:
             )
             # The retry must re-push the seeded branch before re-creating.
             tail = s[retry_idx:]
-            assert "push_branch.sh" in tail.split("Draft PR:")[0], (
+            push = (
+                "push-branch.sh"
+                if path.parent == _LIFECYCLE_SCRIPTS
+                else own_names("push-branch.sh")
+            )
+            assert push in tail.split("Draft PR:")[0], (
                 f"{path}: the seeded commit must be pushed before the retry"
             )
 
@@ -303,7 +310,7 @@ class TestStartIssueSeedCommit:
         behind origin/main, feature branch cut from origin/main. The old
         local-base comparison says 'has commits' (skip seed); the remote-base
         comparison correctly says 'level' (seed)."""
-        s = (_LIFECYCLE_SCRIPTS / "start_issue.sh").read_text()
+        s = (_LIFECYCLE_SCRIPTS / "start-issue.sh").read_text()
         m = re.search(r"^_seed_base\(\) \{\n.*?\n\}$", s, re.MULTILINE | re.DOTALL)
         assert m, "_seed_base not found"
         helper = m.group(0)
@@ -366,7 +373,7 @@ class TestMonitorPrMergeRetry:
 
     def test_merge_paths_use_retry(self):
         for path in (
-            _LIFECYCLE_SCRIPTS / "monitor_pr.sh",
+            _LIFECYCLE_SCRIPTS / "watch-pr.sh",
             _ROOT_SCRIPTS / "monitor_pr.sh",
         ):
             s = path.read_text()
@@ -408,7 +415,7 @@ class TestMonitorPrMergeRetry:
         self, tmp_path: Path, stub: str, script_tail: str
     ) -> subprocess.CompletedProcess:
         helpers = self._extract(
-            _LIFECYCLE_SCRIPTS / "monitor_pr.sh",
+            _LIFECYCLE_SCRIPTS / "watch-pr.sh",
             "_run_gh",
             "_pr_is_merged",
             "_merge_with_retry",
@@ -486,7 +493,7 @@ class TestMonitorPrLocalBranchCleanup:
 
     def test_every_confirmed_merge_triggers_cleanup(self):
         for path in (
-            _LIFECYCLE_SCRIPTS / "monitor_pr.sh",
+            _LIFECYCLE_SCRIPTS / "watch-pr.sh",
             _ROOT_SCRIPTS / "monitor_pr.sh",
         ):
             lines = path.read_text().splitlines()
@@ -530,7 +537,7 @@ class TestMonitorPrLocalBranchCleanup:
         head_oid: str,
         pr_state: str = "MERGED",
     ) -> subprocess.CompletedProcess:
-        s = (_LIFECYCLE_SCRIPTS / "monitor_pr.sh").read_text()
+        s = (_LIFECYCLE_SCRIPTS / "watch-pr.sh").read_text()
         parts = []
         for name in ("_pr_is_merged", "_cleanup_local_branch"):
             m = re.search(rf"^{name}\(\) \{{\n.*?\n\}}$", s, re.MULTILINE | re.DOTALL)
@@ -648,9 +655,9 @@ class TestPrCreationDoesNotRelyOnGhInference:
 
     def test_start_issue_passes_head_explicitly(self, tmp_path: Path):
         """Behavioural: run the real _create_pr with a fake gh recording argv."""
-        source = (_LIFECYCLE_SCRIPTS / "start_issue.sh").read_text()
+        source = (_LIFECYCLE_SCRIPTS / "start-issue.sh").read_text()
         m = re.search(r"^_create_pr\(\) \{\n.*?\n\}$", source, re.MULTILINE | re.DOTALL)
-        assert m, "_create_pr not found in start_issue.sh"
+        assert m, "_create_pr not found in start-issue.sh"
 
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
@@ -739,15 +746,15 @@ class TestPrCreationFixReachesGeneratedProjects:
 
     def test_generated_start_issue_passes_head(self, tmp_path: Path):
         target = self._scaffolded(tmp_path)
-        script = target / ".agents" / "scripts" / "start_issue.sh"
-        assert script.is_file(), "lifecycle scaffold did not emit start_issue.sh"
+        script = target / ".agents" / "scripts" / "start-issue.sh"
+        assert script.is_file(), "lifecycle scaffold did not emit start-issue.sh"
 
         m = re.search(
             r"^_create_pr\(\) \{\n.*?\n\}$",
             script.read_text(encoding="utf-8"),
             re.MULTILINE | re.DOTALL,
         )
-        assert m, "_create_pr missing from the GENERATED start_issue.sh"
+        assert m, "_create_pr missing from the GENERATED start-issue.sh"
 
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()

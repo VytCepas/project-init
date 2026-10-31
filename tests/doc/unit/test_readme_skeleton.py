@@ -71,7 +71,7 @@ def test_the_test_section_names_a_recipe_only_where_there_is_a_justfile(render) 
 
 
 def test_the_links_the_readme_makes_are_written_by_the_scaffold(render) -> None:
-    # `.agents/docs/adr/` and `AGENTS.md` are templated paths; a link to a path the
+    # `.agents/docs/decisions/` and `AGENTS.md` are templated paths; a link to a path the
     # scaffold does not write is the defect harbor#967 is closing.
     text = (render() / "README.md").read_text(encoding="utf-8")
     for link in re.findall(r"\]\(([^)#]+)\)", text):

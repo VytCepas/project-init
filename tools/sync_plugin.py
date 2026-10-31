@@ -3,7 +3,7 @@
 Source of truth after the PI-165 cutover: templates/fallback/dot_agents
 (shared skills + hook scripts; rendered into projects only with --no-plugin),
 plus the GitHub-lifecycle overlays (#476/ADR-021): templates/lifecycle (the
-dag_workflow.py library) and templates/lifecycle_fallback (the lifecycle guard
+dag_workflow.py library) and templates/lifecycle-fallback (the lifecycle guard
 hooks + lifecycle skills). Derived copies:
 
 - plugins/project-init-workflow/ — the forge-agnostic CORE plugin: quality +
@@ -13,7 +13,7 @@ hooks + lifecycle skills). Derived copies:
   guard + workflow-state hooks and the issue→PR→merge skills. Enabled in plugin
   mode only when the lifecycle tier is on, so a `--lifecycle none` scaffold
   advertises no lifecycle hooks/skills in plugin mode either (mirrors the
-  no-plugin lifecycle_fallback overlay).
+  no-plugin lifecycle-fallback overlay).
 - templates/{codex,antigravity,amp}/dot_agents/skills/ and
   templates/junie/dot_junie/skills/ (PI-137, PI-386, PI-397): Codex/Antigravity/
   Amp read .agents/skills, Junie reads .junie/skills — byte-identical copies of
@@ -47,7 +47,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_CLAUDE = REPO_ROOT / "templates" / "base" / "dot_agents"
 FALLBACK_CLAUDE = REPO_ROOT / "templates" / "fallback" / "dot_agents"
 LIFECYCLE_CLAUDE = REPO_ROOT / "templates" / "lifecycle" / "dot_agents"
-LIFECYCLE_FALLBACK_CLAUDE = REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents"
+LIFECYCLE_FALLBACK_CLAUDE = REPO_ROOT / "templates" / "lifecycle-fallback" / "dot_agents"
 WORKFLOW_PLUGIN = REPO_ROOT / "plugins" / "project-init-workflow"
 LIFECYCLE_PLUGIN = REPO_ROOT / "plugins" / "project-init-lifecycle"
 CODEX_SKILLS = REPO_ROOT / "templates" / "codex" / "dot_agents" / "skills"
@@ -190,7 +190,7 @@ def core_skill_dirs() -> list[Path]:
 
 
 def lifecycle_skill_dirs() -> list[Path]:
-    """GitHub-lifecycle skills (#476): the lifecycle_fallback overlay."""
+    """GitHub-lifecycle skills (#476): the lifecycle-fallback overlay."""
     return _skill_dirs(LIFECYCLE_FALLBACK_CLAUDE / "skills")
 
 
@@ -202,8 +202,8 @@ def all_skill_dirs() -> list[Path]:
 def core_hook_scripts() -> list[Path]:
     """CORE plugin hook scripts.
 
-    The fallback quality/safety hooks plus the base _py.sh resolver (PI-361),
-    prod_guard.py safety hook (PI-394), and package_guard.py supply-chain
+    The fallback quality/safety hooks plus the base python-resolve.sh resolver (PI-361),
+    prod_guard.py safety hook (PI-394), and admission_package.py supply-chain
     guard (PI-564).
     """
     scripts = [
@@ -211,9 +211,9 @@ def core_hook_scripts() -> list[Path]:
         for p in (FALLBACK_CLAUDE / "hooks").iterdir()
         if p.is_file() and p.suffix in {".sh", ".py"}
     ]
-    scripts.append(TEMPLATE_CLAUDE / "hooks" / "_py.sh")
+    scripts.append(TEMPLATE_CLAUDE / "hooks" / "python-resolve.sh")
     scripts.append(TEMPLATE_CLAUDE / "hooks" / "prod_guard.py")
-    scripts.append(TEMPLATE_CLAUDE / "hooks" / "package_guard.py")
+    scripts.append(TEMPLATE_CLAUDE / "hooks" / "admission_package.py")
     return sorted(scripts)
 
 
@@ -221,7 +221,7 @@ def lifecycle_hook_scripts() -> list[Path]:
     """LIFECYCLE plugin hook scripts (#476).
 
     The guard + workflow-state hooks plus everything they exec/source as siblings
-    — _py.sh (base), the dag_workflow.py library (lifecycle), and _usage_log.sh
+    — python-resolve.sh (base), the dag_workflow.py library (lifecycle), and usage-log.sh
     (fallback, for the guarded self-log) — so the plugin is self-contained under
     CLAUDE_PLUGIN_ROOT.
     """
@@ -230,9 +230,9 @@ def lifecycle_hook_scripts() -> list[Path]:
         for p in (LIFECYCLE_FALLBACK_CLAUDE / "hooks").iterdir()
         if p.is_file() and p.suffix in {".sh", ".py"}
     ]
-    scripts.append(TEMPLATE_CLAUDE / "hooks" / "_py.sh")
+    scripts.append(TEMPLATE_CLAUDE / "hooks" / "python-resolve.sh")
     scripts.append(LIFECYCLE_CLAUDE / "hooks" / "dag_workflow.py")
-    scripts.append(FALLBACK_CLAUDE / "hooks" / "_usage_log.sh")
+    scripts.append(FALLBACK_CLAUDE / "hooks" / "usage-log.sh")
     return sorted(scripts)
 
 
@@ -373,7 +373,7 @@ HARNESS_INVOCATION: tuple[tuple[str, str, str], ...] = (
 def invoked_only(skill_md: Path) -> bool:
     """Whether *skill_md*'s own frontmatter sets ``disable-model-invocation: true``.
 
-    Only the frontmatter counts. `add_command` shows the key in a fenced example
+    Only the frontmatter counts. `add-command` shows the key in a fenced example
     in its BODY, as a thing a reader may write, and that skill is not
     invoked-only. An unterminated frontmatter block is not frontmatter. Only a
     top-level key counts: the same key indented under another mapping (say
@@ -514,7 +514,7 @@ def _sync_agent_skills(trees: dict[str, Path] | None = None) -> list[str]:
 
     Lifecycle skills are shipped gated on ``{{#if lifecycle}}`` (PI-537 #5) so a
     `--lifecycle none` scaffold drops them from `.agents/skills` and
-    `.junie/skills`, just as it leaves out the `lifecycle_fallback` overlay that
+    `.junie/skills`, just as it leaves out the `lifecycle-fallback` overlay that
     carries them on the Claude path.
 
     An invoked-only skill gets the Codex policy and a demotion record beside it

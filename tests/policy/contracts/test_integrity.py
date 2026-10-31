@@ -144,7 +144,7 @@ class TestStrictMode:
         preset = memory_preset("obsidian-only")
         scaffold(target, preset, make_variables(), strict=True)
 
-        memory_file = target / ".agents" / "memory" / "project_context.md"
+        memory_file = target / ".agents" / "memory" / "project-context.md"
         memory_file.write_text("custom project context\n", encoding="utf-8")
         scaffold(target, preset, make_variables(project_name="changed"), strict=True)
 

@@ -91,9 +91,9 @@ class TestSecurityEnforcementMigration:
         for name in (
             "github_command_guard.sh",
             "dag_workflow.py",
-            "pre_commit_gate.sh",
-            "post_edit_lint.sh",
-            "workflow_state_reminder.sh",
+            "pre-commit-gate.sh",
+            "post-edit-lint.sh",
+            "workflow-state-reminder.sh",
         ):
             assert (hooks_dir / name).is_file(), f"{name} must survive ADR-007"
 
@@ -106,9 +106,9 @@ class TestSecurityEnforcementMigration:
         ]
         for wired in (
             "github_command_guard.sh",
-            "pre_commit_gate.sh",
-            "post_edit_lint.sh",
-            "workflow_state_reminder.sh",
+            "pre-commit-gate.sh",
+            "post-edit-lint.sh",
+            "workflow-state-reminder.sh",
         ):
             assert any(wired in c for c in commands), f"{wired} must stay wired"
 
@@ -228,13 +228,13 @@ class TestPrePushLifecycleGate:
 
 
 class TestInstallHooks:
-    """install_hooks.sh wires all git-level enforcement into .git/hooks."""
+    """install-hooks.sh wires all git-level enforcement into .git/hooks."""
 
     def test_installs_all_enforcement_hooks(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         subprocess.run(["git", "init", "-q"], cwd=tmp_target, check=True, capture_output=True)
         result = subprocess.run(
-            ["bash", str(tmp_target / ".agents" / "scripts" / "install_hooks.sh")],
+            ["bash", str(tmp_target / ".agents" / "scripts" / "install-hooks.sh")],
             cwd=tmp_target,
             capture_output=True,
             text=True,
@@ -257,7 +257,7 @@ class TestInstallHooks:
         dst.symlink_to(referent)
 
         result = subprocess.run(
-            ["bash", str(tmp_target / ".agents" / "scripts" / "install_hooks.sh")],
+            ["bash", str(tmp_target / ".agents" / "scripts" / "install-hooks.sh")],
             cwd=tmp_target,
             capture_output=True,
             text=True,

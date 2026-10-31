@@ -68,7 +68,7 @@ class TestClaudeOnlyIsolation:
 
     def test_agent_agnostic_enforcement_documented_for_all(self, target: Path):
         head = (target / "AGENTS.md").read_text().partition("## Claude Code specifics")[0]
-        assert "install_hooks.sh" in head, (
+        assert "install-hooks.sh" in head, (
             "git-level enforcement is universal — belongs before the Claude section"
         )
         assert "gitleaks" in head
@@ -87,7 +87,7 @@ class TestPortableReferencesResolve:
 
     def test_agents_skills_index_link_gated_by_plugin_mode(self, tmp_path: Path):
         """#437 (repointed to AGENTS.md in PI-450): the instruction file must not
-        dangle a `.agents/skills/INDEX.md` link in the default plugin scaffold —
+        dangle a `.agents/skills/index.md` link in the default plugin scaffold —
         INDEX.md ships only via the fallback layer (--no-plugin). In plugin mode
         the link must be absent; in --no-plugin mode it must be present and
         resolve."""
@@ -95,8 +95,8 @@ class TestPortableReferencesResolve:
         plug = tmp_path / "plug"
         scaffold(plug, load_preset("obsidian-only"), make_variables())
         agents_plug = (plug / "AGENTS.md").read_text()
-        assert "skills/INDEX.md" not in agents_plug
-        assert not (plug / ".agents" / "skills" / "INDEX.md").exists()
+        assert "skills/index.md" not in agents_plug
+        assert not (plug / ".agents" / "skills" / "index.md").exists()
         # --no-plugin mode: INDEX.md is linked and present. Clear plugin_mode as
         # the real CLI does (plugin_mode and no_plugin are coupled: __main__.py
         # sets `plugin_mode = "" if no_plugin`) so this is not an impossible mix.
@@ -108,8 +108,8 @@ class TestPortableReferencesResolve:
         }
         scaffold(np, preset, make_variables(plugin_mode="", no_plugin="true"), strict=True)
         agents_np = (np / "AGENTS.md").read_text()
-        assert "skills/INDEX.md" in agents_np
-        assert (np / ".agents" / "skills" / "INDEX.md").exists()
+        assert "skills/index.md" in agents_np
+        assert (np / ".agents" / "skills" / "index.md").exists()
 
     def test_no_unrendered_placeholders_in_instruction_files(self, target: Path):
         placeholder = re.compile(r"(?<!\$)\{\{[^}]+\}\}")
@@ -125,19 +125,19 @@ class TestSkillNeutrality:
 
     def test_claude_specific_skills_are_marked(self):
         """Skills that manage Claude Code config must say so explicitly."""
-        for name in ("add_command", "add_hook"):
+        for name in ("add-command", "add-hook"):
             content = (self._SKILLS / name / "SKILL.md").read_text()
             assert "Claude Code specific" in content, f"{name} missing scope marker"
 
     def test_github_workflow_skill_is_agent_neutral(self):
-        # github_workflow moved to the lifecycle_fallback overlay (#476).
+        # github-workflow moved to the lifecycle-fallback overlay (#476).
         gw = (
             Path(__file__).resolve().parents[3]
             / "templates"
-            / "lifecycle_fallback"
+            / "lifecycle-fallback"
             / "dot_agents"
             / "skills"
-            / "github_workflow"
+            / "github-workflow"
             / "SKILL.md"
         )
         content = gw.read_text()
@@ -170,23 +170,23 @@ class TestPluginModeHookDocs:
 
 
 class TestAdrPathCanonical:
-    """#462 F4: ADRs live in .agents/docs/adr/ (where the add_adr skill writes and
+    """#462 F4: ADRs live in .agents/docs/decisions/ (where the add-decision-record skill writes and
     the scaffold creates them). The invariant is that every markdown link to an
     ADR path resolves: CLAUDE.md sits at repo root, while project-init.md lives in
-    .agents/, so its link *href* must be document-relative (`docs/adr/`) even
-    though the displayed path is the absolute `.agents/docs/adr/`. A naive
-    .agents/-prefixed href resolves to the non-existent .agents/.agents/docs/adr/."""
+    .agents/, so its link *href* must be document-relative (`docs/decisions/`) even
+    though the displayed path is the absolute `.agents/docs/decisions/`. A naive
+    .agents/-prefixed href resolves to the non-existent .agents/.agents/docs/decisions/."""
 
     _FILES = (
         "CLAUDE.md",
         ".agents/project-init.md",
         ".agents/docs/README.md",
         ".agents/docs/guides/using-memory.md",
-        ".agents/docs/adr/adr-001-memory-stack.md",
+        ".agents/docs/decisions/memory-stack.md",
     )
 
     def test_canonical_adr_dir_exists(self, target: Path):
-        assert (target / ".agents" / "docs" / "adr").is_dir(), "canonical ADR dir missing"
+        assert (target / ".agents" / "docs" / "decisions").is_dir(), "canonical ADR dir missing"
 
     def test_no_doubled_claude_prefix(self, target: Path):
         for rel in self._FILES:
@@ -202,7 +202,7 @@ class TestAdrPathCanonical:
         for rel in ("CLAUDE.md", ".agents/project-init.md"):
             f = target / rel
             for href in link.findall(f.read_text()):
-                if "adr" not in href:
+                if "decisions" not in href:
                     continue
                 assert (f.parent / href).exists(), (
                     f"{rel}: broken adr link href {href!r} -> {f.parent / href}"
@@ -210,31 +210,31 @@ class TestAdrPathCanonical:
 
     def test_root_claude_md_names_canonical_adr_path(self, target: Path):
         # CLAUDE.md is at repo root; its plain-text ADR ref must be root-correct.
-        assert ".agents/docs/adr/" in (target / "CLAUDE.md").read_text()
+        assert ".agents/docs/decisions/" in (target / "CLAUDE.md").read_text()
 
 
 class TestGithubWorkflowProductionBoundary:
-    """PI-321 (epic #316): the github_workflow skill must make the agent's
+    """PI-321 (epic #316): the github-workflow skill must make the agent's
     production-ref boundary explicit, and all copies must stay in sync."""
 
     _REPO = Path(__file__).resolve().parents[3]
-    # github_workflow moved to the lifecycle_fallback overlay + the
+    # github-workflow moved to the lifecycle-fallback overlay + the
     # project-init-lifecycle plugin (#476); the agent-surface copies stay.
     # The codex/antigravity copies ship gated as SKILL.md.tmpl ({{#if lifecycle}})
     # so `--lifecycle none` drops them (PI-537 #5); the wrapped body still carries
     # the production-boundary text.
     _SKILLS = [
-        _REPO / "templates/lifecycle_fallback/dot_agents/skills/github_workflow/SKILL.md",
-        _REPO / "templates/codex/dot_agents/skills/github_workflow/SKILL.md.tmpl",
-        _REPO / "templates/antigravity/dot_agents/skills/github_workflow/SKILL.md.tmpl",
-        _REPO / "plugins/project-init-lifecycle/skills/github_workflow/SKILL.md",
+        _REPO / "templates/lifecycle-fallback/dot_agents/skills/github-workflow/SKILL.md",
+        _REPO / "templates/codex/dot_agents/skills/github-workflow/SKILL.md.tmpl",
+        _REPO / "templates/antigravity/dot_agents/skills/github-workflow/SKILL.md.tmpl",
+        _REPO / "plugins/project-init-lifecycle/skills/github-workflow/SKILL.md",
     ]
 
     def test_skill_documents_production_boundary(self):
         text = self._SKILLS[0].read_text()
         assert "production boundary" in text.lower()
         assert "never push or commit to the production ref" in text
-        assert "setup_github.sh --protect" in text
+        assert "setup-github.sh --protect" in text
 
     def test_all_copies_carry_the_boundary(self):
         for skill in self._SKILLS:

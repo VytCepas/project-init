@@ -11,11 +11,11 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCRIPTS = _REPO_ROOT / "templates/base/dot_agents/scripts"
-# Lifecycle scripts moved to the lifecycle overlay (#476); gh_host.sh stays base.
+# Lifecycle scripts moved to the lifecycle overlay (#476); gh-host.sh stays base.
 _LIFECYCLE_SCRIPTS = _REPO_ROOT / "templates/lifecycle/dot_agents/scripts"
-_GH_HOST = _SCRIPTS / "gh_host.sh"
-_MONITOR = _LIFECYCLE_SCRIPTS / "monitor_pr.sh"
-_SETUP = _LIFECYCLE_SCRIPTS / "setup_github.sh"
+_GH_HOST = _SCRIPTS / "gh-host.sh"
+_MONITOR = _LIFECYCLE_SCRIPTS / "watch-pr.sh"
+_SETUP = _LIFECYCLE_SCRIPTS / "setup-github.sh"
 _DOC = _REPO_ROOT / "docs/development/enforcement-classification.md"
 
 
@@ -29,7 +29,7 @@ class TestProfileHelper:
 class TestOrgRefusesAdminMerge:
     def test_monitor_refuses_admin_for_org(self):
         s = _MONITOR.read_text()
-        assert "gh_host.sh" in s  # sources the shared helper
+        assert "gh-host.sh" in s  # sources the shared helper
         assert "gh_profile" in s
         assert "admin-merge is refused under the org profile" in s
 

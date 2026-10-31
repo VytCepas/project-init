@@ -143,7 +143,7 @@ Each invoked-only skill gets an `INVOCATION.md` beside it with this table, and
 table lives once, in `HARNESS_INVOCATION`. When a harness gains a control, its
 row changes and the record becomes accurate without anything else being revisited.
 
-No shipped skill is invoked-only today. `add_command` shows the key only
+No shipped skill is invoked-only today. `add-command` shows the key only
 inside an example in its body, and the generator reads frontmatter alone.
 
 ## Rows to confirm by running the surface

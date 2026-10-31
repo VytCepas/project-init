@@ -1,11 +1,11 @@
 """PI-846 / PI-850: tame what `graphify install --project` writes.
 
-The third-party installer (invoked by setup_graphify.sh) wires PreToolUse
+The third-party installer (invoked by setup-graphify.sh) wires PreToolUse
 hooks that fire on every Bash command containing a search word and every
 Read/Glob of ~30 extensions (incl. .md/.txt), per call — and appends a full
 `## graphify` workflow section to CLAUDE.md duplicating
-`.agents/rules/graphify.md`. setup_graphify.sh now runs
-graphify_post_install.py to scope the hooks to `.agents/hooks/graphify_guard.sh`
+`.agents/rules/graphify.md`. setup-graphify.sh now runs
+graphify_post_install.py to scope the hooks to `.agents/hooks/admission-graphify.sh`
 (source-code activity only, advisory once per session) and trim the CLAUDE.md
 section to a pointer. Fixtures below are the installer's real output,
 captured 2026-07-17 from graphifyy on PyPI.
@@ -91,8 +91,8 @@ class TestPostInstallTightening:
         settings = json.loads((root / ".claude" / "settings.json").read_text())
         commands = [h["command"] for e in settings["hooks"]["PreToolUse"] for h in e["hooks"]]
         assert commands == [
-            'bash "$CLAUDE_PROJECT_DIR"/.agents/hooks/graphify_guard.sh search',
-            'bash "$CLAUDE_PROJECT_DIR"/.agents/hooks/graphify_guard.sh read',
+            'bash "$CLAUDE_PROJECT_DIR"/.agents/hooks/admission-graphify.sh search',
+            'bash "$CLAUDE_PROJECT_DIR"/.agents/hooks/admission-graphify.sh read',
         ]
 
     def test_claude_md_section_becomes_a_pointer(self, tmp_path: Path):
@@ -120,17 +120,17 @@ class TestPostInstallTightening:
 
 class TestGuardHook:
     def _run_guard(self, cwd: Path, tmp: Path, mode: str, payload: dict) -> str:
-        # The guard resolves its sibling _py.sh, whose true source is
+        # The guard resolves its sibling python-resolve.sh, whose true source is
         # templates/base — reproduce the scaffolded .agents/hooks layout.
         import shutil
 
         hooks_dir = cwd / ".agents" / "hooks"
         hooks_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy(_HOOKS / "graphify_guard.sh", hooks_dir / "graphify_guard.sh")
-        base_py = _REPO / "templates" / "base" / "dot_agents" / "hooks" / "_py.sh"
-        shutil.copy(base_py, hooks_dir / "_py.sh")
+        shutil.copy(_HOOKS / "admission-graphify.sh", hooks_dir / "admission-graphify.sh")
+        base_py = _REPO / "templates" / "base" / "dot_agents" / "hooks" / "python-resolve.sh"
+        shutil.copy(base_py, hooks_dir / "python-resolve.sh")
         result = subprocess.run(
-            ["bash", str(hooks_dir / "graphify_guard.sh"), mode],
+            ["bash", str(hooks_dir / "admission-graphify.sh"), mode],
             input=json.dumps(payload),
             capture_output=True,
             text=True,

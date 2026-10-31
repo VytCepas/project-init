@@ -43,19 +43,23 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from rich.console import Console
     from rich.text import Text
 
+from project_init.renames import SHIMMED_OLD_PATHS, TEMPLATE_RENAMES, rename_mentions, renamed
 from project_init.scaffold import (
     _ALWAYS_OVERWRITE,
     _GOVERNANCE_USER_FILES,
@@ -146,6 +150,112 @@ def _migrate_legacy_tree(target: Path) -> None:
         moved += 1
     if moved:
         console.print(f"[green]migrated[/green] {moved} file(s) .claude/ → .agents/")
+
+
+def _rekey_renamed(recorded: dict[str, str]) -> dict[str, str]:
+    """Re-key a manifest or merge base from old template paths to renamed ones (naming standard, 1.2.3).
+
+    Read before drift is measured, so a renamed file is a restoration of a file the user
+    already has, never a genuinely new addition behind the consent gate, and its edits
+    3-way merge against the base recorded under its old name. A shimmed old path keeps
+    its entry too: the template still renders a file there.
+    """
+    out: dict[str, str] = {}
+    for rel, value in recorded.items():
+        new = renamed(rel)
+        if new is None or rel in SHIMMED_OLD_PATHS:
+            out[rel] = value
+        if new is not None:
+            out.setdefault(new, value)
+    return out
+
+
+def planned_renames(target: Path) -> list[tuple[str, str]]:
+    """The ``(old, new)`` rows whose old path still exists in *target*, in apply order.
+
+    A shimmed old path next to its new one is the shim the template renders now, not a
+    file left to move.
+    """
+    return [
+        (old, new)
+        for old, new in TEMPLATE_RENAMES
+        if _exists_as_spelled(target, old)
+        and not (old in SHIMMED_OLD_PATHS and (target / new).exists())
+    ]
+
+
+def _exists_as_spelled(target: Path, rel: str) -> bool:
+    """True when *rel* exists under *target* with exactly this spelling.
+
+    On a case-insensitive file system ``PLAN.md`` "exists" once ``plan.md`` does, so a
+    plain ``exists()`` would re-run the case-only rename on every upgrade.
+    """
+    path = target
+    for part in PurePosixPath(rel).parts:
+        if not path.is_dir() or part not in os.listdir(path):
+            return False
+        path = path / part
+    return True
+
+
+def _move_renamed(target: Path, old: str, new: str) -> int:
+    """Move *old* to *new* under *target*; a directory moves file by file. Never clobbers."""
+    src_root, dest_root = target / old, target / new
+    files = (
+        sorted(p for p in src_root.rglob("*") if p.is_file()) if src_root.is_dir() else [src_root]
+    )
+    for src in files:
+        dest = dest_root / src.relative_to(src_root) if src_root.is_dir() else dest_root
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.exists() and dest.samefile(src):
+                # A case-only rename (PLAN.md -> plan.md) on a case-insensitive file
+                # system: the destination IS the source, so step through a free name.
+                src = src.rename(src.with_name(f"{src.name}.renaming"))
+            elif dest.exists():
+                dest = _new_sibling(dest, src.read_bytes())
+            shutil.move(str(src), str(dest))
+        except OSError as exc:
+            msg = f"cannot move {src.relative_to(target)} to {dest}: {exc}"
+            raise UpgradeError(msg) from exc
+    if src_root.is_dir():
+        for d in sorted((p for p in src_root.rglob("*") if p.is_dir()), reverse=True):
+            if not any(d.iterdir()):
+                d.rmdir()
+        if not any(src_root.iterdir()):
+            src_root.rmdir()
+    return len(files)
+
+
+def _migrate_renamed_paths(target: Path) -> list[tuple[str, str]]:
+    """Move every renamed template path the project still has to its new name (naming standard, 1.2.3).
+
+    The same move-then-re-measure as :func:`_migrate_legacy_tree`: after the move the
+    file sits where the render puts it, so the drift engine merges it rather than writing
+    the fresh template over a hand-edit. Unmanaged files inside a renamed directory move
+    with it. The merge base is re-keyed on disk too, so it does not keep dead names.
+    Call only on an apply, past the consent gate.
+    """
+    rows = planned_renames(target)
+    if not rows:
+        return rows
+    from rich.console import Console
+
+    console = Console()
+    for old, new in rows:
+        n = _move_renamed(target, old, new)
+        console.print(f"[green]renamed[/green] {old} → {new} ({n} file(s))")
+    base = read_base(target)
+    if base:
+        write_base(target, _rekey_renamed(base))
+    # config.yaml is the owner's file, never re-rendered, but its template-written
+    # comments name the scripts: the one text edit the rename makes there.
+    config = scaffold_record_path(target)
+    if config.is_file():
+        text = config.read_text(encoding="utf-8")
+        if (moved := rename_mentions(text)) != text:
+            config.write_text(moved, encoding="utf-8", newline="\n")
+    return rows
 
 
 def scaffold_record_path(target: Path) -> Path:
@@ -1280,7 +1390,7 @@ def _memory_section(text: str) -> str:
 
 # The `rag_endpoint:` line inside the memory block: key, value (up to a
 # comment), optional trailing comment. The template always renders the value
-# EMPTY — setup_rag.sh instructs the user to hand-set it (ADR-026).
+# EMPTY — setup-rag.sh instructs the user to hand-set it (ADR-026).
 _RAG_ENDPOINT_RE = re.compile(r"(?m)^(\s*rag_endpoint:)([^#\n]*)(#.*)?$")
 
 
@@ -1289,7 +1399,7 @@ def _carry_rag_endpoint(old_mem: str, new_mem: str) -> str:
 
     The staged render always has an empty ``rag_endpoint:`` (it is not a
     template variable), so splicing the block wholesale would silently reset
-    the endpoint the user recorded per setup_rag.sh — breaking the ADR-025
+    the endpoint the user recorded per setup-rag.sh — breaking the ADR-025
     descriptor the field exists for (2026-07 review). Carry the old line over
     when the user set a value and the fresh render left it empty.
     """
@@ -1651,10 +1761,16 @@ def _print_migration_notes(prev: str | None, current: str | None) -> None:
             )
 
 
-def _print_report(report: DriftReport, applied: bool) -> None:
+def _print_report(
+    report: DriftReport,
+    applied: bool,  # noqa: FBT001 — existing positional callers
+    renames: list[tuple[str, str]] | None = None,
+) -> None:
     from rich.console import Console
 
     console = Console()
+    if not applied:
+        _print_planned_renames(renames or [])
     if report.migrated:
         console.print(
             "[yellow]No scaffold record found — reconstructed inputs from the"
@@ -2198,6 +2314,26 @@ def adopt_base(
     return 0
 
 
+def _carry_naming_baseline(target: Path, renames: list[tuple[str, str]]) -> None:
+    """Move the naming baseline's lines across the paths this upgrade renamed (naming standard, 1.2.3).
+
+    Without it the repo's own naming gate turns red on the upgrade that fixed the names:
+    every finding at an old path is STALE and every moved file is judged NEW.
+    """
+    from project_init import naming_gate
+
+    if not renames:
+        return
+    ok, msg = naming_gate.carry_renames(target, renames)
+    if ok:
+        sys.stdout.write(f"{msg}\n")
+    elif msg != "no naming gate":
+        sys.stderr.write(
+            f"note: naming baseline NOT carried across the renames: {msg}\n"
+            "  Run `sh gates/naming-check.sh` and update gates/naming.baseline by hand.\n"
+        )
+
+
 def _seed_naming_baseline(target: Path, staging: Path, report: DriftReport) -> None:
     """Seed the naming gate's baseline from the upgraded repo's current findings.
 
@@ -2221,6 +2357,52 @@ def _seed_naming_baseline(target: Path, staging: Path, report: DriftReport) -> N
             f"note: naming baseline NOT seeded: {msg}\n"
             "  The gate stays red/UNCHECKED until `sh gates/naming-check.sh --seed` succeeds.\n"
         )
+
+
+def _remeasure(
+    target: Path, staging: Path, rendered: list[Path], manifest: dict[str, str]
+) -> DriftReport:
+    """Drift against the tree as it stands now, with the merge base under renamed keys."""
+    return compute_drift(target, staging, rendered, manifest, _rekey_renamed(read_base(target)))
+
+
+def _migrate_moved_paths(
+    target: Path,
+    legacy_layout: bool,  # noqa: FBT001 — mirrors run_upgrade's own flag
+    report: DriftReport,
+    remeasure: Callable[[], DriftReport],
+) -> tuple[DriftReport, list[tuple[str, str]]]:
+    """Move a project's files to where the render now puts them, then re-measure drift.
+
+    Runs past the consent gate and before apply_drift (PI-813, PI-816), and both edges
+    are load-bearing:
+      - AFTER the gate, because a gated run returns 2 having applied nothing, and a run
+        that applies nothing must not move the user's files either.
+      - BEFORE apply_drift, or every moved file looks like a brand-new render and the
+        fresh template is written over the user's copy — which is how the memory tier
+        was lost (memory/MEMORY.md IS a template output, so "carry only unmanaged
+        files" still clobbered it).
+    Hence the re-measure rather than migrating up at the render: drift was measured
+    against the pre-move tree, where the managed files sat elsewhere. Re-measuring turns
+    them from "new" (overwrite) into "changed/merged" (3-way merge against the recorded
+    base), which is what preserves user edits. Two moves use it: a pre-PI-606 ``.claude/``
+    tree into ``.agents/``, then the naming-standard renames (which a legacy tree also needs).
+    """
+    if legacy_layout:
+        _migrate_legacy_tree(target)
+    renames = _migrate_renamed_paths(target)
+    if legacy_layout or renames:
+        report, migrated = remeasure(), report.migrated
+        report.migrated = migrated
+    return report, renames
+
+
+def _print_planned_renames(renames: list[tuple[str, str]]) -> None:
+    """On a dry run, say which paths an apply would rename (naming standard, 1.2.3)."""
+    if renames:
+        print(f"{len(renames)} path(s) renamed to the naming standard (applied on --apply):")
+        for old, new in renames:
+            print(f"  {old} -> {new}")
 
 
 def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
@@ -2295,7 +2477,10 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
         if adopt:
             return adopt_base(target, staging, rendered, adopt, legacy_layout=legacy_layout)
 
-        report = compute_drift(target, staging, rendered, manifest, read_base(target))
+        # Renamed template paths (naming standard, 1.2.3) are measured under their new names from
+        # the start, so a rename is never mistaken for a brand-new file.
+        manifest, renames = _rekey_renamed(manifest), planned_renames(target)
+        report = _remeasure(target, staging, rendered, manifest)
         report.migrated = migrated
         # Opt-in consent for new additions (#249): bucket genuinely-new files
         # into groups and require an accept/decline decision before --apply
@@ -2317,23 +2502,12 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
         # Run apply even with zero file drift: the config version line and the
         # scaffold record must still refresh to the current tool version.
         if apply:
-            if legacy_layout:
-                # Migrate here — past the consent gate, before apply_drift (PI-813,
-                # PI-816). Both edges are load-bearing and pull in opposite directions:
-                #   - AFTER the gate, because a gated run returns 2 having applied
-                #     nothing, and a run that applies nothing must not move the user's
-                #     files either.
-                #   - BEFORE apply_drift, or every legacy file looks like a brand-new
-                #     render and the fresh template is written over the user's copy —
-                #     which is how the memory tier was lost (memory/MEMORY.md IS a
-                #     template output, so "carry only unmanaged files" still clobbered it).
-                # Hence the recompute below rather than migrating up at the render:
-                # drift was measured against the pre-migration tree, where the managed
-                # files did not exist yet. Re-measuring against the migrated tree turns
-                # them from "new" (overwrite) into "changed/merged" (3-way merge against
-                # the recorded base), which is what preserves user edits.
-                _migrate_legacy_tree(target)
-                report = compute_drift(target, staging, rendered, manifest, read_base(target))
+            report, renames = _migrate_moved_paths(
+                target,
+                legacy_layout,
+                report,
+                lambda: _remeasure(target, staging, rendered, manifest),
+            )
             suppressed = {p for gid in gate["declined_now"] for p in groups[gid]["paths"]}
             report.new = [rel for rel in report.new if rel not in suppressed]
             # Per-file interactive walk (#245): drop the files the user skips so
@@ -2353,7 +2527,8 @@ def run_upgrade(  # noqa: PLR0913 — CLI entry point; options map 1:1 to flags
                 plugin_mode=bool(variables.get("plugin_mode")),
             )
             _write_declined(target, gate["declined_map"])
-        _print_report(report, applied=apply)
+            _carry_naming_baseline(target, renames)
+        _print_report(report, applied=apply, renames=renames)
         if groups:
             span = _describe_version_span(
                 variables.get("project_init_version_prev"),

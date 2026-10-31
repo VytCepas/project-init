@@ -1,7 +1,7 @@
 """PI-659 (epic #641): project-init.md defers to single sources, no duplication.
 
 The Commit-and-PR format table (canonical: AGENTS.md quick-ref + the
-github_workflow skill) and the compaction preserve-list (canonical: CLAUDE.md)
+github-workflow skill) and the compaction preserve-list (canonical: CLAUDE.md)
 were duplicated verbatim in project-init.md — three drifting copies of the
 same rules. The file now points at the single source; the rest of the
 GitHub-tracking section stays (it is the lifecycle doc for skill-less
@@ -27,7 +27,7 @@ class TestProjectInitMdDedupe:
         # The duplicated table rows are gone.
         assert "| Commit message |" not in content
         # nojira flow (not duplicated elsewhere at this detail) stays.
-        assert "create_nojira_pr.sh" in content
+        assert "create-pr-without-issue.sh" in content
 
     def test_compact_preserve_list_lives_only_in_claude_md(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())

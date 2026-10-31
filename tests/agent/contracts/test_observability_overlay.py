@@ -71,7 +71,7 @@ class TestOverlayLayers:
         )
         # Order is stable: fallback, agents, then the opt-in overlays in
         # declaration order.
-        assert layers == ["fallback", "codex", "multi_model", "governance", "observability"]
+        assert layers == ["fallback", "codex", "multi-model", "governance", "observability"]
 
 
 class TestObservabilityOn:

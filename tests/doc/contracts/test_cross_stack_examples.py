@@ -2,7 +2,7 @@
 
 A Go/GCP scaffold must not carry Python/Node/AWS example noise. The example
 placeholders (.env.example loader hint, .dockerignore ignores, devcontainer
-PATH, infra/backend.tf) are gated by the existing language/cloud flags. These
+PATH, infrastructure/backend.tf) are gated by the existing language/cloud flags. These
 assertions lock the gating so a regression — e.g. un-gating the bun PATH or the
 Python ignores — fails CI rather than silently leaking cross-stack hints.
 """
@@ -107,7 +107,7 @@ class TestBackendCloudNeutral:
     def test_shows_both_s3_and_gcs(self, tmp_path: Path):
         backend = (
             _service(tmp_path / "g", "go", iac="opentofu", iac_enabled="true")
-            / "infra"
+            / "infrastructure"
             / "backend.tf"
         ).read_text()
         assert 'backend "s3"' in backend

@@ -108,8 +108,8 @@ class TestInstalledWheel:
         # --no-plugin copies the hook payload; the exec bit must survive
         # wheel packaging (plugin-mode scaffolds copy only dag_workflow.py).
         for hook in [
-            "post_edit_lint.sh",
-            "pre_commit_gate.sh",
+            "post-edit-lint.sh",
+            "pre-commit-gate.sh",
         ]:
             hook_path = scaffold_target / ".agents" / "hooks" / hook
             assert hook_path.is_file()

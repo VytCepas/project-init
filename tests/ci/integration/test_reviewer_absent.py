@@ -76,7 +76,7 @@ def _run_monitor(tmp_target: Path, tmp_path: Path, *, cycle: str):
     return subprocess.run(
         [
             "bash",
-            str(tmp_target / _SCRIPTS / "monitor_pr.sh"),
+            str(tmp_target / _SCRIPTS / "watch-pr.sh"),
             "1",
             "--merge",
             "--review-cycle",

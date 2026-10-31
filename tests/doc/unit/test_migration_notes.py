@@ -41,7 +41,7 @@ def test_v_prefix_is_tolerated():
 def test_action_required_is_carried_through():
     entry = dict(notes_for_span("0.3.0", "0.4.0"))["0.4.0"]
     assert entry["action_required"]
-    assert "setup_github.sh" in entry["action_required"]
+    assert "setup-github.sh" in entry["action_required"]
 
 
 def test_every_entry_has_a_summary():

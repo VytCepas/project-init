@@ -1,6 +1,6 @@
 {{#if rag_wired}}---
 description: RAG memory (tier 3) — a semantic recall surface, authoritative for nothing
-globs: [".agents/scripts/setup_rag.sh", ".agents/config.yaml"]
+globs: [".agents/scripts/setup-rag.sh", ".agents/config.yaml"]
 alwaysApply: false
 ---
 
@@ -24,7 +24,7 @@ sqlite-vec cache in `.cocoindex_code/`.
 - **Query it:** `ccc search "where do we validate webhooks"` (semantic) or
   `ccc grep '<pattern>'` (structural). Agents can also consume it over MCP via
   `ccc mcp` (a stdio server) — see `.agents/docs/guides/using-rag.md`.
-- **Not set up yet?** Run `.agents/scripts/setup_rag.sh` (installs `ccc`, pins a
+- **Not set up yet?** Run `.agents/scripts/setup-rag.sh` (installs `ccc`, pins a
   keyless local model, builds the index). Until then, fall back to the graph +
   grep — recall still works, just without semantic search.
 - **The index is a derived, gitignored cache** — never a source of truth, never
@@ -32,11 +32,11 @@ sqlite-vec cache in `.cocoindex_code/`.
   curate it.
 {{/if rag_wired}}{{#if rag_unwired}}---
 description: RAG memory (tier 3) — selected but not wired yet
-globs: [".agents/scripts/setup_rag.sh", ".agents/config.yaml"]
+globs: [".agents/scripts/setup-rag.sh", ".agents/config.yaml"]
 alwaysApply: false
 ---
 
-RAG (tier 3) is selected but **not set up**: run `.agents/scripts/setup_rag.sh`,
+RAG (tier 3) is selected but **not set up**: run `.agents/scripts/setup-rag.sh`,
 then set `memory.rag_endpoint` in `.agents/config.yaml` and re-run
 `project-init upgrade --apply` to expand this rule into the full guidance.
 Until then use the graph + grep; details: `.agents/docs/guides/using-rag.md`.

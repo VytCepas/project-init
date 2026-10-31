@@ -44,7 +44,7 @@ class TestCLI:
             ]
         )
         assert rc == 0
-        assert (tmp_target / ".agents" / "scripts" / "setup_graphify.sh").is_file()
+        assert (tmp_target / ".agents" / "scripts" / "setup-graphify.sh").is_file()
 
     def test_interactive_abort_at_prompt_leaves_no_dir(self, tmp_path: Path, monkeypatch, capsys):
         """PI-199: a Ctrl-C (or error) at an interactive prompt must not leave an
@@ -490,17 +490,17 @@ class TestCLIOverlayFlags:
     def test_agents_flag_renders_overlays(self, tmp_path: Path):
         target = tmp_path / "p"
         assert self._run(target, "--agents", "codex,antigravity,ollama") == 0
-        assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert (target / ".agents" / "skills" / "github-workflow" / "SKILL.md").is_file()
         assert (target / ".codex" / "hooks.json").is_file()
         assert (target / ".agents" / "hooks.json").is_file()
-        assert (target / ".agents" / "hooks" / "agent_guard_adapter.py").is_file()
+        assert (target / ".agents" / "hooks" / "admission_agent_adapter.py").is_file()
 
     def test_agents_default_is_claude_only(self, tmp_path: Path):
         target = tmp_path / "p"
         assert self._run(target) == 0
         assert not (target / ".codex").exists()
         # Verify no specific antigravity or other agent configs leaked
-        assert not (target / ".agents" / "hooks" / "agent_guard_adapter.py").exists()
+        assert not (target / ".agents" / "hooks" / "admission_agent_adapter.py").exists()
 
     def test_unknown_agent_rejected(self, tmp_path: Path):
         with pytest.raises(SystemExit):

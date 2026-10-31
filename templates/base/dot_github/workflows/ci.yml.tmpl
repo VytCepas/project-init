@@ -244,18 +244,18 @@ jobs:
       - name: Typecheck
         run: just typecheck
 
-      # PI-686: CODE_MAP.md's header tells agents to "read this before grepping",
+      # PI-686: code-map.md's header tells agents to "read this before grepping",
       # but nothing checked it was current — the generator shipped wired only to
       # a manual `just code-map`, so the map rotted silently and agents were
-      # routed to a stale index. Regenerate into a temp dir (gen_code_map.py
-      # writes .agents/docs/CODE_MAP.md relative to cwd) and compare bytes;
+      # routed to a stale index. Regenerate into a temp dir (generate-code-map.py
+      # writes .agents/docs/code-map.md relative to cwd) and compare bytes;
       # never rewrite the committed file in CI. Skips cleanly before the first
       # `just code-map` run, so a fresh scaffold is not born red.
       - name: CODE_MAP is current
         run: |
           set -euo pipefail
-          map=".agents/docs/CODE_MAP.md"
-          gen=".agents/scripts/gen_code_map.py"
+          map=".agents/docs/code-map.md"
+          gen=".agents/scripts/generate-code-map.py"
           # A python scaffold always ships the generator, so its absence is a
           # broken scaffold, not a not-yet-generated map — fail rather than
           # silently pass a check that can never run (PR #724 review).
@@ -274,7 +274,7 @@ jobs:
           ( cd "$tmp" && uv run --no-project python \
               "$GITHUB_WORKSPACE/$gen" "$GITHUB_WORKSPACE/$scan" >/dev/null )
           if ! cmp -s "$tmp/$map" "$map"; then
-            echo "::error file=$map::CODE_MAP.md is stale — run 'just code-map' and commit"
+            echo "::error file=$map::code-map.md is stale — run 'just code-map' and commit"
             diff -u "$map" "$tmp/$map" | head -n 40 || true
             exit 1
           fi
@@ -289,7 +289,7 @@ jobs:
       - name: Tests — parallel, coverage-gated
         run: just test-cov
 
-      # Dependency vulnerability scan (PI-568). Complements package_guard.py,
+      # Dependency vulnerability scan (PI-568). Complements admission_package.py,
       # which only blocks installing a package that doesn't exist or looks
       # typosquatted — this catches a real, correctly-spelled dependency
       # already in the lockfile with a known CVE/advisory.
@@ -632,7 +632,7 @@ jobs:
           gh run view --log-failed
           \`\`\`
 
-          Fix the issues, then {{#if lifecycle}}run \`.agents/scripts/push_branch.sh\`{{/if lifecycle}}{{#if lifecycle_off}}push your branch{{/if lifecycle_off}} to re-trigger CI."
+          Fix the issues, then {{#if lifecycle}}run \`.agents/scripts/push-branch.sh\`{{/if lifecycle}}{{#if lifecycle_off}}push your branch{{/if lifecycle_off}} to re-trigger CI."
 
 {{#if python}}
   # Optimization #2: Split heavyweight tests into separate job
@@ -799,7 +799,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       # Scan the SAME image this job built (#577). The repo already uses Trivy
-      # for Terraform IaC misconfig (infra/.pre-commit-config); this is the same
+      # for Terraform IaC misconfig (infrastructure/.pre-commit-config); this is the same
       # tool aimed at container-image CVEs instead. Fail on CRITICAL/HIGH so a
       # vulnerable base image can't be promoted dev → staging → prod.
       # ignore-unfixed: don't block on advisories with no upstream fix yet.
@@ -1350,7 +1350,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Validate system cards
-        run: bash .agents/scripts/governance_gate.sh
+        run: bash .agents/scripts/governance-gate.sh
 {{/if governance}}
 
 # Optimization #3: Conditional job execution

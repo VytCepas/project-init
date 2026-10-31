@@ -193,7 +193,7 @@ def fallback_preset(name: str = "obsidian-only") -> dict:
     preset = load_preset(name)
     stack = preset.get("vars", {}).get("memory_stack", "obsidian-only")
     # Full (lifecycle-ON) --no-plugin scaffold (#476): include the lifecycle +
-    # lifecycle_fallback overlays so the copied lifecycle hooks/skills are present.
+    # lifecycle-fallback overlays so the copied lifecycle hooks/skills are present.
     extra = overlay_layers([], no_plugin=True, memory_stack=stack, lifecycle=True)
     return {**preset, "layers": [*preset["layers"], *extra]}
 

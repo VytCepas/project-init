@@ -19,7 +19,7 @@ _PLUGIN_ROOT = _REPO_ROOT / "plugins" / "project-init-workflow"
 _LIFECYCLE_PLUGIN_ROOT = _REPO_ROOT / "plugins" / "project-init-lifecycle"
 _TEMPLATE_CLAUDE = _REPO_ROOT / "templates" / "base" / "dot_agents"
 _FALLBACK_CLAUDE = _REPO_ROOT / "templates" / "fallback" / "dot_agents"
-_LIFECYCLE_FALLBACK_CLAUDE = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents"
+_LIFECYCLE_FALLBACK_CLAUDE = _REPO_ROOT / "templates" / "lifecycle-fallback" / "dot_agents"
 _LIFECYCLE_CLAUDE = _REPO_ROOT / "templates" / "lifecycle" / "dot_agents"
 
 
@@ -70,7 +70,7 @@ class TestPluginManifest:
         ]
         assert commands, "plugin must wire at least one hook"
         # A command may reference CLAUDE_PLUGIN_ROOT more than once — e.g. the
-        # _py.sh resolver plus the Python hook it runs (PI-361). Every such
+        # python-resolve.sh resolver plus the Python hook it runs (PI-361). Every such
         # referenced path must exist.
         for command in commands:
             refs = re.findall(r'\$\{CLAUDE_PLUGIN_ROOT\}"?/([^\s"]+)', command)
@@ -283,8 +283,8 @@ class TestScaffoldedSettingsWiring:
         assert settings["enabledPlugins"]["project-init-lifecycle@project-init"] is True
         assert "hooks" not in settings, "plugin provides the hook wiring"
         # No payload copies in plugin mode (dag_workflow.py stays: scripts exec it).
-        assert not (target / ".agents" / "skills" / "github_workflow").exists()
-        assert not (target / ".agents" / "hooks" / "pre_commit_gate.sh").exists()
+        assert not (target / ".agents" / "skills" / "github-workflow").exists()
+        assert not (target / ".agents" / "hooks" / "pre-commit-gate.sh").exists()
         assert (target / ".agents" / "hooks" / "dag_workflow.py").is_file()
 
     def test_no_plugin_restores_copies_and_wiring(self, tmp_path: Path):
@@ -301,8 +301,8 @@ class TestScaffoldedSettingsWiring:
             for entry in entries
             for h in entry["hooks"]
         ]
-        assert any("pre_commit_gate.sh" in c for c in commands)
-        assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert any("pre-commit-gate.sh" in c for c in commands)
+        assert (target / ".agents" / "skills" / "github-workflow" / "SKILL.md").is_file()
         assert (target / ".agents" / "hooks" / "prod_guard.py").is_file()
 
 
@@ -319,7 +319,7 @@ class TestSyncTool:
         shutil.copytree(_FALLBACK_CLAUDE, fake_fallback)
         fake_lifecycle = fake_root / "templates" / "lifecycle" / "dot_agents"
         shutil.copytree(_LIFECYCLE_CLAUDE, fake_lifecycle)
-        fake_lifecycle_fallback = fake_root / "templates" / "lifecycle_fallback" / "dot_agents"
+        fake_lifecycle_fallback = fake_root / "templates" / "lifecycle-fallback" / "dot_agents"
         shutil.copytree(_LIFECYCLE_FALLBACK_CLAUDE, fake_lifecycle_fallback)
         fake_plugin = fake_root / "plugins" / "project-init-workflow"
         shutil.copytree(_PLUGIN_ROOT, fake_plugin)
@@ -339,10 +339,10 @@ class TestSyncTool:
         monkeypatch.setattr(sync_plugin, "JUNIE_SKILLS", fake_root / "junie-skills")
 
         # A core (fallback) hook deletion must vanish from the core plugin.
-        (fake_fallback / "hooks" / "pre_commit_gate.sh").unlink()
+        (fake_fallback / "hooks" / "pre-commit-gate.sh").unlink()
         sync_plugin.sync()
 
-        assert not (fake_plugin / "hooks" / "pre_commit_gate.sh").exists()
+        assert not (fake_plugin / "hooks" / "pre-commit-gate.sh").exists()
         assert (fake_plugin / "hooks" / "hooks.json").exists()
         assert (fake_lifecycle_plugin / "hooks" / "hooks.json").exists()
         assert (fake_plugin / "hooks" / "hooks.json").exists()

@@ -1,4 +1,4 @@
-"""PI-674: monitor_pr.sh CI timeout is overridable via PI_CI_TIMEOUT.
+"""PI-674: watch-pr.sh CI timeout is overridable via PI_CI_TIMEOUT.
 
 A single self-hosted runner serializes CI past the 900s default (downstream
 zarija recap after #666), forcing manual merges. The timeout now reads
@@ -26,7 +26,7 @@ esac
 
 def test_pi_ci_timeout_override_respected(tmp_target: Path, tmp_path: Path):
     scaffold(tmp_target, fallback_preset(), fallback_variables())
-    script = tmp_target / ".agents" / "scripts" / "monitor_pr.sh"
+    script = tmp_target / ".agents" / "scripts" / "watch-pr.sh"
     stub_bin = tmp_path / "stub-bin"
     stub_bin.mkdir()
     gh = stub_bin / "gh"
@@ -55,7 +55,7 @@ def test_pi_ci_timeout_override_respected(tmp_target: Path, tmp_path: Path):
 
 def test_invalid_pi_ci_timeout_fails_closed_with_clear_message(tmp_target: Path, tmp_path: Path):
     scaffold(tmp_target, fallback_preset(), fallback_variables())
-    script = tmp_target / ".agents" / "scripts" / "monitor_pr.sh"
+    script = tmp_target / ".agents" / "scripts" / "watch-pr.sh"
     env = os.environ.copy()
     # "00" is digits-only but numerically zero — must fail closed too (review).
     for bad in ("twenty", "0", "00"):

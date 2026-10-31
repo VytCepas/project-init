@@ -27,9 +27,9 @@ are true gates (ADR-007). Agent/git hooks are fast-feedback UX, not a boundary.
 - **Rulesets, applied directly to the repo.** A ruleset with an empty
   `bypass_actors` binds owners/admins too — unlike classic branch protection
   (`enforce_admins: false`). Forks do **not** inherit branch/tag rulesets, so the
-  org applies them directly (`setup_github.sh --protect` → the
+  org applies them directly (`setup-github.sh --protect` → the
   `project-init-baseline` ruleset).
-- **No admin bypass.** `monitor_pr.sh` refuses `--admin` under the org profile —
+- **No admin bypass.** `watch-pr.sh` refuses `--admin` under the org profile —
   merge via auto-merge / the merge queue under the required checks instead.
 - **Required workflows** use the org ruleset "require workflows" rule (Enterprise
   Cloud / GHES); Team-tier orgs fall back to required status checks.
@@ -43,6 +43,6 @@ are true gates (ADR-007). Agent/git hooks are fast-feedback UX, not a boundary.
 | "Require workflows" ruleset rule | ⚠️ likely Enterprise-only | ✅ | ✅ |
 | Merge queue (private/internal) | ⚠️ → Enterprise Cloud | ✅ | ✅ |
 
-`setup_github.sh` feature-probes the rulesets API and degrades gracefully (warns,
+`setup-github.sh` feature-probes the rulesets API and degrades gracefully (warns,
 falls back to branch protection) where a primitive is unavailable. See the
 [enterprise support matrix](enterprise-github-support-matrix.md) for sources.

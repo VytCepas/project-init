@@ -4,11 +4,11 @@ Three layers, each closing a gap the others leave:
 
 - **git `pre-commit`** now runs `just lint` (not only gitleaks), so a *human*
   committing from a terminal/IDE is held to the same static gate as CI — the
-  Claude `pre_commit_gate.sh` only fires for agent-driven commits.
+  Claude `pre-commit-gate.sh` only fires for agent-driven commits.
 - **git `pre-push`** runs the fast `just fast-ci` (lint + parallel tests), so
   the common break is caught locally without re-running the full `just ci` (CI's
   job) before every push (PI-759).
-- **`pre_commit_gate.sh`** (the agent commit gate) gained a per-file shell block
+- **`pre-commit-gate.sh`** (the agent commit gate) gained a per-file shell block
   so staged `.sh` files are `shfmt`/`shellcheck`'d even when `just` is absent.
 
 All three fail-open when their tooling is missing (CI is the hard backstop) and
@@ -191,7 +191,7 @@ def test_pre_push_does_not_point_the_recipe_at_the_pushing_repo(tmp_target: Path
 def test_pre_commit_gate_has_per_file_shell_block(tmp_target: Path):
     """The agent commit gate must shellcheck/shfmt staged .sh without needing `just`."""
     scaffold(tmp_target, fallback_preset(), fallback_variables(language="python", python="true"))
-    gate = (tmp_target / ".agents" / "hooks" / "pre_commit_gate.sh").read_text()
+    gate = (tmp_target / ".agents" / "hooks" / "pre-commit-gate.sh").read_text()
     assert "shfmt -w -i 2" in gate
     assert "shellcheck -S error -x" in gate
     # A shfmt parse error (nonzero exit) is recorded as blocking, not swallowed,
@@ -204,7 +204,7 @@ def test_pre_commit_gate_autofixes_staged_shell(tmp_path: Path):
     _require_tool("shfmt")
     target = tmp_path / "proj"
     scaffold(target, fallback_preset(), fallback_variables(language="python", python="true"))
-    hook = target / ".agents" / "hooks" / "pre_commit_gate.sh"
+    hook = target / ".agents" / "hooks" / "pre-commit-gate.sh"
 
     subprocess.run(["git", "init", "-q"], cwd=target, check=True)
     subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=target, check=True)
@@ -234,7 +234,7 @@ def test_pre_commit_gate_blocks_a_broken_staged_shell(tmp_path: Path):
     _require_tool("shfmt")
     target = tmp_path / "proj"
     scaffold(target, fallback_preset(), fallback_variables(language="python", python="true"))
-    hook = target / ".agents" / "hooks" / "pre_commit_gate.sh"
+    hook = target / ".agents" / "hooks" / "pre-commit-gate.sh"
     subprocess.run(["git", "init", "-q"], cwd=target, check=True)
     subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=target, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=target, check=True)

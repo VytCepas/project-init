@@ -13,14 +13,14 @@ Small, structured facts that agents read at the start of each session.
 
 Quick-save via slash command:
 ```
-/save_memory <fact>
+/save-memory <fact>
 ```
 
 ## `.agents/vault/` — Human workspace
 
 Exploratory notes, session logs, design sketches. Managed in Obsidian.
 
-- **Sessions:** `vault/sessions/YYYY-MM-DD.md` — written by the `/session_summary` skill
+- **Sessions:** `vault/sessions/YYYY-MM-DD.md` — written by the `/session-summary` skill
 - **Decisions:** `vault/decisions/` — working notes before a decision solidifies
 - **Knowledge:** `vault/knowledge/` — concepts, research, architecture explorations
 
@@ -28,9 +28,9 @@ Exploratory notes, session logs, design sketches. Managed in Obsidian.
 
 When an exploratory vault note becomes a real decision:
 
-1. Create `.agents/docs/adr/adr-NNN-<topic>.md` (see existing ADRs for format)
+1. Create `.agents/docs/decisions/<topic>.md`, titled `ADR-NNN: …` (see existing ADRs for format)
 2. Update `.agents/docs/README.md` to link the new ADR
 3. Commit and push
 4. Delete or summarise the vault note (avoid duplication)
 
-Agents read `.agents/docs/adr/` — not vault — for authoritative decisions.
+Agents read `.agents/docs/decisions/` — not vault — for authoritative decisions.

@@ -149,12 +149,12 @@ class TestCli:
 
 class TestLifecycleSeedCommit:
     """The rendered lifecycle scripts honor commit.coauthor, so the seed commit
-    start_issue.sh creates carries the trailer only when opted in (#888 review)."""
+    start-issue.sh creates carries the trailer only when opted in (#888 review)."""
 
     @staticmethod
     def _coauthor_reader(target: Path) -> str:
         r = subprocess.run(
-            ["bash", "-c", "source .agents/scripts/gh_host.sh; coauthor"],
+            ["bash", "-c", "source .agents/scripts/gh-host.sh; coauthor"],
             cwd=target,
             capture_output=True,
             text=True,
@@ -174,7 +174,7 @@ class TestLifecycleSeedCommit:
     def test_seed_commit_gates_trailer_on_reader(self, tmp_path: Path):
         target = tmp_path / "p"
         _scaffold_cli(target)
-        seed = (target / ".agents" / "scripts" / "start_issue.sh").read_text()
+        seed = (target / ".agents" / "scripts" / "start-issue.sh").read_text()
         assert '"$(coauthor)" = "true"' in seed and _TRAILER in seed
 
 

@@ -2,7 +2,7 @@
 install.sh API-base resolution (ADR-013, spike #254).
 
 The lifecycle scripts are copied verbatim (not rendered), so host-awareness must
-hold at runtime via the gh_host.sh helper rather than via template variables.
+hold at runtime via the gh-host.sh helper rather than via template variables.
 """
 
 from __future__ import annotations
@@ -16,18 +16,18 @@ from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCRIPTS = _REPO_ROOT / "templates/base/dot_agents/scripts"
-# Lifecycle scripts moved to the lifecycle overlay (#476); gh_host.sh stays in
+# Lifecycle scripts moved to the lifecycle overlay (#476); gh-host.sh stays in
 # base (shared host resolver also sourced by the deploy scripts).
 _LIFECYCLE_SCRIPTS = _REPO_ROOT / "templates/lifecycle/dot_agents/scripts"
-_GH_HOST = _SCRIPTS / "gh_host.sh"
-_SETUP_GITHUB = _LIFECYCLE_SCRIPTS / "setup_github.sh"
-_PUSH_WIKI = _LIFECYCLE_SCRIPTS / "push_wiki.sh"
+_GH_HOST = _SCRIPTS / "gh-host.sh"
+_SETUP_GITHUB = _LIFECYCLE_SCRIPTS / "setup-github.sh"
+_PUSH_WIKI = _LIFECYCLE_SCRIPTS / "push-wiki.sh"
 _INSTALL = _REPO_ROOT / "install.sh"
 
 
 class TestGhHostHelper:
     def test_helper_exists(self):
-        assert _GH_HOST.exists(), "gh_host.sh must ship in templates/base scripts"
+        assert _GH_HOST.exists(), "gh-host.sh must ship in templates/base scripts"
 
     def test_resolution_order_and_overrides_documented(self):
         s = _GH_HOST.read_text()
@@ -46,7 +46,7 @@ class TestGhHostHelper:
 class TestScriptsAreHostAware:
     def test_setup_github_sources_helper(self):
         s = _SETUP_GITHUB.read_text()
-        assert "gh_host.sh" in s
+        assert "gh-host.sh" in s
         assert 'gh auth status -h "$HOST"' in s, "auth check must target the repo host"
 
     def test_setup_github_has_no_hardcoded_repo_links(self):
@@ -56,7 +56,7 @@ class TestScriptsAreHostAware:
 
     def test_push_wiki_clone_is_host_aware(self):
         s = _PUSH_WIKI.read_text()
-        assert "gh_host.sh" in s
+        assert "gh-host.sh" in s
         assert "gh_web_base" in s
         assert "https://github.com/${REPO_SLUG}.wiki.git" not in s
 
@@ -73,11 +73,11 @@ class TestHostHelperIsScaffolded:
     def test_gh_host_ships_into_projects(self, tmp_path: Path):
         target = tmp_path / "p"
         scaffold(target, load_preset("obsidian-only"), make_variables(), strict=True)
-        assert (target / ".agents" / "scripts" / "gh_host.sh").exists()
+        assert (target / ".agents" / "scripts" / "gh-host.sh").exists()
 
 
 def _run_bash(snippet: str, *, cwd: Path | None = None, env_extra: dict | None = None) -> str:
-    """Source gh_host.sh and run a snippet against the real helper. Host env vars
+    """Source gh-host.sh and run a snippet against the real helper. Host env vars
     are cleared so each case exercises the intended resolution path."""
     env = {k: v for k, v in os.environ.items() if k not in ("PROJECT_INIT_HOST", "GH_HOST")}
     if env_extra:

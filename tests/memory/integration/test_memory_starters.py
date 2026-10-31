@@ -19,13 +19,13 @@ class TestMemoryStarterFiles:
         scaffold(tmp_target, preset, variables)
 
     def test_project_context_exists(self):
-        assert (self.target / ".agents" / "memory" / "project_context.md").is_file()
+        assert (self.target / ".agents" / "memory" / "project-context.md").is_file()
 
     def test_user_role_exists(self):
-        assert (self.target / ".agents" / "memory" / "user_role.md").is_file()
+        assert (self.target / ".agents" / "memory" / "user-role.md").is_file()
 
     def test_feedback_conventions_exists(self):
-        assert (self.target / ".agents" / "memory" / "feedback_conventions.md").is_file()
+        assert (self.target / ".agents" / "memory" / "feedback-conventions.md").is_file()
 
     def test_schema_exists(self):
         assert (self.target / ".agents" / "memory" / "SCHEMA.md").is_file()
@@ -37,7 +37,7 @@ class TestMemoryStarterFiles:
 
     def test_starter_files_have_valid_frontmatter(self):
         fm_re = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
-        for name in ("project_context.md", "user_role.md", "feedback_conventions.md"):
+        for name in ("project-context.md", "user-role.md", "feedback-conventions.md"):
             content = (self.target / ".agents" / "memory" / name).read_text()
             match = fm_re.match(content)
             assert match, f"{name}: no YAML frontmatter"
@@ -48,7 +48,7 @@ class TestMemoryStarterFiles:
     def test_starter_types_are_valid(self):
         fm_re = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
         valid_types = {"user", "feedback", "project", "reference"}
-        for name in ("project_context.md", "user_role.md", "feedback_conventions.md"):
+        for name in ("project-context.md", "user-role.md", "feedback-conventions.md"):
             content = (self.target / ".agents" / "memory" / name).read_text()
             match = fm_re.match(content)
             type_line = [line for line in match.group(1).splitlines() if line.startswith("type:")]
@@ -58,12 +58,12 @@ class TestMemoryStarterFiles:
 
     def test_memory_index_references_all_starters(self):
         content = (self.target / ".agents" / "memory" / "MEMORY.md").read_text()
-        assert "project_context.md" in content
-        assert "user_role.md" in content
-        assert "feedback_conventions.md" in content
+        assert "project-context.md" in content
+        assert "user-role.md" in content
+        assert "feedback-conventions.md" in content
 
     def test_project_context_renders_project_name(self):
-        content = (self.target / ".agents" / "memory" / "project_context.md").read_text()
+        content = (self.target / ".agents" / "memory" / "project-context.md").read_text()
         assert "my-project" in content
         assert "{{project_name}}" not in content
 
@@ -88,13 +88,11 @@ class TestVaultStarterContent:
         assert "Operational Log" in content
 
     def test_adr_000_exists(self):
-        adr = self.target / ".agents" / "vault" / "decisions" / "adr-000-project-setup.md"
+        adr = self.target / ".agents" / "vault" / "decisions" / "project-setup.md"
         assert adr.is_file()
 
     def test_adr_000_renders_variables(self):
-        content = (
-            self.target / ".agents" / "vault" / "decisions" / "adr-000-project-setup.md"
-        ).read_text()
+        content = (self.target / ".agents" / "vault" / "decisions" / "project-setup.md").read_text()
         assert "{{created_date}}" not in content
         assert "{{memory_stack}}" not in content
         assert "obsidian-only" in content
@@ -185,17 +183,17 @@ class TestLintMemoryScript:
         scaffold(tmp_target, preset, variables)
 
     def test_lint_script_exists(self):
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         assert script.is_file()
 
     def test_lint_script_is_executable(self):
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         assert script.stat().st_mode & 0o111
 
     def test_lint_passes_on_clean_scaffold(self):
         # Initialize a git repo so git rev-parse works
         subprocess.run(["git", "init", str(self.target)], capture_output=True, check=True)
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         result = subprocess.run(
             ["bash", str(script)],
             cwd=str(self.target),
@@ -209,9 +207,9 @@ class TestLintMemoryScript:
         # Remove a file from the index but keep the file
         index = self.target / ".agents" / "memory" / "MEMORY.md"
         content = index.read_text()
-        index.write_text(content.replace("- [User role](user_role.md)", "").strip() + "\n")
+        index.write_text(content.replace("- [User role](user-role.md)", "").strip() + "\n")
 
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         result = subprocess.run(
             ["bash", str(script)],
             cwd=str(self.target),
@@ -219,14 +217,14 @@ class TestLintMemoryScript:
             text=True,
         )
         assert result.returncode == 1
-        assert "user_role.md" in result.stderr
+        assert "user-role.md" in result.stderr
 
     def test_lint_fails_on_stale_index_reference(self):
         subprocess.run(["git", "init", str(self.target)], capture_output=True, check=True)
         # Delete a memory file but leave its index entry
-        (self.target / ".agents" / "memory" / "user_role.md").unlink()
+        (self.target / ".agents" / "memory" / "user-role.md").unlink()
 
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         result = subprocess.run(
             ["bash", str(script)],
             cwd=str(self.target),
@@ -234,7 +232,7 @@ class TestLintMemoryScript:
             text=True,
         )
         assert result.returncode == 1
-        assert "user_role.md" in result.stderr
+        assert "user-role.md" in result.stderr
 
     def test_orphan_check_matches_wikilinks_exactly(self):
         """The orphan-note report must match note names to wikilink targets as
@@ -253,7 +251,7 @@ class TestLintMemoryScript:
         (vault / "bar.md").write_text("Link to [[foobar]].\n")
         (vault / "foobar.md").write_text("# foobar\n")
 
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         result = subprocess.run(
             ["bash", str(script)], cwd=str(self.target), capture_output=True, text=True
         )
@@ -281,7 +279,7 @@ class TestLintMemoryScript:
             index.read_text(encoding="utf-8") + "- [probe](probe.md) — p\n", encoding="utf-8"
         )
 
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         result = subprocess.run(
             ["bash", str(script)], cwd=str(self.target), capture_output=True, text=True
         )
@@ -295,7 +293,7 @@ class TestLintMemoryScript:
         match, SIGPIPEs the writer, and the match reads as a failure. It made the
         starter lint fail ~1% of runs under load (`missing required field 'name'`).
         Pin the whole script, since the race is not reproducible on demand."""
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         offenders = [
             line.strip()
             for line in script.read_text(encoding="utf-8").splitlines()
@@ -326,7 +324,7 @@ class TestLintMemoryScript:
             capture_output=True,
             check=True,
         )
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         result = subprocess.run(
             ["bash", str(script)],
             cwd=str(self.target),
@@ -356,11 +354,11 @@ class TestAutoTierStarters:
         assert not (self.target / ".agents" / "vault").exists()
 
     def test_lint_script_present(self):
-        assert (self.target / ".agents" / "scripts" / "lint_memory.sh").is_file()
+        assert (self.target / ".agents" / "scripts" / "lint-memory.sh").is_file()
 
     def test_lint_passes_clean(self):
         subprocess.run(["git", "init", str(self.target)], capture_output=True, check=True)
-        script = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        script = self.target / ".agents" / "scripts" / "lint-memory.sh"
         result = subprocess.run(
             ["bash", str(script)], cwd=str(self.target), capture_output=True, text=True
         )

@@ -26,21 +26,35 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "AND `.agents/governance/NO_AI_SYSTEM.md` carries a real `reason` and a "
             "`declared_on` date. No card and no declaration fails; a card and a "
             "declaration together fail as a contradiction. A copy-me template "
-            "ships at `.agents/governance/examples/NO_AI_SYSTEM.template.md`."
+            "ships at `.agents/governance/examples/no-ai-system-template.md`. "
+            "Template names now follow the naming standard: snake_case scripts, "
+            "hooks and skills are kebab case (`monitor_pr.sh` is `watch-pr.sh`, "
+            "`create_nojira_pr.sh` is `create-pr-without-issue.sh`, `gen_code_map.py` "
+            "is `generate-code-map.py`, the `add_adr` skill is `add-decision-record`), "
+            "`.agents/docs/adr/` is `.agents/docs/decisions/`, `infra/` is "
+            "`infrastructure/` and `PLAN.md` is `plan.md`. `upgrade --apply` moves each "
+            "file to its new name before it merges, so a local edit and your own files "
+            "in a renamed directory come along, and it carries the naming gate's "
+            "baseline across the moves."
         ),
         "action_required": (
             "Only repos with governance enabled and no real SYSTEM_CARD.md: after "
             "upgrading, the `governance` CI job (and the `CI gate` that needs it) "
             "goes red until the repo declares something. Pick one. (1) It ships an "
-            "AI system: copy `.agents/governance/examples/SYSTEM_CARD.template.md` "
+            "AI system: copy `.agents/governance/examples/system-card-template.md` "
             "to `.agents/governance/SYSTEM_CARD.md` and fill it in. (2) It ships "
             "none: create `.agents/governance/NO_AI_SYSTEM.md` holding a "
             "`reason: <why>` line and a `declared_on: <YYYY-MM-DD>` line between "
             "two `---` fences (template: "
-            "`.agents/governance/examples/NO_AI_SYSTEM.template.md`, which an "
+            "`.agents/governance/examples/no-ai-system-template.md`, which an "
             "upgrade adds once you accept new files). Check locally with "
-            "`bash .agents/scripts/governance_gate.sh`. A repo with a valid card, "
-            "or without governance enabled, needs nothing."
+            "`bash .agents/scripts/governance-gate.sh`. A repo with a valid card, "
+            "or without governance enabled, needs nothing. Everyone: anything outside "
+            "the scaffolder's own files that names an old path (your scripts, aliases, "
+            "notes) needs the new name; `.agents/scripts/install_hooks.sh` keeps working "
+            "as a shim until 2026-12-01. In plugin mode the skill commands are renamed "
+            "too (`/add-hook`, not `/add_hook`). Notes in `.agents/memory/` keep their "
+            "names: an upgrade never touches them."
         ),
     },
     "1.2.2": {
@@ -129,17 +143,17 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
     "1.1.6": {
         "summary": (
             "Fixes two more holes in the branch-protection diagnostic (#825). "
-            "`setup_github.sh` enforces through TWO layers — classic branch "
+            "`setup-github.sh` enforces through TWO layers — classic branch "
             "protection AND (org profile) a `project-init-baseline` repository "
             "ruleset — and the check read only the first, so a PR blocked solely by "
             "a stale RULESET check was told 'all required checks are reported'. It "
-            "now unions both layers (paginated). And `setup_github.sh` itself only "
+            "now unions both layers (paginated). And `setup-github.sh` itself only "
             "CREATED a ruleset, warning if one already existed — so re-running it, "
             "the remedy the diagnostic prints, never fixed a stale ruleset. It now "
             "updates an existing one."
         ),
         "action_required": (
-            "Org-profile repos: re-run `.agents/scripts/setup_github.sh --protect` "
+            "Org-profile repos: re-run `.agents/scripts/setup-github.sh --protect` "
             "(note the flag — without it the script touches neither branch "
             "protection nor the ruleset). It now re-syncs a stale ruleset instead of "
             "warning and doing nothing."
@@ -148,7 +162,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
     "1.1.5": {
         "summary": (
             "Fixes a FALSE ALARM in the 1.1.4 branch-protection diagnostic (#822). "
-            "Run without a PR number, `.agents/scripts/check_branch_protection.sh` "
+            "Run without a PR number, `.agents/scripts/check-branch-protection.sh` "
             "compared required contexts against the default branch's check-runs and "
             "reported a PR-only check (`Check PR title, branch, and linked issue`) "
             "as unsatisfiable — telling you to rewrite branch protection that was "
@@ -160,7 +174,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
         "action_required": (
             "If 1.1.4's diagnostic told you a required check was unsatisfiable, "
             "re-check with a PR number before changing anything: "
-            "`.agents/scripts/check_branch_protection.sh <PR>`. If it now reports "
+            "`.agents/scripts/check-branch-protection.sh <PR>`. If it now reports "
             "all checks satisfied, your branch protection was always correct and "
             "needs no change."
         ),
@@ -174,15 +188,15 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "request in the repo becomes unmergeable. Projects scaffolded before "
             "PI-555 require the per-version matrix contexts (`Lint and test (3.12)` "
             "…), and PI-761 stopped producing those on a PR, so they are stranded. "
-            "The new `.agents/scripts/check_branch_protection.sh` names the "
-            "unsatisfiable checks, and `monitor_pr.sh` runs it whenever a PR is "
+            "The new `.agents/scripts/check-branch-protection.sh` names the "
+            "unsatisfiable checks, and `watch-pr.sh` runs it whenever a PR is "
             "BLOCKED instead of leaving the cause to be guessed."
         ),
         "action_required": (
             "If your PRs are stuck 'BLOCKED' while every check passes, run "
-            "`.agents/scripts/check_branch_protection.sh` — it names the required "
+            "`.agents/scripts/check-branch-protection.sh` — it names the required "
             "checks nothing reports. The fix is to re-run "
-            "`.agents/scripts/setup_github.sh`, which re-syncs protection to require "
+            "`.agents/scripts/setup-github.sh`, which re-syncs protection to require "
             "the single `CI gate` job (it `needs:` the whole matrix and the secret "
             "scan, so it survives any future matrix change). Scaffolds created after "
             "PI-555 already require `CI gate` and need nothing."
@@ -231,7 +245,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "pre-v1.0.1 scaffold, reporting it as never scaffolded (#814)."
         ),
         "action_required": (
-            "Run `.agents/scripts/install_hooks.sh` after upgrading. The git hooks "
+            "Run `.agents/scripts/install-hooks.sh` after upgrading. The git hooks "
             "are COPIED into `.git/hooks/` at install time, so upgrading the "
             "template does NOT replace the copy you are running — without this "
             "step you keep the pre-commit hook that destroys unstaged work, while "
@@ -310,8 +324,8 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "and still offers the browser concern when `--mcps` is passed. "
             "Scaffolded fixes: the GitHub command-guard closes a quoted "
             "global-option bypass (`git -c foo='a b' push`), its hook budget no "
-            "longer fails open on one slow gh call, start_issue.sh reports a "
-            "nonexistent issue instead of dying silently, monitor_pr.sh "
+            "longer fails open on one slow gh call, start-issue.sh reports a "
+            "nonexistent issue instead of dying silently, watch-pr.sh "
             "surfaces bot review comments instead of a false timeout message, "
             "and the commit gate no longer blocks commits in uv projects that "
             "don't ship ruff."
@@ -331,7 +345,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "options, GraphQL merge mutations, interpreter heredocs). Scaffolded "
             "fixes: the rust/go/node + service justfile no longer defines `build` "
             "twice (the container recipe is now `image`), `.gitignore` stops "
-            "ignoring committed `.codex/` wiring, monitor_pr.sh requires an "
+            "ignoring committed `.codex/` wiring, watch-pr.sh requires an "
             "explicit --admin to override a BLOCKED merge, and several hooks/"
             "scripts are more portable. CI SHA-pins its Actions and verifies the "
             "shfmt download against published checksums."
@@ -365,7 +379,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
             "default ON (opt-out), so an upgrade scaffolds the same surface as "
             "before. Tier-3 RAG is opt-in: scaffold with "
             "--memory obsidian-graphify-rag, then run "
-            "`.agents/scripts/setup_rag.sh` in the project to install the "
+            "`.agents/scripts/setup-rag.sh` in the project to install the "
             "engine."
         ),
     },
@@ -379,7 +393,7 @@ MIGRATION_NOTES: dict[str, dict[str, str | None]] = {
         "action_required": (
             "Branch-per-env was removed — if you used dev/staging branches, "
             "branch protection is now centralized: run "
-            "`.agents/scripts/setup_github.sh --protect`."
+            "`.agents/scripts/setup-github.sh --protect`."
         ),
     },
     "0.3.0": {

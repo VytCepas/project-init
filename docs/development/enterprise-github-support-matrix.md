@@ -148,7 +148,7 @@ exactly the spike-decision the plan anticipated.
 4. **Never derive host/API base from the repo URL string** — resolve via `gh`/explicit config (#255).
 5. **Enforcement = org-level rulesets applied directly to the fork** (not via inheritance), with an
    **empty bypass allowlist** so rules bind owners too; the org profile **refuses admin-merge**
-   (`monitor_pr.sh --admin`) and relies on auto-merge / required merge queue under required status
+   (`watch-pr.sh --admin`) and relies on auto-merge / required merge queue under required status
    checks. "Required workflows" uses the org ruleset rule (Enterprise Cloud/GHES). Team-tier orgs get
    rulesets but may lack the required-workflows rule and private merge queue → degrade to required
    status checks (feature probe per #251).
@@ -173,7 +173,7 @@ exactly the spike-decision the plan anticipated.
 - **#255** (enterprise host implementation): **confirmed.** Resolve REST base via `gh api --hostname`
   / `GH_HOST` / explicit `PROJECT_INIT_API_BASE` — never string-derive from the repo URL. Replace
   hardcoded `api.github.com` (`install.sh:56`) and `https://github.com/...` manual links
-  (`setup_github.sh`, `push_wiki.sh`).
+  (`setup-github.sh`, `push-wiki.sh`).
 - **#258** (no-egress mode): **de-risked.** Claude Code exposes managed-settings controls
   (`strictKnownMarketplaces` / `blockedMarketplaces` / `hostPattern`) to disable external marketplaces
   entirely — emit these for the org profile.
@@ -181,7 +181,7 @@ exactly the spike-decision the plan anticipated.
   protection / branch+tag rulesets / push rulesets / required-workflows-ruleset / merge queue have
   distinct availability); (2) **forks don't inherit branch/tag rulesets** (only push rulesets) → apply
   **org rulesets directly to the target repo**; (3) rulesets' empty bypass allowlist binds owners, so
-  the org profile should **refuse `monitor_pr.sh --admin`** and use auto-merge/merge queue. The
+  the org profile should **refuse `watch-pr.sh --admin`** and use auto-merge/merge queue. The
   standalone Actions "Required workflows" is **deprecated** — use the org ruleset rule. Feature probes
   still needed for Team-vs-Enterprise gaps (required-workflows rule, private merge queue).
 

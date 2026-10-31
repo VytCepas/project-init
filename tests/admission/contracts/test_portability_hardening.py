@@ -88,21 +88,21 @@ def test_gh_callers_have_presence_guard(scaffolded: Path):
         text = sh.read_text()
         code = [ln for ln in text.splitlines() if not ln.lstrip().startswith("#")]
         calls_gh = any(gh_call.search(ln) for ln in code)
-        # gh_host.sh is a sourced helper (functions only) — not a standalone entry.
-        if not calls_gh or sh.name == "gh_host.sh":
+        # gh-host.sh is a sourced helper (functions only) — not a standalone entry.
+        if not calls_gh or sh.name == "gh-host.sh":
             continue
         assert "command -v gh" in text, f"{sh.name} calls gh but has no presence guard"
 
 
 def test_audit_stat_guidance_is_portable():
     for mirror in (
-        # audit moved to the lifecycle_fallback overlay (#476); agent-surface
+        # audit moved to the lifecycle-fallback overlay (#476); agent-surface
         # copies (codex/antigravity) still carry it via the sync, now gated as
         # SKILL.md.tmpl ({{#if lifecycle}}, PI-537 #5) — the wrapped body keeps
         # the portable stat guidance.
         _REPO_ROOT
         / "templates"
-        / "lifecycle_fallback"
+        / "lifecycle-fallback"
         / "dot_agents"
         / "skills"
         / "audit"

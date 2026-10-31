@@ -1,5 +1,5 @@
 """PI-145: governance starter files — CODEOWNERS, CONTRIBUTING, SECURITY,
-LICENSE picker, and the setup_github.sh --protect gate."""
+LICENSE picker, and the setup-github.sh --protect gate."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from project_init.scaffold import load_preset, scaffold
 from tests.helpers import make_variables
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_SETUP_GITHUB = _REPO_ROOT / "templates/lifecycle/dot_agents/scripts/setup_github.sh"
+_SETUP_GITHUB = _REPO_ROOT / "templates/lifecycle/dot_agents/scripts/setup-github.sh"
 
 
 def _scaffold(target: Path, **overrides: str) -> Path:
@@ -46,7 +46,7 @@ class TestGovernanceFiles:
         target = _scaffold(tmp_path / "p")
         content = (target / "CONTRIBUTING.md").read_text()
         assert "just --list" in content
-        assert "install_hooks.sh" in content
+        assert "install-hooks.sh" in content
         assert "type(KEY-N): description" in content
         assert "AGENTS.md" in content, "must match the canonical-instructions framing"
 

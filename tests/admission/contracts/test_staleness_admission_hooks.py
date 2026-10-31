@@ -4,7 +4,7 @@ Two mechanically-verifiable facts that used to live in multiple hand-kept copies
 with nothing tying them together (map-not-territory, ADR-024):
 
 1. The lifecycle DAG: authoritative in ``GRAPH`` (dag_workflow.py), redrawn as
-   ASCII in workflow_state_reminder.sh. A node added to GRAPH without updating
+   ASCII in workflow-state-reminder.sh. A node added to GRAPH without updating
    the reminder is silent drift.
 2. Committed Mermaid diagrams: nodes carry repo-relative paths (the diagram
    skill's labels-carry-paths rule, PI-684) so a diagram that still points at a

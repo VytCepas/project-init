@@ -107,7 +107,7 @@ def _shipped_guards() -> list[str]:
         ".claude-plugin/marketplace.json",
         "plugins/project-init-workflow/hooks/prod_guard.py",
         "templates/base/dot_agents/hooks/prod_guard.py",
-        "templates/lifecycle/dot_agents/scripts/monitor_pr.sh",
+        "templates/lifecycle/dot_agents/scripts/watch-pr.sh",
         "templates/base/dot_agents/settings.json.tmpl",
         "templates/base/dot_github/workflows/ci.yml.tmpl",
         ".agents/settings.json",

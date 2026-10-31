@@ -70,7 +70,7 @@ v0** by the reader's rule below.
 
 ## Invariants (ADR-024)
 
-- **Anchors never move.** `.agents/memory/MEMORY.md`, `.agents/docs/adr/`, and
+- **Anchors never move.** `.agents/memory/MEMORY.md`, `.agents/docs/decisions/`, and
   (when present) `.agents/vault/` are at the same path on every tier. Higher tiers
   only *add* retrieval surfaces (the right-hand columns); they never relocate an
   anchor. An orchestrator can therefore assume the anchors and feature-detect the
