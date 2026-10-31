@@ -227,6 +227,71 @@ class TestPrePushLifecycleGate:
         assert _run_hook(self.hook, stdin=line).returncode == 0
 
 
+class TestPrePushGatePushSkip:
+    """harbor#1411: a pass `gate-push` recorded for this exact push skips fast-ci, and only fast-ci."""
+
+    SHA = "a" * 40
+    ZERO = "0" * 40
+
+    @pytest.fixture(autouse=True)
+    def _scaffold(self, tmp_target: Path, tmp_path: Path):
+        self.target = tmp_target
+        scaffold(tmp_target, fallback_preset(), fallback_variables())
+        self.hook = self.target / ".github" / "hooks" / "pre-push"
+        self.ran, self.seen = tmp_path / "fast-ci-ran", tmp_path / "gate-push-saw"
+        self.bin = tmp_path / "stub-bin"
+        self.bin.mkdir()
+        just = self.bin / "just"
+        just.write_text(f'#!/bin/sh\n[ "$1" = --show ] && exit 0\n: > "{self.ran}"\n')
+        just.chmod(0o755)
+
+    def _gate_push(self, answer: int) -> None:
+        stub = self.bin / "gate-push"
+        stub.write_text(f'#!/bin/sh\n{{ echo "$*"; cat; }} > "{self.seen}"\nexit {answer}\n')
+        stub.chmod(0o755)
+
+    def _push(self, remote_ref: str = "refs/heads/feat/PI-42-x"):
+        import shutil
+
+        env = {**os.environ, "PATH": f"{self.bin}{os.pathsep}/usr/bin{os.pathsep}/bin"}
+        return subprocess.run(
+            [shutil.which("bash") or "/bin/bash", str(self.hook), "origin", "url"],
+            input=f"refs/heads/x {self.SHA} {remote_ref} {self.ZERO}\n",
+            capture_output=True,
+            text=True,
+            cwd=self.target,
+            env=env,
+        )
+
+    def test_a_recorded_pass_skips_fast_ci(self):
+        self._gate_push(0)
+        result = self._push()
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert not self.ran.exists()
+        assert (
+            self.seen.read_text()
+            == f"check origin url\nrefs/heads/x {self.SHA} refs/heads/feat/PI-42-x {self.ZERO}\n"
+        )
+
+    def test_no_pass_runs_fast_ci(self):
+        self._gate_push(1)
+        assert self._push().returncode == 0
+        assert self.ran.exists()
+
+    def test_no_gate_push_runs_fast_ci(self):
+        assert self._push().returncode == 0
+        assert self.ran.exists()
+
+    def test_a_pass_never_skips_the_branch_rules(self):
+        self._gate_push(0)
+        result = self._push("refs/heads/main")
+        assert result.returncode == 1
+        assert "not allowed" in result.stdout
+
+    def test_the_recipe_is_declared_in_the_check_set(self):
+        assert "# gate-push: cmd just --show fast-ci" in self.hook.read_text()
+
+
 class TestInstallHooks:
     """install-hooks.sh wires all git-level enforcement into .git/hooks."""
 
