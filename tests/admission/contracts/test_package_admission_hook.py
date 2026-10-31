@@ -18,7 +18,7 @@ import pytest
 from project_init.scaffold import scaffold
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_HOOK = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "package_guard.py"
+_HOOK = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "admission_package.py"
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
@@ -217,8 +217,8 @@ class TestWiring:
         commands = [
             h["command"] for entry in settings["hooks"]["PreToolUse"] for h in entry["hooks"]
         ]
-        assert any("package_guard.py" in c for c in commands)
-        assert (tmp_target / ".agents" / "hooks" / "package_guard.py").is_file()
+        assert any("admission_package.py" in c for c in commands)
+        assert (tmp_target / ".agents" / "hooks" / "admission_package.py").is_file()
 
     def test_plugin_ships_the_guard(self):
         plugin_hooks = json.loads(
@@ -227,8 +227,8 @@ class TestWiring:
         commands = [
             h["command"] for entry in plugin_hooks["hooks"]["PreToolUse"] for h in entry["hooks"]
         ]
-        assert any("package_guard.py" in c for c in commands)
-        assert (_REPO_ROOT / "plugins/project-init-workflow/hooks/package_guard.py").is_file()
+        assert any("admission_package.py" in c for c in commands)
+        assert (_REPO_ROOT / "plugins/project-init-workflow/hooks/admission_package.py").is_file()
 
     def test_multi_agent_adapter_chains_the_guard(self, tmp_target: Path):
         from tests.helpers import fallback_preset, fallback_variables
@@ -239,5 +239,5 @@ class TestWiring:
             fallback_variables(multi_agent="true"),
             strict=True,
         )
-        adapter = (tmp_target / ".agents" / "hooks" / "agent_guard_adapter.py").read_text()
-        assert "package_guard.py" in adapter
+        adapter = (tmp_target / ".agents" / "hooks" / "admission_agent_adapter.py").read_text()
+        assert "admission_package.py" in adapter

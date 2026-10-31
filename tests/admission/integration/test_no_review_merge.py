@@ -74,7 +74,7 @@ def _run_monitor(tmp_target: Path, tmp_path: Path, *, merge_state: str, pr_state
     env["PI_TEST_MERGE_STATE"] = merge_state
     env["PI_TEST_PR_STATE"] = pr_state
     return subprocess.run(
-        ["bash", str(tmp_target / _SCRIPTS / "monitor_pr.sh"), "1", "--merge", "--no-review"],
+        ["bash", str(tmp_target / _SCRIPTS / "watch-pr.sh"), "1", "--merge", "--no-review"],
         capture_output=True,
         text=True,
         cwd=tmp_target,

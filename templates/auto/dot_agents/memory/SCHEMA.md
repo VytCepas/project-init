@@ -1,6 +1,6 @@
 # Memory Schema
 
-Authoritative governance for `.agents/memory/` files. `lint_memory.sh` enforces these rules.
+Authoritative governance for `.agents/memory/` files. `lint-memory.sh` enforces these rules.
 
 ## Required frontmatter
 
@@ -25,9 +25,9 @@ type: user | feedback | project | reference
 
 ## File naming
 
-Convention (not enforced by lint): `<type>_<slug>.md` — lowercase, hyphenated slug.
+Convention (not enforced by lint): `<type>-<slug>.md` — lowercase words joined by hyphens.
 
-Examples: `user_role.md`, `feedback_testing.md`, `project_deadline.md`, `reference_api-docs.md`
+Examples: `user-role.md`, `feedback-testing.md`, `project-deadline.md`, `reference-api-docs.md`
 
 ## Index
 
@@ -39,7 +39,7 @@ Every memory file must appear in `MEMORY.md` as a one-line bullet:
 
 Keep lines under ~150 characters and files under 100 lines (`LINT_MEMORY_MAX_LINES` overrides).
 One fact per file — move longer material to the vault.
-`lint_memory.sh` enforces the size cap and checks for orphaned files and stale index entries.
+`lint-memory.sh` enforces the size cap and checks for orphaned files and stale index entries.
 
 ## What NOT to store
 
@@ -57,7 +57,7 @@ ownership) or **immune to change** (a rationale, a decision and its date).
 Volatile specifics — tool names, thresholds, version pins, line numbers — must
 be **pointed at, not restated**: name the file that owns the value, don't copy
 the value in. Restated "territory" rots silently the moment its source moves,
-and no gate catches it: `lint_memory.sh` can flag a dangling backtick-`path.ext`
+and no gate catches it: `lint-memory.sh` can flag a dangling backtick-`path.ext`
 but not a threshold that has drifted from the `justfile`. Cheap-to-regenerate
 artifacts get regenerated, not cached; underivable rationale goes here or to an ADR.
 

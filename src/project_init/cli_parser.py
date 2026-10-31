@@ -222,7 +222,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "Obsidian vault; alias for obsidian-only), obsidian-graphify (obsidian "
             "PLUS a derived code knowledge graph for agents), or obsidian-graphify-rag "
             "(tier 3 — graphify PLUS a keyless on-device semantic/vector recall surface; "
-            "run .agents/scripts/setup_rag.sh to install cocoindex-code — no API key, no "
+            "run .agents/scripts/setup-rag.sh to install cocoindex-code — no API key, no "
             "container; worth it only at multi-project / monorepo scale). Overrides the "
             "preset's default."
         ),

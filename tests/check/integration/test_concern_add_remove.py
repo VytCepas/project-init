@@ -125,7 +125,7 @@ class TestRemove:
         target = _scaffold(tmp_path / "p")
         apply_concern(target, "governance", enable=True, apply=True)
         out = " ".join(capsys.readouterr().out.split())
-        for needle in ("SYSTEM_CARD.md", "NO_AI_SYSTEM.md", "governance_gate.sh"):
+        for needle in ("SYSTEM_CARD.md", "NO_AI_SYSTEM.md", "governance-gate.sh"):
             assert needle in out, needle
 
     def test_remove_governance_does_not_print_the_gate_advisory(self, tmp_path: Path, capsys):

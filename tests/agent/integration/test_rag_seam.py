@@ -2,7 +2,7 @@
 
 Tier 3 (`obsidian-graphify-rag`) adds a keyless, on-device semantic/vector recall
 surface over the corpus. The engine is cocoindex-code (`ccc`): scaffolding ships
-docs + a user-run `setup_rag.sh` (which installs the tool at tool level), agent
+docs + a user-run `setup-rag.sh` (which installs the tool at tool level), agent
 rules, the gitignored index path, and the `rag_endpoint` descriptor. It is opt-in
 via `--memory` only — deliberately not a preset, since RAG earns its keep only at
 multi-project scale. These tests pin that contract: the overlay is present, the
@@ -57,14 +57,14 @@ class TestSeamScaffolded:
         target = tmp_path / "p"
         _scaffold_rag(target)
         c = _claude(target)
-        assert (c / "scripts" / "setup_rag.sh").exists()
+        assert (c / "scripts" / "setup-rag.sh").exists()
         assert (c / "rules" / "rag.md").exists()
         assert (c / "docs" / "guides" / "using-rag.md").exists()
 
     def test_setup_stub_is_executable(self, tmp_path):
         target = tmp_path / "p"
         _scaffold_rag(target)
-        assert os.access(_claude(target) / "scripts" / "setup_rag.sh", os.X_OK)
+        assert os.access(_claude(target) / "scripts" / "setup-rag.sh", os.X_OK)
 
     def test_descriptor_records_tier_and_rag_endpoint(self, tmp_path):
         target = tmp_path / "p"
@@ -89,10 +89,10 @@ class TestSeamScaffolded:
 
 class TestEngineWired:
     def test_setup_installs_cocoindex_at_tool_level(self, tmp_path):
-        """setup_rag.sh installs the engine as a uv tool (the Graphify pattern)."""
+        """setup-rag.sh installs the engine as a uv tool (the Graphify pattern)."""
         target = tmp_path / "p"
         _scaffold_rag(target)
-        setup = (_claude(target) / "scripts" / "setup_rag.sh").read_text()
+        setup = (_claude(target) / "scripts" / "setup-rag.sh").read_text()
         assert "uv tool install" in setup
         assert "cocoindex-code" in setup
         # pinned, not floating (alpha tool, ~weekly releases)
@@ -103,7 +103,7 @@ class TestEngineWired:
         the [full] extra, and no cloud-provider/key references in the install path."""
         target = tmp_path / "p"
         _scaffold_rag(target)
-        setup = (_claude(target) / "scripts" / "setup_rag.sh").read_text()
+        setup = (_claude(target) / "scripts" / "setup-rag.sh").read_text()
         assert "cocoindex-code[full]" in setup  # [full] => local embeddings, no key
         assert "provider: sentence-transformers" in setup
         for keyish in ("OPENAI_API_KEY", "VOYAGE_API_KEY", "api_key", "litellm"):
@@ -114,14 +114,14 @@ class TestEngineWired:
         actually loads in cocoindex-code (ADR-026 bake-off)."""
         target = tmp_path / "p"
         _scaffold_rag(target)
-        setup = (_claude(target) / "scripts" / "setup_rag.sh").read_text()
+        setup = (_claude(target) / "scripts" / "setup-rag.sh").read_text()
         assert 'RAG_EMBED_MODEL="${RAG_EMBED_MODEL:-nomic-ai/CodeRankEmbed}"' in setup
 
     def test_no_container_or_server(self, tmp_path):
         """RAG must not require Docker or a vector-DB server (embedded sqlite-vec)."""
         target = tmp_path / "p"
         _scaffold_rag(target)
-        setup = (_claude(target) / "scripts" / "setup_rag.sh").read_text()
+        setup = (_claude(target) / "scripts" / "setup-rag.sh").read_text()
         for infra in ("docker", "milvus", "qdrant", "compose"):
             assert infra not in setup.lower(), f"RAG must stay container-free: {infra}"
 
@@ -152,7 +152,7 @@ class TestTier2HasNoRagResidue:
         )
         assert rc == 0
         c = _claude(target)
-        assert not (c / "scripts" / "setup_rag.sh").exists()
+        assert not (c / "scripts" / "setup-rag.sh").exists()
         assert not (c / "rules" / "rag.md").exists()
         block = (c / "config.yaml").read_text().partition("\nmemory:")[2].partition("\nmcps:")[0]
         assert "rag_endpoint" not in block
@@ -189,4 +189,4 @@ class TestUpgradeRoundTrip:
         block = config.read_text().partition("\nmemory:")[2].partition("\nmcps:")[0]
         assert "tier: 3" in block
         assert "rag_endpoint" in block
-        assert (_claude(target) / "scripts" / "setup_rag.sh").exists()
+        assert (_claude(target) / "scripts" / "setup-rag.sh").exists()

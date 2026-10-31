@@ -51,7 +51,7 @@ class TestCheckpointSkill:
     def test_listed_in_skill_tables(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         for rel in (
-            ".agents/skills/INDEX.md",
+            ".agents/skills/index.md",
             ".agents/skills/README.md",
             ".agents/project-init.md",
         ):

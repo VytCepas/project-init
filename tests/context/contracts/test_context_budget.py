@@ -3,8 +3,8 @@
 Every line of CLAUDE.md/AGENTS.md is re-sent each turn and every line of a
 SKILL.md is paid on each skill load, so growth there is a per-turn token tax.
 WS7/WS11 trimmed the content; this gate keeps it trimmed: scaffolded projects
-get `.agents/scripts/lint_context_budget.sh` wired into every language's
-`just lint` recipe (which scaffolded CI runs), and `lint_memory.sh` gains a
+get `.agents/scripts/lint-context-budget.sh` wired into every language's
+`just lint` recipe (which scaffolded CI runs), and `lint-memory.sh` gains a
 per-file size cap. The repo-side tests here hold this repo's own always-loaded
 files and every shipped SKILL.md to the same budgets.
 """
@@ -22,7 +22,7 @@ from tests.helpers import fallback_preset, fallback_variables
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
-_SCRIPT = Path(".agents") / "scripts" / "lint_context_budget.sh"
+_SCRIPT = Path(".agents") / "scripts" / "lint-context-budget.sh"
 
 
 def _run_gate(target: Path, env_overrides: dict[str, str] | None = None):
@@ -84,17 +84,17 @@ class TestJustfileWiring:
         gate_calls = sum(
             1
             for line in template.splitlines()
-            if line.strip() == "bash .agents/scripts/lint_context_budget.sh"
+            if line.strip() == "bash .agents/scripts/lint-context-budget.sh"
         )
         assert lint_recipes > 0
         assert gate_calls == lint_recipes, (
             f"{gate_calls} gate call(s) for {lint_recipes} lint recipe(s) — "
-            "wire lint_context_budget.sh into every language's lint recipe"
+            "wire lint-context-budget.sh into every language's lint recipe"
         )
 
     def test_rendered_justfile_carries_the_gate(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        assert "lint_context_budget.sh" in (tmp_target / "justfile").read_text()
+        assert "lint-context-budget.sh" in (tmp_target / "justfile").read_text()
 
 
 class TestMemorySizeCap:
@@ -102,7 +102,7 @@ class TestMemorySizeCap:
     def _scaffold(self, tmp_target: Path):
         self.target = tmp_target
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        self.lint = self.target / ".agents" / "scripts" / "lint_memory.sh"
+        self.lint = self.target / ".agents" / "scripts" / "lint-memory.sh"
 
     def _run(self, env_overrides: dict[str, str] | None = None):
         env = {**os.environ, **(env_overrides or {})}
@@ -119,15 +119,15 @@ class TestMemorySizeCap:
         assert result.returncode == 0, result.stderr
 
     def test_oversized_memory_file_errors(self):
-        fact = self.target / ".agents" / "memory" / "user_role.md"
+        fact = self.target / ".agents" / "memory" / "user-role.md"
         fact.write_text(fact.read_text() + "detail line\n" * 120)
         result = self._run()
         assert result.returncode == 1
-        assert "user_role.md" in result.stderr
+        assert "user-role.md" in result.stderr
         assert "cap" in result.stderr
 
     def test_cap_is_env_overridable(self):
-        fact = self.target / ".agents" / "memory" / "user_role.md"
+        fact = self.target / ".agents" / "memory" / "user-role.md"
         fact.write_text(fact.read_text() + "detail line\n" * 120)
         result = self._run({"LINT_MEMORY_MAX_LINES": "10000"})
         assert result.returncode == 0, result.stderr

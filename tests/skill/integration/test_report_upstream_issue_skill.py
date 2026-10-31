@@ -20,11 +20,11 @@ class TestReportUpstreamIssueSkill:
         """--no-plugin copies the skill in as a real .agents/skills file, on by
         default (no opt-in flag), with the required frontmatter."""
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        skill = tmp_target / ".agents" / "skills" / "report_upstream_issue" / "SKILL.md"
+        skill = tmp_target / ".agents" / "skills" / "report-upstream-issue" / "SKILL.md"
         content = skill.read_text()
-        assert "name: report_upstream_issue" in content
+        assert "name: report-upstream-issue" in content
         assert "when_to_use:" in content
-        # User-invocable so `/report_upstream_issue` works; on by default.
+        # User-invocable so `/report-upstream-issue` works; on by default.
         assert "user-invocable: true" in content
 
     def test_present_on_codex_surface(self, tmp_path: Path):
@@ -43,14 +43,14 @@ class TestReportUpstreamIssueSkill:
                 agents="claude,codex",
             ),
         )
-        skill = target / ".agents" / "skills" / "report_upstream_issue" / "SKILL.md"
+        skill = target / ".agents" / "skills" / "report-upstream-issue" / "SKILL.md"
         assert skill.exists()
-        assert "name: report_upstream_issue" in skill.read_text()
+        assert "name: report-upstream-issue" in skill.read_text()
 
     def test_body_classifies_and_routes_upstream(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         content = (
-            tmp_target / ".agents" / "skills" / "report_upstream_issue" / "SKILL.md"
+            tmp_target / ".agents" / "skills" / "report-upstream-issue" / "SKILL.md"
         ).read_text()
         # Classification: project-level vs tooling/scaffolding.
         assert "Classify" in content
@@ -66,16 +66,16 @@ class TestReportUpstreamIssueSkill:
         # Conform to the UPSTREAM repo's own conventions, not this template.
         assert "conventional-commit" in content.lower()
         assert "gh issue list" in content
-        # Project-level bugs are filed locally (via the create_issue skill).
-        assert "create_issue" in content
+        # Project-level bugs are filed locally (via the create-issue skill).
+        assert "create-issue" in content
         # Confirm target + title/body before filing.
         assert "confirm" in content.lower()
 
     def test_listed_in_skill_tables(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
-        index = (tmp_target / ".agents" / "skills" / "INDEX.md").read_text()
-        assert "report_upstream_issue" in index
+        index = (tmp_target / ".agents" / "skills" / "index.md").read_text()
+        assert "report-upstream-issue" in index
         readme = (tmp_target / ".agents" / "skills" / "README.md").read_text()
-        assert "report_upstream_issue" in readme
+        assert "report-upstream-issue" in readme
         project_init = (tmp_target / ".agents" / "project-init.md").read_text()
-        assert "report_upstream_issue" in project_init
+        assert "report-upstream-issue" in project_init

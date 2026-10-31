@@ -70,7 +70,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/session_setup.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/session-setup.sh",
             "timeout": 300
           }
         ]
@@ -83,7 +83,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/pre_commit_gate.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/pre-commit-gate.sh",
             "timeout": 60
           },
 {{#if lifecycle}}          {
@@ -95,13 +95,13 @@
 {{/if lifecycle}}          {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/prod_guard.py",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/python-resolve.sh \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/prod_guard.py",
             "timeout": 10
           },
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/package_guard.py",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/python-resolve.sh \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/admission_package.py",
             "timeout": 15
           }
         ]
@@ -112,7 +112,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/pre_edit_issue_guard.py",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/python-resolve.sh \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/admission_issue_edit.py",
             "timeout": 10
           }
         ]
@@ -125,7 +125,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/post_edit_lint.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/post-edit-lint.sh",
             "timeout": 30
           }
         ]
@@ -136,7 +136,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/_py.sh \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/tool_output_compressor.py",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/python-resolve.sh \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/tool_output_compressor.py",
             "timeout": 10
           }
         ]
@@ -148,7 +148,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/workflow_state_reminder.sh",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.agents/hooks/workflow-state-reminder.sh",
             "timeout": 10
           }
         ]

@@ -54,8 +54,8 @@ def test_skills_and_hooks_and_mcp_listed(tmp_path: Path):
     for name, _ in capabilities.canonical_skills():
         assert f"| {name} |" in text
     # The always-on hooks appear with their events.
-    assert "| SessionStart | session_setup.sh |" in text
-    assert "| UserPromptSubmit | workflow_state_reminder.sh |" in text
+    assert "| SessionStart | session-setup.sh |" in text
+    assert "| UserPromptSubmit | workflow-state-reminder.sh |" in text
     # The selected MCP server + its invocation.
     # PI-842: a python-language scaffold's toolchain has no bun — npx.
     assert "| context7 | npx @upstash/context7-mcp |" in text

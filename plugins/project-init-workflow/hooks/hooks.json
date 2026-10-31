@@ -6,7 +6,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/session_setup.sh",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/session-setup.sh",
             "timeout": 300
           }
         ]
@@ -19,19 +19,19 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/pre_commit_gate.sh",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/pre-commit-gate.sh",
             "timeout": 60
           },
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/_py.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/prod_guard.py",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/python-resolve.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/prod_guard.py",
             "timeout": 10
           },
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/_py.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/package_guard.py",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/python-resolve.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/admission_package.py",
             "timeout": 15
           }
         ]
@@ -44,7 +44,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/post_edit_lint.sh",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/post-edit-lint.sh",
             "timeout": 30
           }
         ]
@@ -55,7 +55,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/_py.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/tool_output_compressor.py",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/python-resolve.sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/tool_output_compressor.py",
             "timeout": 10
           }
         ]

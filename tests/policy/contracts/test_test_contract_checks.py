@@ -1,6 +1,6 @@
 """#1052/#1053: test-contract rules 2 and 4 are mechanised, here and in the scaffold.
 
-`check_test_contract.py exit-codes` fails on an assertion that accepts any
+`check-test-contract.py exit-codes` fails on an assertion that accepts any
 non-zero exit. The ratchet is zero: every assertion in this repo names its code.
 """
 
@@ -21,9 +21,9 @@ from tests.helpers import make_variables
 from tools.sync_agents_from_templates import strip_conditional_wrapper
 
 REPO = Path(__file__).resolve().parents[3]
-TEMPLATE = REPO / "templates" / "base" / "dot_agents" / "scripts" / "check_test_contract.py.tmpl"
+TEMPLATE = REPO / "templates" / "base" / "dot_agents" / "scripts" / "check-test-contract.py.tmpl"
 # The template is stored `{{#if python}}`-gated; render it (Python scaffold) once.
-_RENDERED = Path(tempfile.mkdtemp(prefix="test-contract-")) / "check_test_contract.py"
+_RENDERED = Path(tempfile.mkdtemp(prefix="test-contract-")) / "check-test-contract.py"
 _RENDERED.write_text(strip_conditional_wrapper(TEMPLATE.read_text()))
 SCRIPT = _RENDERED
 
@@ -116,7 +116,7 @@ class TestScaffoldShipsItOnlyWherePythonRuns:
             load_preset("core"),
             make_variables(language=language, python="", **{language: "true"}),
         )
-        assert not (target / ".agents" / "scripts" / "check_test_contract.py").exists()
+        assert not (target / ".agents" / "scripts" / "check-test-contract.py").exists()
 
 
 def _seed_naming(target: Path) -> None:
@@ -151,7 +151,7 @@ class TestScaffoldRunsIt:
     def test_scaffold_lint_goes_red_on_a_planted_nonzero_assertion(self, tmp_path: Path) -> None:
         target = tmp_path / "p"
         scaffold(target, load_preset("core"), make_variables())
-        assert (target / ".agents" / "scripts" / "check_test_contract.py").is_file()
+        assert (target / ".agents" / "scripts" / "check-test-contract.py").is_file()
         (target / "tests").mkdir(exist_ok=True)
         planted = target / "tests" / "test_planted.py"
         planted.write_text("def test_x(proc):\n    assert proc.returncode == 1\n")

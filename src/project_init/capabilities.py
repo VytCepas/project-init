@@ -38,7 +38,7 @@ def _skill_meta(skill_md: Path) -> tuple[str, str]:
 
 #: Provenance labels for the skills table (#962). ``base`` skills are rendered
 #: into the project's own ``.agents/skills/``; the shared ``fallback`` /
-#: ``lifecycle_fallback`` sets are rendered there ONLY in no-plugin mode
+#: ``lifecycle-fallback`` sets are rendered there ONLY in no-plugin mode
 #: (ADR-010) and otherwise arrive via the declared plugin.
 _SOURCE_IN_TREE = "in-tree"
 _SOURCE_PLUGIN = "plugin"
@@ -63,7 +63,7 @@ def canonical_skills_with_source(
 
     Both the always-rendered base skills (e.g. ``plan``, as ``SKILL.md.tmpl``)
     and the shared fallback/plugin skill set — the canonical skill source.
-    The GitHub-lifecycle skills (#476) live in the ``lifecycle_fallback``
+    The GitHub-lifecycle skills (#476) live in the ``lifecycle-fallback``
     overlay and ship only when the lifecycle tier is on; ``variables=None`` (the
     canonical full set, used by tests/tooling) includes them. Deduped by name,
     sorted.
@@ -79,7 +79,7 @@ def canonical_skills_with_source(
     if variables is None or variables.get("lifecycle"):
         dirs.append(
             (
-                _TEMPLATES_DIR / "lifecycle_fallback" / "dot_agents" / "skills",
+                _TEMPLATES_DIR / "lifecycle-fallback" / "dot_agents" / "skills",
                 shared_source,
             )
         )
@@ -108,10 +108,10 @@ def canonical_skills(variables: dict[str, str] | None = None) -> list[tuple[str,
 def _script_name(command: str) -> str:
     """Return the meaningful hook script in a settings.json command.
 
-    Skips the _py.sh interpreter shim.
+    Skips the python-resolve.sh interpreter shim.
     """
     files = [m.split("/")[-1].strip('"') for m in _SCRIPT_RE.findall(command)]
-    files = [f for f in files if f != "_py.sh"]
+    files = [f for f in files if f != "python-resolve.sh"]
     return files[-1] if files else command.split()[0]
 
 
@@ -227,8 +227,8 @@ def _memory_descriptor(variables: dict[str, str]) -> list[tuple[str, str]]:
         rows.append(("graph_path", "graphify-out/graph.json"))
     if variables.get("rag"):
         # Tier 3 (ADR-024 §4, ADR-026): the overlay is scaffolded; the endpoint is
-        # empty until the user runs setup_rag.sh (cocoindex-code, keyless/on-device).
-        rows.append(("rag_endpoint", "(unset — run .agents/scripts/setup_rag.sh)"))
+        # empty until the user runs setup-rag.sh (cocoindex-code, keyless/on-device).
+        rows.append(("rag_endpoint", "(unset — run .agents/scripts/setup-rag.sh)"))
     return rows
 
 

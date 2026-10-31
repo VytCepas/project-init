@@ -29,7 +29,7 @@ class TestDiagramSkill:
         assert "sequenceDiagram" in content
         assert "layout: elk" in content
         # Grounding: code diagrams derive from reality, never invented.
-        assert "CODE_MAP.md" in content
+        assert "code-map.md" in content
         assert "Never invent" in content
         # Iteration loop: committed source, targeted feedback, stable IDs.
         assert "docs/diagrams/" in content
@@ -68,7 +68,7 @@ class TestDiagramSkill:
     def test_listed_in_skill_tables(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         for rel in (
-            ".agents/skills/INDEX.md",
+            ".agents/skills/index.md",
             ".agents/skills/README.md",
             ".agents/project-init.md",
         ):

@@ -123,11 +123,11 @@ def _advisory(concern: str, *, enable: bool) -> str | None:
         return (
             "The governance gate never passes on silence: its CI job stays red until the "
             "repo has a real .agents/governance/SYSTEM_CARD.md (it ships an AI system: copy "
-            ".agents/governance/examples/SYSTEM_CARD.template.md) or a filled "
+            ".agents/governance/examples/system-card-template.md) or a filled "
             ".agents/governance/NO_AI_SYSTEM.md (it ships none: copy "
-            ".agents/governance/examples/NO_AI_SYSTEM.template.md, set reason and "
+            ".agents/governance/examples/no-ai-system-template.md, set reason and "
             "declared_on). Already have one? Nothing to do. Check with "
-            "`bash .agents/scripts/governance_gate.sh`."
+            "`bash .agents/scripts/governance-gate.sh`."
         )
     if concern == "lifecycle" and not enable:
         return (

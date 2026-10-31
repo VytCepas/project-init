@@ -3,7 +3,7 @@
 Reads the always-present Claude Code transcript JSONL plus an optional guarded
 hook self-log and emits a text summary (stdout) + a self-contained
 ``dashboard.html`` (inline CSS, no CDN, no JS). Deterministic, stdlib-only;
-runs via ``_py.sh``.
+runs via ``python-resolve.sh``.
 
 **Aggregate-only by construction.** It extracts only names, counts, and numbers
 — never prompt text, tool-input bodies, command strings, or file contents. The

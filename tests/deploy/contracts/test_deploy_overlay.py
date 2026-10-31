@@ -120,11 +120,11 @@ class TestResolveDeploy:
 
 
 def _envprot(t: Path) -> Path:
-    return t / ".agents" / "scripts" / "setup_env_protection.sh"
+    return t / ".agents" / "scripts" / "setup-environment-protection.sh"
 
 
 def _whats(t: Path) -> Path:
-    return t / ".agents" / "scripts" / "whats_deployed.sh"
+    return t / ".agents" / "scripts" / "what-is-deployed.sh"
 
 
 class TestDeployGateScripts:

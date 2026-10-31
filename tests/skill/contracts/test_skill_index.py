@@ -10,14 +10,14 @@ from tests.helpers import fallback_preset, fallback_variables
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SKILLS_DIR = _REPO_ROOT / "templates" / "fallback" / "dot_agents" / "skills"
 # INDEX.md became a template (#476) so its lifecycle skill rows can be gated.
-_INDEX_PATH = _SKILLS_DIR / "INDEX.md.tmpl"
+_INDEX_PATH = _SKILLS_DIR / "index.md.tmpl"
 
 
 class TestSkillIndex:
     """Verify INDEX.md exists and covers every skill directory."""
 
     def test_index_file_exists(self):
-        assert _INDEX_PATH.exists(), "templates/fallback/dot_agents/skills/INDEX.md.tmpl missing"
+        assert _INDEX_PATH.exists(), "templates/fallback/dot_agents/skills/index.md.tmpl missing"
 
     def test_every_skill_dir_mentioned_in_index(self):
         index_text = _INDEX_PATH.read_text()
@@ -59,29 +59,29 @@ class TestSkillIndex:
         target = tmp_path / "proj"
         preset = fallback_preset()
         scaffold(target, preset, fallback_variables())
-        index = target / ".agents" / "skills" / "INDEX.md"
-        assert index.exists(), ".agents/skills/INDEX.md not scaffolded into project"
+        index = target / ".agents" / "skills" / "index.md"
+        assert index.exists(), ".agents/skills/index.md not scaffolded into project"
 
     def test_index_content_in_scaffolded_project(self, tmp_path: Path):
         target = tmp_path / "proj"
         preset = fallback_preset()
         scaffold(target, preset, fallback_variables())
-        content = (target / ".agents" / "skills" / "INDEX.md").read_text()
-        assert "start_task" in content
-        assert "session_summary" in content
-        assert "add_hook" in content
-        assert "add_command" in content
-        assert "github_workflow" in content
+        content = (target / ".agents" / "skills" / "index.md").read_text()
+        assert "start-task" in content
+        assert "session-summary" in content
+        assert "add-hook" in content
+        assert "add-command" in content
+        assert "github-workflow" in content
 
     def test_github_workflow_skill_scaffolded(self, tmp_path: Path):
         target = tmp_path / "proj"
         preset = fallback_preset()
         scaffold(target, preset, fallback_variables())
-        skill = target / ".agents" / "skills" / "github_workflow" / "SKILL.md"
-        assert skill.exists(), "github_workflow/SKILL.md not scaffolded"
+        skill = target / ".agents" / "skills" / "github-workflow" / "SKILL.md"
+        assert skill.exists(), "github-workflow/SKILL.md not scaffolded"
         content = skill.read_text()
-        assert "finish_pr.sh" in content
-        assert "monitor_pr.sh" in content
+        assert "finish-pr.sh" in content
+        assert "watch-pr.sh" in content
         assert "review-cycle" in content
 
 
@@ -96,7 +96,7 @@ class TestAgentInstructionFiles:
 
     def test_agents_md_references_skills_index(self):
         content = (self.target / "AGENTS.md").read_text()
-        assert "INDEX.md" in content or "skills" in content.lower()
+        assert "index.md" in content or "skills" in content.lower()
 
 
 class TestSkillFrontmatter:
@@ -142,7 +142,7 @@ class TestSkillFrontmatter:
     def test_sub_skills_marked_not_user_invocable(self):
         """Skills documented as indirectly invoked must not be /command-visible."""
         for root in self._SKILL_ROOTS:
-            for skill in ("create_issue", "github_workflow"):
+            for skill in ("create-issue", "github-workflow"):
                 path = root / skill / "SKILL.md"
                 if not path.exists():
                     continue
@@ -153,8 +153,8 @@ class TestSkillFrontmatter:
 
     def test_audit_runs_in_forked_context(self):
         """Heavyweight scan isolates its context; findings land in a GitHub issue."""
-        # audit moved to the lifecycle_fallback overlay (#476).
-        audit = _REPO_ROOT / "templates" / "lifecycle_fallback" / "dot_agents" / "skills" / "audit"
+        # audit moved to the lifecycle-fallback overlay (#476).
+        audit = _REPO_ROOT / "templates" / "lifecycle-fallback" / "dot_agents" / "skills" / "audit"
         fm = self._frontmatter(audit / "SKILL.md")
         assert fm.get("context") == "fork"
 
@@ -162,8 +162,8 @@ class TestSkillFrontmatter:
 class TestCodeMapStaleness:
     """PI-686: the scaffolded CODE_MAP had a generator but no staleness check.
 
-    `gen_code_map.py` was wired only to a manual `just code-map` recipe — absent
-    from the scaffolded ci.yml, pre-push hook, install_hooks.sh, and pre-commit
+    `generate-code-map.py` was wired only to a manual `just code-map` recipe — absent
+    from the scaffolded ci.yml, pre-push hook, install-hooks.sh, and pre-commit
     config. The file whose header says "read this before grepping" rotted freely
     in every scaffolded project.
     """

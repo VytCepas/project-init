@@ -65,7 +65,7 @@ class ScaffoldInputs:
     # →review→merge automation (DAG hooks/scripts, board/wiki/validation
     # workflows, issue/PR templates, lifecycle skills); "none" declines it for a
     # forge-agnostic / minimalist scaffold. Opt-OUT — default ON. Drives the
-    # lifecycle/lifecycle_fallback overlays + the `lifecycle` gate var. Resolved
+    # lifecycle/lifecycle-fallback overlays + the `lifecycle` gate var. Resolved
     # with precedence flag > interactive > preset var > "github". Forge-portable
     # quality hooks (commit-msg, gitleaks, lint/format gate, prod-safety) are
     # core and stay regardless.
@@ -110,11 +110,11 @@ class ScaffoldInputs:
     # at run time), so a --python-version that disagrees is rejected outright
     # rather than half-applied; see _reject_conflicting_python_version.
     python_version: str = ""
-    # Review-fix cycles the scaffolded monitor_pr.sh runs before it stops asking
+    # Review-fix cycles the scaffolded watch-pr.sh runs before it stops asking
     # for another pass (#714). Rendered into .agents/config.yaml and read back by
-    # gh_host.sh's review_cycles(). 0 = no review control (merge on green CI).
+    # gh-host.sh's review_cycles(). 0 = no review control (merge on green CI).
     # Only meaningful with the GitHub lifecycle; a --lifecycle none project ships
-    # no monitor_pr.sh, so the wizard doesn't ask and the key isn't rendered.
+    # no watch-pr.sh, so the wizard doesn't ask and the key isn't rendered.
     review_cycles: int = 2
     # Co-Authored-By: Claude commit trailer (#888). When True, the scaffolded
     # agent commit guidance (project-init.md, conventions.md) and the optional
@@ -196,7 +196,7 @@ def rag_gate_variables(memory_stack: str, target: Path | None) -> dict[str, str]
     The full rag.md rule (~1.9KB) auto-loads every session, but until
     `memory.rag_endpoint` is set in .agents/config.yaml the stack it describes
     isn't wired — emit a one-line pointer instead. rag_endpoint is the durable
-    signal setup_rag.sh tells the operator to set (the index cache itself is
+    signal setup-rag.sh tells the operator to set (the index cache itself is
     gitignored, so it can't gate re-renders on a fresh clone).
     """
     is_rag = memory_stack == "obsidian-graphify-rag"
@@ -248,7 +248,7 @@ def _validate_review_cycles(
 
     Runs on BOTH paths (PR #717 review). The interactive wizard used to copy the
     raw value, so `--review-cycles -1` recorded a count that later crashed
-    monitor_pr.sh, and a lifecycle-none pairing was dropped in silence.
+    watch-pr.sh, and a lifecycle-none pairing was dropped in silence.
 
     ``effective_lifecycle`` is the tier this run will actually scaffold, or None
     when it isn't knowable yet. A *preset* may set ``lifecycle = "none"`` with no
@@ -431,7 +431,7 @@ _IAC_ALIASES = {"tofu": "opentofu", "terraform": "opentofu"}
 _IAC_SUMMARY = {
     "none": "no infrastructure-as-code scaffolding (default)",
     "opentofu": (
-        "OpenTofu (open-source Terraform) starter under infra/ + a plan preview "
+        "OpenTofu (open-source Terraform) starter under infrastructure/ + a plan preview "
         "on each PR; applying stays manual"
     ),
 }
@@ -617,7 +617,7 @@ def _build_variables(
     has_obsidian = memory_stack in ("obsidian-only", "obsidian-graphify", "obsidian-graphify-rag")
     is_graphify = memory_stack in ("obsidian-graphify", "obsidian-graphify-rag")
     has_memory = memory_stack != "none"
-    # GitHub lifecycle gate (#476, ADR-021): drives the lifecycle/lifecycle_fallback
+    # GitHub lifecycle gate (#476, ADR-021): drives the lifecycle/lifecycle-fallback
     # overlays + every {{#if lifecycle}} block (settings hooks, pre-push branch
     # rule, AGENTS/project-init prose). Recorded so `upgrade` re-derives the same
     # set (PI-189); _backfill_variables / _migrate_semantic_config emit it too.
@@ -659,7 +659,7 @@ def _build_variables(
         "python_floor": python_floor,
         "python_image_tag": python_image_tag,
         "python_version_pin": python_version_pin,
-        # #714: read back by gh_host.sh's review_cycles(); only rendered under
+        # #714: read back by gh-host.sh's review_cycles(); only rendered under
         # the {{#if lifecycle}} gate in config.yaml.tmpl.
         "review_cycles": str(inputs.review_cycles),
         "project_name": project_name,
@@ -710,7 +710,7 @@ def _build_variables(
         "deploy_cloud_run": "true" if inputs.deploy == "cloud-run" else "",
         "deploy_fly": "true" if inputs.deploy == "fly" else "",
         "deploy_k8s": "true" if inputs.deploy == "k8s" else "",
-        # IaC overlay (ADR-015, opt-in): infra/ HCL skeleton + infra.yml gate on this.
+        # IaC overlay (ADR-015, opt-in): infrastructure/ HCL skeleton + infrastructure.yml gate on this.
         "iac": inputs.iac,
         "iac_enabled": "true" if inputs.iac != "none" else "",
         # Cloud-OIDC integration seam (#326): set whenever a deploy or IaC workflow
@@ -807,7 +807,7 @@ def _build_variables(
         # Single trunk: feature PRs target 'main'. Pinned to 'main' (not the live
         # default branch) so the rendered workflows and gh_host's base_branch()
         # agree. Templates that key off the trunk (ci.yml, validate-pr.yml,
-        # start_issue.sh) consume this.
+        # start-issue.sh) consume this.
         "base_branch": "main",
         # No-egress mode (#258): omit the external official marketplace. egress_ok
         # is the inverse flag the template gates on (the engine has no else-branch).

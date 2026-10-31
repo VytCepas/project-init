@@ -1,6 +1,6 @@
 """PI-651 (epic #641): failure-path hook output is capped before injection.
 
-`post_edit_lint.sh` (PostToolUse additionalContext) and `pre_commit_gate.sh`
+`post-edit-lint.sh` (PostToolUse additionalContext) and `pre-commit-gate.sh`
 (PreToolUse deny reason) persist their text in the transcript, re-sent every
 turn — so the injected error report is capped at 40 lines with a trailer
 pointing at the full report. The deny/allow decisions themselves are
@@ -42,12 +42,12 @@ def _make_workdir(tmp_path: Path, *hooks: str) -> Path:
     work = tmp_path / "work"
     hooks_dir = work / ".agents" / "hooks"
     hooks_dir.mkdir(parents=True)
-    for name in (*hooks, "_usage_log.sh"):
+    for name in (*hooks, "usage-log.sh"):
         shutil.copy(_HOOKS_SRC / name, hooks_dir / name)
-    # _py.sh lives in the base layer (always copied by the scaffolder).
+    # python-resolve.sh lives in the base layer (always copied by the scaffolder).
     shutil.copy(
-        _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "_py.sh",
-        hooks_dir / "_py.sh",
+        _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks" / "python-resolve.sh",
+        hooks_dir / "python-resolve.sh",
     )
     return work
 
@@ -62,7 +62,7 @@ class TestPostEditLintCap:
     def _run(self, work: Path, file_path: Path) -> str:
         payload = json.dumps({"tool_input": {"file_path": str(file_path)}})
         result = subprocess.run(
-            ["bash", str(work / ".agents" / "hooks" / "post_edit_lint.sh")],
+            ["bash", str(work / ".agents" / "hooks" / "post-edit-lint.sh")],
             input=payload,
             capture_output=True,
             text=True,
@@ -76,7 +76,7 @@ class TestPostEditLintCap:
         return json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
 
     def test_oversized_lint_output_is_capped_with_trailer(self, tmp_path: Path):
-        work = _make_workdir(tmp_path, "post_edit_lint.sh")
+        work = _make_workdir(tmp_path, "post-edit-lint.sh")
         bad = work / "bad.py"
         _noisy_py(bad, 60)
         ctx = self._run(work, bad)
@@ -89,7 +89,7 @@ class TestPostEditLintCap:
         assert "undefined_name_0" in ctx  # the first findings survive
 
     def test_small_lint_output_is_not_truncated(self, tmp_path: Path):
-        work = _make_workdir(tmp_path, "post_edit_lint.sh")
+        work = _make_workdir(tmp_path, "post-edit-lint.sh")
         bad = work / "bad.py"
         _noisy_py(bad, 2)
         ctx = self._run(work, bad)
@@ -101,7 +101,7 @@ class TestPreCommitGateCap:
     def _run_gate(self, work: Path) -> dict:
         payload = json.dumps({"tool_input": {"command": "git commit -m x"}})
         result = subprocess.run(
-            ["bash", str(work / ".agents" / "hooks" / "pre_commit_gate.sh")],
+            ["bash", str(work / ".agents" / "hooks" / "pre-commit-gate.sh")],
             input=payload,
             capture_output=True,
             text=True,
@@ -117,7 +117,7 @@ class TestPreCommitGateCap:
         still produce the capped deny — passing $ERRORS as argv used to fail
         the exec with E2BIG and silently skip the deny (gate bypass; Codex
         review on PI-651). $ERRORS now travels via stdin."""
-        work = _make_workdir(tmp_path, "pre_commit_gate.sh")
+        work = _make_workdir(tmp_path, "pre-commit-gate.sh")
         subprocess.run(["git", "init", "-q"], cwd=work, check=True, capture_output=True)
         bad = work / "bad.py"
         _noisy_py(bad, 3000)  # ruff report comfortably exceeds 128KB
@@ -127,7 +127,7 @@ class TestPreCommitGateCap:
         assert "output truncated" in out["permissionDecisionReason"]
 
     def test_oversized_deny_reason_is_capped_but_still_denies(self, tmp_path: Path):
-        work = _make_workdir(tmp_path, "pre_commit_gate.sh")
+        work = _make_workdir(tmp_path, "pre-commit-gate.sh")
         subprocess.run(["git", "init", "-q"], cwd=work, check=True, capture_output=True)
         bad = work / "bad.py"
         _noisy_py(bad, 60)

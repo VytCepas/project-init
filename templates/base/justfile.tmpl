@@ -19,10 +19,10 @@ lint:
     uv run ruff format --check .
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
-    bash .agents/scripts/lint_context_budget.sh
+    bash .agents/scripts/lint-context-budget.sh
     just naming
-    uv run python .agents/scripts/check_test_contract.py exit-codes
-    uv run --with pytest python .agents/scripts/check_test_contract.py discovery
+    uv run python .agents/scripts/check-test-contract.py exit-codes
+    uv run --with pytest python .agents/scripts/check-test-contract.py discovery
 
 # static type check (strict mode per mypy.ini; add mypy with `uv add --dev mypy`)
 # no-op on a fresh scaffold with no src/ yet — mypy errors on a missing path.
@@ -72,7 +72,7 @@ test-mutation:
     uv run --with mutmut mutmut export-cicd-stats
 
 # dependency vulnerability scan against known CVEs/advisories (PI-568).
-# complements package_guard.py, which only blocks installing a package that
+# complements admission_package.py, which only blocks installing a package that
 # doesn't exist or looks typosquatted — this catches a real, correctly-
 # spelled dependency with a known vulnerability already in the lockfile.
 # It audits the exported lock, never an environment: `uv run --with pip-audit`
@@ -140,9 +140,9 @@ docs:
 scan:
     gitleaks git --pre-commit --staged --redact --no-banner --verbose
 
-# regenerate .agents/docs/CODE_MAP.md (low-token "what does what" map; read before grepping)
+# regenerate .agents/docs/code-map.md (low-token "what does what" map; read before grepping)
 code-map:
-    uv run python .agents/scripts/gen_code_map.py
+    uv run python .agents/scripts/generate-code-map.py
 {{/if python}}{{#if node}}# justfile — the canonical command interface (scaffolded by project-init).
 # `just --list` shows every recipe. Recipes are thin wrappers — logic lives
 # in the tools and their configs, never in this file.
@@ -172,7 +172,7 @@ lint:
     bunx @biomejs/biome format .
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
-    bash .agents/scripts/lint_context_budget.sh
+    bash .agents/scripts/lint-context-budget.sh
     just naming
 
 # static type check (strict mode per tsconfig.base.json)
@@ -194,7 +194,7 @@ format:
 # own exit code (#1054).
 [doc("run the test suite (coverage-gated per bunfig.toml — PI-569).")]
 test:
-    sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bash .agents/hooks/_py.sh .agents/scripts/contract_line.py {{project_slug}} bun -- bun test; else echo "No test files yet — nothing to test."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
+    sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bash .agents/hooks/python-resolve.sh .agents/scripts/contract-line.py {{project_slug}} bun -- bun test; else echo "No test files yet — nothing to test."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
 
 # fail-fast run for the edit-test loop (token-efficiency; PI-641)
 test-quick:
@@ -278,7 +278,7 @@ lint:
     sh -c 'if find . -name "*.go" | grep -q .; then golangci-lint run; else echo "No Go sources yet — nothing to lint."; fi'
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
-    bash .agents/scripts/lint_context_budget.sh
+    bash .agents/scripts/lint-context-budget.sh
     just naming
 
 # type-only pass. Redundant with `just lint` by design: golangci-lint runs
@@ -301,7 +301,7 @@ format:
 # last; the output shown is go's plain form and the exit code is go's (#1054).
 [doc("run the test suite")]
 test:
-    sh -c 'if find . -name "*.go" | grep -q .; then bash .agents/hooks/_py.sh .agents/scripts/contract_line.py {{project_slug}} go -- go test -json ./...; else echo "No Go sources yet — nothing to test."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
+    sh -c 'if find . -name "*.go" | grep -q .; then bash .agents/hooks/python-resolve.sh .agents/scripts/contract-line.py {{project_slug}} go -- go test -json ./...; else echo "No Go sources yet — nothing to test."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
 
 # fail-fast run for the edit-test loop (token-efficiency; PI-641). Same day-one
 # guard as `test`.
@@ -422,7 +422,7 @@ lint:
     sh -c 'if [ -f Cargo.toml ]; then cargo fmt --check; else echo "No Cargo project yet — run cargo init."; fi'
     sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
-    bash .agents/scripts/lint_context_budget.sh
+    bash .agents/scripts/lint-context-budget.sh
     just naming
 
 # type-only compile pass. Redundant with `just lint` by design: clippy already
@@ -441,7 +441,7 @@ format:
 # line and cargo's own exit code (#1054).
 [doc("run the test suite")]
 test:
-    sh -c 'if [ -f Cargo.toml ]; then bash .agents/hooks/_py.sh .agents/scripts/contract_line.py {{project_slug}} cargo -- cargo test; else echo "No Cargo project yet — run cargo init."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
+    sh -c 'if [ -f Cargo.toml ]; then bash .agents/hooks/python-resolve.sh .agents/scripts/contract-line.py {{project_slug}} cargo -- cargo test; else echo "No Cargo project yet — run cargo init."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
 
 # quiet run for the edit-test loop (token-efficiency; PI-641; cargo has no
 # stable fail-fast flag, so quiet output is the lever here)

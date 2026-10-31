@@ -795,8 +795,8 @@ class TestPluginCutoverMigration:
         rc = main(["upgrade", str(target), "--apply", "--accept-new", "python-pin"])
         assert rc == 0
         # The copied payload survives: still present, not flagged removed.
-        assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()
-        assert (target / ".agents" / "hooks" / "pre_commit_gate.sh").is_file()
+        assert (target / ".agents" / "skills" / "github-workflow" / "SKILL.md").is_file()
+        assert (target / ".agents" / "hooks" / "pre-commit-gate.sh").is_file()
 
 
 class TestNoPluginSwitch:
@@ -805,13 +805,13 @@ class TestNoPluginSwitch:
         the copied-payload fallback (PR #175 review)."""
         target = tmp_path / "p"
         _scaffold(target)  # default: plugin mode, no copies
-        assert not (target / ".agents" / "hooks" / "pre_commit_gate.sh").exists()
+        assert not (target / ".agents" / "hooks" / "pre-commit-gate.sh").exists()
 
         rc = main(["upgrade", str(target), "--no-plugin", "--apply", "--accept-new", "all"])
         assert rc == 0
         assert "switching to the no-plugin fallback" in capsys.readouterr().err
-        assert (target / ".agents" / "hooks" / "pre_commit_gate.sh").is_file()
-        assert (target / ".agents" / "skills" / "github_workflow" / "SKILL.md").is_file()
+        assert (target / ".agents" / "hooks" / "pre-commit-gate.sh").is_file()
+        assert (target / ".agents" / "skills" / "github-workflow" / "SKILL.md").is_file()
         # The mode is recorded, so plain upgrades stay in fallback mode.
         _, variables, _, _ = read_scaffold_record(target)
         assert variables["no_plugin"] == "true"
@@ -846,7 +846,7 @@ class TestInteractiveNoPlugin:
         monkeypatch.setattr(cli, "_gather_inputs_interactive", _fake_gather)
         target = tmp_path / "p"
         assert cli.main([str(target), "--no-plugin", "--preset", "obsidian-only"]) == 0
-        assert (target / ".agents" / "hooks" / "pre_commit_gate.sh").is_file()
+        assert (target / ".agents" / "hooks" / "pre-commit-gate.sh").is_file()
         settings = (target / ".agents" / "settings.json").read_text()
         assert "project-init-workflow" not in settings
 
@@ -1020,14 +1020,14 @@ class TestThreeWayMergeApply:
 
         target = tmp_path / "p"
         _scaffold(target)
-        script = target / ".agents" / "scripts" / "push_branch.sh"
+        script = target / ".agents" / "scripts" / "push-branch.sh"
         assert script.stat().st_mode & stat.S_IXUSR, "fixture script must be executable"
         # Force a genuine overlap so a conflict-marked .new is written.
-        _set_base(target, ".agents/scripts/push_branch.sh", "#!/usr/bin/env bash\n# base\n")
+        _set_base(target, ".agents/scripts/push-branch.sh", "#!/usr/bin/env bash\n# base\n")
         script.write_text("#!/usr/bin/env bash\n# my local edit\n")
 
         assert main(["upgrade", str(target), "--apply"]) == 0
-        sibling = target / ".agents" / "scripts" / "push_branch.sh.new"
+        sibling = target / ".agents" / "scripts" / "push-branch.sh.new"
         assert sibling.exists()
         assert sibling.stat().st_mode & stat.S_IXUSR, "the .new sibling must keep +x"
         assert os.access(sibling, os.X_OK)

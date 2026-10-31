@@ -30,12 +30,12 @@ _MEMORY_NEXT_STEPS = {
     "obsidian-only": "Memory: .agents/memory/ + Obsidian vault — open .agents/vault/ in Obsidian (optional).",
     "obsidian-graphify": (
         "Memory: build the code graph — run "
-        "[bold]uv tool install graphifyy && .agents/scripts/setup_graphify.sh[/bold]"
+        "[bold]uv tool install graphifyy && .agents/scripts/setup-graphify.sh[/bold]"
     ),
     "obsidian-graphify-rag": (
         "Memory: code graph + semantic RAG — run "
-        "[bold]uv tool install graphifyy && .agents/scripts/setup_graphify.sh[/bold], "
-        "then [bold].agents/scripts/setup_rag.sh[/bold] (installs cocoindex-code — "
+        "[bold]uv tool install graphifyy && .agents/scripts/setup-graphify.sh[/bold], "
+        "then [bold].agents/scripts/setup-rag.sh[/bold] (installs cocoindex-code — "
         "keyless, on-device; see .agents/docs/guides/using-rag.md)"
     ),
 }

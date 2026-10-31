@@ -1,4 +1,4 @@
-"""PI-558 review finding: the mypy-on-edit gate in post_edit_lint.sh only
+"""PI-558 review finding: the mypy-on-edit gate in post-edit-lint.sh only
 matched an absolute `$ROOT/src/*` path. Claude tool payloads can carry a
 repo-relative path (e.g. "src/foo.py") instead, which silently skipped mypy
 entirely. Runs the real hook script end-to-end for both path shapes.
@@ -19,15 +19,15 @@ _BASE_HOOKS = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks"
 
 
 def _run_hook(file_path: str, cwd: Path) -> dict | None:
-    # post_edit_lint.sh resolves its sibling _py.sh at runtime — that file's
-    # true source is templates/base/, only landing alongside post_edit_lint.sh
+    # post-edit-lint.sh resolves its sibling python-resolve.sh at runtime — that file's
+    # true source is templates/base/, only landing alongside post-edit-lint.sh
     # once scaffold() copies both into a project's .agents/hooks/. Reproduce
     # that layout rather than invoking the fallback template in place.
     hooks_dir = cwd / ".agents" / "hooks"
     hooks_dir.mkdir(parents=True, exist_ok=True)
-    hook = hooks_dir / "post_edit_lint.sh"
-    shutil.copy(_FALLBACK_HOOKS / "post_edit_lint.sh", hook)
-    shutil.copy(_BASE_HOOKS / "_py.sh", hooks_dir / "_py.sh")
+    hook = hooks_dir / "post-edit-lint.sh"
+    shutil.copy(_FALLBACK_HOOKS / "post-edit-lint.sh", hook)
+    shutil.copy(_BASE_HOOKS / "python-resolve.sh", hooks_dir / "python-resolve.sh")
 
     payload = json.dumps({"tool_input": {"file_path": file_path}})
     result = subprocess.run(

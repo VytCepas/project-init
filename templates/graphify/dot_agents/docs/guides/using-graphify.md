@@ -9,7 +9,7 @@ together", vault for "why did we do it this way".
 ## One-time setup
 
 ```bash
-.agents/scripts/setup_graphify.sh
+.agents/scripts/setup-graphify.sh
 ```
 
 This installs the `graphify` CLI (`uv tool install graphifyy`), registers

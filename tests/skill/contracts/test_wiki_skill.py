@@ -51,7 +51,7 @@ class TestWikiSkillStructure:
         fabricated ``gh wiki`` subcommand (which does not exist)."""
         content = skill_file.read_text()
         required = [
-            "push_wiki.sh",  # guard-allowlisted write path
+            "push_wiki.sh",  # guard-allowlisted write path (this repo's own skill keeps the old name)
             ".wiki.git",  # the wiki is a plain git repo
         ]
         for action in required:

@@ -88,18 +88,18 @@ class TestFrontmatterReading:
         assert not sync_plugin.invoked_only(md)
 
     def test_add_command_is_not_invoked_only(self):
-        """The ticket's comment named `add_command` as carrying the field. It
+        """The ticket's comment named `add-command` as carrying the field. It
         does not: the key is in a fenced example in its body, showing a reader
         what they may write. Marking it would hide a skill that is meant to be
         found."""
-        assert not sync_plugin.invoked_only(_FALLBACK_SKILLS / "add_command" / "SKILL.md")
+        assert not sync_plugin.invoked_only(_FALLBACK_SKILLS / "add-command" / "SKILL.md")
 
 
 class TestAddCommandTeachesTheOtherHarnesses:
     """#1011: the skill that teaches users to write skills must not say other
     agents ignore them, and must cover Codex's policy file for a user-only one."""
 
-    _TEXT = (_FALLBACK_SKILLS / "add_command" / "SKILL.md").read_text(encoding="utf-8")
+    _TEXT = (_FALLBACK_SKILLS / "add-command" / "SKILL.md").read_text(encoding="utf-8")
 
     def test_no_claim_that_other_agents_do_not_consume_the_output(self):
         assert "Other agents do not consume" not in self._TEXT
@@ -250,7 +250,7 @@ def _fake_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point the sync at copies of the real skill sources; return the core root."""
     fallback = tmp_path / "fallback"
     shutil.copytree(sync_plugin.FALLBACK_CLAUDE, fallback)
-    lifecycle_fallback = tmp_path / "lifecycle_fallback"
+    lifecycle_fallback = tmp_path / "lifecycle-fallback"
     shutil.copytree(sync_plugin.LIFECYCLE_FALLBACK_CLAUDE, lifecycle_fallback)
     monkeypatch.setattr(sync_plugin, "FALLBACK_CLAUDE", fallback)
     monkeypatch.setattr(sync_plugin, "LIFECYCLE_FALLBACK_CLAUDE", lifecycle_fallback)

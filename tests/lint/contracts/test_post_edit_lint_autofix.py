@@ -1,4 +1,4 @@
-"""PI-839: post_edit_lint.sh must never auto-remove imports mid-edit-sequence.
+"""PI-839: post-edit-lint.sh must never auto-remove imports mid-edit-sequence.
 
 Agents make paired edits — edit k adds an import, edit k+1 adds its usage.
 The PostToolUse hook fires between them, when the import is momentarily
@@ -22,13 +22,13 @@ _BASE_HOOKS = _REPO_ROOT / "templates" / "base" / "dot_agents" / "hooks"
 
 
 def _run_hook(file_path: str, cwd: Path) -> dict | None:
-    # post_edit_lint.sh resolves its sibling _py.sh at runtime — reproduce the
+    # post-edit-lint.sh resolves its sibling python-resolve.sh at runtime — reproduce the
     # scaffolded .agents/hooks/ layout rather than invoking the template in place.
     hooks_dir = cwd / ".agents" / "hooks"
     hooks_dir.mkdir(parents=True, exist_ok=True)
-    hook = hooks_dir / "post_edit_lint.sh"
-    shutil.copy(_FALLBACK_HOOKS / "post_edit_lint.sh", hook)
-    shutil.copy(_BASE_HOOKS / "_py.sh", hooks_dir / "_py.sh")
+    hook = hooks_dir / "post-edit-lint.sh"
+    shutil.copy(_FALLBACK_HOOKS / "post-edit-lint.sh", hook)
+    shutil.copy(_BASE_HOOKS / "python-resolve.sh", hooks_dir / "python-resolve.sh")
 
     payload = json.dumps({"tool_input": {"file_path": file_path}})
     result = subprocess.run(

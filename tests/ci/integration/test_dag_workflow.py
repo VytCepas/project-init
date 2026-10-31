@@ -13,6 +13,7 @@ import pytest
 
 from project_init.scaffold import scaffold
 from tests.helpers import fallback_preset, fallback_variables
+from tools.sync_agents_from_templates import own_names
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SOURCE_HOOK = REPO_ROOT / ".agents" / "hooks" / "dag_workflow.py"
@@ -29,13 +30,13 @@ def _load_module(path: Path):
 
 @pytest.fixture(scope="module")
 def dag():
-    return _load_module(SOURCE_HOOK)
+    return _load_module(TEMPLATE_HOOK)
 
 
 def _run_guard(payload: dict, cwd: Path | None = None) -> dict | None:
     """Run dag_workflow.py guard via subprocess and return parsed stdout."""
     proc = subprocess.run(
-        [sys.executable, str(SOURCE_HOOK), "guard"],
+        [sys.executable, str(TEMPLATE_HOOK), "guard"],
         input=json.dumps(payload),
         capture_output=True,
         text=True,
@@ -62,7 +63,7 @@ def _project_with_hook(root: Path) -> Path:
     hooks = root / ".agents" / "hooks"
     hooks.mkdir(parents=True, exist_ok=True)
     dest = hooks / "dag_workflow.py"
-    dest.write_bytes(SOURCE_HOOK.read_bytes())
+    dest.write_bytes(TEMPLATE_HOOK.read_bytes())
     return dest
 
 
@@ -111,7 +112,9 @@ class TestFilesPresent:
         assert TEMPLATE_HOOK.is_file()
 
     def test_template_and_source_match(self):
-        assert SOURCE_HOOK.read_bytes() == TEMPLATE_HOOK.read_bytes()
+        # Byte-equal but for the names this repo's own .agents/ still carries (see
+        # tools/sync_agents_from_templates.py own_names).
+        assert SOURCE_HOOK.read_text() == own_names(TEMPLATE_HOOK.read_text())
 
     def test_python_hook_is_not_executable(self):
         if sys.platform == "win32":
@@ -172,32 +175,32 @@ class TestGuardSteering:
         # into the tmp project and provide the wrapper it redirects to.
         hook = _project_with_hook(tmp_path)
         (tmp_path / ".agents" / "scripts").mkdir(parents=True)
-        (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts" / "watch-pr.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard_hook(hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path)
         assert _denied(out)
-        assert "monitor_pr.sh" in _deny_reason(out)
+        assert "watch-pr.sh" in _deny_reason(out)
 
     def test_blocks_gh_api_merge(self, tmp_path: Path):
         hook = _project_with_hook(tmp_path)
         (tmp_path / ".agents" / "scripts").mkdir(parents=True)
-        (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts" / "watch-pr.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard_hook(
             hook,
             {"tool_input": {"command": "gh api repos/foo/bar/pulls/42/merge -X PUT"}},
             cwd=tmp_path,
         )
         assert _denied(out)
-        assert "monitor_pr.sh" in _deny_reason(out)
+        assert "watch-pr.sh" in _deny_reason(out)
 
     def test_blocks_raw_git_push_when_wrapper_exists(self, tmp_path: Path):
         hook = _project_with_hook(tmp_path)
         (tmp_path / ".agents" / "scripts").mkdir(parents=True)
-        (tmp_path / ".agents" / "scripts" / "push_branch.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts" / "push-branch.sh").write_text("#!/bin/sh\nexit 0\n")
         out = _run_guard_hook(
             hook, {"tool_input": {"command": "git push -u origin feat/x"}}, cwd=tmp_path
         )
         assert _denied(out)
-        assert "push_branch.sh" in _deny_reason(out)
+        assert "push-branch.sh" in _deny_reason(out)
 
     def test_no_redirect_when_wrapper_missing(self, tmp_path: Path):
         # Hook installed but no .agents/scripts dir → suppress redirect.
@@ -213,12 +216,12 @@ class TestGuardSteering:
         own — the wrapper is found via the hook's own location, not the CWD."""
         hook = _project_with_hook(tmp_path)
         (tmp_path / ".agents" / "scripts").mkdir(parents=True)
-        (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts" / "watch-pr.sh").write_text("#!/bin/sh\nexit 0\n")
         subdir = tmp_path / "src" / "pkg"
         subdir.mkdir(parents=True)
         out = _run_guard_hook(hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=subdir)
         assert _denied(out)
-        assert "monitor_pr.sh" in _deny_reason(out)
+        assert "watch-pr.sh" in _deny_reason(out)
 
     def test_redirect_resolves_via_project_dir_in_plugin_mode(self, tmp_path: Path):
         """#447 review (P1): in the default plugin path the hook runs from the
@@ -230,17 +233,17 @@ class TestGuardSteering:
         plugin_hooks = tmp_path / "plugin" / "hooks"
         plugin_hooks.mkdir(parents=True)
         hook = plugin_hooks / "dag_workflow.py"
-        hook.write_bytes(SOURCE_HOOK.read_bytes())
+        hook.write_bytes(TEMPLATE_HOOK.read_bytes())
         # The real project (with the wrapper) lives elsewhere.
         project = tmp_path / "project"
         (project / ".agents" / "scripts").mkdir(parents=True)
-        (project / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (project / ".agents" / "scripts" / "watch-pr.sh").write_text("#!/bin/sh\nexit 0\n")
         env = {**os.environ, "CLAUDE_PROJECT_DIR": str(project)}
         out = _run_guard_hook(
             hook, {"tool_input": {"command": "gh pr merge 42"}}, cwd=tmp_path, env=env
         )
         assert _denied(out)
-        assert "monitor_pr.sh" in _deny_reason(out)
+        assert "watch-pr.sh" in _deny_reason(out)
 
     @pytest.mark.parametrize(
         "cmd",
@@ -311,11 +314,11 @@ class TestGuardSteering:
         the REST `/pulls/N/merge` rule and must be blocked in its own right."""
         hook = _project_with_hook(tmp_path)
         (tmp_path / ".agents" / "scripts").mkdir(parents=True)
-        (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").write_text("#!/bin/sh\nexit 0\n")
+        (tmp_path / ".agents" / "scripts" / "watch-pr.sh").write_text("#!/bin/sh\nexit 0\n")
         cmd = 'gh api graphql -f query="mutation { mergePullRequest(input:{pullRequestId:1}){x} }"'
         out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
         assert _denied(out)
-        assert "monitor_pr.sh" in _deny_reason(out)
+        assert "watch-pr.sh" in _deny_reason(out)
 
     def test_blocks_guarded_command_in_interpreter_heredoc(self, tmp_path: Path):
         """2026-07 review: a heredoc fed to an interpreter executes its body, so
@@ -370,13 +373,13 @@ class TestGuardSteering:
     def test_still_blocks_command_substitution_inside_body(self, tmp_path: Path):
         """#550 evasion guard: a value containing a command substitution IS
         executed, so masking must leave it intact and the inner merge must
-        still be caught (monitor_pr.sh redirect exists in this repo)."""
+        still be caught (watch-pr.sh redirect exists in this repo)."""
         out = _run_guard(
             {"tool_input": {"command": 'gh pr comment 5 --body "$(gh pr merge 9)"'}},
             cwd=tmp_path,
         )
         assert _denied(out)
-        assert "monitor_pr.sh" in _deny_reason(out)
+        assert "watch-pr.sh" in _deny_reason(out)
 
     def test_masked_flag_does_not_hide_a_real_following_push(self, tmp_path: Path):
         """#550: masking a flag value must not swallow a real push-to-main that
@@ -398,7 +401,7 @@ class TestGuardSteering:
 
     def test_bad_json_passes(self, tmp_path: Path):
         proc = subprocess.run(
-            [sys.executable, str(SOURCE_HOOK), "guard"],
+            [sys.executable, str(TEMPLATE_HOOK), "guard"],
             input="not json",
             capture_output=True,
             text=True,
@@ -485,7 +488,7 @@ class TestIssuePrefixOverride:
         # via a one-shot Python invocation (subprocess so env is honored).
         code = (
             "import importlib.util, sys; "
-            f"spec = importlib.util.spec_from_file_location('dw', {str(SOURCE_HOOK)!r}); "
+            f"spec = importlib.util.spec_from_file_location('dw', {str(TEMPLATE_HOOK)!r}); "
             "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); "
             f"r = m._issue_from_branch({branch!r}); "
             "sys.stdout.write('None' if r is None else str(r))"
@@ -515,7 +518,7 @@ class TestIssuePrefixOverride:
 class TestCheckSubcommand:
     def test_unknown_node_exits_2(self):
         proc = subprocess.run(
-            [sys.executable, str(SOURCE_HOOK), "check", "no.such.node"],
+            [sys.executable, str(TEMPLATE_HOOK), "check", "no.such.node"],
             capture_output=True,
             text=True,
         )
@@ -524,7 +527,7 @@ class TestCheckSubcommand:
 
     def test_nodes_subcommand_lists_dag(self):
         proc = subprocess.run(
-            [sys.executable, str(SOURCE_HOOK), "nodes"],
+            [sys.executable, str(TEMPLATE_HOOK), "nodes"],
             capture_output=True,
             text=True,
         )
@@ -539,7 +542,7 @@ class TestSubcommands:
 
     def _run(self, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [sys.executable, str(SOURCE_HOOK), *args],
+            [sys.executable, str(TEMPLATE_HOOK), *args],
             capture_output=True,
             text=True,
             cwd=cwd,
@@ -593,11 +596,12 @@ class TestScriptShims:
     """The bash lifecycle scripts are now thin shims around dag_workflow.py."""
 
     @pytest.mark.parametrize(
-        "name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"]
+        "name",
+        ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"],
     )
     def test_source_script_is_shim(self, name: str):
-        # Since PI-685 the repo's shims are synced verbatim from
-        # templates/lifecycle, so they carry the PI-361 _py.sh resolver form.
+        # Since PI-685 the repo's shims are synced from templates/lifecycle, so they
+        # carry the PI-361 resolver form, under the names this repo's own copy keeps.
         path = REPO_ROOT / ".agents" / "scripts" / name
         assert path.is_file()
         text = path.read_text()
@@ -607,17 +611,18 @@ class TestScriptShims:
         assert len(text.splitlines()) <= 6
 
     @pytest.mark.parametrize(
-        "name", ["push_branch.sh", "promote_review.sh", "finish_pr.sh", "create_nojira_pr.sh"]
+        "name",
+        ["push-branch.sh", "promote-review.sh", "finish-pr.sh", "create-pr-without-issue.sh"],
     )
     def test_template_script_is_shim(self, name: str):
         path = REPO_ROOT / "templates" / "lifecycle" / "dot_agents" / "scripts" / name
         assert path.is_file()
         text = path.read_text()
         assert "dag_workflow.py" in text
-        # PI-361: the scaffolded shim execs the interpreter via the _py.sh
+        # PI-361: the scaffolded shim execs the interpreter via the python-resolve.sh
         # resolver rather than a bare `python3`.
         assert "exec " in text
-        assert "_py.sh" in text
+        assert "python-resolve.sh" in text
         assert "python3" not in text
 
 
@@ -638,10 +643,10 @@ class TestScaffoldedTemplate:
         assert "guard" in text
 
     def test_workflow_reminder_includes_full_rules(self):
-        text = (self.target / ".agents" / "hooks" / "workflow_state_reminder.sh").read_text()
+        text = (self.target / ".agents" / "hooks" / "workflow-state-reminder.sh").read_text()
         assert "DAG" in text or "dag" in text
-        assert "monitor_pr.sh" in text
-        assert "push_branch.sh" in text
+        assert "watch-pr.sh" in text
+        assert "push-branch.sh" in text
 
     def test_settings_json_wires_hooks(self):
         path = self.target / ".agents" / "settings.json"
@@ -663,7 +668,7 @@ class TestPushForceWithLease:
 
     def test_refuses_nonforce_push_to_main(self, dag, capsys):
         """PI-202: refuse main/master for ANY push, not only force-pushes —
-        otherwise push_branch.sh run on main bypasses the direct-push guard."""
+        otherwise push-branch.sh run on main bypasses the direct-push guard."""
         assert dag.cmd_push("main", 0) == 1
         assert dag.cmd_push("master", 0) == 1
         assert "refusing to push" in capsys.readouterr().err
@@ -683,7 +688,7 @@ class TestPushForceWithLease:
         subprocess.run([*env_git, "commit", "-q", "-m", "feat: one"], check=True)
 
         proc = subprocess.run(
-            [sys.executable, str(SOURCE_HOOK), "push", "feat/x", "0"],
+            [sys.executable, str(TEMPLATE_HOOK), "push", "feat/x", "0"],
             cwd=work,
             capture_output=True,
             text=True,
@@ -693,7 +698,7 @@ class TestPushForceWithLease:
         # Rewrite history (amend) — a plain push must now fail...
         subprocess.run([*env_git, "commit", "-q", "--amend", "-m", "feat: one v2"], check=True)
         proc = subprocess.run(
-            [sys.executable, str(SOURCE_HOOK), "push", "feat/x", "0"],
+            [sys.executable, str(TEMPLATE_HOOK), "push", "feat/x", "0"],
             cwd=work,
             capture_output=True,
             text=True,
@@ -702,7 +707,7 @@ class TestPushForceWithLease:
 
         # ...and --force-with-lease must succeed.
         proc = subprocess.run(
-            [sys.executable, str(SOURCE_HOOK), "push", "feat/x", "0", "--force-with-lease"],
+            [sys.executable, str(TEMPLATE_HOOK), "push", "feat/x", "0", "--force-with-lease"],
             cwd=work,
             capture_output=True,
             text=True,
@@ -716,7 +721,7 @@ class TestFinishBranchGuard:
     branch."""
 
     def test_finish_refuses_when_current_branch_mismatches_pr_head(self, monkeypatch):
-        mod = _load_module(SOURCE_HOOK)
+        mod = _load_module(TEMPLATE_HOOK)
         # PR #99's head is feat/PI-99-x, but a different branch is checked out.
         monkeypatch.setattr(mod, "_current_branch", lambda: "chore/PI-50-other")
         monkeypatch.setattr(
@@ -734,7 +739,7 @@ class TestFinishBranchGuard:
         assert pushed == [], "finish must NOT push when the branch mismatches"
 
     def test_finish_refuses_on_detached_head(self, monkeypatch):
-        mod = _load_module(SOURCE_HOOK)
+        mod = _load_module(TEMPLATE_HOOK)
         monkeypatch.setattr(mod, "_current_branch", lambda: None)
         monkeypatch.setattr(
             mod,
@@ -750,7 +755,7 @@ class TestFinishBranchGuard:
         assert pushed == []
 
     def test_finish_pushes_pr_head_branch_on_match(self, monkeypatch):
-        mod = _load_module(SOURCE_HOOK)
+        mod = _load_module(TEMPLATE_HOOK)
         monkeypatch.setattr(mod, "_current_branch", lambda: "feat/PI-99-x")
         monkeypatch.setattr(
             mod,
@@ -817,9 +822,9 @@ class TestCiGreenStatusContext:
 
 
 class TestUpstreamIssueCreate:
-    """PI-845: the issue-create rule must not dead-end report_upstream_issue.
+    """PI-845: the issue-create rule must not dead-end report-upstream-issue.
 
-    create_issue.sh only files issues in THIS project; the direct-create route
+    create-issue.sh only files issues in THIS project; the direct-create route
     targets ANOTHER repo via -R/--repo, which has no wrapper equivalent — the
     guard now lets it through, while same-repo and flag-less forms stay
     redirected to the wrapper.
@@ -831,7 +836,7 @@ class TestUpstreamIssueCreate:
     def _repo_with_origin(self, root: Path, slug: str) -> Path:
         hook = _project_with_hook(root)
         (root / ".agents" / "scripts").mkdir(parents=True, exist_ok=True)
-        (root / ".agents" / "scripts" / "create_issue.sh").write_text("#!/bin/sh\n")
+        (root / ".agents" / "scripts" / "create-issue.sh").write_text("#!/bin/sh\n")
         subprocess.run(["git", "init", "-q"], cwd=root, check=True)
         subprocess.run(
             ["git", "remote", "add", "origin", f"https://github.com/{slug}.git"],
@@ -846,7 +851,7 @@ class TestUpstreamIssueCreate:
             hook, {"tool_input": {"command": f'{self._CREATE} --title "t"'}}, cwd=tmp_path
         )
         assert _denied(out)
-        assert "create_issue.sh" in _deny_reason(out)
+        assert "create-issue.sh" in _deny_reason(out)
 
     def test_upstream_repo_flag_is_allowed(self, tmp_path: Path):
         hook = self._repo_with_origin(tmp_path, "me/myproj")
@@ -873,7 +878,7 @@ class TestUpstreamIssueCreate:
         cmd = f'{self._CREATE} -R github.com/me/myproj --title "t"'
         out = _run_guard_hook(hook, {"tool_input": {"command": cmd}}, cwd=tmp_path)
         assert _denied(out)
-        assert "create_issue.sh" in _deny_reason(out)
+        assert "create-issue.sh" in _deny_reason(out)
 
     def test_host_qualified_upstream_repo_flag_is_allowed(self, tmp_path: Path):
         # The host prefix must not break the cross-repo carve-out either.
@@ -885,7 +890,7 @@ class TestUpstreamIssueCreate:
     def _repo_with_origin_url(self, root: Path, url: str) -> Path:
         hook = _project_with_hook(root)
         (root / ".agents" / "scripts").mkdir(parents=True, exist_ok=True)
-        (root / ".agents" / "scripts" / "create_issue.sh").write_text("#!/bin/sh\n")
+        (root / ".agents" / "scripts" / "create-issue.sh").write_text("#!/bin/sh\n")
         subprocess.run(["git", "init", "-q"], cwd=root, check=True)
         subprocess.run(["git", "remote", "add", "origin", url], cwd=root, check=True)
         return hook

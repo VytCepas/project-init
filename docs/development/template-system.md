@@ -12,7 +12,7 @@ templates/
 ├── auto/               # agent memory files (memory tiers `auto` and higher)
 ├── fallback/           # shared hooks/skills — rendered only with --no-plugin (ADR-010)
 ├── lifecycle/          # GitHub lifecycle enforcement (default; --lifecycle none opts out)
-├── lifecycle_fallback/ # lifecycle guard hooks + skills for --no-plugin
+├── lifecycle-fallback/ # lifecycle guard hooks + skills for --no-plugin
 ├── obsidian/           # vault overlay for both Obsidian-* presets
 ├── graphify/           # Graphify overlay (implies obsidian)
 ├── rag/                # tier-3 RAG memory overlay

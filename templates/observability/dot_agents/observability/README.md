@@ -12,7 +12,7 @@ and off by default.
 ## What's here
 
 - [`usage_report.py`](usage_report.py) — a **stdlib-only** analyzer (no
-  third-party imports; runs via `_py.sh`). It parses the always-present Claude
+  third-party imports; runs via `python-resolve.sh`). It parses the always-present Claude
   Code transcript JSONL plus an optional hook self-log into four buckets —
   **Adoption** (per-skill / tool / sub-agent / hook counts), **Cost** (USD via
   an embedded static price table + cache-read ratio, labelled approximate),
@@ -23,7 +23,7 @@ and off by default.
   `git` only, never `gh` or the network.
 - [`../scripts/observability.sh`](../scripts/observability.sh) — the entry
   point: `observability.sh report [--open] [--transcript …] [--session-id …]`.
-  Resolves Python via `_py.sh`; `--open` is best-effort (xdg-open / open /
+  Resolves Python via `python-resolve.sh`; `--open` is best-effort (xdg-open / open /
   explorer) and fail-open.
 - `.keep` — the **activation marker**. The presence of this
   `.agents/observability/` directory flips the guarded hook self-log on (see the

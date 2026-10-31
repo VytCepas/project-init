@@ -67,8 +67,8 @@ def test_a_fresh_python_scaffold_still_points_at_the_recipe_that_makes_the_map(r
 def test_code_map_is_named_once_it_exists(render, tmp_path: Path) -> None:
     target = tmp_path / "target"
     (target / ".agents" / "docs").mkdir(parents=True)
-    (target / ".agents" / "docs" / "CODE_MAP.md").write_text("# map\n")
-    assert "`.agents/docs/CODE_MAP.md`" in render(target=target)
+    (target / ".agents" / "docs" / "code-map.md").write_text("# map\n")
+    assert "`.agents/docs/code-map.md`" in render(target=target)
 
 
 def test_an_existing_justfile_counts_as_presence(render, tmp_path: Path) -> None:
@@ -81,9 +81,9 @@ def test_an_existing_justfile_counts_as_presence(render, tmp_path: Path) -> None
 def test_upgrade_probes_the_real_project_not_the_staging_dir(render, tmp_path: Path) -> None:
     real = tmp_path / "real"
     (real / ".agents" / "docs").mkdir(parents=True)
-    (real / ".agents" / "docs" / "CODE_MAP.md").write_text("# map\n")
+    (real / ".agents" / "docs" / "code-map.md").write_text("# map\n")
     text = render(target=tmp_path / "staging", detect_root=real)
-    assert "`.agents/docs/CODE_MAP.md`" in text
+    assert "`.agents/docs/code-map.md`" in text
 
 
 def test_surfaces_not_enabled_are_not_named(render) -> None:

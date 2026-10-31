@@ -45,7 +45,7 @@ def _run_hook(target: Path, bin_dir: Path) -> subprocess.CompletedProcess:
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["CLAUDE_PROJECT_DIR"] = str(target)
     return subprocess.run(
-        ["bash", str(target / ".agents" / "hooks" / "session_setup.sh")],
+        ["bash", str(target / ".agents" / "hooks" / "session-setup.sh")],
         capture_output=True,
         text=True,
         env=env,

@@ -67,7 +67,7 @@ class TestOverlayLayers:
     def test_composes_with_agents_fallback_and_multi_model(self):
         layers = overlay_layers("claude,codex", no_plugin=True, multi_model=True, governance=True)
         # Order is stable: fallback, agents, then the opt-in overlays.
-        assert layers == ["fallback", "codex", "multi_model", "governance"]
+        assert layers == ["fallback", "codex", "multi-model", "governance"]
 
 
 class TestGovernanceOn:
@@ -101,11 +101,11 @@ class TestUsageTrackDocs:
 
     _GOV = Path(".agents") / "governance"
     _DOCS = (
-        "AI_USAGE_POLICY.md",
+        "ai-usage-policy.md",
         "approved-tools.md",
         "data-handling.md",
         "ai-code-provenance.md",
-        "NIST_RMF_CROSSWALK.md",
+        "nist-risk-management-framework-crosswalk.md",
     )
 
     def test_all_docs_present(self, tmp_path: Path):
@@ -128,7 +128,9 @@ class TestUsageTrackDocs:
 
     def test_crosswalk_covers_four_nist_functions(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p", governance=True)
-        text = (target / self._GOV / "NIST_RMF_CROSSWALK.md").read_text(encoding="utf-8")
+        text = (target / self._GOV / "nist-risk-management-framework-crosswalk.md").read_text(
+            encoding="utf-8"
+        )
         for fn in ("Govern", "Map", "Measure", "Manage"):
             assert fn in text, fn
 

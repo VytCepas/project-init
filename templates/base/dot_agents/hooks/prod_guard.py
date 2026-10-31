@@ -9,7 +9,7 @@ session. It lives here rather than in a sibling hook because it needs the
 identical machinery — the config walk with its symlink refusal, ``safety.allow``,
 the ask/deny-by-mode posture, fail-open — and a second copy of security-critical
 code is the drift this repo keeps finding. Extending this hook also reaches the
-non-Claude surfaces through ``agent_guard_adapter.py`` for free.
+non-Claude surfaces through ``admission_agent_adapter.py`` for free.
 Destructive operations that bypass the git/CI boundary (cloud deletes,
 DROP DATABASE, terraform destroy, …) get:
 

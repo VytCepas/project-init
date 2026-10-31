@@ -61,7 +61,7 @@ class TestOrgEndToEnd:
     def test_enforcement_scripts_bind_under_org(self, tmp_path: Path):
         target = tmp_path / "p"
         _scaffold_org(target)
-        setup = (target / ".agents" / "scripts" / "setup_github.sh").read_text()
+        setup = (target / ".agents" / "scripts" / "setup-github.sh").read_text()
         assert '"bypass_actors": []' in setup  # ruleset binds everyone
-        monitor = (target / ".agents" / "scripts" / "monitor_pr.sh").read_text()
+        monitor = (target / ".agents" / "scripts" / "watch-pr.sh").read_text()
         assert "admin-merge is refused under the org profile" in monitor

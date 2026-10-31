@@ -27,14 +27,14 @@ opt-in (`--memory obsidian-graphify-rag`), never a preset default.
   it fit together" (a derived, regenerated cache).
 - RAG is authoritative for **nothing** — a *recall surface* for the fuzzy "where
   did we touch X" across the corpus. It never relocates the anchors
-  (`.agents/memory/MEMORY.md`, `.agents/docs/adr/`, `.agents/vault/`); it only
+  (`.agents/memory/MEMORY.md`, `.agents/docs/decisions/`, `.agents/vault/`); it only
   adds a way to search them. Graphify (structural) and RAG (semantic) are
   complementary retrieval modes, not substitutes (ADR-026 option A).
 
 ## One-time setup
 
 ```bash
-.agents/scripts/setup_rag.sh
+.agents/scripts/setup-rag.sh
 ```
 
 This installs `ccc` (`uv tool install 'cocoindex-code[full]'`), pins the

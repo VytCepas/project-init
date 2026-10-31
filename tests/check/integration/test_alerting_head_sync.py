@@ -1,4 +1,4 @@
-"""PI-706: monitor_pr.sh must not judge checks belonging to another commit.
+"""PI-706: watch-pr.sh must not judge checks belonging to another commit.
 
 Right after a push, GitHub's API can still report the PREVIOUS commit as the
 PR head. Its checks are already settled, so the CI wait loop broke on the first
@@ -67,7 +67,7 @@ def _stub_bin(tmp_path: Path) -> Path:
 
 def _run(tmp_target: Path, tmp_path: Path, api_sha: str, **overrides: str):
     scaffold(tmp_target, fallback_preset(), fallback_variables())
-    script = tmp_target / ".agents" / "scripts" / "monitor_pr.sh"
+    script = tmp_target / ".agents" / "scripts" / "watch-pr.sh"
     env = os.environ.copy()
     env["PATH"] = f"{_stub_bin(tmp_path)}:{env['PATH']}"
     env["PI_TEST_API_SHA"] = api_sha

@@ -64,7 +64,7 @@ def _write_transcript(path: Path) -> None:
                         "type": "tool_use",
                         "id": "t1",
                         "name": "Skill",
-                        "input": {"skill": "github_workflow"},
+                        "input": {"skill": "github-workflow"},
                     },
                     {
                         "type": "tool_use",
@@ -152,7 +152,7 @@ class TestBuckets:
         report = mod.analyze(raw, hooks, {"commits": 3, "merge_commits": 1})
 
         adoption = report["adoption"]
-        assert adoption["skills"] == {"github_workflow": 1}
+        assert adoption["skills"] == {"github-workflow": 1}
         # Task with a description but no subagent_type buckets as "unknown" — the
         # description text is never used as a key (no tool-input leak).
         assert adoption["subagents"] == {"Explore": 1, "unknown": 1}

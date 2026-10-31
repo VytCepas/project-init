@@ -31,10 +31,10 @@ class TestIacOverlayPresent:
             "backend.tf",
             "README.md",
         ):
-            assert (t / "infra" / f).is_file(), f"missing infra/{f}"
+            assert (t / "infrastructure" / f).is_file(), f"missing infrastructure/{f}"
 
     def test_backend_is_commented_stub(self, tmp_path: Path):
-        backend = (_iac(tmp_path / "p") / "infra" / "backend.tf").read_text()
+        backend = (_iac(tmp_path / "p") / "infrastructure" / "backend.tf").read_text()
         # Every backend line is commented — no uncommented backend/terraform block
         # anywhere, including the file's first line (column 0).
         assert 'backend "s3"' in backend
@@ -45,14 +45,14 @@ class TestIacOverlayPresent:
             assert not stripped.startswith("backend "), f"uncommented: {line!r}"
 
     def test_gitignore_keeps_lockfile_tracked(self, tmp_path: Path):
-        gi = (_iac(tmp_path / "p") / "infra" / ".gitignore").read_text()
+        gi = (_iac(tmp_path / "p") / "infrastructure" / ".gitignore").read_text()
         assert "*.tfstate" in gi
         assert ".terraform.lock.hcl" not in gi.replace(
             "# NOT ignored: .terraform.lock.hcl is committed (provider checksum pinning).", ""
         )
 
     def test_workflow_uses_opentofu_and_gated_apply(self, tmp_path: Path):
-        wf = (_iac(tmp_path / "p") / ".github" / "workflows" / "infra.yml").read_text()
+        wf = (_iac(tmp_path / "p") / ".github" / "workflows" / "infrastructure.yml").read_text()
         assert "opentofu/setup-opentofu" in wf
         assert "tofu plan" in wf and "tofu validate" in wf
         assert "environment: infra-apply" in wf  # gated apply
@@ -65,8 +65,8 @@ class TestIacOverlayPresent:
         unprotected. The docs must not claim it is an unconditional gate; they
         must say it has to be armed and is unprotected by default."""
         target = _iac(tmp_path / "p")
-        wf = (target / ".github" / "workflows" / "infra.yml").read_text()
-        readme = (target / "infra" / "README.md").read_text()
+        wf = (target / ".github" / "workflows" / "infrastructure.yml").read_text()
+        readme = (target / "infrastructure" / "README.md").read_text()
         # The old absolute over-promise must be gone.
         assert "An agent cannot apply to prod infra without clearing it" not in wf
         # ...replaced by the honest "arm it / does not block by default" framing.
@@ -75,7 +75,7 @@ class TestIacOverlayPresent:
         assert "unprotected" in readme.lower()
 
     def test_precommit_targets_tofu(self, tmp_path: Path):
-        pc = (_iac(tmp_path / "p") / "infra" / ".pre-commit-config.yaml").read_text()
+        pc = (_iac(tmp_path / "p") / "infrastructure" / ".pre-commit-config.yaml").read_text()
         assert "pre-commit-terraform" in pc
         assert "terraform_trivy" in pc
         assert "PCT_TFPATH=tofu" in pc  # invoke OpenTofu, not terraform
@@ -84,8 +84,8 @@ class TestIacOverlayPresent:
 class TestIacOverlayAbsent:
     def test_none_emits_no_infra(self, tmp_path: Path):
         t = _scaffold(tmp_path / "p", iac="none")
-        assert not (t / "infra").exists()
-        assert not (t / ".github" / "workflows" / "infra.yml").exists()
+        assert not (t / "infrastructure").exists()
+        assert not (t / ".github" / "workflows" / "infrastructure.yml").exists()
 
 
 class TestResolveIac:

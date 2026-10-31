@@ -7,9 +7,9 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# Resolve Python through the canonical helper (PI-361); _py.sh ships with the
-# base layer at .agents/hooks/_py.sh.
-PY="$HERE/../hooks/_py.sh"
+# Resolve Python through the canonical helper (PI-361); python-resolve.sh ships with the
+# base layer at .agents/hooks/python-resolve.sh.
+PY="$HERE/../hooks/python-resolve.sh"
 REPORT="$HERE/../observability/usage_report.py"
 # Project root: prefer the git toplevel; otherwise resolve from this script's
 # fixed location (.agents/scripts/) so a non-git checkout still targets the

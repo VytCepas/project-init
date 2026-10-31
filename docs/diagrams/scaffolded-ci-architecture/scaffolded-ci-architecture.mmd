@@ -8,16 +8,16 @@ flowchart TB
     TPL -->|"project-init scaffold run"| TARGET[("target project repo\n.github/ + .agents/")]
 
     subgraph LOCALGUARD["Target repo: local hooks (git-level)"]
-        PRECOMMIT["dot_github/hooks/pre-commit\ninstalled via install_hooks.sh\n1. lint staged snapshot (just lint)\n2. gitleaks scan of staged diff\nfail-closed on lint, fail-open on missing gitleaks"]
+        PRECOMMIT["dot_github/hooks/pre-commit\ninstalled via install-hooks.sh\n1. lint staged snapshot (just lint)\n2. gitleaks scan of staged diff\nfail-closed on lint, fail-open on missing gitleaks"]
         GITLEAKSCFG["dot_gitleaks.toml"]
         PRECOMMIT --> GITLEAKSCFG
     end
 
     subgraph CLAUDEGUARD["Target repo: agent-side hooks (Claude Code, PreToolUse)"]
-        PCG["pre_commit_gate.sh\nintercepts `git commit`, auto-fixes lint,\nblocks only if errors remain"]
+        PCG["pre-commit-gate.sh\nintercepts `git commit`, auto-fixes lint,\nblocks only if errors remain"]
         DAGT["dag_workflow.py (same DAG engine as this repo)\nissue.created -> branch.created -> branch.pushed\n-> pr.opened -> {ci.green, review.approved} -> pr.merged"]
         PRODGUARD["prod_guard.py\nblocks terraform/tofu destroy, apply -destroy,\nkubectl delete, helm uninstall/delete\nask (interactive) / deny (autonomous)"]
-        PKGGUARD["package_guard.py\nblocks unpinned/unsafe package installs"]
+        PKGGUARD["admission_package.py\nblocks unpinned/unsafe package installs"]
     end
 
     DEV2["Agent / developer commits & pushes"] --> PCG --> PRECOMMIT
@@ -28,7 +28,7 @@ flowchart TB
 
     subgraph CIWF["Target repo: .github/workflows (server-side, applies to everyone)"]
         direction TB
-        RUNSON{{"runs-on: vars.CI_RUNS_ON || 'ubuntu-24.04'\n(local_ci skill toggles the repo variable;\nself-hosted escape hatch, PI-666/PI-673)"}}
+        RUNSON{{"runs-on: vars.CI_RUNS_ON || 'ubuntu-24.04'\n(local-ci skill toggles the repo variable;\nself-hosted escape hatch, PI-666/PI-673)"}}
         LT["lint-and-test\n(+ python-matrix if python)"]
         IT["integration-tests (python)"]
         MT["mutation-tests (python, mutmut)\nscore gate: see ci.yml.tmpl"]
@@ -63,7 +63,7 @@ flowchart TB
         BUILD["deploy.yml.tmpl: build-push\nimage by digest to GHCR, SLSA L3 provenance"]
         STAGE["deploy-staging\nenvironment: staging, auto on merge"]
         PROD["deploy-production\nneeds build-push + deploy-staging\nenvironment: production (manual approval gate)\npromotes the SAME digest, no rebuild"]
-        INFRA["infra.yml.tmpl (OpenTofu)\nplan (on PR) -> apply\nenvironment: infra-apply (approval gate)"]
+        INFRA["infrastructure.yml.tmpl (OpenTofu)\nplan (on PR) -> apply\nenvironment: infra-apply (approval gate)"]
         BUILD --> STAGE --> PROD
     end
     MERGE2 -->|"merge to base branch"| BUILD

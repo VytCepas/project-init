@@ -55,47 +55,74 @@ def strip_conditional_wrapper(text: str) -> str:
 
 # dest (relative to .agents/) -> source (relative to templates/), or
 # (source, transform) when the stored form needs rendering.
+def _own_name_pairs() -> list[tuple[str, str]]:
+    """``(template name, this repo's name)``, longest first (harbor#967)."""
+    from project_init import renames
+
+    leaves = (*renames.RENAMED_LEAVES,)
+    paths = [
+        (new.removeprefix(".agents/"), old.removeprefix(".agents/"))
+        for old, new in renames.TEMPLATE_RENAMES
+        if old.startswith(".agents/") and "/" in old.removeprefix(".agents/")
+    ]
+    return sorted([(n, o) for o, n in leaves] + paths, key=lambda p: -len(p[0]))
+
+
+def own_names(text: str) -> str:
+    """Spell a template source with the names this repo's own ``.agents/`` still carries.
+
+    The templates were renamed to the naming standard (harbor#967), but this checkout's
+    ``.agents/hooks/`` is write-protected to the agent session that renamed them, so the
+    repo's own copies keep the old names until the operator applies the own-tree patch
+    (then this transform goes, and the copies are byte-equal to their sources again).
+    Every other byte must still match: the transform renames, it never forgives drift.
+    """
+    for new, old in _own_name_pairs():
+        text = re.sub(rf"(?<![A-Za-z0-9_-]){re.escape(new)}(?![A-Za-z0-9_])", old, text)
+    return text
+
+
 SYNCED: dict[str, str | tuple[str, object]] = {
     # lifecycle guard engine + hook shims
     "hooks/dag_workflow.py": "lifecycle/dot_agents/hooks/dag_workflow.py",
-    "hooks/github_command_guard.sh": "lifecycle_fallback/dot_agents/hooks/github_command_guard.sh",
-    "hooks/workflow_state_reminder.sh": "lifecycle_fallback/dot_agents/hooks/workflow_state_reminder.sh",
+    "hooks/github_command_guard.sh": "lifecycle-fallback/dot_agents/hooks/github_command_guard.sh",
+    "hooks/workflow_state_reminder.sh": "lifecycle-fallback/dot_agents/hooks/workflow-state-reminder.sh",
     # shared hook helpers the shims above depend on
-    "hooks/_py.sh": "base/dot_agents/hooks/_py.sh",
-    "hooks/_usage_log.sh": "fallback/dot_agents/hooks/_usage_log.sh",
+    "hooks/_py.sh": "base/dot_agents/hooks/python-resolve.sh",
+    "hooks/_usage_log.sh": "fallback/dot_agents/hooks/usage-log.sh",
     # lifecycle wrapper scripts (thin shims over dag_workflow.py)
-    "scripts/push_branch.sh": "lifecycle/dot_agents/scripts/push_branch.sh",
-    "scripts/create_nojira_pr.sh": "lifecycle/dot_agents/scripts/create_nojira_pr.sh",
-    "scripts/finish_pr.sh": "lifecycle/dot_agents/scripts/finish_pr.sh",
-    "scripts/promote_review.sh": "lifecycle/dot_agents/scripts/promote_review.sh",
+    "scripts/push_branch.sh": "lifecycle/dot_agents/scripts/push-branch.sh",
+    "scripts/create_nojira_pr.sh": "lifecycle/dot_agents/scripts/create-pr-without-issue.sh",
+    "scripts/finish_pr.sh": "lifecycle/dot_agents/scripts/finish-pr.sh",
+    "scripts/promote_review.sh": "lifecycle/dot_agents/scripts/promote-review.sh",
     # full lifecycle scripts newly adopted by the semi-scaffold (PI-685)
-    "scripts/gh_host.sh": "base/dot_agents/scripts/gh_host.sh",
-    "scripts/create_issue.sh": "lifecycle/dot_agents/scripts/create_issue.sh",
-    "scripts/start_issue.sh": "lifecycle/dot_agents/scripts/start_issue.sh",
-    "scripts/setup_github.sh": "lifecycle/dot_agents/scripts/setup_github.sh",
-    "scripts/backfill_board_done.sh": "lifecycle/dot_agents/scripts/backfill_board_done.sh",
+    "scripts/gh_host.sh": "base/dot_agents/scripts/gh-host.sh",
+    "scripts/create_issue.sh": "lifecycle/dot_agents/scripts/create-issue.sh",
+    "scripts/start_issue.sh": "lifecycle/dot_agents/scripts/start-issue.sh",
+    "scripts/setup_github.sh": "lifecycle/dot_agents/scripts/setup-github.sh",
+    "scripts/backfill_board_done.sh": "lifecycle/dot_agents/scripts/backfill-board-done.sh",
     # reconciled from DIVERGED (#708): the template's extras (gh hard-require,
     # gh_host.sh sourcing incl. the org-profile admin guard, _py.sh interpreter
     # resolution) strictly supersede the repo copy's wording tweaks; both
     # dependencies (scripts/gh_host.sh, hooks/_py.sh) are in the shared set
-    "scripts/monitor_pr.sh": "lifecycle/dot_agents/scripts/monitor_pr.sh",
+    "scripts/monitor_pr.sh": "lifecycle/dot_agents/scripts/watch-pr.sh",
     # monitor_pr.sh execs this from its own directory when a PR is BLOCKED; without
     # it in the shared set the repo's own copy has nothing to exec (PI-819 review).
-    "scripts/check_branch_protection.sh": "lifecycle/dot_agents/scripts/check_branch_protection.sh",
+    "scripts/check_branch_protection.sh": "lifecycle/dot_agents/scripts/check-branch-protection.sh",
     # reconciled from DIVERGED (#710): the repo copy's --prune flag, bash-3.2
     # empty-array guard, and bot-identity commit fallback were upstreamed into
     # the template, which keeps its host-aware gh_web_base clone URL
-    "scripts/push_wiki.sh": "lifecycle/dot_agents/scripts/push_wiki.sh",
+    "scripts/push_wiki.sh": "lifecycle/dot_agents/scripts/push-wiki.sh",
     # subagent specs (Claude Code reads them from the .claude/ mirror)
     "agents/README.md": "base/dot_agents/agents/README.md",
     # test-contract checks (#1052): `just lint` runs them on this repo's tests too
     "scripts/check_test_contract.py": (
-        "base/dot_agents/scripts/check_test_contract.py.tmpl",
+        "base/dot_agents/scripts/check-test-contract.py.tmpl",
         strip_conditional_wrapper,
     ),
     # code map generator (stored Python-gated; this repo is Python)
     "scripts/gen_code_map.py": (
-        "base/dot_agents/scripts/gen_code_map.py.tmpl",
+        "base/dot_agents/scripts/generate-code-map.py.tmpl",
         strip_conditional_wrapper,
     ),
 }
@@ -104,24 +131,24 @@ SYNCED: dict[str, str | tuple[str, object]] = {
 # these really DO differ — a reconciled file must move to SYNCED, not linger.
 DIVERGED: dict[str, tuple[str, str]] = {
     "skills/add_command": (
-        "fallback/dot_agents/skills/add_command",
+        "fallback/dot_agents/skills/add-command",
         "source-repo adaptation (hook/skill paths differ from scaffolded projects)",
     ),
     "skills/add_hook": (
-        "fallback/dot_agents/skills/add_hook",
+        "fallback/dot_agents/skills/add-hook",
         "source-repo adaptation (hook/skill paths differ from scaffolded projects)",
     ),
     "skills/session_summary": (
-        "fallback/dot_agents/skills/session_summary",
+        "fallback/dot_agents/skills/session-summary",
         "source-repo adaptation (vault layout differs from scaffolded projects)",
     ),
     "skills/github_workflow": (
-        "lifecycle_fallback/dot_agents/skills/github_workflow",
+        "lifecycle-fallback/dot_agents/skills/github-workflow",
         "carries the 'project-init source repo note'; revisit once the PI-685 "
         "script adoption has bedded in",
     ),
     "skills/start_task": (
-        "lifecycle_fallback/dot_agents/skills/start_task",
+        "lifecycle-fallback/dot_agents/skills/start-task",
         "documented gh fallbacks written before create_issue.sh/start_issue.sh were "
         "adopted (PI-685); revisit once the adoption has bedded in",
     ),
@@ -130,7 +157,7 @@ DIVERGED: dict[str, tuple[str, str]] = {
 # Template files deliberately NOT brought into this repo.
 NOT_ADOPTED: dict[str, tuple[str, str]] = {
     "hooks/pre_edit_issue_guard.py": (
-        "lifecycle_fallback/dot_agents/hooks/pre_edit_issue_guard.py",
+        "lifecycle-fallback/dot_agents/hooks/admission_issue_edit.py",
         "would deny edits while on main — a workflow change to adopt deliberately, "
         "not as a side effect of the semi-scaffold",
     ),
@@ -140,8 +167,10 @@ NOT_ADOPTED: dict[str, tuple[str, str]] = {
 def _source_bytes(spec: str | tuple[str, object]) -> bytes:
     if isinstance(spec, tuple):
         path, transform = spec
-        return transform((TEMPLATES / path).read_text(encoding="utf-8")).encode("utf-8")
-    return (TEMPLATES / spec).read_bytes()
+        text = transform((TEMPLATES / path).read_text(encoding="utf-8"))
+    else:
+        text = (TEMPLATES / spec).read_text(encoding="utf-8")
+    return own_names(text).encode("utf-8")
 
 
 def check(repo_root: Path = REPO_ROOT) -> list[str]:

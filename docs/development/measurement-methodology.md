@@ -61,7 +61,7 @@ local sources, into the same cost/adoption/reliability signals. Track B reuses
 that **parsing method**, not the code:
 
 - The **scaffolded analyzer stays stdlib-only** — it ships into other people's
-  projects and runs via `_py.sh` against any Python 3.
+  projects and runs via `python-resolve.sh` against any Python 3.
 - The **repo benchmark harness** (`tools/benchmark/`, dev tooling) may use `rich`
   and the vendored price table, and orchestrates *runs* (bare vs scaffolded) the
   in-project analyzer never does.

@@ -1,6 +1,6 @@
 ---
 description: Graphify memory — query the code knowledge graph before grepping
-globs: ["graphify-out/**", ".agents/scripts/setup_graphify.sh"]
+globs: ["graphify-out/**", ".agents/scripts/setup-graphify.sh"]
 alwaysApply: false
 ---
 
@@ -17,7 +17,7 @@ alwaysApply: false
   or `graphify update .` (CLI).
 - Export to the vault: `graphify . --obsidian` writes graph notes
   alongside human notes.
-- Not installed yet? Run `.agents/scripts/setup_graphify.sh` once.
+- Not installed yet? Run `.agents/scripts/setup-graphify.sh` once.
 
 The graph is a derived artifact — never hand-edit `graphify-out/`, and keep
 decisions in the vault (`.agents/vault/decisions/`), not in graph notes.

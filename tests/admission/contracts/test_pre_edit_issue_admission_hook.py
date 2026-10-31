@@ -17,10 +17,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HOOK = (
     _REPO_ROOT
     / "templates"
-    / "lifecycle_fallback"
+    / "lifecycle-fallback"
     / "dot_agents"
     / "hooks"
-    / "pre_edit_issue_guard.py"
+    / "admission_issue_edit.py"
 )
 
 
@@ -116,7 +116,7 @@ class TestWiring:
         commands = [
             h["command"] for entry in plugin_hooks["hooks"]["PreToolUse"] for h in entry["hooks"]
         ]
-        assert any("pre_edit_issue_guard.py" in c for c in commands)
+        assert any("admission_issue_edit.py" in c for c in commands)
 
     def test_fallback_lifecycle_settings_wire_the_guard(self, tmp_path: Path):
         target = tmp_path / "p"
@@ -125,5 +125,5 @@ class TestWiring:
         commands = [
             h["command"] for entry in settings["hooks"]["PreToolUse"] for h in entry["hooks"]
         ]
-        assert any("pre_edit_issue_guard.py" in c for c in commands)
-        assert (target / ".agents" / "hooks" / "pre_edit_issue_guard.py").is_file()
+        assert any("admission_issue_edit.py" in c for c in commands)
+        assert (target / ".agents" / "hooks" / "admission_issue_edit.py").is_file()

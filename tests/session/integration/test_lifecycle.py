@@ -34,7 +34,7 @@ def _scaffold(target: Path, *extra: str) -> None:
 
 
 def _has_lifecycle(target: Path) -> bool:
-    return (target / ".agents" / "scripts" / "start_issue.sh").exists()
+    return (target / ".agents" / "scripts" / "start-issue.sh").exists()
 
 
 class TestLifecyclePrecedence:
@@ -60,7 +60,7 @@ class TestLifecyclePrecedence:
         # Quality core survives: git hooks, CI, install, prod-safety.
         assert (target / ".github" / "hooks" / "pre-push").is_file()
         assert (target / ".github" / "workflows" / "ci.yml").is_file()
-        assert (target / ".agents" / "scripts" / "install_hooks.sh").is_file()
+        assert (target / ".agents" / "scripts" / "install-hooks.sh").is_file()
         assert (target / ".agents" / "hooks" / "prod_guard.py").is_file()
 
     def test_core_lifecycle_none_is_minimal(self, tmp_path: Path):

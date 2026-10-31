@@ -69,18 +69,18 @@ class TestSessionScopedInjection:
     def _scaffold(self, tmp_target: Path):
         scaffold(tmp_target, fallback_preset(), fallback_variables())
         self.target = tmp_target
-        self.hook = tmp_target / ".agents" / "hooks" / "workflow_state_reminder.sh"
+        self.hook = tmp_target / ".agents" / "hooks" / "workflow-state-reminder.sh"
         assert self.hook.is_file()
 
     def test_first_trigger_injects_full_rules(self, tmp_path: Path):
         context = _run_hook(self.hook, "let's implement the feature", "sess-a", tmp_path)
         assert _STATIC_MARKER in context
         # The banned-command → wrapper map survives the trim.
-        assert "push_branch.sh" in context
+        assert "push-branch.sh" in context
         assert "git push" in context
         assert "Closes #N" in context
         # Details defer to the on-demand skill instead of inlined prose.
-        assert "github_workflow skill" in context
+        assert "github-workflow skill" in context
 
     def test_rules_inject_once_and_only_once_per_session(self, tmp_path: Path):
         prompts = [

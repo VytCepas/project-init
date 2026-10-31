@@ -73,9 +73,9 @@ projects pin to the fork's version, not upstream's.
   `project-init <target> --profile org`.
 - The recorded profile/host/enforcement in `.agents/config.yaml` (#259) drives
   delivery and enforcement on every `upgrade`.
-- **Server-side enforcement** (#251): `.agents/scripts/setup_github.sh --protect`
+- **Server-side enforcement** (#251): `.agents/scripts/setup-github.sh --protect`
   applies the `project-init-baseline` ruleset directly (empty `bypass_actors` —
-  binds everyone, no admin bypass). `monitor_pr.sh` refuses admin-merge under the
+  binds everyone, no admin bypass). `watch-pr.sh` refuses admin-merge under the
   org profile; merge via auto-merge / the merge queue under the required checks.
 
 ## Update flow — pull-and-recommend (#250 / #249)

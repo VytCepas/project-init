@@ -1,7 +1,7 @@
 name: Review status
 
 # Creates a commit status named "review/decision" reflecting the *agent* review
-# protocol, so monitor_pr.sh can treat review state as just another CI check.
+# protocol, so watch-pr.sh can treat review state as just another CI check.
 #
 # PI-715: this used to map straight off reviewDecision, which meant the check
 # only ever went green on APPROVED. On a solo repo nobody can approve — GitHub
@@ -32,7 +32,7 @@ name: Review status
 #   APPROVED                      → success  ("Approved")
 #   head reviewed, nothing open   → success  ("Reviewed — no open comments")
 #
-# A failure is not a dead end: it is what drives monitor_pr.sh's review cycle
+# A failure is not a dead end: it is what drives watch-pr.sh's review cycle
 # (exit 2 → address comments → resolve threads → push → re-run).
 
 on:

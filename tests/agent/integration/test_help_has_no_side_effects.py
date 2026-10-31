@@ -1,7 +1,7 @@
 """#992: `--help` on any scaffolded `.agents/` script does no work.
 
 An agent or a person sweeping a tree for usage information runs `<script>
---help` on everything in it. Before #992, that sweep wrote `CODE_MAP.md`,
+--help` on everything in it. Before #992, that sweep wrote `code-map.md`,
 installed git hooks, ran `uv sync`, installed cocoindex-code and graphify, ran
 the multi-model installer (#1005), appended usage-log lines, and called `gh`
 with `--help` as a PR number until it timed out.
@@ -45,7 +45,7 @@ _REAL = (
 # Sourced by other scripts, never run: they have no usage to print, and a
 # `--help` branch in a sourced file would read the CALLER's arguments. They
 # still must not act when run directly.
-_SOURCED = {"_usage_log.sh", "gh_host.sh"}
+_SOURCED = {"usage-log.sh", "gh-host.sh"}
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -103,7 +103,7 @@ def scaffolded(tmp_path_factory: pytest.TempPathFactory) -> Path:
     )
     assert rc == 0
     if not (target / ".git").exists():
-        # install_hooks.sh needs a .git/hooks to write into, or its check is vacuous.
+        # install-hooks.sh needs a .git/hooks to write into, or its check is vacuous.
         subprocess.run(["git", "init", "-q", str(target)], check=True)
     return target
 

@@ -299,12 +299,12 @@ def _choose_governance_interactive() -> bool:
         "travels with the repo — for projects that build or operate an AI "
         "system.\n\n"
         "[bold]Scaffolds today:[/bold]\n"
-        "  [dim]AI_USAGE_POLICY.md[/dim]      [dim]# 1-page acceptable-use policy "
+        "  [dim]ai-usage-policy.md[/dim]      [dim]# 1-page acceptable-use policy "
         "(NIST-aligned)[/dim]\n"
         "  [dim]approved-tools.md[/dim]       [dim]# allow/deny models, endpoints, data[/dim]\n"
         "  [dim]data-handling.md[/dim]        [dim]# what data may reach AI tools[/dim]\n"
         "  [dim]ai-code-provenance.md[/dim]   [dim]# attribution + licence checks[/dim]\n"
-        "  [dim]NIST_RMF_CROSSWALK.md[/dim]   [dim]# maps to Govern/Map/Measure/Manage[/dim]\n"
+        "  [dim]nist-risk-management-framework-crosswalk.md[/dim]   [dim]# maps to Govern/Map/Measure/Manage[/dim]\n"
         "  [dim]examples/SYSTEM_CARD[/dim]    [dim]# system-card template + filled example[/dim]\n"
         "  [dim]examples/NO_AI_SYSTEM[/dim]   [dim]# template: this repo ships no AI system[/dim]\n"
         "  [dim]ai-bom.generated.md[/dim]     [dim]# AI bill of materials (AIBOM), "
@@ -379,12 +379,12 @@ def _choose_memory_interactive(default: str = "obsidian-only") -> str:
         "[bold]4. obsidian-graphify[/bold]  [dim]obsidian PLUS a derived knowledge[/dim]\n"
         "            [dim]graph agents can query (Graphify)[/dim]\n"
         "            [dim]Installs now: files only · You run later:[/dim]\n"
-        "            [dim]uv tool install graphifyy && .agents/scripts/setup_graphify.sh[/dim]\n"
+        "            [dim]uv tool install graphifyy && .agents/scripts/setup-graphify.sh[/dim]\n"
         "            [dim](the package name really has two y's)[/dim]\n"
         "[bold]5. obsidian-graphify-rag[/bold]  [dim]graphify PLUS search-by-meaning[/dim]\n"
         "            [dim]over all notes+code, not just exact words (RAG)[/dim]\n"
         "            [dim]Installs now: files only · You run later:[/dim]\n"
-        "            [dim].agents/scripts/setup_rag.sh (cocoindex-code —[/dim]\n"
+        "            [dim].agents/scripts/setup-rag.sh (cocoindex-code —[/dim]\n"
         "            [dim]keyless, on-device; no container, no API key)[/dim]\n\n"
         "[cyan]Helps:[/cyan] agents recall why a decision was made weeks later;\n"
         "the RAG rung (option 5) is worth it only at [bold]multi-project /\n"
@@ -415,7 +415,7 @@ def _choose_lifecycle_interactive(default: str = "github") -> str:
         "mis-ordered.\n\n"
         "[bold]1. github[/bold]  [dim]guard hooks that enforce the step order, "
         "lifecycle scripts[/dim]\n"
-        "          [dim](start_issue/finish_pr/…), board+wiki+PR-validation "
+        "          [dim](start-issue/finish-pr/…), board+wiki+PR-validation "
         "workflows,[/dim]\n"
         "          [dim]issue/PR templates, and the matching skills[/dim]\n"
         "[bold]2. none[/bold]    [dim]not tied to GitHub, or you prefer your own "
@@ -437,14 +437,14 @@ def _choose_review_cycles_interactive(default: int = 2) -> int:
     """Explain review cycles, then ask how many the merge gate should run (#714).
 
     Only reached when the GitHub lifecycle is selected — a `--lifecycle none`
-    project ships no monitor_pr.sh, so there is no cycle count to configure.
+    project ships no watch-pr.sh, so there is no cycle count to configure.
     """
     from rich.panel import Panel
 
     body = (
         "A [bold]review cycle[/bold] is one pass of the merge gate: "
         "[bold]push → the review agents comment → you resolve → they re-review[/bold]. "
-        "monitor_pr.sh runs up to this many before it stops asking for another.\n\n"
+        "watch-pr.sh runs up to this many before it stops asking for another.\n\n"
         "[bold]0[/bold]  [dim]no review control — merge as soon as CI is green[/dim]\n"
         "[bold]1[/bold]  [dim]comment once, resolve, merge[/dim]\n"
         "[bold]2[/bold]  [dim]the resolved comments are reviewed too, then merge[/dim]\n"

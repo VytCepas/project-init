@@ -1,8 +1,8 @@
 """PI-714: review cycles are configurable, explained, and lifecycle-gated.
 
-`monitor_pr.sh` hardcoded MAX_REVIEW_CYCLES=2 and nothing told the user it
+`watch-pr.sh` hardcoded MAX_REVIEW_CYCLES=2 and nothing told the user it
 existed. The count now comes from `.agents/config.yaml` (written by the wizard or
-`--review-cycles`), read back by gh_host.sh's `review_cycles()`, overridable
+`--review-cycles`), read back by gh-host.sh's `review_cycles()`, overridable
 per-run via PI_REVIEW_CYCLES.
 
 0 means no review control: merge as soon as CI is green. It is NOT an admin
@@ -66,10 +66,10 @@ def test_default_is_two(tmp_path: Path):
 
 
 def test_lifecycle_none_renders_no_cycle_key(tmp_path: Path):
-    """No monitor_pr.sh ships, so there is no gate to size."""
+    """No watch-pr.sh ships, so there is no gate to size."""
     assert _scaffold(tmp_path, "--lifecycle", "none").returncode == 0
     assert _config_cycles(tmp_path) is None
-    assert not (tmp_path / ".agents" / "scripts" / "monitor_pr.sh").exists()
+    assert not (tmp_path / ".agents" / "scripts" / "watch-pr.sh").exists()
 
 
 def test_review_cycles_without_lifecycle_is_rejected(tmp_path: Path):
@@ -88,7 +88,7 @@ def test_negative_review_cycles_is_rejected(tmp_path: Path):
 def test_gh_host_reads_the_configured_count(tmp_path: Path):
     assert _scaffold(tmp_path, "--review-cycles", "3").returncode == 0
     result = subprocess.run(
-        ["bash", "-c", ". .agents/scripts/gh_host.sh; review_cycles"],
+        ["bash", "-c", ". .agents/scripts/gh-host.sh; review_cycles"],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -103,7 +103,7 @@ def test_gh_host_falls_back_to_two_without_a_key(tmp_target: Path):
     cfg = tmp_target / ".agents" / "config.yaml"
     cfg.write_text(re.sub(r"^[ \t]*review_cycles:.*\n", "", cfg.read_text(), flags=re.M))
     result = subprocess.run(
-        ["bash", "-c", ". .agents/scripts/gh_host.sh; review_cycles"],
+        ["bash", "-c", ". .agents/scripts/gh-host.sh; review_cycles"],
         cwd=tmp_target,
         capture_output=True,
         text=True,
@@ -114,7 +114,7 @@ def test_gh_host_falls_back_to_two_without_a_key(tmp_target: Path):
 
 def test_monitor_pr_env_override_beats_config(tmp_target: Path):
     scaffold(tmp_target, fallback_preset(), fallback_variables())
-    body = (tmp_target / ".agents" / "scripts" / "monitor_pr.sh").read_text()
+    body = (tmp_target / ".agents" / "scripts" / "watch-pr.sh").read_text()
     assert 'MAX_REVIEW_CYCLES="${PI_REVIEW_CYCLES:-$(review_cycles)}"' in body
     # 0 skips the review gate, and must not reach _admin_merge.
     zero_block = body.split('if [ "$MAX_REVIEW_CYCLES" -eq 0 ]', 1)[1][:500]
@@ -323,7 +323,7 @@ def _run_monitor_zero(tmp_target: Path, tmp_path: Path, *, merge: bool):
     env = os.environ.copy()
     env["PATH"] = f"{stub}:{env['PATH']}"
     env["PI_REVIEW_CYCLES"] = "0"
-    argv = ["bash", str(tmp_target / ".agents" / "scripts" / "monitor_pr.sh"), "1"]
+    argv = ["bash", str(tmp_target / ".agents" / "scripts" / "watch-pr.sh"), "1"]
     if merge:
         argv.append("--merge")
     return subprocess.run(
@@ -369,7 +369,7 @@ def test_leading_zero_cycle_counts_are_not_read_as_octal(
     result = subprocess.run(
         [
             "bash",
-            str(tmp_target / ".agents" / "scripts" / "monitor_pr.sh"),
+            str(tmp_target / ".agents" / "scripts" / "watch-pr.sh"),
             "1",
             "--merge",
             "--review-cycle",

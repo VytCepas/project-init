@@ -6,7 +6,7 @@ reviewer (pre-enabled whenever egress is allowed); both registered twice in
 the agent index every session (#848). code-reviewer survives as the fallback
 reviewer on --no-egress scaffolds, and must stay a well-formed spec. The #687
 orientation contract that lived in explore.md now travels with the delegation
-guidance in the token_efficiency skill.
+guidance in the token-efficiency skill.
 """
 
 from __future__ import annotations
@@ -50,19 +50,19 @@ def test_no_egress_reviewer_is_a_well_formed_spec(tmp_path: Path):
 
 def test_delegation_guidance_carries_the_orientation_contract(tmp_path: Path):
     """#687: the agent whose job is discovery used to grep blind. The contract
-    moved from explore.md (removed, #848) into the token_efficiency skill's
+    moved from explore.md (removed, #848) into the token-efficiency skill's
     delegation guidance — same four steps, now applied to the built-in Explore."""
     target = tmp_path / "p"
     # The skill file lands in .agents/skills only on --no-plugin scaffolds;
     # plugin mode ships the same payload via sync_plugin (byte-identity tested).
     scaffold(target, fallback_preset(), fallback_variables(), strict=True)
-    body = (target / ".agents" / "skills" / "token_efficiency" / "SKILL.md").read_text(
+    body = (target / ".agents" / "skills" / "token-efficiency" / "SKILL.md").read_text(
         encoding="utf-8"
     )
 
     flat = " ".join(body.split())  # phrase asserts must survive line wrapping
     for artifact in (
-        ".agents/docs/CODE_MAP.md",
+        ".agents/docs/code-map.md",
         ".agents/memory/MEMORY.md",
         ".agents/CAPABILITIES.md",
     ):

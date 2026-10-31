@@ -37,7 +37,7 @@ def test_unwired_tier3_gets_the_stub(tmp_path: Path):
     rule = _rag_scaffold(tmp_path / "p")
     text = rule.read_text()
     assert "not set up" in text
-    assert "setup_rag.sh" in text
+    assert "setup-rag.sh" in text
     # The full stack description must NOT load before wiring.
     assert "recall surface, authoritative for nothing" not in text
     assert len(text) < 700, "the stub must stay a pointer, not a treatise"

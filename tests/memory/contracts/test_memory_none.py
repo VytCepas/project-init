@@ -169,9 +169,9 @@ class TestCoreScaffold:
 
     def test_no_memory_specific_docs(self):
         assert not (self.target / ".agents" / "docs" / "guides" / "using-memory.md").exists()
-        assert not (self.target / ".agents" / "docs" / "adr" / "adr-001-memory-stack.md").exists()
-        # the rest of docs/adr is still there
-        assert (self.target / ".agents" / "docs" / "adr" / "adr-002-mcp-choices.md").is_file()
+        assert not (self.target / ".agents" / "docs" / "decisions" / "memory-stack.md").exists()
+        # the rest of docs/decisions is still there
+        assert (self.target / ".agents" / "docs" / "decisions" / "mcp-choices.md").is_file()
 
     def test_config_has_no_memory_block(self):
         cfg = (self.target / ".agents" / "config.yaml").read_text()

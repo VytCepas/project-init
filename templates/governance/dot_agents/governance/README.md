@@ -13,24 +13,24 @@ ISO/IEC 42001, the EU AI Act, and the OWASP LLM/Agentic Top 10.
 
 **Usage track (#411)** — the policy layer (adopt-and-customise templates):
 
-- [`AI_USAGE_POLICY.md`](AI_USAGE_POLICY.md) — the 1-page AUP (umbrella policy).
+- [`ai-usage-policy.md`](ai-usage-policy.md) — the 1-page AUP (umbrella policy).
 - [`approved-tools.md`](approved-tools.md) — an allow/deny policy for models,
   endpoints, and data classes (deny-by-default).
 - [`data-handling.md`](data-handling.md) — what data may/may not go to AI tools,
   by class, plus the repo's enforcement backstops.
 - [`ai-code-provenance.md`](ai-code-provenance.md) — attribution, licence
   contamination, and the review bar for AI-authored code.
-- [`NIST_RMF_CROSSWALK.md`](NIST_RMF_CROSSWALK.md) — maps the above to the NIST
+- [`nist-risk-management-framework-crosswalk.md`](nist-risk-management-framework-crosswalk.md) — maps the above to the NIST
   AI RMF functions (Govern/Map/Measure/Manage) + ISO 42001 / EU AI Act pointers.
 
 **Product track (#412)** — the system card, AIBOM, and CI gate:
 
-- [`examples/SYSTEM_CARD.example.md`](examples/SYSTEM_CARD.example.md) +
-  [`examples/SYSTEM_CARD.template.md`](examples/SYSTEM_CARD.template.md) — a
+- [`examples/system-card-example.md`](examples/system-card-example.md) +
+  [`examples/system-card-template.md`](examples/system-card-template.md) — a
   reference card and a copy-me template carrying a flat-scalar **governance
   manifest**. Copy the template to `.agents/governance/SYSTEM_CARD.md` to create
   a real, gated card.
-- [`examples/NO_AI_SYSTEM.template.md`](examples/NO_AI_SYSTEM.template.md) — the
+- [`examples/no-ai-system-template.md`](examples/no-ai-system-template.md) — the
   copy-me alternative to a card when this repo ships **no** AI system. Copy it to
   `.agents/governance/NO_AI_SYSTEM.md` and fill in a `reason` and a `declared_on`
   date.
@@ -38,7 +38,7 @@ ISO/IEC 42001, the EU AI Act, and the OWASP LLM/Agentic Top 10.
   CCR routes), regenerated each scaffold/upgrade. Do not hand-edit.
 - [`ai-declarations.md`](ai-declarations.md) — the user-owned counterpart for
   models/APIs called directly; seeded once and preserved.
-- `../scripts/governance_gate.sh` (+ `governance_gate.py`) — the **CI gate**. It
+- `../scripts/governance-gate.sh` (+ `governance_gate.py`) — the **CI gate**. It
   validates every *real* `SYSTEM_CARD.md` and fails on missing/placeholder fields,
   out-of-range values, the `prohibited`+`allowed:true` illegal combo, an unfilled
   declarations file, or a stale `last_reviewed`. **It never passes on silence**: a
@@ -55,8 +55,8 @@ case that is true, and the gate passes on exactly that:
 
 | This repo… | Write | The gate then |
 |---|---|---|
-| builds, operates or ships an AI system | `SYSTEM_CARD.md` (from `examples/SYSTEM_CARD.template.md`) and a filled `ai-declarations.md` | validates the card; fails on any violation |
-| ships **no** AI system | `NO_AI_SYSTEM.md` (from `examples/NO_AI_SYSTEM.template.md`): a `reason` and a `declared_on` date | passes; fails if either field is missing, a placeholder, a YAML null (`~`, `null`), a block indicator (`\|`, `>`) or a non-answer (`TODO`, `n/a`), if the `reason` is too short to be a sentence, or if the date is not a real ISO date that is neither in the future nor older than the gate |
+| builds, operates or ships an AI system | `SYSTEM_CARD.md` (from `examples/system-card-template.md`) and a filled `ai-declarations.md` | validates the card; fails on any violation |
+| ships **no** AI system | `NO_AI_SYSTEM.md` (from `examples/no-ai-system-template.md`): a `reason` and a `declared_on` date | passes; fails if either field is missing, a placeholder, a YAML null (`~`, `null`), a block indicator (`\|`, `>`) or a non-answer (`TODO`, `n/a`), if the `reason` is too short to be a sentence, or if the date is not a real ISO date that is neither in the future nor older than the gate |
 | neither of the above written | nothing | **fails** and names both options |
 | both a card and `NO_AI_SYSTEM.md` | — | **fails**: a repo ships an AI system or it does not |
 | a `NO_AI_SYSTEM.md` anywhere but `.agents/governance/` | — | **fails** as misfiled: the gate reads only the root file, so a copy elsewhere would otherwise pass unseen |

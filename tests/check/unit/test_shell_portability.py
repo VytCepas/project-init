@@ -1,7 +1,7 @@
 """PI-363 Layer 1: denylist lint over every scaffolded shell template.
 
 The broad backstop guarding #360 (bash 3.2 / BSD coreutils), #361 (interpreter
-resolution via _py.sh) and #362 (hardening sweep) against regression. Scans
+resolution via python-resolve.sh) and #362 (hardening sweep) against regression. Scans
 templates/**/*.sh and *.sh.tmpl and fails with the offending file:line, so
 reintroducing any forbidden construct breaks an ordinary PR (no new CI infra —
 this runs in `just test`).
@@ -24,9 +24,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _TEMPLATES = _REPO_ROOT / "templates"
 
 # The one file allowed to name Python interpreters: the resolver itself (#361).
-_RESOLVER = "_py.sh"
+_RESOLVER = "python-resolve.sh"
 # Opt-in day-2 CCR config editor: a JSON manipulator that declares its own
-# dependency (`have jq || die`). jq-removal was scoped to setup_github.sh (#362);
+# dependency (`have jq || die`). jq-removal was scoped to setup-github.sh (#362);
 # rewriting this jq-native script is out of scope.
 _JQ_ALLOWED = {"models.sh"}
 
@@ -50,7 +50,7 @@ def _shell_templates() -> list[Path]:
             continue
         rendered_name = p.name[: -len(".tmpl")] if p.name.endswith(".tmpl") else p.name
         if "." in rendered_name:
-            continue  # e.g. _py.sh / .json — handled by the *.sh patterns above
+            continue  # e.g. python-resolve.sh / .json — handled by the *.sh patterns above
         first = _IF_GUARD.sub("", p.read_text().splitlines()[0])
         if first.startswith("#!"):
             out.add(p)
@@ -80,7 +80,7 @@ def test_templates_discovered():
     assert _SHELL_TEMPLATES, "no shell templates found — wrong path?"
     # pre-push became pre-push.tmpl (#476): main/master block always renders,
     # the lifecycle branch-prefix rule is gated.
-    assert {"pre_commit_gate.sh", "_py.sh", "pre-push.tmpl"} <= names
+    assert {"pre-commit-gate.sh", "python-resolve.sh", "pre-push.tmpl"} <= names
 
 
 _POSIX_SH_TEMPLATES = sorted(p for p in _TEMPLATES.rglob("*.sh") if _is_posix_sh_template(p))
@@ -180,7 +180,7 @@ def test_python_only_via_resolver(tmpl: Path):
             if any(s <= m.start() < e for s, e in probe_spans):
                 continue
             pytest.fail(
-                f"{_id(tmpl)}:{n} Python invoked directly — route via _py.sh: {line.strip()!r}"
+                f"{_id(tmpl)}:{n} Python invoked directly — route via python-resolve.sh: {line.strip()!r}"
             )
 
 

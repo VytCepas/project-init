@@ -23,7 +23,7 @@ class TestScaffoldGraphify:
         self.created = scaffold(self.target, preset, variables, strict=True)
 
     def test_setup_script_present_and_executable(self):
-        script = self.target / ".agents" / "scripts" / "setup_graphify.sh"
+        script = self.target / ".agents" / "scripts" / "setup-graphify.sh"
         assert script.is_file()
         assert os.access(script, os.X_OK)
         content = script.read_text()
@@ -36,12 +36,12 @@ class TestScaffoldGraphify:
     def test_rule_file_directs_graph_first_lookup(self):
         rule = (self.target / ".agents" / "rules" / "graphify.md").read_text()
         assert "graphify-out/graph.json" in rule
-        assert "setup_graphify.sh" in rule
+        assert "setup-graphify.sh" in rule
 
     def test_guide_documents_workflow(self):
         guide = (self.target / ".agents" / "docs" / "guides" / "using-graphify.md").read_text()
         assert "--obsidian" in guide
-        assert "setup_graphify.sh" in guide
+        assert "setup-graphify.sh" in guide
 
     def test_gitignore_keeps_report_tracked(self):
         gitignore = (self.target / ".gitignore").read_text()

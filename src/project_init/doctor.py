@@ -188,7 +188,7 @@ def _hook_commands(settings: dict[str, Any]) -> list[str]:
 def _referenced_scripts(settings: dict[str, Any]) -> list[str]:
     """Every ``$CLAUDE_PROJECT_DIR/.agents/...`` script path settings.json invokes.
 
-    A command is a shell string — ``_py.sh foo.py`` names two paths — so each is
+    A command is a shell string — ``python-resolve.sh foo.py`` names two paths — so each is
     tokenised and every ``.agents``-rooted token kept, as a repo-relative POSIX
     path (``$CLAUDE_PROJECT_DIR`` prefix stripped).
     """
@@ -227,7 +227,7 @@ def check_referenced_scripts_executable(target: Path, settings: dict[str, Any]) 
     """Referenced ``.sh`` hooks carry the executable bit.
 
     Only shell scripts are checked: Python hooks are invoked as arguments to the
-    ``_py.sh`` interpreter wrapper (``_py.sh prod_guard.py``), so they run
+    ``python-resolve.sh`` interpreter wrapper (``python-resolve.sh prod_guard.py``), so they run
     without ``+x`` — but every ``.sh`` is exec'd directly and a lost bit means a
     silent ``permission denied`` at hook time. Missing files are the previous
     check's job; here we only judge files that exist.
@@ -513,7 +513,7 @@ def check_git_hooks(target: Path) -> Check:
     """Git hooks are installed when a ``.github/hooks/`` source ships them.
 
     Scaffolded projects ship ``.github/hooks/`` (gitleaks pre-commit + the
-    lifecycle pre-push/commit-msg guards, ADR-007); ``install_hooks.sh`` copies
+    lifecycle pre-push/commit-msg guards, ADR-007); ``install-hooks.sh`` copies
     each into ``.git/hooks/``. If no source is present there is nothing to
     install and the check passes trivially. This is a WARN,
     not a FAIL: a freshly-scaffolded project has not run ``git init`` yet, and a
@@ -527,7 +527,7 @@ def check_git_hooks(target: Path) -> Check:
             "WARN",
             "git hooks",
             "not a git repository yet — lifecycle git hooks are not installed",
-            hint="git init && .agents/scripts/install_hooks.sh",
+            hint="git init && .agents/scripts/install-hooks.sh",
         )
     expected = sorted(p.name for p in src.iterdir() if p.is_file())
     dst = target / ".git" / "hooks"
@@ -542,15 +542,15 @@ def check_git_hooks(target: Path) -> Check:
             "WARN",
             "git hooks",
             f"git hook(s) not installed or not executable: {', '.join(not_ready)}",
-            hint=".agents/scripts/install_hooks.sh",
+            hint=".agents/scripts/install-hooks.sh",
         )
     return Check("PASS", "git hooks", f"all {len(expected)} git hooks installed")
 
 
 def check_python_available() -> Check:
-    """A Python 3 interpreter is resolvable, mirroring ``_py.sh``.
+    """A Python 3 interpreter is resolvable, mirroring ``python-resolve.sh``.
 
-    Every Python hook runs through ``_py.sh``, which resolves ``python3`` →
+    Every Python hook runs through ``python-resolve.sh``, which resolves ``python3`` →
     a 3.x ``python`` → ``uv run python``. If none of those exist the hooks fail
     with exit 127 at runtime, so surface it now. WARN (not FAIL): the host that
     runs the hooks may differ from the one running ``doctor``.
@@ -563,7 +563,7 @@ def check_python_available() -> Check:
         "WARN",
         "python available",
         "no python3, python, or uv on PATH — Python hooks will fail (exit 127)",
-        hint="install Python 3 or uv so .agents/hooks/_py.sh can resolve an interpreter",
+        hint="install Python 3 or uv so .agents/hooks/python-resolve.sh can resolve an interpreter",
     )
 
 

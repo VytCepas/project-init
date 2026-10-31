@@ -1,6 +1,6 @@
 # Preset: Auto — flat agent-memory files, no Obsidian vault (#497, ADR-024)
 # Tier 0 of the memory ladder: ships .agents/memory/ (flat facts agents read
-# every session) and lint_memory.sh, WITHOUT the human Obsidian vault. Pure
+# every session) and lint-memory.sh, WITHOUT the human Obsidian vault. Pure
 # files — installs nothing. Pick this when you want durable agent recall but no
 # vault to curate. `obsidian-only` is this PLUS the vault; `obsidian-graphify`
 # adds a code knowledge graph on top.

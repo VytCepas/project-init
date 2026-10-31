@@ -139,14 +139,14 @@ class TestPresetVarsReachRender:
 class TestCarryRagEndpoint:
     """The memory-block splice on upgrade must not reset a hand-set
     memory.rag_endpoint — the template always renders it empty and
-    setup_rag.sh explicitly instructs the user to set it (2026-07 review)."""
+    setup-rag.sh explicitly instructs the user to set it (2026-07 review)."""
 
-    _OLD = 'memory:\n  tier: 3\n  rag_endpoint: "ccc mcp"  # user-set per setup_rag.sh\n\n'
-    _NEW = "memory:\n  tier: 3\n  rag_endpoint:        # tier 3: set after running setup_rag.sh\n\n"
+    _OLD = 'memory:\n  tier: 3\n  rag_endpoint: "ccc mcp"  # user-set per setup-rag.sh\n\n'
+    _NEW = "memory:\n  tier: 3\n  rag_endpoint:        # tier 3: set after running setup-rag.sh\n\n"
 
     def test_user_value_survives_the_splice(self):
         out = _carry_rag_endpoint(self._OLD, self._NEW)
-        assert '  rag_endpoint: "ccc mcp"  # user-set per setup_rag.sh' in out
+        assert '  rag_endpoint: "ccc mcp"  # user-set per setup-rag.sh' in out
         assert "tier: 3" in out
 
     def test_untouched_endpoint_takes_fresh_render(self):

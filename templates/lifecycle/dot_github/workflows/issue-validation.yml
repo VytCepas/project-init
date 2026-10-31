@@ -45,11 +45,11 @@ jobs:
             fi
           }
 
-          # Map a body "Type" value (either the create_issue.sh type keyword —
+          # Map a body "Type" value (either the create-issue.sh type keyword —
           # feat/fix/chore/docs/test — or the label name itself) to the canonical
           # type label. spike and debt/tech-debt are LABEL-only types: a spike
           # does not branch and tech-debt branches as fix/ or chore/, so the
-          # keyword alphabet (create_issue.sh, start_issue.sh, branch names) does
+          # keyword alphabet (create-issue.sh, start-issue.sh, branch names) does
           # not carry them.
           map_type_label() {
             case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
@@ -65,7 +65,7 @@ jobs:
           }
 
           # Derive the type from the body, tolerating both the "- Type: value"
-          # bullet (create_issue.sh / MCP-API issues) and the "### Type" heading
+          # bullet (create-issue.sh / MCP-API issues) and the "### Type" heading
           # block (issue forms).
           parse_type_from_body() {
             local body="$1" val

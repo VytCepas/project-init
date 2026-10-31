@@ -85,8 +85,8 @@ class TestSessionStartHookRefuses:
     def _hooks(tmp_path: Path) -> list[Path]:
         target = tmp_path / "p"
         scaffold(target, fallback_preset(), fallback_variables(), strict=True)
-        plugin = REPO / "plugins" / "project-init-workflow" / "hooks" / "session_setup.sh"
-        return [target / ".agents" / "hooks" / "session_setup.sh", plugin]
+        plugin = REPO / "plugins" / "project-init-workflow" / "hooks" / "session-setup.sh"
+        return [target / ".agents" / "hooks" / "session-setup.sh", plugin]
 
     @staticmethod
     def _run(hook: Path, project: Path, stub: Path) -> subprocess.CompletedProcess[str]:

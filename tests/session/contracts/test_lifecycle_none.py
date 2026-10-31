@@ -55,11 +55,11 @@ class TestLifecycleLayerDerivation:
     def test_overlay_appends_lifecycle_when_on(self):
         # plugin mode: just the lifecycle layer (both modes).
         assert overlay_layers("claude", no_plugin=False, lifecycle=True) == ["lifecycle"]
-        # no-plugin: fallback + lifecycle + lifecycle_fallback.
+        # no-plugin: fallback + lifecycle + lifecycle-fallback.
         assert overlay_layers("claude", no_plugin=True, lifecycle=True) == [
             "fallback",
             "lifecycle",
-            "lifecycle_fallback",
+            "lifecycle-fallback",
         ]
 
     def test_overlay_omits_lifecycle_when_off(self):
@@ -71,11 +71,11 @@ class TestLifecycleLayerDerivation:
         assert overlay_layers("claude", no_plugin=False) == []
 
     def test_lifecycle_precedes_agents(self):
-        # base → fallback → lifecycle → lifecycle_fallback → agents.
+        # base → fallback → lifecycle → lifecycle-fallback → agents.
         assert overlay_layers("claude,codex", no_plugin=True, lifecycle=True) == [
             "fallback",
             "lifecycle",
-            "lifecycle_fallback",
+            "lifecycle-fallback",
             "codex",
         ]
 
@@ -133,29 +133,29 @@ class TestLifecycleNoneScaffold:
     def test_no_lifecycle_scripts(self):
         scripts = self.target / ".agents" / "scripts"
         for s in (
-            "create_issue.sh",
-            "start_issue.sh",
-            "finish_pr.sh",
-            "monitor_pr.sh",
-            "push_branch.sh",
-            "setup_github.sh",
-            "promote_review.sh",
-            "create_nojira_pr.sh",
-            "push_wiki.sh",
+            "create-issue.sh",
+            "start-issue.sh",
+            "finish-pr.sh",
+            "watch-pr.sh",
+            "push-branch.sh",
+            "setup-github.sh",
+            "promote-review.sh",
+            "create-pr-without-issue.sh",
+            "push-wiki.sh",
         ):
             assert not (scripts / s).exists(), f"lifecycle script leaked: {s}"
         # Quality + shared-utility scripts stay.
-        assert (scripts / "install_hooks.sh").is_file()
-        assert (scripts / "gh_host.sh").is_file()
+        assert (scripts / "install-hooks.sh").is_file()
+        assert (scripts / "gh-host.sh").is_file()
 
     def test_no_dag_or_guard_hooks(self):
         hooks = self.target / ".agents" / "hooks"
         assert not (hooks / "dag_workflow.py").exists()
         assert not (hooks / "github_command_guard.sh").exists()
-        assert not (hooks / "workflow_state_reminder.sh").exists()
+        assert not (hooks / "workflow-state-reminder.sh").exists()
         # Quality/safety hooks stay.
         assert (hooks / "prod_guard.py").is_file()
-        assert (hooks / "pre_commit_gate.sh").is_file()
+        assert (hooks / "pre-commit-gate.sh").is_file()
 
     def test_no_lifecycle_workflows_or_templates(self):
         gh = self.target / ".github"
@@ -175,7 +175,7 @@ class TestLifecycleNoneScaffold:
 
     def test_no_lifecycle_skills(self):
         skills = self.target / ".agents" / "skills"
-        for sk in ("create_issue", "start_task", "github_workflow", "request_review", "audit"):
+        for sk in ("create-issue", "start-task", "github-workflow", "request-review", "audit"):
             assert not (skills / sk).exists(), f"lifecycle skill leaked: {sk}"
         # A general skill stays (plan is the always-rendered base skill).
         assert (skills / "plan" / "SKILL.md").is_file()
@@ -195,19 +195,19 @@ class TestLifecycleNoneScaffold:
         assert "workflow_state_reminder" not in joined
         assert "UserPromptSubmit" not in settings["hooks"]
         # Quality/safety hooks still wired.
-        assert any("pre_commit_gate.sh" in c for c in commands)
+        assert any("pre-commit-gate.sh" in c for c in commands)
         assert any("prod_guard.py" in c for c in commands)
 
     def test_pre_push_keeps_main_block_drops_branch_rule(self):
         pp = (self.target / ".github" / "hooks" / "pre-push").read_text()
         assert "Direct push to main/master is not allowed" in pp  # quality, stays
         assert "lifecycle naming convention" not in pp  # lifecycle rule, gated out
-        assert "start_issue.sh" not in pp  # no dangling lifecycle-script reference
+        assert "start-issue.sh" not in pp  # no dangling lifecycle-script reference
 
     def test_no_dangling_lifecycle_links(self):
         """No markdown link points at a missing lifecycle file."""
         link_re = re.compile(
-            r"\]\((?:\./)?(?:\.agents/(?:scripts|hooks)/(?:create_issue|start_issue|finish_pr|"
+            r"\]\((?:\./)?(?:\.agents/(?:scripts|hooks)/(?:create-issue|start_issue|finish_pr|"
             r"monitor_pr|push_branch|setup_github|promote_review|create_nojira_pr|push_wiki|"
             r"dag_workflow|github_command_guard|workflow_state_reminder)"
             r"|\.github/(?:workflows/(?:board-automation|issue-validation|review-status|validate-pr|"
@@ -230,36 +230,36 @@ class TestLifecycleNoneScaffold:
         lifecycle-free scaffold didn't ship (Codex review, #482). Catches inline
         `code` references, not just markdown links."""
         names = [
-            "create_issue.sh",
-            "start_issue.sh",
-            "create_nojira_pr.sh",
-            "promote_review.sh",
-            "monitor_pr.sh",
-            "finish_pr.sh",
-            "push_branch.sh",
-            "setup_github.sh",
-            "push_wiki.sh",
+            "create-issue.sh",
+            "start-issue.sh",
+            "create-pr-without-issue.sh",
+            "promote-review.sh",
+            "watch-pr.sh",
+            "finish-pr.sh",
+            "push-branch.sh",
+            "setup-github.sh",
+            "push-wiki.sh",
             "dag_workflow.py",
             "board-automation",
             "issue-validation",
             "review-status",
             "validate-pr",
             "project-init-upgrade",
-            "skills/create_issue",
-            "skills/start_task",
-            "skills/github_workflow",
-            "skills/request_review",
+            "skills/create-issue",
+            "skills/start-task",
+            "skills/github-workflow",
+            "skills/request-review",
             "skills/audit",
         ]
         pat = re.compile("|".join(re.escape(n) for n in names))
         # The guard hooks and gh_host carry internal design comments that mention
-        # dag_workflow.py / start_issue.sh as examples — not user-facing paths and
+        # dag_workflow.py / start-issue.sh as examples — not user-facing paths and
         # not present as wired hooks in a lifecycle-off scaffold. Allowed.
         allowed = {
-            ".agents/hooks/_usage_log.sh",
-            ".agents/scripts/gh_host.sh",
-            ".claude/hooks/_usage_log.sh",
-            ".claude/scripts/gh_host.sh",
+            ".agents/hooks/usage-log.sh",
+            ".agents/scripts/gh-host.sh",
+            ".claude/hooks/usage-log.sh",
+            ".claude/scripts/gh-host.sh",
         }
         offenders = {}
         for p in self.target.rglob("*"):
@@ -323,9 +323,9 @@ class TestPluginSplit:
             json.loads((root / "hooks" / "hooks.json").read_text(encoding="utf-8"))["hooks"]
         )
         assert events == {"PreToolUse", "UserPromptSubmit"}
-        for sk in ("create_issue", "start_task", "github_workflow", "request_review", "audit"):
+        for sk in ("create-issue", "start-task", "github-workflow", "request-review", "audit"):
             assert (root / "skills" / sk / "SKILL.md").is_file()
-        for hk in ("github_command_guard.sh", "workflow_state_reminder.sh", "dag_workflow.py"):
+        for hk in ("github_command_guard.sh", "workflow-state-reminder.sh", "dag_workflow.py"):
             assert (root / "hooks" / hk).is_file()
 
     def test_core_plugin_has_no_lifecycle_hooks(self):
@@ -335,7 +335,7 @@ class TestPluginSplit:
         )
         assert "UserPromptSubmit" not in events
         assert not (root / "hooks" / "github_command_guard.sh").exists()
-        assert not (root / "skills" / "create_issue").exists()
+        assert not (root / "skills" / "create-issue").exists()
 
 
 class TestAgentSurfaceLifecycleSkills:
@@ -344,7 +344,7 @@ class TestAgentSurfaceLifecycleSkills:
     `.agents/skills` just as it does from `.agents/skills` — previously they
     leaked, referencing scripts the declined concern never scaffolds."""
 
-    _LIFECYCLE = ("create_issue", "start_task", "github_workflow", "request_review", "audit")
+    _LIFECYCLE = ("create-issue", "start-task", "github-workflow", "request-review", "audit")
 
     def _scaffold(self, target: Path, lifecycle: str) -> int:
         from project_init.__main__ import main
@@ -374,7 +374,7 @@ class TestAgentSurfaceLifecycleSkills:
         skills = target / ".agents" / "skills"
         for sk in self._LIFECYCLE:
             assert not (skills / sk).exists(), f"lifecycle agent skill leaked: {sk}"
-        assert (skills / "add_hook" / "SKILL.md").is_file()  # core skill stays
+        assert (skills / "add-hook" / "SKILL.md").is_file()  # core skill stays
 
     def test_agents_skills_include_lifecycle_when_github(self, tmp_path: Path):
         target = tmp_path / "p"

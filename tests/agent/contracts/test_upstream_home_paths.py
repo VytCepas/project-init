@@ -10,7 +10,7 @@ Four instances shipped before this guard existed:
 Path         Where                           Symptom                Fixed by
 ===========  ==============================  =====================  ==========
 ~/.claude    tools/benchmark/harness.py      creds not found        PI-802
-~/.claude-…  templates/multi_model           config silently unread PI-869
+~/.claude-…  templates/multi-model           config silently unread PI-869
 ~/.claude/p… templates/observability         no transcript found    PI-872
 ~/.claude/c… install.sh                      dead /project-init     PI-877
 ===========  ==============================  =====================  ==========

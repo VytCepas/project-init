@@ -43,6 +43,6 @@ This policy keeps AI assistance auditable and safe to ship.
 
 ## Related
 
-- [`AI_USAGE_POLICY.md`](AI_USAGE_POLICY.md) — the umbrella policy.
+- [`ai-usage-policy.md`](ai-usage-policy.md) — the umbrella policy.
 - [`approved-tools.md`](approved-tools.md) — which tools may produce code here.
-- [`NIST_RMF_CROSSWALK.md`](NIST_RMF_CROSSWALK.md) — framework mapping.
+- [`nist-risk-management-framework-crosswalk.md`](nist-risk-management-framework-crosswalk.md) — framework mapping.

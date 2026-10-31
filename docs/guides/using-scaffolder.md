@@ -54,7 +54,7 @@ The most-used flags:
 | `--strict` | flag (fail on unrendered placeholders) | off |
 
 A **review cycle** is one pass of the merge gate: push → the review agents comment
-→ you resolve → they re-review. `--review-cycles` sizes how many `monitor_pr.sh`
+→ you resolve → they re-review. `--review-cycles` sizes how many `watch-pr.sh`
 runs before it stops asking for another. `0` disables review control and merges on
 green CI — it is *not* an admin override, so an approval policy still blocks the
 merge. Whatever the count, the merge rule is the same: once the agents' comments
@@ -110,8 +110,8 @@ your-project/
     ├── memory/
     │   ├── MEMORY.md            # Grep-able memory index
     │   ├── SCHEMA.md            # Memory type definitions
-    │   ├── project_context.md   # Starter: project goals
-    │   └── user_role.md         # Starter: team preferences
+    │   ├── project-context.md   # Starter: project goals
+    │   └── user-role.md         # Starter: team preferences
     ├── vault/                   # Obsidian vault — open this dir as vault root
     │   ├── log.md               # Operational log (auto-appended by hooks)
     │   ├── decisions/           # Architecture Decision Records
@@ -121,7 +121,7 @@ your-project/
     ├── docs/                    # Agent-readable reference docs
     ├── hooks/                   # Deterministic safety hooks
     ├── scripts/                 # GitHub lifecycle scripts
-    ├── skills/                  # Slash commands (/start_task, etc.)
+    ├── skills/                  # Slash commands (/start-task, etc.)
     ├── rules/                   # Language-specific agent rules
     └── agents/                  # Sub-agent persona specs
 ```
@@ -155,13 +155,13 @@ Memory lives in `.agents/memory/`. Four types:
 
 Each memory is a markdown file with YAML frontmatter. `MEMORY.md` is the index — agents grep it without loading every file.
 
-Run `/session_summary` at the end of each session to record what was done and update memory.
+Run `/session-summary` at the end of each session to record what was done and update memory.
 
 ### Obsidian Vault
 
 Open `.agents/vault/` as the vault root in Obsidian to get wikilinks, graph view, and Templater templates for ADRs, session notes, design notes, and knowledge entries.
 
-Session notes land in `vault/sessions/` via `/session_summary` — a running operational log.
+Session notes land in `vault/sessions/` via `/session-summary` — a running operational log.
 
 Write an ADR for every non-obvious architectural decision. Future agents will understand why choices were made.
 
@@ -171,13 +171,13 @@ Wired in `.agents/settings.json`:
 
 | Hook | Trigger | Purpose |
 |------|---------|---------|
-| `pre_commit_gate.sh` | Pre-commit | Runs lint and format before every commit |
+| `pre-commit-gate.sh` | Pre-commit | Runs lint and format before every commit |
 | `github_command_guard.sh` | git/gh commands | Steers toward lifecycle scripts |
 
 Security enforcement is agent-agnostic (ADR-007): a gitleaks `pre-commit`
 git hook scans staged changes for secrets, `commit-msg`/`pre-push` git hooks
 gate the lifecycle (install once per clone with
-`.agents/scripts/install_hooks.sh`), and CI mirrors both with a
+`.agents/scripts/install-hooks.sh`), and CI mirrors both with a
 `secret-scan` job and the `validate-pr` workflow. Claude-side guidance comes
 from the official `security-guidance` plugin, enabled in `settings.json`.
 
@@ -185,15 +185,15 @@ from the official `security-guidance` plugin, enabled in `settings.json`.
 
 | Skill | Purpose |
 |-------|---------|
-| `/start_task` | Create GitHub issue + branch + draft PR |
-| `/session_summary` | Save session note and update memory |
-| `/github_workflow` | Load PR lifecycle instructions |
-| `/add_hook` | Add a new hook to `settings.json` |
-| `/add_adr` | Record an architectural decision (MADR template) |
-| `/add_command` | Create a new slash command |
+| `/start-task` | Create GitHub issue + branch + draft PR |
+| `/session-summary` | Save session note and update memory |
+| `/github-workflow` | Load PR lifecycle instructions |
+| `/add-hook` | Add a new hook to `settings.json` |
+| `/add-decision-record` | Record an architectural decision (MADR template) |
+| `/add-command` | Create a new slash command |
 | `/audit` | Review for security and quality issues |
 
-Use `/start_task` before any non-trivial work — one issue, one branch, one PR keeps work traceable.
+Use `/start-task` before any non-trivial work — one issue, one branch, one PR keeps work traceable.
 
 ---
 
@@ -202,7 +202,7 @@ Use `/start_task` before any non-trivial work — one issue, one branch, one PR 
 If you chose `obsidian-graphify`, run the one-time setup and build the graph:
 
 ```bash
-.agents/scripts/setup_graphify.sh   # installs the CLI, skill, and post-commit hook
+.agents/scripts/setup-graphify.sh   # installs the CLI, skill, and post-commit hook
 # then inside your agent: /graphify .
 ```
 
@@ -212,9 +212,9 @@ The graph rebuilds incrementally per commit; agents query `graphify-out/graph.js
 
 ## 7. Common Customization
 
-**Add a hook**: run `/add_hook` or edit `.agents/settings.json` directly. Scripts go in `.agents/hooks/`.
+**Add a hook**: run `/add-hook` or edit `.agents/settings.json` directly. Scripts go in `.agents/hooks/`.
 
-**Add a slash command**: run `/add_command`. Creates a `SKILL.md` in `.agents/skills/<name>/`. Register it in `.agents/skills/INDEX.md`.
+**Add a slash command**: run `/add-command`. Creates a `SKILL.md` in `.agents/skills/<name>/`. Register it in `.agents/skills/index.md`.
 
 **Upgrade to current templates**: `project-init upgrade .` reports drift between
 your project and the current templates (nothing is touched); `project-init
@@ -261,7 +261,7 @@ project-init remove memory --target . --apply --purge
 ls .agents/hooks/
 
 # Lint memory index integrity
-bash .agents/scripts/lint_memory.sh
+bash .agents/scripts/lint-memory.sh
 
 # Confirm pre_commit_gate fires
 git commit --allow-empty -m "test: verify hooks"
@@ -279,5 +279,5 @@ git commit --allow-empty -m "test: verify hooks"
 | Hooks don't fire on commit | Check `python3 --version`; hooks need `python3` on PATH |
 | `native Windows shell ... is not supported` | Native Windows (Git Bash, MSYS2, Cygwin) is refused. Run inside WSL2, from the WSL filesystem (#1070). |
 | Unrendered `{{...}}` in output | Re-run with `--strict` to surface the missing variable |
-| `lint_memory.sh` reports errors | Each file in `memory/` needs a matching entry in `MEMORY.md` |
+| `lint-memory.sh` reports errors | Each file in `memory/` needs a matching entry in `MEMORY.md` |
 | CRLF line ending errors on WSL | Edit and commit from inside WSL, not from the Windows side |

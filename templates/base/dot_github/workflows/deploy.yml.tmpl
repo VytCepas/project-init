@@ -1,7 +1,7 @@
 {{#if deploy_container}}# Deploy ({{deploy_target}}) — build once, promote the SAME image digest through
 # environments (ADR-015). Staging deploys automatically on merge to
 # {{base_branch}}; production is gated by the `production` GitHub Environment
-# (arm its protection rules with `.agents/scripts/setup_env_protection.sh`).
+# (arm its protection rules with `.agents/scripts/setup-environment-protection.sh`).
 # The model is declared in deploy/environments.yaml.
 name: Deploy
 
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ vars.CI_RUNS_ON == '' }}  # hosted-only: skip (not fail) when CI_RUNS_ON routes CI to a self-hosted runner
     # The `production` GitHub Environment is the server-side gate (required
-    # reviewers / wait timer). An agent cannot bypass it. See #324 / setup_env_protection.sh.
+    # reviewers / wait timer). An agent cannot bypass it. See #324 / setup-environment-protection.sh.
     environment: production
     env:
       IMAGE: ${{ needs.build-push.outputs.image }}@${{ needs.build-push.outputs.digest }}

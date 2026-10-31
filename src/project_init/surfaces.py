@@ -32,14 +32,14 @@ def _guard_command(surface: str) -> str:
     """Command-guard invocation that resolves from the git repo root (PI-537).
 
     Agent surfaces run hooks in the session's working directory, which may be a
-    subdirectory of the project; a bare relative ``.agents/hooks/_py.sh …`` then
+    subdirectory of the project; a bare relative ``.agents/hooks/python-resolve.sh …`` then
     exits 127 from there and fails open. Wrap it so it ``cd``s to the git toplevel
     first (falling back to the current dir outside a repo — the old behavior),
     then ``exec``s the guard so stdin (the tool-call JSON) is inherited.
     """
     return (
         'sh -c \'cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" && '
-        f"exec .agents/hooks/_py.sh .agents/hooks/agent_guard_adapter.py {surface}'"
+        f"exec .agents/hooks/python-resolve.sh .agents/hooks/admission_agent_adapter.py {surface}'"
     )
 
 

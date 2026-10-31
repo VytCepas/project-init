@@ -19,4 +19,4 @@ set -euo pipefail
 # redacted command), which is what a root orchestrator's governance signal reads
 # — a decision-less firing here would just be `action=unknown` noise (WS3).
 
-exec "$(dirname "$0")/_py.sh" "$(dirname "$0")/dag_workflow.py" guard
+exec "$(dirname "$0")/python-resolve.sh" "$(dirname "$0")/dag_workflow.py" guard

@@ -16,7 +16,7 @@ from pathlib import Path
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables
 
-_SCRIPT_REL = Path(".agents/scripts/gen_code_map.py")
+_SCRIPT_REL = Path(".agents/scripts/generate-code-map.py")
 
 
 def _scaffold(target: Path, language: str = "python") -> None:
@@ -42,19 +42,19 @@ class TestScaffoldedArtifacts:
         assert script.stat().st_mode & 0o111  # executable
 
     def test_agents_md_names_the_map_only_once_it_exists(self, tmp_path: Path):
-        """A scaffold never writes CODE_MAP.md, so it names the recipe that makes it;
+        """A scaffold never writes code-map.md, so it names the recipe that makes it;
         a project that already holds the map is pointed at the file (harbor#967)."""
         fresh = tmp_path / "fresh"
         _scaffold(fresh, "python")
         text = (fresh / "AGENTS.md").read_text()
-        assert "CODE_MAP.md" not in text
+        assert "code-map.md" not in text
         assert "`just code-map`" in text
 
         held = tmp_path / "held"
         (held / ".agents" / "docs").mkdir(parents=True)
-        (held / ".agents" / "docs" / "CODE_MAP.md").write_text("# map\n")
+        (held / ".agents" / "docs" / "code-map.md").write_text("# map\n")
         _scaffold(held, "python")
-        assert "`.agents/docs/CODE_MAP.md`" in (held / "AGENTS.md").read_text()
+        assert "`.agents/docs/code-map.md`" in (held / "AGENTS.md").read_text()
 
     def test_justfile_has_code_map_recipe(self, tmp_path: Path):
         target = tmp_path / "p"
@@ -66,7 +66,7 @@ class TestScaffoldedArtifacts:
         target = tmp_path / "p"
         _scaffold(target, "node")
         assert not (target / _SCRIPT_REL).exists()
-        assert "CODE_MAP.md" not in (target / "AGENTS.md").read_text()
+        assert "code-map.md" not in (target / "AGENTS.md").read_text()
 
 
 class TestGeneratorOutput:
@@ -79,7 +79,7 @@ class TestGeneratorOutput:
             check=True,
             text=True,
         )
-        return target / ".agents" / "docs" / "CODE_MAP.md"
+        return target / ".agents" / "docs" / "code-map.md"
 
     def test_map_lists_public_api_with_summaries(self, tmp_path: Path):
         target = tmp_path / "p"
@@ -133,7 +133,7 @@ class TestGeneratorOutput:
             check=True,
             text=True,
         )
-        text = (target / ".agents" / "docs" / "CODE_MAP.md").read_text()
+        text = (target / ".agents" / "docs" / "code-map.md").read_text()
         assert "The app." in text
         assert "Top-level noise." not in text  # cwd not scanned when src/ exists
 

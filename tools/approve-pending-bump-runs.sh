@@ -16,7 +16,7 @@
 #     a fork pull request or queued by the Actions bot". The `Review status`
 #     run triggered by a bot's review is exactly that case, so `review/decision`
 #     is NOT recoverable here. A plain PR comment re-triggers that workflow;
-#     monitor_pr.sh does it.
+#     watch-pr.sh does it.
 #   - GITHUB_TOKEN may be refused outright depending on repository settings.
 #     That is reported, not retried, and never fails the caller.
 #

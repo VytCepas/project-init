@@ -2,7 +2,7 @@
 
 Moving the GitHub lifecycle (DAG library, scripts, board/wiki/validation
 workflows, issue/PR templates, guard hooks, lifecycle skills) out of base into
-the ``lifecycle`` / ``lifecycle_fallback`` overlays and gating the mixed files
+the ``lifecycle`` / ``lifecycle-fallback`` overlays and gating the mixed files
 (settings hooks, pre-push, AGENTS/project-init prose) behind ``{{#if lifecycle}}``
 must render the default lifecycle-ON scaffold BYTE-IDENTICALLY.
 
@@ -15,17 +15,17 @@ the move. If this test fails, the move/gating changed rendered bytes — fix the
 template, do NOT regenerate the baseline.
 
 Exception (#496): the code-map feature intentionally ADDS
-`.agents/scripts/gen_code_map.py` and edits AGENTS.md + the justfile. Only those
+`.agents/scripts/generate-code-map.py` and edits AGENTS.md + the justfile. Only those
 three keys were re-pinned, after verifying every other file still matched the
 baseline — the move invariant is intact for everything else.
 
-Exception (#497/#498): later features re-pinned `lint_memory.sh` (staleness) and
+Exception (#497/#498): later features re-pinned `lint-memory.sh` (staleness) and
 `.agents/config.yaml` (memory descriptor `tier`/`graph_path`, then the top-level
 `project_init_contract_version`, ADR-025) the same way — only the intentionally
 changed key, after verifying no other drift.
 
-Exception (PI-526): the concern-decoupled skills `save_memory`, `status`, and
-`session_summary` gained deterministic presence-checks in their bodies — a
+Exception (PI-526): the concern-decoupled skills `save-memory`, `status`, and
+`session-summary` gained deterministic presence-checks in their bodies — a
 deliberate fix, not move-drift. Only those three SKILL.md hashes were re-pinned
 (no_plugin combos), after verifying every other file still matched.
 
@@ -37,7 +37,7 @@ across all four combos, after verifying every other file still matched.
 
 Exception (PI-570): `ruff.toml` gained the RUF/PERF/PTH/RET/ARG/A/S/BLE rule
 groups (per-language quality-gate strictness pass) — a deliberate content
-change, not move-drift. `.agents/hooks/package_guard.py` also picked up
+change, not move-drift. `.agents/hooks/admission_package.py` also picked up
 `# noqa: S310` placement fixes for the new `S` rule group; it was already
 excluded above. Only `ruff.toml` is newly excluded here, after verifying
 every other file still matched.
@@ -47,14 +47,14 @@ after verifying no other file drifted — `dag_workflow.py` (git-global-option
 normalization + GraphQL-merge rule + interpreter-heredoc scanning),
 `.gitignore` (stopped ignoring the committed `.codex/` wiring), `prod_guard.py`
 (rm split-flag detection), `commit-msg` (corrected install comment), and the
-fallback hooks `pre_commit_gate.sh` / `post_edit_lint.sh` (cd to repo root so a
+fallback hooks `pre-commit-gate.sh` / `post-edit-lint.sh` (cd to repo root so a
 subdirectory session lints the right paths).
 
 Exception (init-lint fix): `dag_workflow.py` gained three `# noqa: S603`
 directives on its `subprocess.run` calls — the scaffolded `ruff.toml` selects
 `S` and lints `.agents/**`, so a fresh lifecycle-on project's `just lint` failed
 on those argv-list (never shell-string) calls, mirroring the `# noqa: S310`
-package_guard.py already carries. Only the `.agents/hooks/dag_workflow.py` hash
+admission_package.py already carries. Only the `.agents/hooks/dag_workflow.py` hash
 was re-pinned across all four combos, after verifying every other file matched.
 
 Exception (2026-07 review, second pass): `dag_workflow.py` closed the
@@ -86,42 +86,42 @@ session state into the generated `.claude/` mirror it reads, and only the
 only the `.gitignore` hash was re-pinned across all four combos, after
 verifying every other file still matched.
 
-Exception (#710): `push_wiki.sh` upstreamed the repo copy's improvements —
+Exception (#710): `push-wiki.sh` upstreamed the repo copy's improvements —
 `--prune <page.md> ...` (remove stale pages in the same commit), the
 bash-3.2-safe empty-array guard, and the bot-identity commit fallback for
 runners with no git identity — while keeping the template's host-aware
 `gh_web_base` clone URL. Deliberate feature reconciliation (semi-scaffold
-DIVERGED → SYNCED), not move-drift — only the `.agents/scripts/push_wiki.sh`
+DIVERGED → SYNCED), not move-drift — only the `.agents/scripts/push-wiki.sh`
 hash was re-pinned across all four combos, after verifying every other file
 still matched.
 
-Exception (#678): `monitor_pr.sh` gained `_cleanup_local_branch` — a squash
+Exception (#678): `watch-pr.sh` gained `_cleanup_local_branch` — a squash
 merge deletes the remote branch but the local one lingered after every merged
 PR; after a confirmed merge the script now deletes the local head branch when
 (and only when) its SHA equals the PR's headRefOid. Deliberate feature, not
-move-drift — only the `.agents/scripts/monitor_pr.sh` hash was re-pinned
+move-drift — only the `.agents/scripts/watch-pr.sh` hash was re-pinned
 across all four combos, after verifying every other file still matched.
 
-Exception (#632): `monitor_pr.sh` gained `_merge_with_retry`/`_pr_is_merged` —
+Exception (#632): `watch-pr.sh` gained `_merge_with_retry`/`_pr_is_merged` —
 the single-shot merge raced GitHub's mergeability computation (failing while
 every check was green) and a failed attempt whose merge actually landed
 server-side was reported as an error. Deliberate bug fix, not move-drift —
-only the `.agents/scripts/monitor_pr.sh` hash was re-pinned across all four
+only the `.agents/scripts/watch-pr.sh` hash was re-pinned across all four
 combos, after verifying every other file still matched.
 
-Exception (#633): `start_issue.sh`'s seed-commit decision now compares HEAD
+Exception (#633): `start-issue.sh`'s seed-commit decision now compares HEAD
 against the REMOTE base (`_seed_base`) — GitHub judges "No commits between"
 against its own base ref, so a branch cut from origin/main with a lagging
 local main skipped the seed and PR creation failed. PR creation also seeds +
 retries once on that rejection. Deliberate bug fix, not move-drift — only the
-`.agents/scripts/start_issue.sh` hash was re-pinned across all four combos,
+`.agents/scripts/start-issue.sh` hash was re-pinned across all four combos,
 after verifying every other file still matched.
 
-Exception (#631): `start_issue.sh` gained `_repo_root_name` — project-key
+Exception (#631): `start-issue.sh` gained `_repo_root_name` — project-key
 derivation now anchors on the MAIN worktree's directory (via git-common-dir)
 instead of `--show-toplevel`, so linked worktrees derive the same key as the
 main checkout. Deliberate bug fix, not move-drift — only the
-`.agents/scripts/start_issue.sh` hash was re-pinned across all four combos,
+`.agents/scripts/start-issue.sh` hash was re-pinned across all four combos,
 after verifying every other file still matched.
 Exception (PI-715): `review-status.yml` no longer maps straight off
 `reviewDecision`. It only ever went green on APPROVED, which a solo repo can
@@ -132,7 +132,7 @@ threads, `failure` on changes-requested or open comments, `pending` before any
 review. Deliberate content change, not move-drift — only the
 `.github/workflows/review-status.yml` hash was re-pinned across all four combos,
 after verifying every other file still matched.
-The same PI-715 change reworded the `github_workflow` SKILL.md (`--no-review` is no longer the routine merge path); its hash was re-pinned in the no_plugin combos only, where the skill ships as a file rather than through the plugin.
+The same PI-715 change reworded the `github-workflow` SKILL.md (`--no-review` is no longer the routine merge path); its hash was re-pinned in the no_plugin combos only, where the skill ships as a file rather than through the plugin.
 
 Exception (PI-687): `agents/explore.md` gained a four-step orientation contract —
 read CODE_MAP/MEMORY/CAPABILITIES first to pick targets, verify every specific
@@ -204,15 +204,15 @@ removed.
 
 Exception (#992): every scaffolded entry point gained a first-statement `--help`
 branch that prints its header and exits before doing any work — `--help` used to
-write CODE_MAP.md, install git hooks, run `uv sync`, and install packages. A
-deliberate content change, not move-drift. Only the `gen_code_map.py`,
-`install_hooks.sh` and `push_wiki.sh` hashes were re-pinned, in all four
+write code-map.md, install git hooks, run `uv sync`, and install packages. A
+deliberate content change, not move-drift. Only the `generate-code-map.py`,
+`install-hooks.sh` and `push-wiki.sh` hashes were re-pinned, in all four
 fixtures, by a re-pin that refused to write if any key outside the files this
 change edits had drifted.
 
-Exception (#988): the scaffold intentionally ADDS a root `PLAN.md` that opens
+Exception (#988): the scaffold intentionally ADDS a root `plan.md` that opens
 with the project's done-gate (`Done when:` / `probed by:`). A new file, not
-move-drift. Only the `PLAN.md` key was added, in all four fixtures, by a re-pin
+move-drift. Only the `plan.md` key was added, in all four fixtures, by a re-pin
 that refused to rewrite a fixture that did not round-trip byte-identically; this
 test then confirmed every other key still matched.
 
@@ -222,6 +222,20 @@ REST list as DISMISSED and the workflow re-runs on dismissal, so excluding only
 PENDING kept a revoked review as "the review of the head". Deliberate content
 change, not move-drift. Only that one hash was re-pinned, in all four fixtures,
 after this suite named it as the sole drifted key with no path added or removed.
+
+Exception (naming standard, 1.2.3): template paths were renamed to the naming
+standard (snake_case scripts, hooks and skills to kebab case, `docs/adr/` to
+`docs/decisions/`, `PLAN.md` to `plan.md`, ...; src/project_init/renames.py
+holds the table). The fixture keys were re-keyed to the new paths and the
+hashes of every file whose bytes changed were re-pinned, after rendering all
+four combos at the commit before the rename and at the rename and checking that
+each changed file differs ONLY by the renamed names, except deliberate edits
+that follow from them: the decision-record skill, its template and the memory
+guide no longer name records `adr-NNN-*.md`; the memory SCHEMA.md and the
+save-memory skill name notes `<type>-<slug>.md`; skills/README.md links the
+renamed index.md and the audit skill names it; graphify_post_install.py
+recognises the guard under both names. `install_hooks.sh` is a new shim (see
+_ADDED_SINCE_BASELINE).
 """
 
 from __future__ import annotations
@@ -232,6 +246,7 @@ from pathlib import Path
 
 import pytest
 
+from project_init.renames import SHIMMED_OLD_PATHS
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables, naming_gate_paths
 
@@ -248,7 +263,7 @@ COMBOS = [
 # Generated inventories regenerated every scaffold/upgrade — NOT part of the
 # static template move this contract guards, and they legitimately gain a
 # "GitHub lifecycle: on/off" row + the lifecycle skills now sourced from the
-# lifecycle_fallback overlay (#476). Their correctness is covered by
+# lifecycle-fallback overlay (#476). Their correctness is covered by
 # test_lifecycle_none.py, not byte-identity.
 _GENERATED = {".agents/CAPABILITIES.md"}
 
@@ -259,16 +274,16 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 # contracts, not byte-identity.
 #   • .gitleaks.toml — new base file shipping with the gitleaks CI job (#554)
 #   • ci.yml — gained the all-green "CI gate" job (#555)
-#   • setup_github.sh — bare required-check contexts + board SSOT (#555/#556)
-#   • create_issue.sh / board-automation.yml / config.yaml — board-number SSOT (#556)
-#   • session_setup.sh — `uv sync --group dev`, no silent-failure masking (#552/#553)
-#   • mypy.ini / justfile / post_edit_lint.sh / python.md — mypy --strict gate:
+#   • setup-github.sh — bare required-check contexts + board SSOT (#555/#556)
+#   • create-issue.sh / board-automation.yml / config.yaml — board-number SSOT (#556)
+#   • session-setup.sh — `uv sync --group dev`, no silent-failure masking (#552/#553)
+#   • mypy.ini / justfile / post-edit-lint.sh / python.md — mypy --strict gate:
 #     new config file, `typecheck` recipe wired into the Python `ci` recipe,
 #     mypy wired into the edit-time lint hook, rule file updated (#558)
 #   • every shipped .sh script — reformatted with `shfmt -w -i 2` so the new
 #     shellcheck+shfmt scaffold gate (#562) doesn't fail against its own
 #     output on a fresh scaffold; a one-time whole-fleet reformat, not a
-#   • package_guard.py / settings.json / AGENTS.md — new supply-chain install
+#   • admission_package.py / settings.json / AGENTS.md — new supply-chain install
 #     guard hook (uv add/bun add/pip install/npm install/cargo add checked
 #     against PyPI/npm/crates.io), wired into settings.json and documented (#564)
 #     lifecycle-move content change
@@ -278,13 +293,13 @@ _GENERATED = {".agents/CAPABILITIES.md"}
 #     auto-ensuring the type label from the body "- Type:" for MCP/API issues,
 #     and (PI-777 area labels) deriving area:<slug> label(s) from the body Area
 #     field for click-to-filter; issue-metadata.md documents the derivation
-#   • skills/report_upstream_issue/SKILL.md + skills/INDEX.md — new default-on
+#   • skills/report-upstream-issue/SKILL.md + skills/index.md — new default-on
 #     skill that routes tooling/scaffolding bugs upstream to project-init; only
 #     the --no-plugin combos copy the skill in (plugin mode ships it via the
 #     workflow plugin), and the INDEX gains its row
-#   • skills/token_efficiency/SKILL.md (PI-647) — new default-on skill with
+#   • skills/token-efficiency/SKILL.md (PI-647) — new default-on skill with
 #     token-frugal working habits; same --no-plugin/plugin split as
-#     report_upstream_issue; INDEX/AGENTS.md/justfile edits already excluded
+#     report-upstream-issue; INDEX/AGENTS.md/justfile edits already excluded
 _ADDED_SINCE_BASELINE = {
     # harbor#967: the base layer gained a README skeleton, a new file, so the
     # baseline (captured before it) cannot hold it.
@@ -324,28 +339,28 @@ _ADDED_SINCE_BASELINE = {
     ".agents/hooks/dag_workflow.py",
     # PI-846/PI-850: graphify installer tightening — new guard hook +
     # post-install fixer; the rule + setup script gained content.
-    ".agents/hooks/graphify_guard.sh",
+    ".agents/hooks/admission-graphify.sh",
     ".agents/hooks/graphify_post_install.py",
     ".agents/rules/graphify.md",
-    ".agents/scripts/setup_graphify.sh",
+    ".agents/scripts/setup-graphify.sh",
     # PI-819: diagnoses a REQUIRED status check that no job reports — the state
     # that leaves every PR permanently BLOCKED with all checks green.
-    ".agents/scripts/check_branch_protection.sh",
+    ".agents/scripts/check-branch-protection.sh",
     # PI-647: token-efficiency conventions propagated to scaffolds
-    ".agents/skills/token_efficiency/SKILL.md",
+    ".agents/skills/token-efficiency/SKILL.md",
     # PI-694: token-budget lint gate — new always-copied script (justfile
     # wiring already excluded above)
-    ".agents/scripts/lint_context_budget.sh",
+    ".agents/scripts/lint-context-budget.sh",
     # #1054: the test contract's summary line for Node/Go/Rust `just test` — new
     # always-copied script (justfile wiring already excluded above)
-    ".agents/scripts/contract_line.py",
+    ".agents/scripts/contract-line.py",
     # #1052: test-contract exit-code check — new always-copied script (justfile
     # wiring already excluded above)
-    ".agents/scripts/check_test_contract.py",
+    ".agents/scripts/check-test-contract.py",
     # Board-visibility fix: one-time backfill that reconciles the Projects board
     # with closed-issue state (new lifecycle script; board-automation.yml already
     # excluded above).
-    ".agents/scripts/backfill_board_done.sh",
+    ".agents/scripts/backfill-board-done.sh",
     # PI-696: PostToolUse tool-output compressor (settings.json/AGENTS.md
     # wiring already excluded above)
     ".agents/hooks/tool_output_compressor.py",
@@ -364,26 +379,26 @@ _ADDED_SINCE_BASELINE = {
     # PI-665: diagram skill (collaborative Mermaid-first diagramming);
     # INDEX/README/project-init.md rows already excluded above
     ".agents/skills/diagram/SKILL.md",
-    # #1011: add_command no longer claims other agents ignore the skills it writes
-    ".agents/skills/add_command/SKILL.md",
+    # #1011: add-command no longer claims other agents ignore the skills it writes
+    ".agents/skills/add-command/SKILL.md",
     # PI-747: verify-test-strength skill (mutation-feedback loop)
     ".agents/skills/verify-test-strength/SKILL.md",
-    # PI-671: local_ci skill (Actions billing-lockout escape hatch)
-    ".agents/skills/local_ci/SKILL.md",
+    # PI-671: local-ci skill (Actions billing-lockout escape hatch)
+    ".agents/skills/local-ci/SKILL.md",
     # #605: Guards log the governance signal (decision + command)
-    ".agents/hooks/_usage_log.sh",
+    ".agents/hooks/usage-log.sh",
     ".agents/hooks/prod_guard.py",
     # #606: the pre-edit issue guard — a new lifecycle hook, not lifecycle-move drift.
-    ".agents/hooks/pre_edit_issue_guard.py",
-    ".agents/skills/report_upstream_issue/SKILL.md",
-    ".agents/skills/INDEX.md",
+    ".agents/hooks/admission_issue_edit.py",
+    ".agents/skills/report-upstream-issue/SKILL.md",
+    ".agents/skills/index.md",
     # ... and its discoverability rows in the surface-independent skill tables.
     ".agents/project-init.md",
     ".agents/skills/README.md",
     ".gitleaks.toml",
     ".github/workflows/ci.yml",
-    ".agents/scripts/setup_github.sh",
-    ".agents/scripts/create_issue.sh",
+    ".agents/scripts/setup-github.sh",
+    ".agents/scripts/create-issue.sh",
     ".github/workflows/board-automation.yml",
     ".github/workflows/issue-validation.yml",
     ".agents/docs/guides/issue-metadata.md",
@@ -393,24 +408,24 @@ _ADDED_SINCE_BASELINE = {
     # not lifecycle-move drift — project-init.md (same trailer note) is already
     # excluded above.
     ".agents/docs/development/conventions.md",
-    ".agents/hooks/session_setup.sh",
+    ".agents/hooks/session-setup.sh",
     "mypy.ini",
     "justfile",
-    ".agents/hooks/post_edit_lint.sh",
+    ".agents/hooks/post-edit-lint.sh",
     ".agents/rules/python.md",
     # node.md gained the `just sbom` (#574) / `just license` (#579) reference
     # lines — a deliberate content edit, like the other rules files here.
     ".agents/rules/node.md",
     ".agents/rules/go.md",
-    ".agents/hooks/_py.sh",
-    ".agents/scripts/gh_host.sh",
-    ".agents/scripts/lint_memory.sh",
-    ".agents/scripts/monitor_pr.sh",
-    ".agents/scripts/start_issue.sh",
+    ".agents/hooks/python-resolve.sh",
+    ".agents/scripts/gh-host.sh",
+    ".agents/scripts/lint-memory.sh",
+    ".agents/scripts/watch-pr.sh",
+    ".agents/scripts/start-issue.sh",
     ".agents/hooks/github_command_guard.sh",
-    ".agents/hooks/pre_commit_gate.sh",
-    ".agents/hooks/workflow_state_reminder.sh",
-    ".agents/hooks/package_guard.py",
+    ".agents/hooks/pre-commit-gate.sh",
+    ".agents/hooks/workflow-state-reminder.sh",
+    ".agents/hooks/admission_package.py",
     ".agents/settings.json",
     "AGENTS.md",
     ".agents/rules/rust.md",
@@ -435,6 +450,9 @@ _ADDED_SINCE_BASELINE = {
 }
 # The naming gate (gates/, vendor/naming/) postdates the captured baseline.
 _ADDED_SINCE_BASELINE |= naming_gate_paths()
+# The naming-standard rename (1.2.3) keeps shims at some old names until 2026-12-01;
+# the renamed paths themselves are re-keyed in the fixtures.
+_ADDED_SINCE_BASELINE |= SHIMMED_OLD_PATHS
 
 
 def _manifest(target: Path) -> dict[str, str]:

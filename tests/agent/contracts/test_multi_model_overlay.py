@@ -54,14 +54,14 @@ def _scaffold(target: Path, *, multi_model: bool) -> Path:
 
 class TestOverlayLayers:
     def test_appended_when_enabled(self):
-        assert overlay_layers("claude", no_plugin=False, multi_model=True) == ["multi_model"]
+        assert overlay_layers("claude", no_plugin=False, multi_model=True) == ["multi-model"]
 
     def test_absent_when_disabled(self):
         assert overlay_layers("claude", no_plugin=False, multi_model=False) == []
 
     def test_composes_with_agents_and_fallback(self):
         layers = overlay_layers("claude,codex", no_plugin=True, multi_model=True)
-        assert layers == ["fallback", "codex", "multi_model"]
+        assert layers == ["fallback", "codex", "multi-model"]
 
 
 class TestMultiModelOn:

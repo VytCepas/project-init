@@ -63,7 +63,7 @@ def _scaffold(target: Path, *, governance: bool = True, multi_model: bool = Fals
 
 def _run_gate(target: Path) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["bash", str(target / _GOV.parent / "scripts" / "governance_gate.sh")],
+        ["bash", str(target / _GOV.parent / "scripts" / "governance-gate.sh")],
         cwd=str(target),
         capture_output=True,
         text=True,
@@ -72,7 +72,7 @@ def _run_gate(target: Path) -> subprocess.CompletedProcess:
 
 def _valid_card(target: Path) -> Path:
     """Write a valid real card + a filled declarations file, return the card path."""
-    example = (target / _GOV / "examples" / "SYSTEM_CARD.example.md").read_text()
+    example = (target / _GOV / "examples" / "system-card-example.md").read_text()
     today = date.today().isoformat()
     card = target / _GOV / "SYSTEM_CARD.md"
     card.write_text(
@@ -269,7 +269,7 @@ class TestGate:
         # example is named *.example.md, so also plant a file the gate would
         # match by name (SYSTEM_CARD.md) — only the examples/ exclusion saves it.
         target = _scaffold(tmp_path / "p")
-        assert (target / _GOV / "examples" / "SYSTEM_CARD.example.md").is_file()
+        assert (target / _GOV / "examples" / "system-card-example.md").is_file()
         (target / _GOV / "examples" / "SYSTEM_CARD.md").write_text(
             "---\nrole: bogus\n---\n", encoding="utf-8"
         )
@@ -305,7 +305,7 @@ class TestGate:
         other.mkdir()
         subprocess.run(["git", "init", "-q"], cwd=str(other), check=True)
         r = subprocess.run(
-            ["bash", str(target / _GOV.parent / "scripts" / "governance_gate.sh")],
+            ["bash", str(target / _GOV.parent / "scripts" / "governance-gate.sh")],
             cwd=str(other),
             capture_output=True,
             text=True,
@@ -446,10 +446,10 @@ class TestGateNeverPassesOnSilence:
         # An instruction to copy a template that was never shipped is a dead end.
         target = _scaffold(tmp_path / "p")
         r = _run_gate(target)
-        templates = set(re.findall(r"\.agents/governance/examples/[\w.]+\.md", r.stdout))
+        templates = set(re.findall(r"\.agents/governance/examples/[\w.-]+\.md", r.stdout))
         assert templates == {
-            ".agents/governance/examples/SYSTEM_CARD.template.md",
-            ".agents/governance/examples/NO_AI_SYSTEM.template.md",
+            ".agents/governance/examples/system-card-template.md",
+            ".agents/governance/examples/no-ai-system-template.md",
         }
         for rel in templates:
             assert (target / rel).is_file(), rel
@@ -622,7 +622,7 @@ class TestGateNeverPassesOnSilence:
         target = _scaffold(tmp_path / "p")
         _valid_card(target)
         shutil.copy(
-            target / _GOV / "examples" / "NO_AI_SYSTEM.template.md",
+            target / _GOV / "examples" / "no-ai-system-template.md",
             target / _GOV / "examples" / "NO_AI_SYSTEM.md",
         )
         r = _run_gate(target)
@@ -630,7 +630,7 @@ class TestGateNeverPassesOnSilence:
 
     def test_template_copied_verbatim_fails_until_filled(self, tmp_path: Path):
         target = _scaffold(tmp_path / "p")
-        template = target / _GOV / "examples" / "NO_AI_SYSTEM.template.md"
+        template = target / _GOV / "examples" / "no-ai-system-template.md"
         declaration = target / _GOV / "NO_AI_SYSTEM.md"
         shutil.copy(template, declaration)
         r = _run_gate(target)
@@ -725,10 +725,10 @@ class TestUpgradeSurfacesTheGateChange:
         for needle in (
             ".agents/governance/NO_AI_SYSTEM.md",
             ".agents/governance/SYSTEM_CARD.md",
-            ".agents/governance/examples/NO_AI_SYSTEM.template.md",
+            ".agents/governance/examples/no-ai-system-template.md",
             "reason",
             "declared_on",
-            "governance_gate.sh",
+            "governance-gate.sh",
         ):
             assert needle in action, needle
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Tighten what `graphify install --project` wrote (PI-846 / PI-850).
 
-Run by setup_graphify.sh right after the installer. Two fixups, both
+Run by setup-graphify.sh right after the installer. Two fixups, both
 fail-open (a shape the tool no longer produces is reported, never fatal):
 
 1. PI-846 — the installer wires PreToolUse hooks on `Bash` and `Read|Glob`
    whose own matching is substring-broad (every command containing "grep",
    every read of ~30 extensions incl. .md/.txt) and fires per call. Replace
-   those hook commands with `.agents/hooks/graphify_guard.sh`, which scopes
+   those hook commands with `.agents/hooks/admission-graphify.sh`, which scopes
    to genuine source-code activity and nudges once per session.
 
 2. PI-850 — the installer appends a full `## graphify` workflow section to
@@ -24,7 +24,7 @@ import re
 import sys
 from pathlib import Path
 
-GUARD = '"$CLAUDE_PROJECT_DIR"/.agents/hooks/graphify_guard.sh'
+GUARD = '"$CLAUDE_PROJECT_DIR"/.agents/hooks/admission-graphify.sh'
 
 POINTER = (
     "## graphify\n\n"
@@ -46,8 +46,10 @@ def tighten_settings(settings_path: Path) -> str:
         for hook in entry.get("hooks", []):
             command = hook.get("command", "")
             # The installer's hooks are the ones that mention the graph file
-            # inline; ours reference the guard script instead.
-            if "graphify-out/graph.json" in command and "graphify_guard" not in command:
+            # inline; ours reference the guard script instead (graphify_guard.sh
+            # in a project scaffolded before the naming-standard rename).
+            ours = "admission-graphify" in command or "graphify_guard" in command
+            if "graphify-out/graph.json" in command and not ours:
                 mode = "search" if matcher == "Bash" else "read"
                 hook["command"] = f"bash {GUARD} {mode}"
                 replaced += 1
