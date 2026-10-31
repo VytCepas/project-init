@@ -233,6 +233,7 @@ from pathlib import Path
 
 import pytest
 
+from project_init.renames import SHIMMED_OLD_PATHS
 from project_init.scaffold import load_preset, overlay_layers, scaffold
 from tests.helpers import make_variables, naming_gate_paths
 
@@ -426,9 +427,9 @@ _ADDED_SINCE_BASELINE = {
 }
 # The naming gate (gates/, vendor/naming/) postdates the captured baseline.
 _ADDED_SINCE_BASELINE |= naming_gate_paths()
-# The naming-standard rename (1.2.3) keeps a shim at install-hooks.sh's old name until
-# 2026-12-01; the renamed paths themselves are re-keyed in the fixtures.
-_ADDED_SINCE_BASELINE.add(".agents/scripts/install_hooks.sh")
+# The naming-standard rename (1.2.3) keeps shims at some old names until 2026-12-01;
+# the renamed paths themselves are re-keyed in the fixtures.
+_ADDED_SINCE_BASELINE |= SHIMMED_OLD_PATHS
 
 
 def _manifest(target: Path) -> dict[str, str]:

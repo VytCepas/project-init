@@ -43,6 +43,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from project_init.renames import SHIMMED_OLD_PATHS
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_CLAUDE = REPO_ROOT / "templates" / "base" / "dot_agents"
 FALLBACK_CLAUDE = REPO_ROOT / "templates" / "fallback" / "dot_agents"
@@ -206,10 +208,12 @@ def core_hook_scripts() -> list[Path]:
     prod_guard.py safety hook (PI-394), and admission_package.py supply-chain
     guard (PI-564).
     """
+    # Old-name shims (naming standard) serve scaffolded trees only; the plugin wires its own.
+    shims = {Path(p).name for p in SHIMMED_OLD_PATHS}
     scripts = [
         p
         for p in (FALLBACK_CLAUDE / "hooks").iterdir()
-        if p.is_file() and p.suffix in {".sh", ".py"}
+        if p.is_file() and p.suffix in {".sh", ".py"} and p.name not in shims
     ]
     scripts.append(TEMPLATE_CLAUDE / "hooks" / "python-resolve.sh")
     scripts.append(TEMPLATE_CLAUDE / "hooks" / "prod_guard.py")

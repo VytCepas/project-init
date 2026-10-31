@@ -177,7 +177,7 @@ _OLD_TOKEN = re.compile(
     + "|".join(
         re.escape(o)
         for o, _n in sorted(RENAMED_LEAVES, key=lambda p: -len(p[0]))
-        if f".agents/scripts/{o}" not in SHIMMED_OLD_PATHS
+        if o not in {Path(s).name for s in SHIMMED_OLD_PATHS}
     )
     + r"|docs/adr/|skills/INDEX\.md|CODE_MAP\.md|NIST_RMF_CROSSWALK|AI_USAGE_POLICY"
     + r"|working-directory: infra|\"infra/\*\*\")(?![A-Za-z0-9_])"

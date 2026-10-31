@@ -115,7 +115,15 @@ RENAMED_LEAVES: tuple[tuple[str, str], ...] = (*_HOOKS, *_SCRIPTS, *_SKILLS)
 
 #: Old names the template still renders, as a shim to the new one, until 2026-12-01:
 #: something outside the project reads them by name (see naming-exemptions.tsv).
-SHIMMED_OLD_PATHS = frozenset({".agents/scripts/install_hooks.sh"})
+SHIMMED_OLD_PATHS = frozenset(
+    {
+        ".agents/scripts/install_hooks.sh",
+        ".agents/hooks/_py.sh",
+        ".agents/hooks/session_setup.sh",
+        ".agents/hooks/pre_commit_gate.sh",
+        ".agents/hooks/post_edit_lint.sh",
+    }
+)
 
 
 def renamed(rel: str) -> str | None:
