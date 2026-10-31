@@ -5,6 +5,7 @@ autofix	technical: a linter applying its own fixes (ruff --fix); the post-edit l
 clippy	tool: the Rust linter, configured by clippy.toml
 decomposition	English
 deduplication	English
+framework	English
 golangci	tool: golangci-lint, the Go linter, configured by .golangci.yml
 graphify	tool: the code knowledge-graph tool behind the obsidian-graphify memory preset
 interoperability	English
