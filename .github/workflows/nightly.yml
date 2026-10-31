@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       # Must stay in sync with pyproject's requires-python classifiers;
-      # tests/contracts/test_repo_ci_python_matrix.py fails CI if they drift.
+      # tests/ci/contracts/test_repo_ci_python_matrix.py fails CI if they drift.
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
