@@ -40,6 +40,7 @@ account	-
 accounting	-
 accounts	-
 accreted	-
+accuracy	-
 accurate	-
 accused	-
 acknowledged	-
@@ -85,6 +86,7 @@ admin	-
 admission	-
 admits	-
 admitted	-
+adnami	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 adopt	-
 adopted	-
 adopter	-
@@ -106,6 +108,8 @@ again	-
 against	-
 age	-
 aged	-
+agency	-
+agendas	-
 agent	-
 agentic	-
 agents	-
@@ -162,6 +166,7 @@ amended	-
 amendment	-
 among	-
 amount	-
+amplitude	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 an	-
 analyse	-
 analysis	-
@@ -240,6 +245,7 @@ archive	-
 archived	-
 are	-
 area	-
+areas	-
 args	-
 arguable	-
 argue	-
@@ -288,6 +294,8 @@ assigned	-
 assigning	-
 assignment	-
 assignments	-
+assimilated	-
+assimilation	-
 assistant	-
 assume	-
 assumed	-
@@ -335,9 +343,11 @@ authority	-
 authorization	-
 authorized	-
 auto	-
+autocompact	Claude Code's own name for compacting a session's context (its autoCompact setting); bin/session-autocompact.sh
 automated	-
 automatic	-
 automatically	-
+automation	-
 autonomous	-
 available	-
 average	-
@@ -354,6 +364,8 @@ back	-
 backbone	-
 backdoor	-
 backed	-
+backend	-
+backends	-
 backfill	-
 background	-
 backgrounded	-
@@ -370,18 +382,21 @@ baked	-
 ban	-
 band	-
 banking	-
+banknote	-
 banner	-
 bar	-
 bare	-
 barely	-
 base	-
 based	-
+baselines	-
 bash	-
 basic	-
 basis	-
 batch	-
 batches	-
 be	-
+beacon	-
 bearer	-
 bearing	-
 beat	-
@@ -407,6 +422,7 @@ belong	-
 belongs	-
 below	-
 belt	-
+benchmark	-
 beneath	-
 benign	-
 beside	-
@@ -426,6 +442,7 @@ binary	-
 bind	-
 binding	-
 binds	-
+biome	tool, product or format name
 bit	-
 bitter	-
 blamed	-
@@ -456,6 +473,7 @@ bomb	-
 book	-
 bookkeeping	-
 books	-
+bookstack	tool, product or format name
 boot	-
 booted	-
 bootstrap	-
@@ -475,6 +493,7 @@ branch	-
 branches	-
 brand	-
 break	-
+breakeven	-
 breaking	-
 breaks	-
 brew	-
@@ -489,6 +508,7 @@ broader	-
 broke	-
 broken	-
 brought	-
+browse	-
 browser	-
 bucket	-
 buckets	-
@@ -500,6 +520,7 @@ bugs	-
 build	-
 buildable	-
 builder	-
+builders	-
 building	-
 builds	-
 built	-
@@ -510,6 +531,7 @@ bun	-
 bundle	-
 bundled	-
 bundles	-
+bunfig	tool, product or format name
 buried	-
 burns	-
 bus	-
@@ -523,12 +545,15 @@ by	-
 bypass	-
 bypassed	-
 bypasses	-
+byte	-
+bytecode	-
 cache	-
 cached	-
 caches	-
 cadence	-
 cal	-
 calendar	-
+calibrate	-
 call	-
 called	-
 caller	-
@@ -538,6 +563,7 @@ callout	-
 calls	-
 came	-
 campaign	-
+campaigns	-
 can	-
 canary	-
 cancel	-
@@ -571,6 +597,7 @@ carry	-
 carrying	-
 case	-
 cased	-
+casefile	tool, product or format name
 cases	-
 casualties	-
 cat	-
@@ -587,18 +614,23 @@ caused	-
 cautions	-
 caveat	-
 caveats	-
+cd	shell command name
+cdp	Chrome DevTools Protocol; tool, product or format name
 ceiling	-
 ceilings	-
 cell	-
 cells	-
 census	-
+certain	-
 certainly	-
 certifies	-
 chain	-
 chained	-
+chains	-
 challenge	-
 change	-
 changed	-
+changelog	CHANGELOG.md, a file name the standard names (section 2); tool, product or format name
 changes	-
 changing	-
 channel	-
@@ -606,6 +638,7 @@ channels	-
 chapters	-
 char	-
 character	-
+characterize	-
 characters	-
 charged	-
 charts	-
@@ -635,6 +668,7 @@ chose	-
 chosen	-
 chrome	-
 churn	-
+cint	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 citable	-
 citation	-
 citations	-
@@ -647,6 +681,7 @@ claim	-
 claimed	-
 claiming	-
 claims	-
+clarity	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 class	-
 classes	-
 classic	-
@@ -671,6 +706,7 @@ clicked	-
 clicks	-
 client	-
 clients	-
+cliff	-
 climb	-
 climbing	-
 clint	-
@@ -685,8 +721,12 @@ closes	-
 closing	-
 closure	-
 cloud	-
+cloudflare	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 clouds	-
 cluster	-
+cmp	standard technical acronym in common use
+coauthor	-
+cocoindex	tool, product or format name
 code	-
 codeowners	tool, product or format name
 codes	-
@@ -703,6 +743,7 @@ collapsing	-
 colleague	-
 colleagues	-
 collected	-
+collection	-
 collector	-
 collects	-
 collision	-
@@ -712,6 +753,8 @@ color	-
 column	-
 columns	-
 com	tool, product or format name
+combination	-
+combinations	-
 combined	-
 come	-
 comes	-
@@ -740,6 +783,8 @@ comparing	-
 comparison	-
 comparisons	-
 compass	-
+compensation	-
+compile	-
 compiled	-
 compiler	-
 complaint	-
@@ -761,6 +806,7 @@ composition	-
 compound	-
 compress	-
 compressed	-
+compressor	-
 computable	-
 compute	-
 computed	-
@@ -769,6 +815,7 @@ computing	-
 concatenated	-
 concept	-
 concern	-
+concerns	-
 concluded	-
 concludes	-
 concluding	-
@@ -801,11 +848,14 @@ conform	-
 conformance	-
 confound	-
 confounded	-
+conftest	tool, product or format name
+confusion	-
 connect	-
 connection	-
 connections	-
 connectivity	-
 connector	-
+connectors	-
 connects	-
 consecutive	-
 consent	-
@@ -880,14 +930,20 @@ converged	-
 converging	-
 conversation	-
 conversion	-
+conversions	-
 convert	-
 converted	-
 converter	-
 converters	-
 converts	-
+cookie	-
+cookiebot	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 cookies	-
+cookiescript	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
+cookieyes	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 copied	-
 copies	-
+copilot	tool, product or format name
 copy	-
 copying	-
 copyright	-
@@ -924,8 +980,10 @@ coverage	-
 covered	-
 covering	-
 covers	-
+cowork	tool, product or format name
 crash	-
 crashed	-
+crazy	word of a vendor name (Crazy Egg, Lucky Orange); tool, product or format name
 create	-
 created	-
 creates	-
@@ -940,25 +998,32 @@ criteria	-
 criterion	-
 critic	-
 critical	-
+criticality	-
 criticals	-
 critics	-
 critique	-
+critiques	-
 crons	-
 cross	-
 crossed	-
 crosses	-
 crossing	-
 crossings	-
+crosswalk	-
+csp	standard technical acronym in common use
 curated	-
 curates	-
 curl	-
+currency	-
 current	-
 currently	-
 cursor	-
+custom	-
 customer	-
 cut	-
 cuts	-
 cutting	-
+cxense	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 cycle	-
 cycles	-
 da	-
@@ -976,6 +1041,7 @@ dash	-
 dashboard	-
 data	-
 database	-
+datalayer	tool, product or format name
 date	-
 dated	-
 dates	-
@@ -986,6 +1052,7 @@ dead	-
 deadline	-
 debate	-
 debt	-
+debug	-
 decidable	-
 decide	-
 decided	-
@@ -1004,13 +1071,17 @@ declaring	-
 declinable	-
 declined	-
 declines	-
+decode	-
 decoded	-
+decoders	-
 decodes	-
 decoding	-
 deconstruct	-
 decoration	-
+decorator	-
 decoupling	-
 dedicated	-
+deduplicate	-
 deep	-
 deeper	-
 default	-
@@ -1062,6 +1133,8 @@ delta	-
 demand	-
 demanded	-
 demanding	-
+demo	-
+demote	-
 demoting	-
 denial	-
 denials	-
@@ -1082,6 +1155,7 @@ deploying	-
 deployment	-
 deploys	-
 deprecated	-
+deprovision	standard identity-lifecycle verb (the reverse of provision)
 depth	-
 derivation	-
 derive	-
@@ -1124,12 +1198,15 @@ detects	-
 determined	-
 deterministic	-
 dev	-
+devcontainer	tool, product or format name
 developed	-
 developer	-
 development	-
 device	-
 devices	-
+devtools	Chrome DevTools; tool, product or format name
 di	-
+diagnostic	-
 diagnostics	-
 diagram	-
 diagrams	-
@@ -1154,6 +1231,7 @@ dig	-
 digest	-
 digests	-
 digit	-
+digitalmatter	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 digits	-
 dilute	-
 dilution	-
@@ -1227,6 +1305,7 @@ doas	-
 doc	-
 docker	-
 dockerfile	-
+dockerignore	tool, product or format name
 docs	-
 doctor	-
 doctrine	-
@@ -1247,15 +1326,18 @@ door	-
 doors	-
 dormant	-
 dot	-
+dotglob	tool, product or format name
 dots	-
 dotted	-
 double	-
 doubled	-
 doubt	-
+doubts	-
 down	-
 downgrade	-
 downgraded	-
 downgrades	-
+download	-
 downstream	-
 dozens	-
 draft	-
@@ -1278,6 +1360,7 @@ drop	-
 dropped	-
 dropping	-
 drops	-
+drupal	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 dry	-
 ds	-
 dual	-
@@ -1301,6 +1384,7 @@ earning	-
 earns	-
 easier	-
 easy	-
+ecc	Everything Claude Code, the upstream project the platform evaluated (D-52)
 echo	-
 economy	-
 ed	-
@@ -1312,8 +1396,12 @@ editing	-
 editor	-
 editors	-
 edits	-
+ee	ISO 3166 country code
+eea	European Economic Area; regulatory term in common use
 effect	-
+effective	-
 effects	-
+efficiency	-
 effort	-
 egress	-
 eight	-
@@ -1325,6 +1413,7 @@ eligible	-
 else	-
 elsewhere	-
 email	-
+embed	-
 embedded	-
 embeds	-
 emergency	-
@@ -1357,6 +1446,7 @@ enforced	-
 enforcement	-
 enforces	-
 enforcing	-
+engagement	-
 engine	-
 engineer	-
 engineering	-
@@ -1370,6 +1460,7 @@ enterprise	-
 enters	-
 entire	-
 entirely	-
+entities	-
 entity	-
 entries	-
 entropy	-
@@ -1381,6 +1472,7 @@ enumerates	-
 enumeration	-
 envelope	-
 environment	-
+environments	-
 ephemeral	-
 epic	-
 epoch	-
@@ -1401,10 +1493,13 @@ escape	-
 escaped	-
 escapes	-
 escaping	-
+eskimi	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
+eslint	tool, product or format name
 essay	-
 establish	-
 established	-
 estate	-
+estates	-
 estimate	-
 estimates	-
 eu	-
@@ -1418,6 +1513,7 @@ even	-
 event	-
 events	-
 ever	-
+evergage	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 every	-
 everyday	-
 everyone	-
@@ -1444,6 +1540,7 @@ exclusions	-
 excusal	-
 excuse	-
 excused	-
+exec	shell command name
 executable	-
 executables	-
 execute	-
@@ -1507,6 +1604,7 @@ extend	-
 extended	-
 extends	-
 extension	-
+extensions	-
 external	-
 extra	-
 extract	-
@@ -1555,7 +1653,9 @@ fat	-
 fatal	-
 fatals	-
 fault	-
+fbevents	the Meta Pixel script name (fbevents.js); tool, product or format name
 feared	-
+feasibility	-
 feat	-
 feature	-
 features	-
@@ -1566,6 +1666,7 @@ feeds	-
 fell	-
 female	-
 fence	-
+fenced	-
 fetch	-
 fetched	-
 fetcher	-
@@ -1606,6 +1707,7 @@ finish	-
 finished	-
 finishes	-
 fire	-
+firebase	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 fired	-
 fires	-
 firing	-
@@ -1637,6 +1739,7 @@ flipped	-
 flipping	-
 flips	-
 flock	-
+floodlight	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 floor	-
 floors	-
 flow	-
@@ -1664,6 +1767,7 @@ forbids	-
 force	-
 forced	-
 forces	-
+foreground	-
 foreign	-
 forensics	-
 forever	-
@@ -1698,6 +1802,7 @@ fragmented	-
 fragmenting	-
 fragments	-
 frame	-
+frames	-
 framing	-
 free	-
 freeze	-
@@ -1709,6 +1814,7 @@ freshly	-
 freshness	-
 friction	-
 friendly	-
+frizbit	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 from	-
 front	-
 frontier	-
@@ -1721,12 +1827,15 @@ fully	-
 function	-
 functional	-
 functions	-
+funnel	-
 further	-
 future	-
 fuzz	-
+fuzzing	-
 gain	-
 gained	-
 gains	-
+gallery	-
 gamma	-
 gap	-
 gaps	-
@@ -1737,8 +1846,11 @@ gates	-
 gateway	-
 gating	-
 gave	-
+gcal	tool, product or format name
 gcloud	-
+gcp	Google Cloud Platform; standard technical acronym in common use
 gcs	-
+gemius	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 gen	-
 general	-
 generate	-
@@ -1762,8 +1874,12 @@ gib	-
 gist	-
 gists	-
 git	-
+gitattributes	tool, product or format name
+githooks	tool, product or format name
 github	-
 gitignore	tool, product or format name
+gitkeep	tool, product or format name
+gitlab	tool, product or format name
 gitleaks	tool, product or format name
 give	-
 given	-
@@ -1774,6 +1890,7 @@ globals	-
 glossary	-
 glued	-
 glyph	-
+gmail	tool, product or format name
 gnu	-
 go	-
 goal	-
@@ -1783,6 +1900,8 @@ going	-
 golden	-
 gone	-
 good	-
+google	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
+gorgias	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 got	-
 gotchas	-
 govern	-
@@ -1798,12 +1917,15 @@ grader	-
 graders	-
 grades	-
 grading	-
+graduate	-
 grained	-
 grammar	-
+grandfather	-
 grandfathered	-
 grant	-
 grantable	-
 granted	-
+grants	-
 granularity	-
 graph	-
 great	-
@@ -1842,6 +1964,7 @@ guessing	-
 guest	-
 guidance	-
 guide	-
+guides	-
 gutted	-
 had	-
 haiku	-
@@ -1864,6 +1987,7 @@ happened	-
 happening	-
 happens	-
 happy	-
+har	HTTP Archive format; tool, product or format name
 harbor	-
 harbors	-
 hard	-
@@ -1912,6 +2036,7 @@ her	-
 here	-
 hermetic	-
 hermetically	-
+hetzner	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 heuristic	-
 hex	-
 hid	-
@@ -1942,6 +2067,7 @@ home	-
 homes	-
 honest	-
 honestly	-
+honeypot	-
 hook	-
 hookhealer	-
 hooks	-
@@ -1952,8 +2078,10 @@ host	-
 hosted	-
 hostile	-
 hosting	-
+hostinger	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 hosts	-
 hot	-
+hotjar	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 hour	-
 hourly	-
 hours	-
@@ -1961,6 +2089,7 @@ house	-
 housekeeping	-
 how	-
 however	-
+http	standard technical acronym in common use
 hub	-
 human	-
 humanize	-
@@ -1972,6 +2101,8 @@ hunk	-
 hygiene	-
 hypothesis	-
 hypothetical	-
+iac	infrastructure as code; standard technical acronym in common use
+iam	Identity and Access Management; standard technical acronym in common use
 iceberg	-
 id	-
 idea	-
@@ -2051,11 +2182,14 @@ information	-
 informed	-
 informing	-
 infrastructure	-
+ingestion	-
 ingests	-
 inherit	-
+inheritance	-
 inherited	-
 inherits	-
 init	-
+initiator	-
 inject	-
 injected	-
 injection	-
@@ -2104,6 +2238,7 @@ interaction	-
 interactive	-
 interceptor	-
 interface	-
+interfaces	-
 interim	-
 interleaved	-
 internal	-
@@ -2153,6 +2288,7 @@ ips	-
 irrelevant	-
 irreversible	-
 is	-
+isa	Ideal State Artifact, the vendored skill's artifact name
 iso	-
 isolate	-
 isolated	-
@@ -2169,6 +2305,7 @@ iteration	-
 iterative	-
 its	-
 itself	-
+iubenda	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 jar	-
 java	-
 jks	-
@@ -2178,6 +2315,8 @@ join	-
 joined	-
 joins	-
 jokes	-
+journey	-
+journeys	-
 js	-
 judge	-
 judged	-
@@ -2188,6 +2327,7 @@ just	-
 justfile	-
 justification	-
 justify	-
+jws	JSON Web Signature; standard technical acronym in common use
 kebab	-
 keep	-
 keeping	-
@@ -2208,6 +2348,8 @@ kills	-
 kind	-
 kinds	-
 kit	-
+kits	-
+klaviyo	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 knew	-
 knob	-
 knobs	-
@@ -2227,11 +2369,13 @@ lags	-
 land	-
 landed	-
 landing	-
+landingi	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 lands	-
 landscape	-
 lane	-
 lanes	-
 language	-
+languages	-
 lapse	-
 lapsed	-
 large	-
@@ -2284,6 +2428,7 @@ legitimate	-
 legitimately	-
 legs	-
 len	-
+lender	-
 length	-
 lens	-
 lenses	-
@@ -2312,6 +2457,7 @@ life	-
 lifetime	-
 lift	-
 lifts	-
+light	-
 like	-
 likely	-
 limit	-
@@ -2324,7 +2470,10 @@ lineage	-
 linear	-
 lines	-
 link	-
+linkage	-
 linked	-
+linkedin	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
+linker	-
 linking	-
 links	-
 lint	-
@@ -2387,6 +2536,7 @@ lose	-
 loses	-
 loss	-
 lost	-
+lotame	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 loud	-
 loudly	-
 lovelace	tool, product or format name
@@ -2395,7 +2545,11 @@ lower	-
 lowered	-
 lowering	-
 ls	-
+lt	ISO 3166 country code
 luck	-
+lucky	word of a vendor name (Crazy Egg, Lucky Orange); tool, product or format name
+lupasearch	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
+lv	ISO 3166 country code
 lying	-
 mac	-
 machine	-
@@ -2406,6 +2560,7 @@ made	-
 magnitude	-
 mail	-
 mailbox	-
+mailerlite	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 main	-
 maintained	-
 major	-
@@ -2440,9 +2595,13 @@ marked	-
 marker	-
 markers	-
 marketing	-
+marketplace	-
 marks	-
+markup	-
 mart	-
+marts	-
 mask	-
+masked	-
 master	-
 match	-
 matched	-
@@ -2508,12 +2667,14 @@ messages	-
 messaging	-
 met	-
 meta	-
+metadata	-
 method	-
 methodology	-
 methods	-
 metric	-
 metrics	-
 micro	-
+microsoft	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 mid	-
 middle	-
 midnight	-
@@ -2541,6 +2702,8 @@ mirror	-
 mirrored	-
 mirrors	-
 mis	-
+miscellaneous	-
+mise	tool, product or format name
 misfiring	-
 misleading	-
 mismatch	-
@@ -2556,8 +2719,10 @@ mitigation	-
 mix	-
 mixed	-
 mjs	-
+mkdocs	tool, product or format name
 mktemp	tool, product or format name
 mnemonic	-
+mobile	-
 mod	-
 modality	-
 mode	-
@@ -2584,6 +2749,7 @@ month	-
 monthly	-
 months	-
 moot	-
+moove	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 more	-
 morning	-
 most	-
@@ -2592,6 +2758,7 @@ motivated	-
 mount	-
 mounted	-
 mounts	-
+mouseflow	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 move	-
 moved	-
 moves	-
@@ -2599,6 +2766,7 @@ moving	-
 mr	-
 ms	-
 much	-
+multi	-
 multiplies	-
 multiply	-
 must	-
@@ -2612,7 +2780,9 @@ mutating	-
 mutation	-
 mutations	-
 muted	-
+mx	tool, product or format name
 my	-
+mypy	tool, product or format name
 naive	-
 name	-
 named	-
@@ -2703,11 +2873,13 @@ null	-
 number	-
 numbered	-
 numbers	-
+oauth	tool, product or format name
 obey	-
 obeyed	-
 obeys	-
 object	-
 objection	-
+objective	-
 objects	-
 obligation	-
 obligations	-
@@ -2731,6 +2903,7 @@ of	-
 off	-
 offer	-
 offers	-
+office	-
 official	-
 offset	-
 offsets	-
@@ -2741,15 +2914,20 @@ older	-
 omission	-
 omits	-
 omitted	-
+omnisend	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 on	-
+onboard	-
+onboarding	-
 once	-
 one	-
 ones	-
+onetrust	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 ongoing	-
 only	-
 onto	-
 opaque	-
 open	-
+openai	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 opened	-
 opener	-
 opening	-
@@ -2795,6 +2973,7 @@ oscillation	-
 other	-
 others	-
 otherwise	-
+otlp	OpenTelemetry protocol; tool, product or format name
 our	-
 ours	-
 out	-
@@ -2819,6 +2998,7 @@ overdue	-
 overhead	-
 overlap	-
 overlay	-
+overlays	-
 overloaded	-
 override	-
 overrides	-
@@ -2842,6 +3022,7 @@ owns	-
 pack	-
 package	-
 packages	-
+packaging	-
 packs	-
 pad	-
 padded	-
@@ -2849,10 +3030,14 @@ padding	-
 page	-
 pager	-
 pages	-
+pageview	tool, product or format name
+pagination	-
 pair	-
 paired	-
 pairing	-
 pairs	-
+palette	-
+pandectes	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 pandora	-
 panel	-
 panels	-
@@ -2902,6 +3087,7 @@ paused	-
 pax	-
 pay	-
 paying	-
+payload	-
 payments	-
 pays	-
 peeled	-
@@ -2954,6 +3140,7 @@ picking	-
 picks	-
 picture	-
 pieces	-
+pii	standard technical acronym in common use
 pill	-
 pilot	-
 pin	-
@@ -2967,6 +3154,8 @@ pipe	-
 piped	-
 pipeline	-
 pipes	-
+pitfalls	-
+pixel	-
 place	-
 placed	-
 placeholder	-
@@ -2990,7 +3179,9 @@ platforms	-
 plausible	-
 plausibly	-
 playbook	-
+playbooks	-
 playwright	-
+plugin	-
 plugins	-
 plumbing	-
 plus	-
@@ -3018,6 +3209,7 @@ portable	-
 ported	-
 position	-
 positional	-
+positioning	-
 positive	-
 positives	-
 possible	-
@@ -3027,6 +3219,7 @@ posture	-
 power	-
 practical	-
 practice	-
+pre	git hook names (pre-commit, pre-push) a tool looks up
 preamble	-
 precede	-
 precedence	-
@@ -3071,7 +3264,9 @@ preset	-
 presets	-
 press	-
 pressure	-
+prestashop	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 pretending	-
+pretooluse	Claude Code hook event name (PreToolUse); tool, product or format name
 prevent	-
 prevention	-
 prevents	-
@@ -3080,6 +3275,7 @@ previous	-
 previously	-
 price	-
 priced	-
+prices	-
 primary	-
 primitive	-
 primitives	-
@@ -3098,6 +3294,7 @@ private	-
 privilege	-
 privileged	-
 pro	-
+probable	-
 probation	-
 probe	-
 probed	-
@@ -3122,6 +3319,7 @@ produces	-
 producing	-
 product	-
 production	-
+products	-
 profile	-
 profiles	-
 program	-
@@ -3190,6 +3388,7 @@ pulled	-
 pulls	-
 pulse	-
 puppeteer	-
+purchase	-
 pure	-
 purely	-
 purpose	-
@@ -3200,7 +3399,11 @@ pushing	-
 put	-
 puts	-
 putting	-
+pypi	tool, product or format name
+pyproject	tool, product or format name
+pytest	tool, product or format name
 python	-
+qa	quality assurance, an acronym in common use (§6.3: acronyms are words); docs/reports/qa-plan.md
 quadratic	-
 qualified	-
 qualifier	-
@@ -3208,6 +3411,7 @@ quality	-
 quantities	-
 quarantine	-
 quarry	-
+queries	-
 query	-
 question	-
 questions	-
@@ -3264,6 +3468,7 @@ reader	-
 readers	-
 readiness	-
 reading	-
+readings	-
 readme	-
 reads	-
 ready	-
@@ -3332,6 +3537,7 @@ redacted	-
 redaction	-
 reddened	-
 reddens	-
+reddit	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 redeeming	-
 redefine	-
 redesign	-
@@ -3352,6 +3558,7 @@ references	-
 refine	-
 reflect	-
 reflog	-
+reframe	-
 reframes	-
 refresh	-
 refreshed	-
@@ -3441,6 +3648,7 @@ renderers	-
 rendering	-
 renders	-
 renew	-
+renovate	tool, product or format name
 reopens	-
 reordered	-
 repair	-
@@ -3476,6 +3684,7 @@ repository	-
 reproduce	-
 reproduced	-
 reproduces	-
+reproducibility	-
 reproducible	-
 reproducing	-
 reproduction	-
@@ -3484,6 +3693,7 @@ requests	-
 require	-
 required	-
 requirement	-
+requirements	-
 requires	-
 requiring	-
 reroute	-
@@ -3548,6 +3758,7 @@ reuse	-
 reused	-
 rev	-
 reveals	-
+revenue	-
 reversals	-
 reverse	-
 reversed	-
@@ -3570,6 +3781,7 @@ revisit	-
 revoke	-
 revoked	-
 rewards	-
+reworded	-
 rewrite	-
 rewrites	-
 rewriting	-
@@ -3581,9 +3793,13 @@ rising	-
 risk	-
 risks	-
 risky	-
+rm	shell command name
 ro	-
 robust	-
 robustness	-
+roi	return on investment; standard business acronym in common use
+roihunter	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
+roivenue	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 role	-
 roles	-
 roll	-
@@ -3595,6 +3811,7 @@ root	-
 rooted	-
 roots	-
 roster	-
+rosters	-
 rot	-
 rotate	-
 rotated	-
@@ -3613,19 +3830,25 @@ row	-
 rows	-
 rss	-
 rsync	tool, product or format name
+rtbhouse	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 rubric	-
 ruby	-
+ruff	tool, product or format name
 rule	-
 rules	-
+ruleset	-
+rulesets	-
 ruling	-
 run	-
 runaway	-
+runbooks	-
 rung	-
 runnable	-
 runner	-
 runners	-
 running	-
 runs	-
+rust	tool, product or format name
 safe	-
 safety	-
 said	-
@@ -3653,6 +3876,7 @@ saw	-
 say	-
 saying	-
 says	-
+sbom	Software Bill of Materials; standard technical acronym in common use
 scaffold	-
 scaffolded	-
 scaffolder	-
@@ -3685,6 +3909,7 @@ scoped	-
 scopes	-
 scoping	-
 score	-
+scorecard	-
 scored	-
 scores	-
 scoring	-
@@ -3732,19 +3957,24 @@ selected	-
 selection	-
 selector	-
 selects	-
+selenium	tool, product or format name
 self	-
 selfhealing	-
 semantic	-
 semantics	-
+semver	tool, product or format name
 send	-
+senders	-
 sends	-
 sense	-
 senses	-
+sensitive	-
 sensitively	-
 sent	-
 sentence	-
 sentences	-
 sentinel	-
+sentry	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 separate	-
 separated	-
 separately	-
@@ -3791,6 +4021,7 @@ sharded	-
 shards	-
 share	-
 shared	-
+sharedid	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 shares	-
 sharing	-
 sharper	-
@@ -3801,6 +4032,7 @@ shed	-
 sheds	-
 sheets	-
 shell	-
+shellcheckrc	tool, product or format name
 shelling	-
 shells	-
 sherlock	-
@@ -3810,9 +4042,11 @@ ship	-
 shipped	-
 shipping	-
 ships	-
+shopify	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 short	-
 shorter	-
 shot	-
+shots	-
 should	-
 show	-
 showed	-
@@ -3887,10 +4121,13 @@ slower	-
 slug	-
 small	-
 smaller	-
+smartlook	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
+smartsupp	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 smell	-
 smoke	-
 smuggled	-
 snake	-
+snapchat	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 snapshot	-
 snapshots	-
 snapshotted	-
@@ -3933,6 +4170,7 @@ spec	-
 specific	-
 specifically	-
 specifics	-
+specimens	-
 specs	-
 speculation	-
 speed	-
@@ -3981,9 +4219,11 @@ standard	-
 standards	-
 standing	-
 stands	-
+stape	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 star	-
 start	-
 started	-
+starters	-
 starting	-
 starts	-
 stash	-
@@ -3998,6 +4238,7 @@ status	-
 stay	-
 stayed	-
 stays	-
+steady	-
 steal	-
 step	-
 steps	-
@@ -4047,9 +4288,11 @@ style	-
 sub	-
 subagent	-
 subagents	-
+subcommands	-
 subject	-
 subjects	-
 submission	-
+submit	-
 subscribe	-
 subscription	-
 subset	-
@@ -4077,9 +4320,11 @@ summaries	-
 summarize	-
 summary	-
 summed	-
+sunset	-
 supersede	-
 superseded	-
 supersedes	-
+supervisor	-
 supplies	-
 supply	-
 support	-
@@ -4101,6 +4346,7 @@ survives	-
 surviving	-
 survivor	-
 survivors	-
+suspect	-
 swallow	-
 swallowable	-
 swallowed	-
@@ -4113,8 +4359,11 @@ swept	-
 switch	-
 switched	-
 switches	-
+switching	-
+swym	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 symbol	-
 symbols	-
+symlink	tool, product or format name
 symptom	-
 sync	-
 synced	-
@@ -4153,8 +4402,10 @@ targets	-
 task	-
 tasked	-
 tasks	-
+tawk	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 taxis	-
 taxonomy	-
+tcf	standard technical acronym in common use
 teach	-
 teaches	-
 team	-
@@ -4180,11 +4431,13 @@ terminate	-
 terminated	-
 termination	-
 terminator	-
+termly	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 terms	-
 terraform	-
 territory	-
 test	-
 testable	-
+testbed	-
 tested	-
 testing	-
 tests	-
@@ -4198,6 +4451,7 @@ their	-
 theirs	-
 them	-
 theme	-
+themes	-
 themselves	-
 then	-
 there	-
@@ -4219,6 +4473,7 @@ those	-
 though	-
 thought	-
 thread	-
+threads	-
 threat	-
 three	-
 threshold	-
@@ -4245,6 +4500,7 @@ tile	-
 time	-
 timed	-
 timeline	-
+timeout	-
 timer	-
 timers	-
 times	-
@@ -4265,6 +4521,7 @@ tomorrow	-
 too	-
 took	-
 tool	-
+toolchain	-
 tooling	-
 tools	-
 top	-
@@ -4302,6 +4559,8 @@ transcript	-
 transcripts	-
 transfer	-
 transferable	-
+transformation	-
+transformations	-
 transition	-
 translate	-
 transport	-
@@ -4318,6 +4577,7 @@ trees	-
 trend	-
 trends	-
 triage	-
+trial	-
 tried	-
 tries	-
 trigger	-
@@ -4344,6 +4604,7 @@ truth	-
 try	-
 trying	-
 ts	-
+tsconfig	tool, product or format name
 tuesday	-
 tui	-
 tuned	-
@@ -4354,6 +4615,8 @@ turned	-
 turning	-
 turns	-
 tutorial	-
+tutorials	-
+tv	standard technical acronym in common use
 tweak	-
 tweet	-
 twelve	-
@@ -4364,6 +4627,7 @@ twins	-
 two	-
 type	-
 typed	-
+typedoc	tool, product or format name
 types	-
 typescript	-
 typing	-
@@ -4387,6 +4651,7 @@ unbuilt	-
 uncertainty	-
 unchanged	-
 unchecked	-
+uncited	-
 unclassified	-
 uncle	-
 unclear	-
@@ -4433,6 +4698,7 @@ unlike	-
 unlink	-
 unlisted	-
 unloaded	-
+unmanaged	-
 unmeasurable	-
 unmeasured	-
 unmerged	-
@@ -4485,6 +4751,7 @@ unwritable	-
 up	-
 update	-
 updated	-
+updates	-
 updating	-
 upgrade	-
 upgrades	-
@@ -4503,12 +4770,15 @@ used	-
 useful	-
 useless	-
 user	-
+usercentrics	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 users	-
 uses	-
 using	-
 usual	-
 usually	-
 utils	-
+utm	standard technical acronym in common use
+uv	tool, product or format name
 vacuous	-
 vale	-
 valid	-
@@ -4539,6 +4809,7 @@ vendor	-
 vendored	-
 vendoring	-
 vendors	-
+venue	-
 ver	-
 verb	-
 verbatim	-
@@ -4571,21 +4842,27 @@ violations	-
 visibility	-
 visible	-
 visited	-
+visitor	-
 visual	-
 visualization	-
 visualize	-
+vitals	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 vocabulary	-
 voice	-
 void	-
 volume	-
 volumes	-
 vs	-
+vscode	tool, product or format name
+vsm	the Viable System Model, an acronym (§6.3) the standard already carries as a terms.tsv column; D-27
 vulnerabilities	-
 vulnerability	-
 wait	-
 waited	-
 waiting	-
 waits	-
+waived	-
+waiver	-
 wake	-
 wakes	-
 walk	-
@@ -4661,6 +4938,9 @@ widening	-
 widens	-
 wider	-
 widgets	-
+wifi	-
+wiki	-
+wildcard	-
 will	-
 win	-
 window	-
@@ -4675,6 +4955,7 @@ wires	-
 wiring	-
 wisdom	-
 wish	-
+wishlist	-
 with	-
 withdrawn	-
 withdraws	-
@@ -4686,8 +4967,10 @@ won	-
 wondering	-
 word	-
 wording	-
+wordpress	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 words	-
 work	-
+workaround	-
 worked	-
 worker	-
 workers	-
@@ -4721,6 +5004,7 @@ written	-
 wrong	-
 wrongly	-
 wrote	-
+www	standard technical acronym in common use
 yard	-
 year	-
 years	-
@@ -4729,6 +5013,7 @@ yet	-
 yield	-
 yields	-
 yoga	-
+yotpo	vendor or platform the estate integrates (azimuth standard/vendors); tool, product or format name
 you	-
 young	-
 your	-

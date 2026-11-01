@@ -36,6 +36,7 @@ cli:tree	cli	tree	2026-10-17	core
 cli:ui	cli	ui	2026-10-17	core
 cli:uninstall	cli	uninstall	2026-10-17	core
 cli:verify	cli	verify	2026-10-17	core
+env:HARBOR_EVAL_REDTEAM_DIR	env	HARBOR_EVAL_REDTEAM_DIR	2026-10-31	core
 env:HARBOR_FLEET_FILE	env	HARBOR_FLEET_FILE	2026-10-17	core
 env:HARBOR_LOCAL_BIN	env	HARBOR_LOCAL_BIN	2026-10-17	core
 env:HARBOR_ORCH_BIN	env	HARBOR_ORCH_BIN	2026-10-29	core

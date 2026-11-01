@@ -2318,12 +2318,11 @@ def _carry_naming_baseline(target: Path, renames: list[tuple[str, str]]) -> None
     """Move the naming baseline's lines across the paths this upgrade renamed (naming standard, 1.2.3).
 
     Without it the repo's own naming gate turns red on the upgrade that fixed the names:
-    every finding at an old path is STALE and every moved file is judged NEW.
+    every finding at an old path is STALE and every moved file is judged NEW. It runs on
+    an upgrade with no renames too, since a newer vendored judge leaves STALE lines alone.
     """
     from project_init import naming_gate
 
-    if not renames:
-        return
     ok, msg = naming_gate.carry_renames(target, renames)
     if ok:
         sys.stdout.write(f"{msg}\n")
