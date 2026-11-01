@@ -1,6 +1,6 @@
 """The marker yard writes is `scope:`, never the legacy `context:` (harbor#966).
 
-harbor CONTRACTS/marker.md: readers accept both spellings, the writer moves to
+harbor contracts/marker.md: readers accept both spellings, the writer moves to
 `scope: project|user`. Rendered from the real `config.yaml.tmpl` through the real
 engine, and parsed as YAML, so a comment that mentions a key cannot satisfy it.
 """

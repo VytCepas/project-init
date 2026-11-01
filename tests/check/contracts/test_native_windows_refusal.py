@@ -1,4 +1,4 @@
-"""#1070: a native Windows shell is refused at entry, naming WSL2 (harbor CONTRACTS/platforms.md).
+"""#1070: a native Windows shell is refused at entry, naming WSL2 (harbor contracts/platforms.md).
 
 Native means ``uname -s`` starts with MINGW, MSYS or CYGWIN, or
 ``platform.system()`` is ``Windows``. Each test stubs ``uname`` on PATH, so the

@@ -5,7 +5,7 @@
 #
 # COLUMNS  id <TAB> rule <TAB> subject <TAB> kind <TAB> remove_by <TAB> reason
 id	rule	subject	kind	remove_by	reason
-yard-0001	*	.agents/	tool-required	-	this repo's own dogfood of the tree it scaffolds: harnesses read .agents/ by name. It still carries the template names from before harbor#967, because its .agents/hooks/ is write-protected to agent sessions; the rename ships as the operator-applied Deliverables/2026-10-30-merge-and-install/project-init-own-tree-names.patch, after which this row narrows to the harbor-owned names (inject.d/, ship.conf). Not legacy only because a legacy row names one rule
+yard-0001	*	.agents/	tool-required	-	this repo's own dogfood of the tree it scaffolds: harnesses read .agents/ by name. It still carries the template names from before harbor#967, because its .agents/hooks/ is write-protected to agent sessions; the rename ships as the operator-applied Deliverables/2026-10-30-merge-and-install/project-init-own-tree-names.patch, after which this row narrows to the harbor-owned names (ship.conf). Not legacy only because a legacy row names one rule
 yard-0002	*	.claude/	tool-required	-	Claude Code reads .claude/ by name; it is the generated mirror of .agents/ (tools/sync_claude_dir.py) and is renamed by the same own-tree patch as yard-0001
 yard-0005	name.alias	src/project_init	tool-required	-	the import name of the PyPI package project-init, published on an index and pinned by users
 yard-0006	name.separator	src/project_init	tool-required	-	Python import names are snake case; the package is project_init

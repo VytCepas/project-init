@@ -4,7 +4,7 @@
 - Date: 2026-09-30
 - Implements: [#1070](https://github.com/VytCepas/project-init/issues/1070)
 - Relates to: [harbor#831](https://github.com/VytCepas/harbor/issues/831) (the cross-repo
-  epic) and harbor's `CONTRACTS/platforms.md` (the shared contract)
+  epic) and harbor's `contracts/platforms.md` (the shared contract)
 - Supersedes in part: [ADR-027](0027-claude-config-projection.md), its Windows rationale only
 
 ## Context

@@ -24,7 +24,7 @@ file is not the risk and a tracked one is.
 
 This rule lives here because `AGENTS.md` is the file every agent surface reads.
 The same text is delivered at session start by
-[`.claude/inject.d/10-this-repo-is-public.md`](.claude/inject.d/10-this-repo-is-public.md),
+[`context-rules/project-init/project-init-is-a-public-repo.md`](context-rules/project-init/project-init-is-a-public-repo.md),
 which Claude loads and nothing else does — so the pack is the convenience and
 this section is the canonical copy.
 
