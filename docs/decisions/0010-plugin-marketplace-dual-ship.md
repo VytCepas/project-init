@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-10
+date: 2026-06-12
+supersedes: -
+superseded_by: -
+---
+
 # ADR-010: Same-repo plugin marketplace; dual-ship before template cutover
 
 - Status: Accepted (amended 2026-06-12: cutover executed in PI-165 — see addendum)

@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-28
+date: 2026-07-08
+supersedes: -
+superseded_by: -
+---
+
 # ADR-028: Session-scoped injection for the workflow-state reminder
 
 - Status: Accepted (amended 2026-09-17: the dynamic DAG-state re-injection

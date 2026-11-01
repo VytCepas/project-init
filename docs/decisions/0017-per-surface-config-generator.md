@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-17
+date: 2026-06-21
+supersedes: -
+superseded_by: -
+---
+
 # ADR-017: Canonical hook/MCP spec → per-surface generator for non-CLI surfaces
 
 - Status: Accepted

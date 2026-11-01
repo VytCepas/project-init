@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-24
+date: 2026-06-26
+supersedes: -
+superseded_by: -
+---
+
 # ADR-024: Memory tiers — a graded ladder over the à-la-carte backend, with a parked RAG rung
 
 - Status: Accepted

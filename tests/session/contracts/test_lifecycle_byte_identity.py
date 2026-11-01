@@ -453,6 +453,14 @@ _ADDED_SINCE_BASELINE |= naming_gate_paths()
 # The naming-standard rename (1.2.3) keeps shims at some old names until 2026-12-01;
 # the renamed paths themselves are re-keyed in the fixtures.
 _ADDED_SINCE_BASELINE |= SHIMMED_OLD_PATHS
+# harbor#1429: the decision-record template moved to the shared series' folder, docs/decisions/, in the one
+# front matter every governed repo uses; the old .agents/docs/decisions/template.md is retired for it.
+_ADDED_SINCE_BASELINE |= {
+    ".agents/docs/decisions/template.md",
+    ".agents/skills/add-decision-record/SKILL.md",  # writes the new series, with both sides of a supersession
+    "docs/decisions/README.md",
+    "docs/decisions/template.md",
+}
 
 
 def _manifest(target: Path) -> dict[str, str]:

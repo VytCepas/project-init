@@ -1,4 +1,5 @@
 context: repo
+repo-kind: scaffolder  # standards/naming/repo-kinds.tsv; its system name, yard, qualifies a decision id outside this repo
 # Project configuration read by lifecycle scripts and hooks
 # (create_issue.sh, start_issue.sh, setup_github.sh, workflow_state_reminder.sh).
 project:

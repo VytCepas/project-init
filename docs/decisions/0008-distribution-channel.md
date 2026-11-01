@@ -1,3 +1,13 @@
+---
+kind: decision-record
+status: accepted
+alias: D-8
+date: 2026-06-11
+supersedes: -
+superseded_by: -
+revised_by: D-11
+---
+
 # ADR-008: Distribution stays git-based with tagged releases; PyPI deferred
 
 - Status: Superseded in part by ADR-011 (PyPI publishing added; git channel unchanged)

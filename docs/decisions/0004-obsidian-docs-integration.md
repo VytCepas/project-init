@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-4
+date: 2026-04-27
+supersedes: -
+superseded_by: -
+---
+
 # ADR-004: Obsidian vault + /docs integration — human memory meets docs-as-code
 
 **Date:** 2026-04-27

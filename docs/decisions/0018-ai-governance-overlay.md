@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-18
+date: 2026-06-23
+supersedes: -
+superseded_by: -
+---
+
 # ADR-018: AI-governance overlay — governance-as-code, system card + AIBOM + CI gate
 
 - Status: Accepted (amended 2026-10-23: the gate no longer passes on silence — see Amendment)

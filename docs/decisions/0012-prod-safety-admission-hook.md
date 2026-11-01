@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-12
+date: 2026-06-12
+supersedes: -
+superseded_by: -
+---
+
 # ADR-012: Prod-safety guard — deny-table guardrail, credential separation as boundary
 
 - Status: Accepted

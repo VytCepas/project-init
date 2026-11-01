@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-22
+date: 2026-06-25
+supersedes: -
+superseded_by: -
+---
+
 # ADR-022: Toolchain decomposition — keep the existing `{{#if}}` conditionals, don't add overlays
 
 - Status: Accepted (spike — file→gate map + recommendation; no production code)

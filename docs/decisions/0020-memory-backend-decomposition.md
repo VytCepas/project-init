@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-20
+date: 2026-06-24
+supersedes: -
+superseded_by: -
+---
+
 # ADR-020: Memory backend is à-la-carte — derived from `memory_stack`, declinable as `none`
 
 - Status: Accepted

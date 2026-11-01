@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-30
+date: 2026-09-30
+supersedes: -
+superseded_by: -
+---
+
 # ADR-030: macOS and Linux only; Windows through WSL2; a native Windows shell is refused
 
 - Status: Accepted

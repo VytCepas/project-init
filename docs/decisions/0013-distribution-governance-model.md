@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-13
+date: 2026-06-18
+supersedes: -
+superseded_by: -
+---
+
 # ADR-013: Distribution & governance model — three profiles, fork-based orgs, opt-in updates, hybrid enforcement
 
 - Status: Accepted

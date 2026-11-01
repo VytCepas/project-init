@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-6
+date: 2026-06-11
+supersedes: -
+superseded_by: -
+---
+
 # ADR-006: Conventional Commits format for commit messages and PR titles
 
 - Status: Accepted

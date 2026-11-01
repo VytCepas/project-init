@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-2
+date: 2026-04-23
+supersedes: -
+superseded_by: -
+---
+
 # ADR-002: dot_ prefix convention for template directories
 
 **Date:** 2026-04-23

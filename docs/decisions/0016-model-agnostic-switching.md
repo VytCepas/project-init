@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-16
+date: 2026-06-21
+supersedes: -
+superseded_by: -
+---
+
 # ADR-016: Model/API-agnostic switching via claude-code-router (pinned, scaffolded)
 
 - Status: Accepted

@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-7
+date: 2026-06-11
+supersedes: -
+superseded_by: -
+---
+
 # ADR-007: Replace custom safety hooks with maintained plugin; enforce at git/CI level
 
 - Status: Accepted

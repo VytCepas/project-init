@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-23
+date: 2026-06-25
+supersedes: -
+superseded_by: -
+---
+
 # ADR-023: Self-explaining wizard — every selectable concern explains its value
 
 - Status: Accepted

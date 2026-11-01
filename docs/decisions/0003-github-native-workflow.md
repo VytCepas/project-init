@@ -1,3 +1,13 @@
+---
+kind: decision-record
+status: accepted
+alias: D-3
+date: 2026-04-27
+supersedes: -
+superseded_by: -
+revised_by: D-6
+---
+
 # ADR-003: GitHub-native project management — GitHub Projects + Issues over Linear
 
 **Date:** 2026-04-27

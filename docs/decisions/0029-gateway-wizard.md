@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: accepted
+alias: D-29
+date: 2026-07-24
+supersedes: -
+superseded_by: -
+---
+
 # ADR-029: The gateway wizard — six asks on the default path
 
 Date: 2026-07-24

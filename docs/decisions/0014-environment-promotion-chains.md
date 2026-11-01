@@ -1,3 +1,12 @@
+---
+kind: decision-record
+status: superseded
+alias: D-14
+date: 2026-06-19
+supersedes: -
+superseded_by: D-15
+---
+
 # ADR-014: Environment promotion-chain branch model (SUPERSEDED)
 
 - Status: **Superseded** by epic #316 (agnostic local↔cloud env/deploy model)

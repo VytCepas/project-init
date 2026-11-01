@@ -1,3 +1,13 @@
+---
+kind: decision-record
+status: accepted
+alias: D-5
+date: 2026-04-27
+supersedes: -
+superseded_by: -
+revised_by: D-6, D-14
+---
+
 # ADR-005: GitHub PR and board lifecycle workflow
 
 **Date:** 2026-04-27
