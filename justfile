@@ -91,6 +91,33 @@ audit:
 license:
     uv run --with pip-licenses pip-licenses --from=mixed --fail-on "GPL;AGPL" --partial-match
 
+# generate a CycloneDX SBOM of the runtime dependency tree (#574); the same recipe the
+# scaffolded justfile ships. --no-dev so it reflects what ships.
+[doc("generate a CycloneDX SBOM of the runtime dependency tree (#574)")]
+sbom:
+    uv sync --no-dev
+    uvx --from cyclonedx-bom cyclonedx-py environment .venv -o sbom.cdx.json
+
+# property-based tests with Hypothesis (#580), as the scaffolded `fuzz`: opt-in per
+# file, nightly in CI, never a PR gate.
+[doc("property-based tests with Hypothesis (#580)")]
+fuzz:
+    uv run --with hypothesis --with pytest-xdist pytest -n auto --tb=short -q
+
+# scan staged changes for secrets (same scan as the pre-commit git hook)
+scan:
+    gitleaks git --pre-commit --staged --redact --no-banner --verbose
+
+# route CI to a self-hosted runner when Actions minutes run out (PI-666);
+# requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+[doc("route CI to a self-hosted runner when Actions minutes run out (PI-666)")]
+ci-local-on:
+    gh variable set CI_RUNS_ON --body self-hosted
+
+# back to GitHub-hosted runners
+ci-local-off:
+    gh variable delete CI_RUNS_ON
+
 # what CI runs (the full gate)
 ci: lint typecheck test audit
 

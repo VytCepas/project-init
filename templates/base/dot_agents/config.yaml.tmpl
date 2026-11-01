@@ -43,6 +43,7 @@ project:
 {{/if lifecycle}}
 
 language: {{language}}            # python | node | go | none
+repo-kind: workload            # standards/naming/repo-kinds.tsv: the kind of repo this is, which fixes the task verbs its justfile must carry
 
 delivery: {{delivery}}            # library | service | prototype — how this ships (ADR-015)
 {{#if delivery_service}}deploy:

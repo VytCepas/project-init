@@ -44,3 +44,5 @@ vale	controls.tsv	type=vale	-	a prose rule of the Vale config generated from ali
 label-axis	label-axes.tsv	-	-	an issue label as <axis>:<value> with the legacy label it replaces; renders issue-taxonomy.tsv (harbor#978)
 writer	writers.tsv	-	-	a script that creates a named thing, and the command patterns that find one (harbor#978)
 word	words.tsv	-	-	an English or technical word a name may carry beyond the terms (D-18, harbor#984)
+label-retired	label-retired.tsv	-	-	a label the register retires: no register row carries it, and the sync plans its removal (harbor#1427)
+verb	verbs.tsv	-	-	a task verb a repo kind must carry in its justfile, with its meaning and exit contract (harbor#1428)
