@@ -26,10 +26,11 @@
 #   sh bin/lint-name.sh --help
 #
 #   --format findings   also print one `<A|V> TAB <rule> TAB <subject>` record per finding on stdout
-#   --root <dir>        the tree to judge (default: this checkout)
-#   --registry <dir>    the registry (default: <root>/standards/naming)
+#   --root <dir>        the tree to judge (default: this checkout; a vendored copy judges the repo that carries it)
+#   --registry <dir>    the registry (default: <root>/standards/naming; a vendored copy's own registry/ when the root has none).
+#                       A root with no standards/naming/ is a workload: the rules that judge the registry itself stay silent (harbor#1415)
 #   --base <ref>        the base for --changed, --added and name.exemption-grow (default: $HARBOR_CI_BASE or origin/main)
-#   --today YYYY-MM-DD  the date alias and exemption expiry is judged against (default: today in UTC, D-51)
+#   --today YYYY-MM-DD  the date alias and exemption expiry is judged against (default: $HARBOR_LINT_TODAY, else today in UTC, D-51)
 #   --exemptions-base <file>   the base exemptions.tsv for name.exemption-grow (default: read from git)
 #   HARBOR_SCOPE_PRIVATE=<dir>  the private layer whose terms.tsv overlays client and system terms (D-85; default: $PORT_ROOT/harbor-private)
 #   <root>/naming-words.tsv, <root>/naming-families.tsv   the repo overlay (harbor#967): a repo's own words and families,
@@ -103,10 +104,15 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+# A vendored copy (vendor/naming/, MANIFEST.tsv beside it) judges the repo that carries it, with the registry beside it
+# (harbor#967, #1415): bare, it finds both; harbor's own bin/ has neither file, so its defaults are unchanged.
+VENDORED=0; [ ! -f "$HERE/MANIFEST.tsv" ] || [ ! -f "$HERE/registry/registers.tsv" ] || VENDORED=1
+if [ "$VENDORED" = 1 ] && [ -z "$ROOT" ]; then ROOT="$HERE/../.."; fi
 ROOT="${ROOT:-$(CDPATH='' cd -- "$HERE/.." && pwd)}"
 ROOT="$(CDPATH='' cd -- "$ROOT" 2>/dev/null && pwd)" || { log_fail "no such root: $ROOT"; log_fix "sh $SELF --root <dir>"; log_end || :; exit 2; }
+if [ -z "$REG" ] && [ "$VENDORED" = 1 ] && [ ! -f "$ROOT/standards/naming/registers.tsv" ]; then REG="$HERE/registry"; fi
 REG="${REG:-$ROOT/standards/naming}"
-TODAY="${TODAY:-$(date -u +%Y-%m-%d)}"   # D-51: UTC for every date
+TODAY="${TODAY:-${HARBOR_LINT_TODAY:-$(date -u +%Y-%m-%d)}}"   # D-51: UTC for every date; the env pins it for a caller that cannot pass --today
 case "$TODAY" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *)
   log_fail "--today is not YYYY-MM-DD: $TODAY"; log_fix "sh $SELF --today 2026-10-04"; log_end || :; exit 2 ;;
 esac
@@ -172,6 +178,10 @@ for _ov in naming-words.tsv naming-families.tsv; do
   if [ "$_ov" = naming-words.tsv ]; then OVW="$OVDIR/$_ov"; else OVF="$OVDIR/$_ov"; fi
 done
 REL_REG="${REG#"$ROOT"/}"
+# A root with no standards/naming/ of its own is judged by harbor's registry, not the owner of it: the registry-owner rules
+# (regrule) judge harbor's controls and exemptions, so a workload run leaves them to harbor (harbor#967, #1415).
+FOREIGN=0
+case "$ACTION" in tree|changed|added) [ -f "$ROOT/standards/naming/registers.tsv" ] || FOREIGN=1 ;; esac
 # THE FILES THIS RUN READS ARE registers.tsv's `file` column (harbor#950), not a list written here: terms.tsv
 # first, because every other file's classes are checked against it, then each named file once in row order.
 # A register is its file plus its row, so a new one needs no edit to this file. Two guards keep that honest:
@@ -220,7 +230,7 @@ function regrule(r) { return r ~ /^name\.(registry-|exemption-|alias-expired|con
 function emit(rule, subject, msg,   k, e) {
   if (mode == "check" && regrule(rule) && surface != "registry") return
   if (mode == "registry" && !regrule(rule)) return
-  if (mode == "added" && regrule(rule)) return   # --added judges the names a branch brings in, not the registry (a tree run does that)
+  if ((mode == "added" || foreign == 1) && regrule(rule)) return   # --added judges names a branch brings in, a foreign root leaves the registry to harbor
   if (mode == "check" && (surface in VIEWR) && VIEWR[surface] != "" && index("," VIEWR[surface] ",", "," rule ",") == 0) return   # a view of a surface for some rules only
   k = rule SUBSEP subject
   if (k in DONE) return
@@ -998,7 +1008,7 @@ judge() { # <mode> <records> [nolegacy] -> the judge's output
   # shellcheck disable=SC2046 # one path per registry file, none with spaces by construction
   awk -v mode="$1" -v surface="$SURFACE" -v today="$TODAY" -v exbase="$_ex" -v recfile="$2" -v root="$ROOT" \
       -v nolegacy="${3:-0}" -v files="$FILES" -v unlisted="$UNLISTED" -v priv="$PRIV" -v packt="$PACKT" \
-      -v ovw="$OVW" -v ovf="$OVF" -v ovhome="$OVHOME" \
+      -v ovw="$OVW" -v ovf="$OVF" -v ovhome="$OVHOME" -v foreign="$FOREIGN" \
       "$JUDGE" $(for _f in $FILES; do reg_file "$_f"; printf ' '; done) ${PRIV:+"$PRIV"} $PACKT ${OVW:+"$OVW"} ${OVF:+"$OVF"} "$2"
 }
 
@@ -1197,8 +1207,8 @@ case "$ACTION" in
     # already, so --added leaves the env tokens to the tree run, and judges the paths.
     [ "$ACTION" = added ] || env_tokens "$T/files" | awk '{ print "E\t" $0 }' >> "$T/rec"
     # bin/lint-conventions.sh's rule ids are names on the rule-id surface too (harbor#957).
-    [ "$ACTION" != tree ] || lc_rules | awk -F'\t' '{ print "C\trule-id\t" $1 }' >> "$T/rec"
-    [ "$ACTION" != tree ] || census >> "$T/rec"
+    [ "$ACTION" != tree ] || [ "$FOREIGN" = 1 ] || lc_rules | awk -F'\t' '{ print "C\trule-id\t" $1 }' >> "$T/rec"
+    [ "$ACTION" != tree ] || [ "$FOREIGN" = 1 ] || census >> "$T/rec"
     log_head "$_what in ${ROOT##*/}"
     judge "$ACTION" "$T/rec" > "$T/out" || unchecked
     _rc=0; report "$T/out" "$_what" || _rc=1

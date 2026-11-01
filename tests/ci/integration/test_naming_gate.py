@@ -295,6 +295,46 @@ class TestUnchecked:
         assert "MANIFEST" in r.stderr
 
 
+class TestVendoredLintRunsBare:
+    """harbor#967 / #1415: the shipped judge, run with no flags, judges this repo's names only."""
+
+    _OWNER = (
+        "name.registry-",
+        "name.exemption-",
+        "name.alias-expired",
+        "name.control-",
+        "name.surface-",
+    )
+
+    def _bare(self, repo: Path) -> subprocess.CompletedProcess[str]:
+        # the judge lists the tree through git, so what it must see is tracked
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
+        return subprocess.run(
+            ["sh", "vendor/naming/lint-name.sh", "--format", "findings"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=180,
+        )
+
+    def test_finds_its_vendored_registry_and_judges_a_planted_name(self, repo: Path):
+        (repo / _PLANTED).write_text("x\n", encoding="utf-8")
+        r = self._bare(repo)
+        assert r.returncode in (0, 1), r.stdout + r.stderr  # 3 is "nothing was judged"
+        assert "nothing was judged" not in r.stdout + r.stderr
+        assert f"name.case\t{_PLANTED}" in r.stdout
+
+    def test_leaves_harbors_registry_rules_to_harbor(self, repo: Path):
+        (repo / _PLANTED).write_text("x\n", encoding="utf-8")
+        out = self._bare(repo).stdout
+        assert (
+            f"name.case\t{_PLANTED}" in out
+        )  # it judged, so an empty owner list is not "judged nothing"
+        rules = [ln.split("\t")[1] for ln in out.splitlines() if ln.count("\t") >= 2]
+        assert [r for r in rules if r.startswith(self._OWNER)] == []
+
+
 class TestUpgradeAddsTheGate:
     def _predates_gate(self, tmp_path: Path) -> Path:
         """A repo scaffolded before the gate existed, with a finding of its own."""

@@ -11,8 +11,8 @@
 #   exit 0 written / current · 1 drift (stale, edited, missing or extra file) · 2 usage · 3 unchecked (no manifest, no source)
 # This file ships in the package (harbor#967): the workload's own copy is what its CI runs, offline.
 #
-# The vendored lint runs offline from the repo root:
-#   sh vendor/naming/lint-name.sh --root . --registry vendor/naming/registry --check <surface> <name>
+# The vendored lint runs offline and needs no flags: bare, it judges the repo that carries it with the registry beside it
+# (workload names only, harbor#1415); a name at its birth: sh vendor/naming/lint-name.sh --check <surface> <name>
 # MANIFEST.tsv opens with `#` header lines (generated, harbor commit, standard_version) then `path sha256 source` rows.
 # --check says three different things: `stale` (the manifest differs from harbor now: upgrade), `edited` (the file differs
 # from its own manifest row: someone edited a generated layer) and `missing`/`extra`. The harbor commit is the pin the
