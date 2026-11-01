@@ -1,4 +1,4 @@
----
+{{#if want_docs}}---
 kind: decision-record
 status: proposed
 alias: D-0
@@ -22,9 +22,12 @@ superseded_by: -
      A record in another repo is written <system>/D-<n>. This repo's own records are D-<n> here and
      <this-repo-name>/D-<n> anywhere else.
 
-     Diagrams: don't paste a render into the record. Draw it with the diagram skill and link its folder.
-     Write the href relative to THIS file's home (docs/decisions/). Linking, not pasting, keeps the record
-     from drifting when the diagram is re-rendered (map-not-territory). -->
+     Diagrams: don't paste a render into the record. Draw it with the diagram skill (source + picture live at
+     the repo-root paths docs/diagrams/<slug>/, or .agents/vault/design/<slug>/ in a vault) and
+     link that folder. Write the href relative to THIS file's home (docs/decisions/), so the repo-root
+     path docs/diagrams/<slug>/ is linked as ../diagrams/<slug>/ (vault: ../../.agents/vault/design/<slug>/).
+     Linking, not pasting, keeps the record from drifting when the diagram is re-rendered
+     (map-not-territory). -->
 
 ## Context and Problem Statement
 
@@ -46,3 +49,4 @@ resolves the problem, fewest downsides -->.
 
 - Good: <!-- what becomes easier -->
 - Bad: <!-- what becomes harder; accepted trade-offs -->
+{{/if want_docs}}
