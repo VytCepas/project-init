@@ -29,7 +29,7 @@
 #   --root <dir>        the tree to judge (default: this checkout)
 #   --registry <dir>    the registry (default: <root>/standards/naming)
 #   --base <ref>        the base for --changed, --added and name.exemption-grow (default: $HARBOR_CI_BASE or origin/main)
-#   --today YYYY-MM-DD  the date alias and exemption expiry is judged against (default: today in UTC, D-51)
+#   --today YYYY-MM-DD  the date alias and exemption expiry is judged against (default: $HARBOR_LINT_TODAY, else today in UTC, D-51)
 #   --exemptions-base <file>   the base exemptions.tsv for name.exemption-grow (default: read from git)
 #   HARBOR_SCOPE_PRIVATE=<dir>  the private layer whose terms.tsv overlays client and system terms (D-85; default: $PORT_ROOT/harbor-private)
 #   <root>/naming-words.tsv, <root>/naming-families.tsv   the repo overlay (harbor#967): a repo's own words and families,
@@ -106,7 +106,7 @@ done
 ROOT="${ROOT:-$(CDPATH='' cd -- "$HERE/.." && pwd)}"
 ROOT="$(CDPATH='' cd -- "$ROOT" 2>/dev/null && pwd)" || { log_fail "no such root: $ROOT"; log_fix "sh $SELF --root <dir>"; log_end || :; exit 2; }
 REG="${REG:-$ROOT/standards/naming}"
-TODAY="${TODAY:-$(date -u +%Y-%m-%d)}"   # D-51: UTC for every date
+TODAY="${TODAY:-${HARBOR_LINT_TODAY:-$(date -u +%Y-%m-%d)}}"   # D-51: UTC for every date; the env pins it for a caller that cannot pass --today
 case "$TODAY" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *)
   log_fail "--today is not YYYY-MM-DD: $TODAY"; log_fix "sh $SELF --today 2026-10-04"; log_end || :; exit 2 ;;
 esac
