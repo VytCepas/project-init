@@ -224,7 +224,7 @@ class TestContractVersionAndBlocks:
             assert "silent" in lowered, f"{surface} does not say what happens where it is silent"
 
     def test_does_not_overload_the_governance_boolean(self, tmp_path: Path):
-        # harbor CONTRACTS/marker.md: `governance` is already a project-init
+        # harbor contracts/marker.md: `governance` is already a project-init
         # boolean (the ADR-018 overlay gate). The marker must not reuse the name
         # — this scaffold renders WITH governance=True, so a collision would
         # show up here as a stray top-level key.

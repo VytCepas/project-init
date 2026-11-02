@@ -928,7 +928,7 @@ def _apply_box_profile(
     Returns the single advisory line to print, or None when no profile exists.
     Flags always beat the box; the box only moves defaults, so every seed
     remains changeable at the gateway. Unknown names are ignored and reported
-    in the same line — never an error (harbor CONTRACTS/box-profile.md v1).
+    in the same line — never an error (harbor contracts/host-profile.md v1).
     """
     if box is None:
         return None

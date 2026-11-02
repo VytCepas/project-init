@@ -36,7 +36,6 @@ logs/
 !.agents/settings.json
 !.agents/agents
 !.agents/config.yaml
-!.agents/inject.d
 # the approval-gate opt-in: manifest, protected-paths register, required checks
 !.agents/ship.conf
 !.agents/protected-paths.tsv

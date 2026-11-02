@@ -156,7 +156,7 @@ def test_rebuild_keeps_a_file_the_projection_never_wrote(tmp_path: Path):
     _mk_agents(tmp_path)
     _generate_claude_projection(tmp_path)
 
-    hand_written = tmp_path / ".claude" / "inject.d" / "10-local-rule.md"
+    hand_written = tmp_path / ".claude" / "local-rules" / "10-local-rule.md"
     hand_written.parent.mkdir(parents=True, exist_ok=True)
     hand_written.write_text("a rule this repo wrote, not the scaffold\n")
     own_skill = tmp_path / ".claude" / "skills" / "graphify" / "SKILL.md"
@@ -218,7 +218,7 @@ def test_an_unmanaged_file_survives_repeated_projections(tmp_path: Path):
     _mk_agents(tmp_path)
     _generate_claude_projection(tmp_path)
 
-    hand_written = tmp_path / ".claude" / "inject.d" / "10-local-rule.md"
+    hand_written = tmp_path / ".claude" / "local-rules" / "10-local-rule.md"
     hand_written.parent.mkdir(parents=True, exist_ok=True)
     hand_written.write_text("repo-authored, no .agents/ counterpart\n")
 
@@ -229,7 +229,7 @@ def test_an_unmanaged_file_survives_repeated_projections(tmp_path: Path):
     import json
 
     listed = json.loads((tmp_path / ".claude" / ".projection.json").read_text())["paths"]
-    assert "inject.d/10-local-rule.md" not in listed, "claimed a file it never wrote"
+    assert "local-rules/10-local-rule.md" not in listed, "claimed a file it never wrote"
 
 
 def test_rebuild_is_still_delete_aware_once_recorded(tmp_path: Path):
@@ -262,7 +262,7 @@ def test_unrecorded_tree_falls_back_to_the_counterpart_rule(tmp_path: Path):
     _generate_claude_projection(tmp_path)
     (tmp_path / ".claude" / ".projection.json").unlink()  # as an older version left it
 
-    stray = tmp_path / ".claude" / "inject.d" / "99-stray.md"
+    stray = tmp_path / ".claude" / "local-rules" / "99-stray.md"
     stray.parent.mkdir(parents=True, exist_ok=True)
     stray.write_text("no counterpart\n")
 

@@ -492,7 +492,7 @@ def _cli(argv: list[str]) -> int:
             cli_deploy_health_url=args.deploy_health_url,
             target=target,
             preset_name=str(preset.get("name", "")),
-            # BOX-1 (harbor CONTRACTS/box-profile.md): advisory defaults from
+            # BOX-1 (harbor contracts/host-profile.md): advisory defaults from
             # the box; every failure path is None and changes nothing.
             box_profile=load_box_profile(),
             cli_overlays=(
