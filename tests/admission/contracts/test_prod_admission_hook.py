@@ -1213,6 +1213,45 @@ class TestContextMarkerValue:
         agents.joinpath("config.yaml").write_text(spelling + _PERMISSIVE)
         assert not _flagged(tmp_path), f"{spelling!r} was read as an opt-out"
 
+    def test_scope_user_is_the_same_opt_out(self, tmp_path: Path):
+        """harbor#966 (M38): the standard's `scope: user` opts out exactly as `context: ambient` does."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text("scope: user\n" + _PERMISSIVE)
+        assert _flagged(tmp_path), "scope: user did not opt the repo out"
+
+    def test_scope_project_still_supplies_its_allowlist(self, tmp_path: Path):
+        """M39: what a fresh scaffold now emits is governed, and keeps its own allowlist."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text("scope: project\n" + _PERMISSIVE)
+        assert not _flagged(tmp_path)
+
+    def test_either_key_opting_out_decides_ambient(self, tmp_path: Path):
+        """M40: `context: repo` beside `scope: user` is an opt-out; for a guard that is the safe direction."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text('context: repo\nscope: "user"\n' + _PERMISSIVE)
+        assert _flagged(tmp_path)
+
+    @pytest.mark.parametrize(
+        ("spelling", "opted_out"),
+        [
+            ("scope : user\n", True),  # M41 space before the colon
+            ('"scope": user\n', True),  # M42 quoted key
+            ("# scope: user\nscope: project\n", False),  # M43 commented out
+            ("scope: project\ntooling:\n  scope: user\n", False),  # M44 nested key
+            ("scope: user#typo\n", False),  # M45 hash without whitespace
+            ("scope: user  # opted out deliberately\n", True),  # M46 trailing comment
+        ],
+    )
+    def test_scope_key_spellings(self, tmp_path: Path, spelling: str, opted_out: bool):
+        """M41-M46: every spelling rule that holds for `context:` holds for `scope:`."""
+        agents = tmp_path / ".agents"
+        agents.mkdir()
+        agents.joinpath("config.yaml").write_text(spelling + _PERMISSIVE)
+        assert _flagged(tmp_path) is opted_out, spelling
+
     def test_inner_optout_is_not_overruled_by_an_outer_marker(self, tmp_path: Path):
         """M19: the value is read AT the marker the walk finds and decides
         there. Continuing the walk would let an outer repo's allowlist govern a
