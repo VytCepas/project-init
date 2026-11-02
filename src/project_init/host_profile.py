@@ -4,7 +4,7 @@ The ONLY up-pointing read in the Harbor layer model (L0 environment → this
 scaffolder): a machine-local ``~/.claude/box-profile.toml`` may declare the
 box's preferred agent surfaces, MCP roster, and distribution profile, which
 seed the wizard's *defaults* — advisory input, never a dependency. Contract:
-``VytCepas/harbor`` ``CONTRACTS/box-profile.md`` (frozen v1).
+``VytCepas/harbor`` ``contracts/host-profile.md`` (frozen v1).
 
 The non-negotiable clause: **absent ⇒ fully functional.** Every failure path
 (missing file, unreadable, malformed TOML, unknown ``schema_version``, wrong

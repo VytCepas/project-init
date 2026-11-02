@@ -1,4 +1,4 @@
-"""BOX-1: the box-profile seam (PI-897, harbor CONTRACTS/box-profile.md v1).
+"""BOX-1: the box-profile seam (PI-897, harbor contracts/host-profile.md v1).
 
 The contract under test: the loader returns None on EVERY failure path with
 zero output; a present profile seeds wizard DEFAULTS only (flags win, every

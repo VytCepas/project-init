@@ -7,7 +7,7 @@ projects. `upgrade` splices `scope: project` in (harbor#966; the legacy
 overwriting an owner who deliberately opted out with `context: ambient` or
 `scope: user`.
 
-harbor#4 H1 / harbor CONTRACTS/marker.md: the marker is what tells a root
+harbor#4 H1 / harbor contracts/marker.md: the marker is what tells a root
 orchestrator or a global agent environment to stand down inside a governed repo.
 An unmarked repo is one the layer above keeps acting in.
 """
