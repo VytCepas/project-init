@@ -122,3 +122,72 @@ def test_every_manifest_tool_declares_where_its_pin_lives():
             assert f'{tool["version_var"]}="{tool["pinned"]}"' in path.read_text(
                 encoding="utf-8"
             ), f'{tool_id}: {rel} does not carry {tool["version_var"]}="{tool["pinned"]}"'
+
+
+# ── tools/pinned-third-party.toml is a view of the box versions register ──────────────
+# The register (the standard's standards/naming/versions.tsv, vendored with the naming package) holds the
+# vetted pin and hold_at for every tool; this file keeps what only yard knows (the package, the
+# version variable, used_in). The two must agree, or the bot proposes bumps the register refuses.
+_REGISTER = REPO_ROOT / "templates" / "base" / "vendor" / "naming" / "registry" / "versions.tsv"
+
+
+def _register_rows(text: str) -> dict[str, dict[str, str]]:
+    """The register's rows by id (comments and the header skipped)."""
+    rows: dict[str, dict[str, str]] = {}
+    header: list[str] = []
+    for line in text.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        cells = line.split("\t")
+        if not header:
+            header = cells
+            continue
+        rows[cells[0]] = dict(zip(header, cells, strict=False))
+    return rows
+
+
+def _view_drift(manifest: dict, register: dict[str, dict[str, str]]) -> list[str]:
+    """Every way a manifest tool disagrees with its register row (pure)."""
+    problems: list[str] = []
+    for tool_id, entry in manifest.items():
+        row = register.get(f"tool.{tool_id}")
+        if row is None:
+            problems.append(f"{tool_id}: no row tool.{tool_id} in the register")
+            continue
+        if entry["pinned"] != row["value"]:
+            problems.append(f"{tool_id}: pinned {entry['pinned']}, register {row['value']}")
+        if entry.get("hold_at", "-") != row["hold_at"]:
+            problems.append(
+                f"{tool_id}: hold_at {entry.get('hold_at', '-')}, register {row['hold_at']}"
+            )
+    return problems
+
+
+_ROW = "id\taxis\tname\tvalue\tsha\thold_at\thold_reason\tupgrade\tnote\n"
+
+
+def test_a_manifest_that_disagrees_with_the_register_is_reported():
+    """The check can fail: a changed pin, a changed hold and a missing row are each named."""
+    register = _register_rows(_ROW + "tool.ccr\ttool\tx\t2.0.0\t-\t3.0.0\tr\tpr\tn\n")
+    ok = {"ccr": {"pinned": "2.0.0", "hold_at": "3.0.0"}}
+    assert _view_drift(ok, register) == []
+    assert _view_drift({"ccr": {"pinned": "2.1.0", "hold_at": "3.0.0"}}, register) == [
+        "ccr: pinned 2.1.0, register 2.0.0"
+    ]
+    assert _view_drift({"ccr": {"pinned": "2.0.0", "hold_at": "4.0.0"}}, register) == [
+        "ccr: hold_at 4.0.0, register 3.0.0"
+    ]
+    assert _view_drift({"other": {"pinned": "1"}}, register) == [
+        "other: no row tool.other in the register"
+    ]
+
+
+def test_the_manifest_is_a_view_of_the_vendored_register():
+    """Once the naming package ships versions.tsv, the manifest must agree with it. Until then the
+    vendored copy has no register, which is said, not passed over."""
+    import pytest
+
+    if not _REGISTER.is_file():
+        pytest.skip("the vendored naming package predates no versions.tsv to compare yet")
+    mod = _load_module()
+    assert _view_drift(mod.load_manifest(), _register_rows(_REGISTER.read_text("utf-8"))) == []
