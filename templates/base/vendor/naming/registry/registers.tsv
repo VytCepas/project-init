@@ -33,6 +33,7 @@ kind	kinds.tsv	-	-	a kind of artifact
 register	registers.tsv	-	-	this file
 rename	renames.tsv	-	-	a path rename the standard orders, one row each: the codemod's only input (harbor#996)
 frozen	frozen.tsv	-	-	a name a stranger types or reads, frozen with the date it first appeared; written by bin/standard-frozen-generate.sh, never by hand (harbor#1276)
+repo	-	-	-	a registered repo or archive under PORT_ROOT: its row is the private layer's repos.tsv (contracts/private-layer.md), never a file in core, because it names the operator's repos (harbor#966)
 repo-kind	repo-kinds.tsv	-	-	the top-level entries each kind of repo carries (§8)
 dialect	dialects.tsv	-	-	a naming dialect a repo may register for objects the standard does not name (D-33, D-53)
 lint	controls.tsv	type=lint	lint-rules:bin/lint-conventions.sh	a static rule; bin/lint-conventions.sh's ids are the census, bin/lint-name.sh's are read from this registry
@@ -44,3 +45,8 @@ vale	controls.tsv	type=vale	-	a prose rule of the Vale config generated from ali
 label-axis	label-axes.tsv	-	-	an issue label as <axis>:<value> with the legacy label it replaces; renders issue-taxonomy.tsv (harbor#978)
 writer	writers.tsv	-	-	a script that creates a named thing, and the command patterns that find one (harbor#978)
 word	words.tsv	-	-	an English or technical word a name may carry beyond the terms (D-18, harbor#984)
+schema	schemas.tsv	-	-	the schema of every .tsv register: columns, key, references, owner and reader (harbor#1424)
+label-retired	label-retired.tsv	-	-	a label the register retires: no register row carries it, and the sync plans its removal (harbor#1427)
+verb	verbs.tsv	-	-	a task verb a repo kind must carry in its justfile, with its meaning and exit contract (harbor#1428)
+version	versions.tsv	-	-	a runtime, tool, library or action version the box pins, with hold_at and its reason (harbor#1426)
+kit	kit.tsv	-	-	what each repo kind inherits: register, control family, tool, template, check and pin items with share and vendoring (harbor#1436)

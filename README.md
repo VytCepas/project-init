@@ -351,6 +351,18 @@ changelog fetch).
 number) — only its `project_init_version` and the scaffold record are
 refreshed.
 
+### A repo of a repo-kind, with its kit
+
+The naming standard's `kit.tsv` (vendored in `templates/base/vendor/naming/registry/`) says which registers, tools, templates, checks and pins a repo of each kind inherits. `new` renders exactly that list on top of the ordinary scaffold, writes the `repo-kind:` line of `.agents/config.yaml` and the check register fragment, and then holds the result to the kit with the vendored `standard-kit.sh --carries`:
+
+```bash
+project-init new ~/port/my-repo --kind workload --dry-run   # print the kit the kind inherits; write nothing
+project-init new ~/port/my-repo --kind workload --json      # scaffold, then check; one JSON result (a fleet `register` reads it)
+project-init new ~/port/old-repo --kind workload --adopt    # an existing directory: bring over only what it lacks, never overwrite
+```
+
+`--language` (default `python`) decides the `justfile`, which the workload, scaffolder, fleet-controller and data kits list.
+
 ### Health-checking a scaffolded project
 
 `.claude/` wiring can break silently — a hook loses its executable bit,

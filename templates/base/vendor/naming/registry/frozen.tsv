@@ -27,6 +27,7 @@ cli:merge-stack	cli	merge-stack	2026-10-17	core
 cli:observe	cli	observe	2026-10-17	core
 cli:pack	cli	pack	2026-10-17	core
 cli:refs	cli	refs	2026-10-17	core
+cli:repo	cli	repo	2026-11-02	core
 cli:restore	cli	restore	2026-10-17	core
 cli:scope	cli	scope	2026-10-17	core
 cli:ship	cli	ship	2026-10-17	core
@@ -48,6 +49,7 @@ env:HARBOR_SCOPE_FLEET_FILE	env	HARBOR_SCOPE_FLEET_FILE	2026-10-29	core
 env:HARBOR_SCOPE_LOCAL_BIN	env	HARBOR_SCOPE_LOCAL_BIN	2026-10-29	core
 env:HARBOR_SCOPE_REPO	env	HARBOR_SCOPE_REPO	2026-10-29	core
 env:HARBOR_SCOPE_SCAFFOLDER	env	HARBOR_SCOPE_SCAFFOLDER	2026-10-17	core
+env:HARBOR_SCOPE_SCAFFOLDER_BIN	env	HARBOR_SCOPE_SCAFFOLDER_BIN	2026-11-02	core
 env:HARBOR_SCOPE_SCAFFOLDER_CLONE	env	HARBOR_SCOPE_SCAFFOLDER_CLONE	2026-10-29	core
 env:PROJECT_INIT_SRC	env	PROJECT_INIT_SRC	2026-10-17	core
 pack-toml:description	pack-toml	description	2026-10-17	core

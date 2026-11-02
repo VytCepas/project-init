@@ -91,6 +91,20 @@ Harbor box-profile seam (BOX-1): advisory wizard defaults from the box.
 - `class BoxProfile` — A successfully-parsed box profile (already contract-validated).
 - `def load_box_profile` — Read the box profile; every failure path is silent and returns None.
 
+### `project_init/kit.py`
+
+`project-init new --kind <repo-kind>`: a repo with the kit its kind inherits (harbor#1436).
+
+- `class KitItem` — One row of kit.tsv that a repo of the kind inherits.
+- `def registry_dir` — The vendored registry yard scaffolds from (templates/base/vendor/naming/registry).
+- `def read_register` — The rows of a TSV register by column name; ``#`` lines and blanks are skipped, the first line is the header.
+- `def repo_kinds` — The repo-kind ids the vendored standard knows.
+- `def kit_for` — The kit rows a repo of ``kind`` inherits, in manifest order.
+- `def ensure_repo_kind` — Make ``repo-kind: <kind>`` the one top-level line of .agents/config.yaml that names the kind.
+- `def apply_kit` — Write what the scaffold does not: the kind line and the check register fragment. Returns the paths written.
+- `def carries` — Hold ``target`` to its kind's list with the vendored standard-kit.sh (offline). Returns (ok, output).
+- `def run_new` — `project-init new <target> --kind <repo-kind>`.
+
 ### `project_init/mcps.py`
 
 MCP catalog and emit helpers for the project-init wizard.

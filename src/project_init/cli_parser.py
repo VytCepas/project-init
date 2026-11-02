@@ -78,6 +78,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "on an existing scaffold (#528)\n"
             "  project-init preset new <name> --extends <base>  author a company "
             "preset (#252)\n"
+            "  project-init new <target> --kind <repo-kind> [--adopt] [--dry-run]  create "
+            "or adopt a repo with the kit its kind inherits (harbor#1436)\n"
             "To scaffold INTO a directory whose name matches a subcommand, pass a "
             "path (e.g. ./upgrade), not the bare name."
         ),
