@@ -361,7 +361,7 @@ project-init new ~/port/my-repo --kind workload --json      # scaffold, then che
 project-init new ~/port/old-repo --kind workload --adopt    # an existing directory: bring over only what it lacks, never overwrite
 ```
 
-`--language` (default `python`) decides the `justfile`, which the workload, scaffolder, fleet-controller and data kits list. `harbor yard new` is this command, run through the harbor CLI.
+`--language` (default `python`) decides the `justfile`, which the workload, scaffolder, fleet-controller and data kits list.
 
 ### Health-checking a scaffolded project
 

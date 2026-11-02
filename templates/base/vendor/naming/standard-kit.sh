@@ -63,7 +63,7 @@ case "$MODE" in
 --render)
   [ -n "$KIND" ] || die "--render takes a repo kind"
   _known="$(rows "$REG/repo-kinds.tsv" 2>/dev/null | cut -f1)"
-  [ -z "$_known" ] || printf '%s\n' "$_known" | grep -qx "$KIND" || { log_fail "'$KIND' is not a repo kind (repo-kinds.tsv: $(printf '%s' "$_known" | tr '\n' ' '))"; log_end || :; exit 2; }
+  [ -z "$_known" ] || printf '%s\n' "$_known" | grep -qx "$KIND" || { log_fail "'$KIND' is not a repo kind (repo-kinds.tsv: $(printf '%s' "$_known" | tr '\n' ' '))"; log_fix "sh $0 --render <one of the kinds above>"; log_end || :; exit 2; }
   kit_rows "$KIND"; exit 0 ;;
 
 --package)
@@ -79,8 +79,8 @@ case "$MODE" in
   rows "$KIT" | awk -F'\t' '$2 == "tool" && $5 == "core" { n = split($3, p, "/"); print p[n] }'; exit 0 ;;
 
 --core-file)
-  _f="$KIND"; [ -f "$REG/$_f" ] || { log_fail "no register $_f in $REG"; log_end || :; exit 2; }
-  sh "$SRC/standard-kit.sh" --registry "$REG" --root "$ROOT" --core 2>/dev/null | grep -qx "$_f" || { log_fail "$_f is not a core-share register (kit.tsv)"; log_end || :; exit 1; }
+  _f="$KIND"; [ -f "$REG/$_f" ] || { log_fail "no register $_f in $REG"; log_fix "sh $0 --core   # lists the core-share registers"; log_end || :; exit 2; }
+  sh "$SRC/standard-kit.sh" --registry "$REG" --root "$ROOT" --core 2>/dev/null | grep -qx "$_f" || { log_fail "$_f is not a core-share register (kit.tsv)"; log_fix "sh $0 --core   # lists the core-share registers"; log_end || :; exit 1; }
   # The core tools are the engines a clean box keeps; a control whose engine is anywhere else has no engine there, and no test is shipped.
   _tools="$(rows "$KIT" | awk -F'\t' '$2 == "tool" && $5 == "core" { n = split($3, p, "/"); print p[n] }' | tr '\n' ' ')"
   _fams="$(rows "$KIT" | awk -F'\t' '$2 == "control" && $5 == "core" { printf "%s ", $3 }')"

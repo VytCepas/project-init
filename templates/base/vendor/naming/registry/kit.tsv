@@ -42,6 +42,7 @@ register.rename-maps	register	standards/rename-maps/*.tsv	control-plane	hub	no	r
 register.naming-words-tsv	register	naming-words.tsv?	*	workload	no	a repo's own overlay of the standard's rows; the repo writes it
 register.naming-families-tsv	register	naming-families.tsv?	*	workload	no	a repo's own overlay of the standard's rows; the repo writes it
 register.naming-schemas-tsv	register	naming-schemas.tsv?	*	workload	no	a repo's own overlay of the standard's rows; the repo writes it
+register.naming-exemptions-tsv	register	naming-exemptions.tsv?	*	workload	no	a repo's own exemptions; the repo writes it
 register.contracts-agents-tsv	register	contracts/agents.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
 register.contracts-catalog-non-tools-tsv	register	contracts/catalog-non-tools.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
 register.contracts-confinement-coverage-tsv	register	contracts/confinement-coverage.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload

@@ -50,6 +50,7 @@ standards/rename-maps/*.tsv	row	old_path new_path wave recommendation confidence
 naming-words.tsv?	=	=standards/naming/words.tsv	=		standard	bin/lint-name.sh	a repo's own words, in the shape of words.tsv; only a repo that vendors the standard carries one
 naming-families.tsv?	=	=standards/naming/terms.tsv	=		standard	bin/lint-name.sh	a repo's own families, in the shape of terms.tsv; only a repo that vendors the standard carries one
 naming-schemas.tsv?	=	=standards/naming/schemas.tsv	=		standard	bin/standard-register.sh	a repo's own registers, in the shape of schemas.tsv; only a repo that vendors the standard carries one
+naming-exemptions.tsv?	none	id rule subject kind remove_by reason	id		standard	bin/lint-name.sh	a repo's own exemptions, the columns of exemptions.tsv with the header row optional (the gate drops it); only a repo that vendors the standard carries one
 contracts/agents.tsv	row	role model effort tools input output done_when must_not stop_rule	role		agent	-	the role table a subagent brief is built from
 contracts/catalog-non-tools.tsv	row	glob why	glob		skill	bin/skill-catalog.sh	a name glob that is not a tool, with the reason
 contracts/confinement-coverage.tsv	row	id coverage why	id	id>standards/naming/controls.tsv:id	admission	bin/deploy-confinement.sh	how each admission rule is covered by the confinement
