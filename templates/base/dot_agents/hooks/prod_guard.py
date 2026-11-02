@@ -1838,7 +1838,7 @@ _AUTONOMOUS_MODES = {"bypassPermissions", "dangerouslySkipPermissions"}
 # orchestrator's real YAML parser resolves the same line differently, which is
 # precisely the three-readers divergence the shared fixtures exist to prevent.
 #
-# TWO SPELLINGS, ONE OPT-OUT (harbor#966, #963): the standard's key is `scope: user`
+# TWO SPELLINGS, ONE OPT-OUT (#963): the standard's key is `scope: user`
 # (D-12) and the legacy `context: ambient` is still read. Either alone opts out.
 _CONTEXT_AMBIENT_RE = re.compile(
     r"""^["']?(?:context["']?[^\S\n]*:[^\S\n]*["']?ambient|scope["']?[^\S\n]*:[^\S\n]*["']?user)"""
