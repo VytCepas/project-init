@@ -1,0 +1,6 @@
+# naming-schemas.tsv (harbor#1424) - this repo's own registers, in the shape of the standard's schemas.tsv.
+# The vendored naming package sits under templates/base/ here (it is what yard scaffolds), not at vendor/naming/.
+id	header	columns	key	refs	owner	read_by	note
+templates/base/vendor/naming/registry/*.tsv	=	=standards/naming/*.tsv	=		standard	bin/standard-vendor.sh	a vendored copy of a standards/naming register: its schema is the original's
+templates/base/vendor/naming/MANIFEST.tsv	none	path sha256 source	path		standard	bin/standard-vendor.sh	the vendored package's files and their hashes
+naming-exemptions.tsv	row	id rule subject kind remove_by reason	id		standard	gates/naming-check.sh	the names this repo's naming gate does not judge
