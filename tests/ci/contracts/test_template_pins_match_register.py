@@ -1,6 +1,6 @@
-"""harbor#1426: the scaffold templates render the versions the box registers.
+"""the scaffold templates render the versions the box registers.
 
-The register is harbor's ``standards/naming/versions.tsv``, vendored with the naming package. A
+The register is the standard's ``standards/naming/versions.tsv``, vendored with the naming package. A
 template that pins an action at another commit, or defaults the Python floor to another version,
 scaffolds drift into every new repo. These checks compare the templates with the register; until the
 vendored package ships it they skip, saying so.
@@ -96,18 +96,14 @@ def test_an_action_pinned_off_the_register_is_reported(tmp_path: Path) -> None:
 def test_every_action_the_templates_pin_is_the_registered_commit() -> None:
     """A scaffold pins only registered actions, each at the register's commit."""
     if not _REGISTER.is_file():
-        pytest.skip(
-            "the vendored naming package predates harbor#1426: no versions.tsv to compare yet"
-        )
+        pytest.skip("the vendored naming package predates no versions.tsv to compare yet")
     assert _action_drift(_template_actions(REPO_ROOT), _rows(_REGISTER.read_text("utf-8"))) == []
 
 
 def test_the_default_python_floor_is_the_registered_floor() -> None:
     """A new repo requires and pins the interpreter the register names."""
     if not _REGISTER.is_file():
-        pytest.skip(
-            "the vendored naming package predates harbor#1426: no versions.tsv to compare yet"
-        )
+        pytest.skip("the vendored naming package predates no versions.tsv to compare yet")
     register = _rows(_REGISTER.read_text("utf-8"))
     assert SUPPORTED_PYTHON_VERSIONS[0] == register["runtime.python-floor"]["value"]
     assert SUPPORTED_PYTHON_VERSIONS[0] == register["runtime.python-version-file"]["value"]

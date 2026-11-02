@@ -124,8 +124,8 @@ def test_every_manifest_tool_declares_where_its_pin_lives():
             ), f'{tool_id}: {rel} does not carry {tool["version_var"]}="{tool["pinned"]}"'
 
 
-# ── harbor#1426: tools/pinned-third-party.toml is a view of the box versions register ──────────────
-# The register (harbor's standards/naming/versions.tsv, vendored with the naming package) holds the
+# ── tools/pinned-third-party.toml is a view of the box versions register ──────────────
+# The register (the standard's standards/naming/versions.tsv, vendored with the naming package) holds the
 # vetted pin and hold_at for every tool; this file keeps what only yard knows (the package, the
 # version variable, used_in). The two must agree, or the bot proposes bumps the register refuses.
 _REGISTER = REPO_ROOT / "templates" / "base" / "vendor" / "naming" / "registry" / "versions.tsv"
@@ -188,8 +188,6 @@ def test_the_manifest_is_a_view_of_the_vendored_register():
     import pytest
 
     if not _REGISTER.is_file():
-        pytest.skip(
-            "the vendored naming package predates harbor#1426: no versions.tsv to compare yet"
-        )
+        pytest.skip("the vendored naming package predates no versions.tsv to compare yet")
     mod = _load_module()
     assert _view_drift(mod.load_manifest(), _register_rows(_REGISTER.read_text("utf-8"))) == []

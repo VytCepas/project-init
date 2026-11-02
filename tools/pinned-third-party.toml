@@ -1,6 +1,6 @@
 # Pinned third-party tools project-init owns the vetted version of (ADR-016 §5).
 #
-# A VIEW of the box versions register (harbor#1426, standards/naming/versions.tsv, row tool.<id>):
+# A VIEW of the box versions register (the box versions register, standards/naming/versions.tsv, row tool.<id>):
 # `pinned` and `hold_at` here must equal the register's value and hold_at, which
 # tests/ci/contracts/test_third_party_pin_contract.py holds once the vendored naming package
 # ships the register. What only yard knows (package, version_var, used_in) stays here.
