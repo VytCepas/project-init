@@ -96,6 +96,9 @@ from project_init.subcommands import (
     _doctor_main as _doctor_main,
 )
 from project_init.subcommands import (
+    _new_main as _new_main,
+)
+from project_init.subcommands import (
     _preset_main as _preset_main,
 )
 from project_init.subcommands import (
@@ -416,6 +419,7 @@ def _cli(argv: list[str]) -> int:
         "remove": lambda a: _concern_main(a, enable=False),
         "preset": lambda a: _preset_main(a),
         "doctor": lambda a: _doctor_main(a),
+        "new": lambda a: _new_main(a),
     }
     assert set(_dispatch) == set(_SUBCOMMANDS)  # keep bare-target rejection in sync
     if argv[:1] and argv[0] in _dispatch:

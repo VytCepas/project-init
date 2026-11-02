@@ -32,7 +32,7 @@ type:chore	type	chore	chore	-	-	-	ok	routine maintenance
 epic:workstream	epic	workstream	epic:workstream	-	-	-	ok	a capability being built; closes when its children do
 epic:provenance	epic	provenance	epic:provenance	-	-	-	ok	origin record of an audit or research pass; closes when its children are triaged
 epic:framing	epic	framing	epic:framing	-	-	-	ok	a problem statement awaiting a design decision
-theme:floor	theme	floor	theme:floor	bin/admission-*.sh bin/library-admission.sh bin/floor-*.sh bin/deploy-restore.sh bin/lint-conventions.sh docs/explanation/admission-baseline.md	-	-	gap	guard and floor correctness — what the gates see and refuse
+theme:floor	theme	floor	theme:floor	bin/admission-*.sh bin/library-admission.sh bin/deploy-restore.sh bin/lint-conventions.sh docs/explanation/admission-baseline.md	-	-	gap	guard and floor correctness — what the gates see and refuse
 family:memory	family	memory	theme:memory	bin/memory*.sh hooks/memory-harvest/* hooks/worklog-push/* worklog/* contracts/memory-format.md	-	-	ok	capture, recall, index, staleness
 family:context	family	context	theme:context	bin/context-budget.sh bin/memory-store-check.sh context-rules/* registries/context-baseline.tsv policy/constitution.md	-	-	ok	always-on surface and per-call context economy
 theme:doc-truth	theme	doc-truth	theme:doc-truth	docs/explanation/doc-truth.md contracts/README.md docs/reports/qa-plan.md docs/reports/evals.md docs/generated/status.md docs/reference/coverage.md	-	-	gap	records that contradict the system they describe

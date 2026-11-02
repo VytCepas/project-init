@@ -345,4 +345,11 @@ def _doctor_main(argv: list[str]) -> int:
     return run_doctor(Path(args.target).resolve())
 
 
-_SUBCOMMANDS = ("upgrade", "add", "remove", "preset", "doctor")
+def _new_main(argv: list[str]) -> int:
+    """Parse and run `project-init new <target> --kind <repo-kind>` (harbor#1436)."""
+    from project_init.kit import run_new
+
+    return run_new(argv)
+
+
+_SUBCOMMANDS = ("upgrade", "add", "remove", "preset", "doctor", "new")
