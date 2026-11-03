@@ -145,6 +145,7 @@ def _wizard(
     *,
     target: Path | None = None,
     python_version: str | None = None,
+    opened: frozenset[str] = frozenset(),
 ):
     """Drive _gather_inputs_interactive, returning (inputs, prompt labels seen)."""
     import project_init.__main__ as cli
@@ -157,8 +158,9 @@ def _wizard(
         return next(answer_iter)
 
     monkeypatch.setattr(_wiz, "_prompt", fake_prompt)
-    # ADR-029: the gateway stays closed — identity prompts bind positionally.
-    monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: set())
+    # ADR-029: the gateway stays closed unless a test opens a group — identity
+    # prompts bind positionally.
+    monkeypatch.setattr(_wiz, "_choose_gateway_interactive", lambda pinned: set(opened))
     monkeypatch.setattr(_wiz, "_choose_mcps_interactive", lambda catalog: [])
     monkeypatch.setattr(_wiz, "_choose_browser_interactive", lambda: False)
     monkeypatch.setattr(_wiz, "_choose_delivery_interactive", lambda language: "prototype")
@@ -167,6 +169,9 @@ def _wizard(
     monkeypatch.setattr(_wiz, "_choose_lifecycle_interactive", lambda *a, **k: "github")
     monkeypatch.setattr(_wiz, "_choose_review_cycles_interactive", lambda *a, **k: 2)
     monkeypatch.setattr(_wiz, "_choose_agents_interactive", lambda: ["claude"])
+    monkeypatch.setattr(_wiz, "_choose_devcontainer_interactive", lambda: False)
+    monkeypatch.setattr(_wiz, "_choose_mise_interactive", lambda: False)
+    monkeypatch.setattr(_wiz, "_choose_vscode_interactive", lambda: False)
     monkeypatch.setattr("rich.prompt.Confirm.ask", lambda *a, **k: False)
 
     inputs = cli._gather_inputs_interactive(
@@ -183,10 +188,20 @@ def _asked_for_python(seen: list[str]) -> bool:
     return any("Target Python" in label for label in seen)
 
 
-def test_wizard_asks_for_python_on_a_greenfield_python_scaffold(monkeypatch):
-    inputs, seen = _wizard(monkeypatch, ["proj", "desc", "python", "3.13", "", "none"])
+def test_wizard_asks_for_python_only_in_the_opened_extras_group(monkeypatch):
+    """#988: the default path asks six questions, so Target Python moved behind
+    the Dev extras group; opening it asks exactly once."""
+    inputs, seen = _wizard(
+        monkeypatch, ["proj", "desc", "python", "3.13", "", "none"], opened=frozenset({"extras"})
+    )
     assert _asked_for_python(seen)
     assert inputs.python_version == "3.13"
+
+
+def test_wizard_default_path_leaves_python_to_the_render(monkeypatch):
+    inputs, seen = _wizard(monkeypatch, ["proj", "desc", "python", "", "none"])
+    assert not _asked_for_python(seen)
+    assert inputs.python_version == ""  # the render pins the supported floor
 
 
 def test_wizard_does_not_ask_for_python_on_a_non_python_scaffold(monkeypatch):
@@ -208,7 +223,12 @@ def test_wizard_drops_python_version_when_the_language_is_not_python(monkeypatch
 def test_wizard_does_not_ask_when_pyproject_already_declares_a_floor(monkeypatch, tmp_path: Path):
     """requires-python is the source of truth; asking would invite a contradiction."""
     (tmp_path / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.12"\n')
-    inputs, seen = _wizard(monkeypatch, ["proj", "desc", "python", "", "none"], target=tmp_path)
+    inputs, seen = _wizard(
+        monkeypatch,
+        ["proj", "desc", "python", "", "none"],
+        target=tmp_path,
+        opened=frozenset({"extras"}),
+    )
     assert not _asked_for_python(seen)
     assert inputs.python_version == ""
 

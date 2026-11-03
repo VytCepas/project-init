@@ -700,7 +700,8 @@ _GATEWAY_GROUPS: tuple[tuple[str, str, str], ...] = (
     (
         "extras",
         "Dev extras",
-        "devcontainer, mise, VS Code workspace — defaults: all off",
+        "devcontainer, mise, VS Code workspace, target Python (python only) — "
+        "defaults: off, off, off, the supported floor",
     ),
     (
         "quality",
@@ -760,6 +761,8 @@ class _CliSeeds:
     vscode: bool
     review_cycles: int | None
     profile: str | None
+    python_version: str = ""
+    target: Path | None = None
     deploy_app: str = ""
     deploy_region: str = ""
     deploy_health_url: str = ""
@@ -795,6 +798,9 @@ class _GatewayState:
     review_cycles: int
     coauthor: bool
     memory_from_preset: bool
+    # Empty = the render derives the floor (a declared one, else the supported
+    # floor); only the opened extras group may fill it interactively.
+    python_version: str = ""
     mcps: list[dict[str, Any]] = field(default_factory=list)
     # Box-profile seeds (BOX-1): recorded so an OPENED group presents the seed
     # as its chooser default instead of resetting to factory (PR #898 review).
@@ -916,6 +922,7 @@ def _default_gateway_state(seeds: _CliSeeds) -> tuple[_GatewayState, set[str]]:
         review_cycles=_resolve_review_cycles(seeds.review_cycles, lifecycle, ask=False),
         coauthor=not seeds.no_coauthor,
         memory_from_preset=seeds.memory is None,
+        python_version=seeds.python_version,
     )
     return state, force_open
 
@@ -982,6 +989,7 @@ def _pinned_gateway_flags(seeds: _CliSeeds) -> dict[str, list[str]]:
             ("--devcontainer", seeds.devcontainer),
             ("--mise", seeds.mise),
             ("--vscode", seeds.vscode),
+            ("--python-version", seeds.python_version),
         ),
         "quality": (("--no-docs", seeds.no_docs), ("--no-renovate", seeds.no_renovate)),
         "overlays": (
@@ -1086,6 +1094,20 @@ def _apply_extras_group(state: _GatewayState, seeds: _CliSeeds) -> None:
     state.devcontainer = seeds.devcontainer or _choose_devcontainer_interactive()
     state.mise = seeds.mise or _choose_mise_interactive()
     state.vscode = seeds.vscode or _choose_vscode_interactive()
+    # #628: only a Python scaffold has a version to pin, and only a greenfield
+    # one has an unanswered question — a declared floor (pyproject.toml,
+    # .python-version) is the source of truth, and an explicit --python-version
+    # wins over both. Moved off the default path by #988 (ADR-029 amendment).
+    if (
+        seeds.language == "python"
+        and not state.python_version
+        and not _declared_python_floor(seeds.target)
+    ):
+        state.python_version = _prompt_choice(
+            "Target Python (pins mise.toml, mypy.ini, and the CI matrix floor)",
+            SUPPORTED_PYTHON_VERSIONS,
+            default=SUPPORTED_PYTHON_VERSIONS[0],
+        )
 
 
 def _apply_quality_group(state: _GatewayState, seeds: _CliSeeds) -> None:
@@ -1201,8 +1223,24 @@ def _choose_gateway_interactive(pinned: dict[str, list[str]]) -> set[str]:
         return opened
 
 
+def _python_floor_echo(inputs: ScaffoldInputs, target: Path | None) -> str:
+    """The Python floor the render will pin, or "" for a non-Python scaffold.
+
+    Same precedence as the render (a declared floor, then the choice, then the
+    supported floor), so the default path echoes what it silently chose (#988).
+    """
+    if inputs.language != "python":
+        return ""
+    return _declared_python_floor(target) or inputs.python_version or SUPPORTED_PYTHON_VERSIONS[0]
+
+
 def _print_resolution_summary(
-    inputs: ScaffoldInputs, *, preset_name: str, memory_from_preset: bool, title: str
+    inputs: ScaffoldInputs,
+    *,
+    preset_name: str,
+    memory_from_preset: bool,
+    title: str,
+    target: Path | None = None,
 ) -> None:
     """Echo every resolved concern with its why/cost (ADR-029, ADR-023).
 
@@ -1216,6 +1254,8 @@ def _print_resolution_summary(
     from rich.table import Table
 
     tier = memory_tier(inputs.memory)
+    floor = _python_floor_echo(inputs, target)
+    language = f"{inputs.language} (floor {floor})" if floor else inputs.language
     egress = "marketplace egress off" if inputs.no_egress else "marketplace egress on"
     table = Table(title=title, show_header=True, header_style="bold")
     table.add_column("Concern")
@@ -1249,7 +1289,7 @@ def _print_resolution_summary(
             f"{'on' if inputs.multi_model else 'off'}",
             "AUP+SYSTEM_CARD gate · transcript metrics · CCR routing",
         ),
-        ("language", inputs.language, "sets toolchain, lint/test commands"),
+        ("language", language, "sets toolchain, lint/test commands, the Python floor"),
         (
             "delivery / deploy / iac",
             f"{inputs.delivery} / {inputs.deploy} / {inputs.iac}",
@@ -1382,10 +1422,9 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         ("python", "node", "go", "rust", "none"),
         default=cli_language or "none",
     )
-    # #628: only a Python scaffold has a version to pin, and only a greenfield
-    # one has an unanswered question — when pyproject.toml already declares
-    # requires-python, that file is the source of truth and asking would invite
-    # a contradiction. An explicit --python-version still wins over both.
+    # #628: only a Python scaffold has a version to pin. The question itself
+    # lives in the opened extras group (#988); an explicit --python-version
+    # seeds it here and wins over both the declared floor and the default.
     python_version = cli_python_version or ""
     if python_version and language != "python":
         # --language wasn't passed, so main() couldn't reject this pairing; the
@@ -1395,12 +1434,6 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
             f"a python project (this is {language}).[/yellow]"
         )
         python_version = ""
-    if not python_version and language == "python" and not _declared_python_floor(target):
-        python_version = _prompt_choice(
-            "Target Python (pins mise.toml, mypy.ini, and the CI matrix floor)",
-            SUPPORTED_PYTHON_VERSIONS,
-            default=SUPPORTED_PYTHON_VERSIONS[0],
-        )
     (
         delivery_flag,
         deploy_flag,
@@ -1434,6 +1467,8 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         vscode=cli_vscode,
         review_cycles=cli_review_cycles,
         profile=profile,
+        python_version=python_version,
+        target=target,
         deploy_app=cli_deploy_app,
         deploy_region=cli_deploy_region,
         deploy_health_url=cli_deploy_health_url,
@@ -1460,7 +1495,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
             no_plugin=_profile_delivery_no_plugin(state.profile, no_plugin),
             profile=state.profile,
             no_egress=no_egress,
-            python_version=python_version,
+            python_version=state.python_version,
             review_cycles=state.review_cycles,
             delivery=state.delivery,
             deploy=state.deploy,
@@ -1487,6 +1522,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
         preset_name=preset_name,
         memory_from_preset=state.memory_from_preset,
         title="Standard setup (accept, or customize any group)",
+        target=target,
     )
     opened = _choose_gateway_interactive(_pinned_gateway_flags(seeds)) | force_open
     _apply_opened_groups(state, opened, seeds)
@@ -1498,6 +1534,7 @@ def _gather_inputs_interactive(  # noqa: PLR0913 — wizard gatherer; args map t
             preset_name=preset_name,
             memory_from_preset=state.memory_from_preset,
             title="Resolved configuration",
+            target=target,
         )
 
     # Post-scaffold bootstrap (#887) — the FINAL question. --bootstrap
