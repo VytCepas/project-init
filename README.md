@@ -162,7 +162,7 @@ After the **git install** (`install.sh`), a `/project-init` slash command is ava
 /project-init
 ```
 
-This runs the interactive wizard in the current project directory. The default path is **six questions** (ADR-029): preset, name, description, language, one **Customize?** gateway, and bootstrap. Every remaining concern (delivery, MCPs, memory ladder, lifecycle, governance, dev extras, …) resolves to its documented default, is annotated with its why/cost in a resolution preview shown *before* you accept, and is one gateway selection away when you want to shape it — each concern still explains itself before asking (ADR-023).
+This runs the interactive wizard in the current project directory. The default path is **six questions** (ADR-029): preset, name, description, language, one **Customize?** gateway, and bootstrap — six for every language (the Python floor defaults to the supported minimum, is echoed in the preview, and is set with `--python-version` or under *Dev extras*). Every remaining concern (delivery, MCPs, memory ladder, lifecycle, governance, dev extras, …) resolves to its documented default, is annotated with its why/cost in a resolution preview shown *before* you accept, and is one gateway selection away when you want to shape it — each concern still explains itself before asking (ADR-023).
 
 ### Option 2: From a shell (non-interactive, for CI / scripts)
 
@@ -415,6 +415,15 @@ project-init add governance --target /path/to/proj --apply  # land it
 project-init add memory obsidian-only --target /path --apply # memory takes a tier
 project-init remove lifecycle --target /path/to/proj --apply # drop a concern
 ```
+
+**Dormant by default.** These are shed until you ask for them; each is a flag at
+scaffold time and one command afterwards (no re-scaffold):
+
+| Shed | Default | Flag at scaffold | Restore later |
+|---|---|---|---|
+| Model routing (claude-code-router) | off | `--multi-model` | `project-init add multi-model --apply` |
+| RAG provisioning (tier 3) | off | `--memory obsidian-graphify-rag` | `project-init add memory obsidian-graphify-rag --apply` |
+| Observability reporting | off | `--observability` | `project-init add observability --apply` |
 
 Concerns: `lifecycle`, `governance`, `observability`, `multi-model`, `docs`,
 `renovate`, and `memory <stack>` (`auto` · `obsidian-only` · `obsidian-graphify` ·

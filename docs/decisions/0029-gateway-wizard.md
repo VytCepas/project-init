@@ -18,8 +18,14 @@ preserved (flags, descriptor fields, tier integers), and the security surface
 ## Decision
 
 **The default interactive path asks exactly six questions:** preset · name ·
-description · language · the **Customize gateway** · bootstrap. (Target-Python
-remains conditional on a greenfield Python scaffold, as before.)
+description · language · the **Customize gateway** · bootstrap, for every
+language (amended by #988: Target-Python was a seventh ask on a greenfield Python
+scaffold; it now lives in the **Dev extras** group, defaults to the supported
+floor `SUPPORTED_PYTHON_VERSIONS[0]` unless `pyproject.toml`/`.python-version`
+declares one, stays reachable by `--python-version`, and is echoed as
+`python (floor X)` in the resolution preview). A test counts the real prompt
+calls through `main()` and fails above six
+(`tests/session/contracts/test_wizard_question_budget.py`).
 
 1. **Gateway groups.** Every other concern belongs to one of seven groups
    (delivery & deploy · integrations · dev extras · docs & updates · profile &
