@@ -194,3 +194,26 @@ class TestCodeMapFreshness:
         assert not (repo / self._MAP).exists()
         r = self._verify(repo)
         assert r.returncode == 0, r.stdout + r.stderr
+
+
+class TestDecisionRecords:
+    """harbor#1429: a scaffold starts its decision series, `docs/decisions/0001-*.md`, under the box-wide record shape."""
+
+    _SHAPE = ("kind", "owner", "status", "alias", "date", "supersedes", "superseded_by")
+
+    def _front_matter(self, path: Path) -> dict[str, str]:
+        head = path.read_text(encoding="utf-8").split("---\n")[1]
+        return dict(line.split(": ", 1) for line in head.splitlines() if ": " in line)
+
+    def test_a_scaffold_has_its_first_record_under_the_shape(self, fresh_scaffold: Path):
+        records = sorted((fresh_scaffold / "docs/decisions").glob("[0-9][0-9][0-9][0-9]-*.md"))
+        assert [r.name for r in records] == ["0001-record-decisions.md"]
+        fields = self._front_matter(records[0])
+        assert tuple(fields) == self._SHAPE
+        assert fields["kind"] == "decision-record" and fields["alias"] == "D-1"
+        assert fields["supersedes"] == "-" and fields["superseded_by"] == "-"
+        assert len(fields["date"]) == 10 and fields["date"][4] == "-"
+
+    def test_the_record_passes_the_scaffolds_own_doc_gate(self, repo: Path):
+        assert (repo / "docs/decisions/0001-record-decisions.md").is_file()
+        assert _gate(repo, "--strict").returncode == 0

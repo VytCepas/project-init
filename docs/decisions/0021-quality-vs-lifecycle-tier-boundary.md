@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-21
+date: 2026-06-25
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-021: GitHub lifecycle vs. forge-agnostic quality tier — the decomposition boundary

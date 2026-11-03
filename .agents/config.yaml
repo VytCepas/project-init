@@ -1,4 +1,5 @@
 context: repo
+repo-kind: scaffolder  # harbor standards/naming/repo-kinds.tsv; the fleet audit judges the justfile verbs by it (harbor#1428)
 # Project configuration read by lifecycle scripts and hooks
 # (create_issue.sh, start_issue.sh, setup_github.sh, workflow_state_reminder.sh).
 project:

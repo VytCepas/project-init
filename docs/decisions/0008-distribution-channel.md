@@ -1,7 +1,12 @@
 ---
 kind: decision-record
 owner: @VytCepas
-status: superseded
+status: accepted
+alias: D-8
+date: 2026-06-11
+supersedes: -
+superseded_by: -
+revised_by: D-11
 ---
 
 # ADR-008: Distribution stays git-based with tagged releases; PyPI deferred

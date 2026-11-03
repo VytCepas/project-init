@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-18
+date: 2026-06-23
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-018: AI-governance overlay — governance-as-code, system card + AIBOM + CI gate

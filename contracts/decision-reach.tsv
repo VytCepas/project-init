@@ -1,0 +1,7 @@
+# decision-reach.tsv (harbor#1429) - the surfaces of this repo that are read outside it.
+#
+# A decision is cited D-<n> inside the repo whose docs/decisions/ holds it and <system>/D-<n> everywhere else (yard/D-3), because
+# a bare id names a different record in harbor, yard and fleet. A bare D-<n> in any path listed here is red (standard.decision-dangling,
+# run from the standard's checkout with HARBOR_SCOPE_ROOT=<this repo>). Columns: path TAB why. A path ending in / is a prefix.
+templates/base/docs/	rendered into every scaffolded repo, where a bare D-<n> names that repo's record (the hooks under templates/base/dot_agents/ are not listed: a comment there cites harbor's D-12 bare, and editing a shipped hook is a plugin payload bump)
+context-rules/	rule packs injected into sessions in any repo

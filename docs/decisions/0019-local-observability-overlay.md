@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-19
+date: 2026-06-23
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-019: Local observability overlay — file-based usage report, no Docker, no OTEL

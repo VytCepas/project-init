@@ -1,0 +1,22 @@
+
+# --- container parity (delivery=service): same image local and in cloud ---
+
+# build + run the app (and any backing services) locally
+up:
+    docker compose up --build
+
+# build the container image only (named `image` so it never collides with a
+# language `build` recipe in a rust/go/node+service scaffold — 2026-07 review)
+[doc("build the container image only")]
+image:
+    docker compose build
+
+# stop and remove the local stack
+down:
+    docker compose down
+
+# lint the Dockerfile (the same hadolint check CI runs — #578).
+# install once: https://github.com/hadolint/hadolint#install
+[doc("lint the Dockerfile (the same hadolint check CI runs — #578).")]
+lint-docker:
+    hadolint Dockerfile

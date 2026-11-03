@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-4
+date: 2026-04-27
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-004: Obsidian vault + /docs integration — human memory meets docs-as-code

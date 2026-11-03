@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-26
+date: 2026-06-26
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-026: Tier-3 RAG engine is cocoindex-code, wired alongside Graphify (option A)

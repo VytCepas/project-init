@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-1
+date: 2026-04-23
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-001: Scaffolder design — pure file ops, no LLM calls

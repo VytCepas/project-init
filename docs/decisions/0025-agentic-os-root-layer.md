@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-25
+date: 2026-06-26
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-025: The agentic-OS root layer is a separate tool over a multirepo, consuming each project's descriptor

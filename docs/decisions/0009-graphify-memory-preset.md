@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-9
+date: 2026-06-12
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-009: Graphify becomes the recommended KG memory preset; LightRAG demoted to legacy

@@ -1,0 +1,123 @@
+# justfile — the canonical command interface (scaffolded by project-init).
+# `just --list` shows every recipe. Recipes are thin wrappers — logic lives
+# in the tools and their configs, never in this file.
+
+# install the lint/format gate toolchain (eslint.config.mjs imports these)
+setup:
+    # Declared toolchain: `bun install --frozen-lockfile`; `bun add -d` re-resolves to latest
+    # and rewrites package.json/bun.lock on every session start. Only missing deps are added.
+    # typescript@^5: typescript-eslint cannot parse with TS 7 (the native rewrite);
+    # unpinned, `bun add -d typescript` resolves to 7.x and eslint crashes with exit 2 (#732).
+    missing=""; \
+    for dep in eslint "typescript@^5" typescript-eslint eslint-plugin-jsdoc eslint-plugin-tsdoc \
+        eslint-plugin-security eslint-plugin-no-unsanitized @biomejs/biome; do \
+        grep -qs "\"${dep%@^*}\"" package.json || missing="$missing $dep"; \
+    done; \
+    if [ -n "$missing" ]; then bun add -d $missing; else bun install --frozen-lockfile; fi
+
+# lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs).
+# `biome format` without --write IS the check: verified against biome 2.x, it
+# leaves files byte-identical and exits 1 on a diff (#726). Do not "fix" this by
+# adding --check — biome rejects the flag ("`--check` is not expected in this
+# context"). Deliberately not `biome ci` either, which also runs biome's linter
+# and would duplicate eslint, the owner of the lint gates here.
+[doc("lint project code (jsdoc/tsdoc + complexity gates per eslint.config.mjs).")]
+lint:
+    bunx eslint .
+    bunx @biomejs/biome format .
+    sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
+    sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
+    bash .agents/scripts/lint-context-budget.sh
+    just naming
+    just docs-check
+
+# static type check (strict mode per tsconfig.base.json)
+# no-op on a fresh scaffold with no .ts sources yet — tsc errors with TS18003
+# ("No inputs were found") instead of passing (the #592-adjacent day-one gap)
+[doc("static type check (strict mode per tsconfig.base.json)")]
+typecheck:
+    sh -c 'if find . \( -name "*.ts" -o -name "*.tsx" \) -not -path "*/node_modules/*" | grep -q .; then bunx tsc --noEmit; else echo "No TypeScript sources yet — nothing to type-check."; fi'
+
+# auto-format project code (Biome is the formatter; eslint owns the gates)
+format:
+    bunx @biomejs/biome format --write .
+
+# run the test suite (coverage-gated per bunfig.toml — PI-569).
+# `bun test` exits 1 when it finds zero test files, which would fail `just ci`
+# (and the pre-push gate) on a fresh scaffold before the first test exists — so
+# skip cleanly until a test file appears, like the go/rust day-one guards.
+# Ends with the test contract's `<project>: N passed, M failed` line and bun's
+# own exit code (#1054).
+[doc("run the test suite (coverage-gated per bunfig.toml — PI-569).")]
+test:
+    sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bash .agents/hooks/python-resolve.sh .agents/scripts/contract-line.py {{project_slug}} bun -- bun test; else echo "No test files yet — nothing to test."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
+
+# fail-fast run for the edit-test loop (token-efficiency; PI-641)
+test-quick:
+    sh -c 'if find . -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" -o -name "*_test.ts" -o -name "*_spec.ts" \) -not -path "*/node_modules/*" | grep -q .; then bun test --bail; else echo "No test files yet — nothing to test."; fi'
+
+# build the API docs (TypeDoc)
+docs:
+    bunx typedoc
+
+# dependency vulnerability scan against known CVEs/advisories (PI-568)
+audit:
+    sh -c 'if [ -f package.json ] || [ -f bun.lock ] || [ -f bun.lockb ]; then bun audit; else echo "No Node dependency manifest yet — nothing to audit."; fi'
+
+# generate a CycloneDX SBOM of the dependency tree (#574). release.yml attaches
+# this to GitHub Releases. cdxgen reads bun's lockfile (cyclonedx-npm rejects bun).
+[doc("generate a CycloneDX SBOM of the dependency tree (#574)")]
+sbom:
+    bunx @cyclonedx/cdxgen -t bun -o sbom.cdx.json
+
+# dependency license compliance scan (#579) — fail on GPL/AGPL (SPDX ids). Tune
+# the --failOn deny-list to your policy. Non-blocking in CI initially (see
+# ci.yml's license-scan job).
+[doc("dependency license compliance scan (#579)")]
+license:
+    bunx license-checker --production --failOn "GPL-1.0;GPL-1.0+;GPL-2.0;GPL-2.0-only;GPL-2.0-or-later;GPL-3.0;GPL-3.0-only;GPL-3.0-or-later;AGPL-1.0;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later"
+
+# property-based tests with fast-check (#580). Add the dep once: bun add -d
+# fast-check. Property tests are opt-in per file and run under `bun test`.
+# Pattern/tooling, NOT a blocking gate: CI runs this in the nightly `fuzz` job,
+# never on a PR (#727). fast-check draws fresh seeds each run, so the nightly job
+# explores inputs a per-PR run would only repeat.
+[doc("property-based tests with fast-check (#580)")]
+fuzz:
+    bun test
+
+# scan staged changes for secrets (same scan as the pre-commit git hook)
+scan:
+    gitleaks git --pre-commit --staged --redact --no-banner --verbose
+
+# the naming standard over this repo, as a ratchet: new findings fail, a fixed
+# finding must be deleted from gates/naming.baseline. Judges with the vendored package in
+# vendor/naming/ (no checkout of the standard needed); UNCHECKED exits 3, never a pass. Guarded so
+# an upgrade that declined the `naming-gate` addition group keeps a working `just lint`.
+[doc("naming standard ratchet (gates/naming-check.sh)")]
+naming:
+    sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
+
+# docs front matter and generated-file headers (kind, owner, status; generated-by equals contracts/fresh-checks.tsv).
+# Born warn: findings print and exit 0; `sh gates/doc-check.sh --strict` makes them red. Guarded like `naming`.
+[doc("docs front matter + generated headers (gates/doc-check.sh)")]
+docs-check:
+    sh -c 'if [ -f gates/doc-check.sh ]; then sh gates/doc-check.sh; else echo "doc gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
+
+# what CI runs (the full gate)
+ci: setup lint typecheck test audit
+
+# fast local gate for the pre-push hook: lint + parallel tests (CI is the full
+# backstop, so pre-push stays fast and doesn't re-run typecheck/audit)
+[doc("fast local gate for the pre-push hook")]
+fast-ci: lint test
+
+# route CI to a self-hosted runner when Actions minutes run out (PI-666);
+# requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+[doc("route CI to a self-hosted runner when Actions minutes run out (PI-666)")]
+ci-local-on:
+    gh variable set CI_RUNS_ON --body self-hosted
+
+# back to GitHub-hosted runners
+ci-local-off:
+    gh variable delete CI_RUNS_ON
