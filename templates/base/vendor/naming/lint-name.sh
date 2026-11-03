@@ -226,7 +226,7 @@ function selfpath(s) {
 # An overlay finding is always block: a malformed private layer must not read as clean, even under --check (D-85).
 function emitb(rule, subject, msg) { if ((rule SUBSEP subject) in DONE) return; DONE[rule SUBSEP subject] = 1; print "F", rule, "block", subject, msg }
 function emitw(rule, subject, msg) { if ((rule SUBSEP subject) in DONE) return; DONE[rule SUBSEP subject] = 1; print "F", rule, "warn", subject, msg }
-function regrule(r) { return r ~ /^name\.(registry-|exemption-|alias-expired|control-|surface-)/ || r ~ /^standard\.(register-declared|reference-resolves|seam-registered|version-registered)$/ }
+function regrule(r) { return r ~ /^name\.(registry-|exemption-|alias-expired|control-|surface-)/ || r ~ /^standard\.(register-declared|reference-resolves|seam-registered|version-registered|env-registered|script-registered)$/ }
 function emit(rule, subject, msg,   k, e) {
   if (mode == "check" && regrule(rule) && surface != "registry") return
   if (mode == "registry" && !regrule(rule)) return
@@ -712,7 +712,7 @@ function repokind_check(label, kind, tok, state,   sj) {
 BEGIN {
   FS = "\t"; OFS = "\t"
   _npk = split(packt, _PK, " "); for (i = 1; i <= _npk; i++) ISPACK[_PK[i]] = 1   # the pack overlays (harbor#950)
-  split("family verb domain client abbreviation kind layer concept system extension subject level mode outcome decision severity priority state control-type moment function lifecycle share relation modality tier commit-type", L, " ")
+  split("family verb domain client abbreviation kind layer concept system extension subject level mode outcome decision severity priority state control-type moment function lifecycle share relation modality tier strength commit-type", L, " ")
   for (i in L) CLASS[L[i]] = 1
   split("codename legacy banned abbreviation spelling", L, " "); for (i in L) AKIND[L[i]] = 1
   split("tool-required world-name legacy", L, " "); for (i in L) EKIND[L[i]] = 1
@@ -854,6 +854,7 @@ FILENAME != recfile {
     if (!(("family" SUBSEP COWN[id]) in IS)) emit("name.control-shape", "control:" id ":owner", "owner " q(COWN[id]) " is not a registered family (09a C4)")
     if (CSTAB[id] != "experimental" && CSTAB[id] != "stable" && CSTAB[id] != "deprecated") emit("name.control-shape", "control:" id ":stability", "stability " q(CSTAB[id]) " is not experimental, stable or deprecated (D-19)")
     if (CSTAB[id] == "deprecated" && CSUCC[id] == "-") emit("name.control-shape", "control:" id ":successor", "a deprecated control names its successor (D-19)")
+    if (CSTAB[id] == "stable" && CRED[id] == "-") emit("name.control-shape", "control:" id ":stability", "a stable control names the suite that watched it red: stable is derived from an observed red proof (harbor#1422)")
   } else if (sh == "surfaces.tsv") {
     SURF[id] = 1; SRULE[id] = col(f, "rule"); REND[id] = col(f, "renderer"); SEX[id] = col(f, "example"); SCHK[id] = col(f, "checked")
     vw = col(f, "view")   # - | <surface>[:<rule>,<rule>]: this id is that surface, for those rules only when some are listed
@@ -1143,6 +1144,9 @@ census() {
                          /^id:/ { sub(/^id:[ \t]*/, ""); if ($0 != "") { print; d = 1; exit } } END { if (f && !d) print n }' "$_f"
                      done
                    done ;;
+      hook-rules)  for _f in $(printf '%s' "$_a" | tr ',' ' '); do
+                     [ -f "$ROOT/$_f" ] && sed -n 's/^[[:space:]]*# control: \([^ ]*\).*$/\1/p' "$ROOT/$_f"
+                   done ;;
       guard-rules) for _f in "$ROOT"/$_a; do
                      [ -f "$_f" ] && awk '/^[ \t]*#/ { next } { l = $0; while (l ~ /\\$/ && (getline nx) > 0) { sub(/\\$/, "", l); l = l " " nx }
                        if (l ~ /floor_block[ \t]+[a-z]+[ \t]/ && l !~ /floor_block\(\)/) {
@@ -1187,7 +1191,8 @@ seam_facts() {
   [ -n "$_sm" ] && [ -r "$_sm" ] || return 0
   awk -F'\t' '
     FNR == NR { if ($0 ~ /^#/ || $1 == "id" || NF < 11) next
-      if ($4 == "harbor" && $5 != "-") { nc++; C[nc] = $5; CID[nc] = $1 }
+      if ($4 == "harbor" && $5 != "-") { nc++; C[nc] = $5; CID[nc] = $1; OPT[nc] = 0
+        if (C[nc] ~ /\?$/) { sub(/\?$/, "", C[nc]); OPT[nc] = 1 } }   # a trailing ? is a dev-layer copy the core export does not ship (D-85)
       if ($3 == "harbor" && $7 != "-") { ns++; S[ns] = $7; SID[ns] = $1 }
       next }
     { P[$1] = 1 }
@@ -1205,7 +1210,7 @@ seam_facts() {
       for (i = 1; i <= nc; i++) {
         found = 0
         for (p in P) if (p == C[i] || (C[i] ~ /\/$/ && index(p, C[i]) == 1)) { found = 1; break }
-        if (!found) printf "G\tstandard.seam-registered\trow:%s\tcontracts/seams.tsv row %s names the copy %s, which is not in the tree: delete the row or restore the copy\n", CID[i], CID[i], C[i]
+        if (!found && !OPT[i]) printf "G\tstandard.seam-registered\trow:%s\tcontracts/seams.tsv row %s names the copy %s, which is not in the tree: delete the row or restore the copy\n", CID[i], CID[i], C[i]
       }
       for (i = 1; i <= ns; i++) if (!(S[i] in P)) printf "G\tstandard.seam-registered\tschema:%s\tcontracts/seams.tsv row %s names the schema %s, which this tree owns and does not hold: the producer ships its schema\n", SID[i], SID[i], S[i]
     }' "$_sm" "$T/regmap"
@@ -1223,14 +1228,29 @@ version_facts() {
   # a fixture overlay carries its files as workflows/*.yml, so no fixture sits in a real workflow folder (the overlay maps only .tsv files)
   [ -z "${_od:-}" ] || find "$_od/workflows" -maxdepth 1 -type f -name '*.yml' 2>/dev/null | while IFS= read -r _wf; do printf '.github/workflows/%s\t%s\n' "${_wf##*/}" "$_wf"; done >> "$T/vwf"
   [ -s "$T/vwf" ] || return 0
+  # a composite action this tree holds (.github/actions/<name>/action.yml) is the repo's own, not a third-party pin (harbor#967)
+  awk -F'\t' '$1 ~ /^\.github\/actions\/[^\/]+\/action\.ya?ml$/ { n = $1; sub(/^\.github\/actions\//, "", n); sub(/\/.*$/, "", n); print n }' "$T/regmap" | sort -u > "$T/vown"
   while IFS='	' read -r _vp _vr; do
-    awk -v f="$_vp" '/^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]/ {
+    awk -v f="$_vp" -v own="$T/vown" 'BEGIN { while ((getline x < own) > 0) O[x] = 1 }
+      /^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]/ {
         l = $0; sub(/^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*/, "", l); sub(/[[:space:]]+#.*$/, "", l); gsub(/["\047]/, "", l)
         if (l ~ /^\.\// || l ~ /^docker:\/\//) next
+        if (l ~ /^[^\/@]+\/[^\/@]+\/\.github\/actions\/[^\/@]+(@|$)/) { nm = l; sub(/^[^\/@]+\/[^\/@]+\/\.github\/actions\//, "", nm); sub(/@.*$/, "", nm); if (nm in O) next }
         n = index(l, "@"); if (n > 0) l = substr(l, 1, n - 1)
         print l "\t" f }' "$_vr"
   done < "$T/vwf" | sort -u | awk -F'\t' 'NR == FNR { k[$1] = 1; next } !($1 in k) { seen[$1] = (($1 in seen) ? seen[$1] ", " : "") $2 }
       END { for (a in seen) printf "G\tstandard.version-registered\taction:%s\t%s is pinned in %s and has no row in standards/naming/versions.tsv: register the action once, for every repo (harbor#1426)\n", a, a, seen[a] }' "$T/vnames" -
+}
+
+# inventory_facts → `G TAB <rule> TAB <subject> TAB <message>`: contracts/env.tsv and contracts/bin.tsv against the tree, both ways
+# (standard.env-registered, standard.script-registered; harbor#1431, #1432). Reads $T/regmap, so a fixture overlay applies; silent
+# where the tree carries neither register or the vendored copy has no standard-inventory.sh beside it.
+inventory_facts() {
+  [ -f "$HERE/standard-inventory.sh" ] && [ -s "$T/regmap" ] || return 0
+  # a fixture overlay that carries neither register leaves the tree's verdict as the plain run gives it: it is not judged again
+  [ -z "${_od:-}" ] || [ -f "$_od/contracts/env.tsv" ] || [ -f "$_od/contracts/bin.tsv" ] || [ -f "$_od/contracts/roots.tsv" ] || return 0
+  sh "$HERE/standard-inventory.sh" --root "$ROOT" --map "$T/regmap" facts || {
+    log_fail "the inventory reader failed, so the env and bin registers were not judged"; log_fix "sh $HERE/standard-inventory.sh facts"; log_end || :; exit "$UNCHECKED"; }
 }
 
 case "$ACTION" in
@@ -1251,7 +1271,7 @@ case "$ACTION" in
     if [ "$SURFACE" = registry ]; then
       list_tree | awk -F'\t' '{ print "X\t" $2 }' > "$T/rec"
       census >> "$T/rec"
-      list_tree > "$T/ltree"; register_facts "$T/ltree" >> "$T/rec"; seam_facts >> "$T/rec"; version_facts >> "$T/rec"
+      list_tree > "$T/ltree"; register_facts "$T/ltree" >> "$T/rec"; seam_facts >> "$T/rec"; version_facts >> "$T/rec"; inventory_facts >> "$T/rec"
       judge registry "$T/rec" > "$T/out" || unchecked
     else
       judge check "$T/rec" > "$T/out" || unchecked
@@ -1302,6 +1322,7 @@ case "$ACTION" in
     [ "$ACTION" != tree ] || register_facts "$T/files" >> "$T/rec"
     [ "$ACTION" != tree ] || seam_facts >> "$T/rec"
     [ "$ACTION" != tree ] || version_facts >> "$T/rec"
+    [ "$ACTION" != tree ] || inventory_facts >> "$T/rec"
     log_head "$_what in ${ROOT##*/}"
     judge "$ACTION" "$T/rec" > "$T/out" || unchecked
     _rc=0; report "$T/out" "$_what" || _rc=1

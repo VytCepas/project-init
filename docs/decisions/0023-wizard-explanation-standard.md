@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-023: Self-explaining wizard — every selectable concern explains its value
 
 - Status: Accepted

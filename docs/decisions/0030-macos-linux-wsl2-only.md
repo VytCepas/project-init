@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-030: macOS and Linux only; Windows through WSL2; a native Windows shell is refused
 
 - Status: Accepted

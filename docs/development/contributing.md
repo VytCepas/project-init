@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Contributing
 
 The canonical, always-current guide lives in the repo root:

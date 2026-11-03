@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Non-CLI agent surface capability matrix (spike #365)
 
 **Status:** spike findings, validated 2026-06-21 against current vendor docs.

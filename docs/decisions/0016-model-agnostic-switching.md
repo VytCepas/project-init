@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-016: Model/API-agnostic switching via claude-code-router (pinned, scaffolded)
 
 - Status: Accepted

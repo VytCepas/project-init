@@ -1,3 +1,9 @@
+---
+kind: how-to
+owner: @VytCepas
+status: unreviewed
+---
+
 # Using project-init in Your Project
 
 project-init scaffolds a `.agents/` folder into any project so that Claude Code (and other agents) have memory, documentation, hooks, and GitHub workflow infrastructure ready from day one.

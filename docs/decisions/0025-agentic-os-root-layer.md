@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-025: The agentic-OS root layer is a separate tool over a multirepo, consuming each project's descriptor
 
 - Status: Accepted

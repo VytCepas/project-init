@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Model-Agnostic Switching — Research & Design Report
 
 > Scope: research and design decisions for **epic #315** (Model/API-agnostic

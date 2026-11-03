@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-026: Tier-3 RAG engine is cocoindex-code, wired alongside Graphify (option A)
 
 - Status: Accepted

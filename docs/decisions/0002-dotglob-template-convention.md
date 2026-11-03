@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-002: dot_ prefix convention for template directories
 
 **Date:** 2026-04-23

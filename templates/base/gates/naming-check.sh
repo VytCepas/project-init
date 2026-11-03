@@ -94,7 +94,9 @@ if [ "$rc" -gt 1 ]; then
 fi
 
 # One `rule TAB subject` per finding; the A/V column is the rule's mode, which may change without the finding changing.
-awk -F'\t' 'NF >= 3 && $2 !~ /^name\.(registry-|exemption-|alias|control-|surface-)/ { print $2 "\t" $3 }' "$T/out" | LC_ALL=C sort -u > "$T/now"
+# A reference into the standard's own register (target:standards/naming/...) cannot resolve here: a workload carries a vendored copy
+# of that register, not the register, so the standard's owner judges that half (contracts/doc-folders.tsv's `kind` column is one).
+awk -F'\t' 'NF >= 3 && $2 !~ /^name\.(registry-|exemption-|alias|control-|surface-)/ && !($2 == "standard.reference-resolves" && $3 ~ /^target:standards\/naming\//) { print $2 "\t" $3 }' "$T/out" | LC_ALL=C sort -u > "$T/now"
 
 if [ "$MODE" = seed ]; then
   if [ -f "$BASELINE" ] && grep -q -v -e '^#' -e '^[[:space:]]*$' "$BASELINE"; then

@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Measurement methodology — is the scaffold worth it?
 
 The Definition-of-Ready gate for epic

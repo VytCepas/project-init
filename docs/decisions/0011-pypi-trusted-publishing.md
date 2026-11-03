@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-011: Publish to PyPI via trusted publishing; supersedes ADR-008's deferral
 
 - Status: Accepted

@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Memory descriptor (cross-project introspection)
 
 **Status:** Accepted — implements #498, extends [ADR-024](../decisions/0024-memory-tier-model.md).

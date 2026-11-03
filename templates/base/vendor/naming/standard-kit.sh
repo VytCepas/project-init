@@ -90,7 +90,7 @@ case "$MODE" in
     controls.tsv) awk -F'\t' -v OFS='\t' -v fams=" $_fams" -v tools=" $_tools" '/^#/ || /^[[:space:]]*$/ || $1 == "id" { print; next }
         { split($1, a, "."); if (!index(fams, " " a[1] " ")) next
           n = split($4, p, "/"); if ($4 != "-" && !index(tools, " " p[n] " ")) $4 = "-"
-          $11 = "-"; print }' "$REG/$_f" ;;
+          $11 = "-"; if ($8 == "stable") $8 = "experimental"; print }' "$REG/$_f" ;;   # no proof ships, so no row claims it watched one red (harbor#1422)
     kit.tsv) awk -F'\t' '/^#/ || /^[[:space:]]*$/ || $1 == "id" { print; next } $5 == "core" && ($2 != "register" || $3 ~ /^standards\/naming\//) { print }' "$REG/$_f" ;;
     registers.tsv) awk -F'\t' -v OFS='\t' '/^#/ || /^[[:space:]]*$/ || $1 == "id" { print; next } { $4 = "-"; print }' "$REG/$_f" ;;
     exemptions.tsv) awk -F'\t' '/^#/ || /^[[:space:]]*$/ || $1 == "id" { print }' "$REG/$_f" ;;
@@ -157,5 +157,5 @@ case "$MODE" in
   _n="$(grep -c . "$F.f" || :)"
   if [ "$_n" -eq 0 ]; then log_ok "$REPO carries all $N items its kind '$KIND' lists"; rm -f "$F".*; log_end || :; exit 0; fi
   sed 's/^/  /' "$F.f" >&2; rm -f "$F".*
-  log_fail "$REPO lacks $_n of $N items its kind '$KIND' lists"; log_fix "yard renders them: project-init new --kind $KIND --adopt $REPO"; log_end || :; exit 1 ;;
+  log_fail "$REPO lacks $_n of $N items its kind '$KIND' lists"; log_fix "yard renders them: harbor yard new --kind $KIND --adopt $REPO"; log_end || :; exit 1 ;;
 esac

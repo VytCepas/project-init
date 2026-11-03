@@ -76,6 +76,17 @@ register.contracts-session-waiting-tsv	register	contracts/session-waiting.tsv	co
 register.contracts-shims-tsv	register	contracts/shims.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
 register.contracts-skill-book-router-tsv	register	contracts/skill-book-router.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
 register.contracts-streams-tsv	register	contracts/streams.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
+register.contracts-agent-tools-tsv	register	contracts/agent-tools.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
+register.contracts-bin-tsv	register	contracts/bin.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
+register.contracts-confinement-classes-tsv	register	contracts/confinement-classes.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
+register.contracts-confinement-mcp-tsv	register	contracts/confinement-mcp.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
+register.contracts-env-tsv	register	contracts/env.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
+register.contracts-launchd-wall-exempt-tsv	register	contracts/launchd-wall-exempt.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
+register.contracts-scheduled-checks-tsv	register	contracts/scheduled-checks.tsv?	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
+register.contracts-verbs-tsv	register	contracts/verbs.tsv	control-plane	hub	no	a contract of the control plane's tools; not inherited by a workload
+register.policy-clauses-tsv	register	policy/clauses.tsv	control-plane	hub	no	the constitution as a register, one row per clause (harbor#1026); the control plane keeps it
+register.policy-enforcement-tsv	register	policy/enforcement.tsv	control-plane	hub	no	which control enforces which clause (harbor#1028); the control plane keeps it
+register.schedule-exempt-tsv	register	schedule-exempt.tsv?	control-plane	hub	no	a control-plane register of repos whose scheduled workflows the box register does not carry (private layer)
 register.registries-context-baseline-tsv	register	registries/context-baseline.tsv?	control-plane	hub	no	a control-plane register (policy, hooks, evals, context)
 register.registries-context-ratchet-tsv	register	registries/context-ratchet.tsv	control-plane	hub	no	a control-plane register (policy, hooks, evals, context)
 register.registries-coverage-incidents-tsv	register	registries/coverage-incidents.tsv?	control-plane	hub	no	a control-plane register (policy, hooks, evals, context)

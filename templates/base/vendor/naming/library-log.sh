@@ -308,3 +308,35 @@ status_end() {
   fi
   [ "$_ST_DR" -eq 0 ]
 }
+
+# ── the auto-remediation allowlist (harbor#1031 item 4) ──────────────────────
+# One list says what may repair without a person: the HEAL rows of contracts/finding.md (the lanes block), added by a
+# person's PR. A reconciler (a tool that fixes what a drift check found) asks before it repairs, and a repair the rows
+# do not name is refused, never run. `--status` itself repairs nothing; this is for the tool that does.
+#   heal_rows [contract]                        `lane TAB key TAB subject TAB repair`, one per row of the lanes block
+#   repair_allowed <key> <subject> <repair> [contract]   0 when a HEAL row of <key> matches <subject> and <repair> is its repair
+#                                               (`<subject>` read as "$1", the way the runner passes it); else 2, a FAIL and a fix
+#                                               on the log. <subject> is `-` for a repair that takes none
+heal_rows() { # [contract]
+  awk '/^<!-- lanes:begin -->$/ { t = 1; next } /^<!-- lanes:end -->$/ { t = 0 } t && /^\|/' "${1:-${ROOT:-.}/contracts/finding.md}" 2>/dev/null \
+    | awk -F'|' '{ for (i = 2; i < NF; i++) { f = $i; gsub(/`/, "", f); gsub(/^[[:space:]]+|[[:space:]]+$/, "", f); $i = f }
+                   if ($2 == "lane" || $2 ~ /^-+$/) next
+                   printf "%s\t%s\t%s\t%s\n", $2, $3, $4, $5 }'
+}
+repair_allowed() { # <key> <subject> <repair> [contract]
+  _ra_k="${1-}"; _ra_s="${2-}"; _ra_c="${3-}"; _ra_f="${4:-${ROOT:-.}/contracts/finding.md}"
+  [ -f "$_ra_f" ] || { log_fail "repair refused: no allowlist at $_ra_f, so nothing says what may repair"; log_fix "git checkout origin/main -- contracts/finding.md"; return 2; }
+  [ "$_ra_s" != stood-down ] || { log_fail "repair refused: $_ra_k is stood down, so a person reads it"; log_nofix "contracts/finding.md, the HEAL rows"; return 2; }
+  _ra_rows="$(heal_rows "$_ra_f")"
+  while IFS='	' read -r _rl _rk _rs _rr; do
+    [ "$_rl" = HEAL ] && [ "$_rk" = "$_ra_k" ] || continue
+    [ "$(printf '%s' "$_rr" | sed 's/<subject>/"$1"/g')" = "$_ra_c" ] || continue
+    # shellcheck disable=SC2254
+    case "$_ra_s" in -) return 0 ;; $_rs) return 0 ;; esac
+  done <<RA_ROWS
+$_ra_rows
+RA_ROWS
+  log_fail "repair refused: $_ra_c on ${_ra_s} is not a HEAL row of $_ra_k in contracts/finding.md"
+  log_fix "a person adds the row to the lanes block of contracts/finding.md in a PR; nothing else may repair on its own"
+  return 2
+}

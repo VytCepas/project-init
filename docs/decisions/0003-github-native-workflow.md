@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-003: GitHub-native project management — GitHub Projects + Issues over Linear
 
 **Date:** 2026-04-27

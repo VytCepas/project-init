@@ -1,3 +1,9 @@
+---
+kind: how-to
+owner: @VytCepas
+status: unreviewed
+---
+
 # Preset Gallery
 
 This gallery shows what each preset actually scaffolds into your project directory.

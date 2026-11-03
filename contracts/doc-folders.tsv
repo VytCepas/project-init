@@ -1,0 +1,15 @@
+# doc-folders.tsv (harbor#1435) — the kind of a docs/ folder or file that the naming standard's kinds.tsv has no row for.
+#
+# WHY THIS FILE EXISTS. bin/doc-shape.sh (vendored as vendor/naming/doc-shape.sh) derives a doc's `kind` from the kinds.tsv
+# row whose folder holds it. This repo's docs/ predates the Diataxis folders, so each folder it has is named here
+# instead of moving the pages.
+#
+# COLUMNS  folder <TAB> kind <TAB> note
+#   folder   docs/<name>/ for a folder, or a docs/ file path for one file
+#   kind     a kinds.tsv id
+folder	kind	note
+docs/development/	explanation	how this repo is built and why; a few pages are reference tables
+docs/guides/	how-to	task guides
+docs/research/	explanation	research notes
+docs/reviews/	report	dated reviews
+docs/positioning.md	explanation	why the project exists

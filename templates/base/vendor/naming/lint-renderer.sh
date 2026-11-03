@@ -37,14 +37,19 @@ finding() {
 
 log_head "renderer"
 # The census: each writer row names a file that must call the renderer.
-awk -F'\t' '$0 !~ /^#/ && $2 == "writer" { print $3 }' "$REG" | while IFS= read -r _f; do
+# A surface with a grammar (a `rule` cell in surfaces.tsv) is rendered; one without can only be checked, so its
+# writer calls `lint-name.sh --check` (harbor#978: `--render branch` answers "no grammar").
+SURF="$ROOT/standards/naming/surfaces.tsv"
+awk -F'\t' '$0 !~ /^#/ && $2 == "writer" { print $3 "\t" $4 }' "$REG" | while IFS='	' read -r _f _s; do
   [ -f "$ROOT/$_f" ] || { echo "MISSING $_f"; continue; }
-  grep -q -e 'lint-name\.sh' "$ROOT/$_f" && grep -q -e '--render' "$ROOT/$_f" || echo "NORENDER $_f"
+  _g="$(awk -F'\t' -v s="$_s" '$0 !~ /^#/ && $1 == s { print ($6 == "" || $6 == "-") ? "check" : "render"; exit }' "$SURF" 2>/dev/null || :)"
+  case "${_g:-render}" in check) _flag='--check' ;; *) _flag='--render' ;; esac
+  grep -q -e 'lint-name\.sh' "$ROOT/$_f" && grep -q -e "$_flag" "$ROOT/$_f" || echo "NORENDER $_f $_flag"
 done > "$TMPDIR/lint-renderer.$$"
-while IFS=' ' read -r _k _f; do
+while IFS=' ' read -r _k _f _flag; do
   case "$_k" in
     MISSING) finding "$_f is a registered writer but is not there" ;;
-    NORENDER) finding "$_f writes a name without calling the renderer (lint-name.sh --render)" ;;
+    NORENDER) finding "$_f writes a name without calling the renderer (lint-name.sh $_flag)" ;;
   esac
 done < "$TMPDIR/lint-renderer.$$"
 # The scan: a creating command in a script that no writer row names. A comment line is not a command.

@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: superseded
+---
+
 # ADR-008: Distribution stays git-based with tagged releases; PyPI deferred
 
 - Status: Superseded in part by ADR-011 (PyPI publishing added; git channel unchanged)

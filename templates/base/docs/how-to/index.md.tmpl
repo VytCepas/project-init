@@ -1,4 +1,10 @@
-{{#if want_docs}}# How-to guides
+{{#if want_docs}}---
+kind: how-to
+{{#if project_owner}}owner: {{project_owner}}
+{{/if project_owner}}status: current
+---
+
+# How-to guides
 
 Goal-oriented recipes for someone already working with the project: "How do
 I X?" Each guide solves one real problem, assumes basic familiarity, and

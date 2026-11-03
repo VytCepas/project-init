@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-010: Same-repo plugin marketplace; dual-ship before template cutover
 
 - Status: Accepted (amended 2026-06-12: cutover executed in PI-165 — see addendum)

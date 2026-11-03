@@ -22,6 +22,7 @@
 #           outside the registry. Extractors: lint-rules (rule "<id> ..." lines), guard-rules
 #           (floor_block <guard> ... <rule> calls, as <guard>:<rule>), checks-table (the docs/reference/checks.md
 #           register), inject-ids (the id: of every rule pack in a folder, comma-separated folders),
+#           hook-rules (the id of every `# control: <id>` line in a git hook, comma-separated files),
 #           required-checks:<file>=<repo> (a repo's rows), lines (one id per line, for fixtures)
 #   note    what the namespace holds
 id	file	select	census	note
@@ -41,6 +42,7 @@ admission	controls.tsv	type=admission	guard-rules:bin/admission-*.sh	a refusal o
 check	controls.tsv	type=check	checks-table:docs/reference/checks.md	a scheduled check; its output is stamped [check:<id>]
 injection	controls.tsv	type=injection	inject-ids:context-rules	a rule pack the injection engine adds to a session
 ci	controls.tsv	type=ci	required-checks:contracts/required-checks.tsv=VytCepas/harbor	a required CI check on harbor's main
+hook	controls.tsv	type=hook	hook-rules:hooks/pre-commit,hooks/pre-push,hooks/commit-msg	a refusal or gate in one of harbor's git hooks, marked `# control: <id>` beside the code that decides it (harbor#1422)
 vale	controls.tsv	type=vale	-	a prose rule of the Vale config generated from aliases.tsv
 label-axis	label-axes.tsv	-	-	an issue label as <axis>:<value> with the legacy label it replaces; renders issue-taxonomy.tsv (harbor#978)
 writer	writers.tsv	-	-	a script that creates a named thing, and the command patterns that find one (harbor#978)

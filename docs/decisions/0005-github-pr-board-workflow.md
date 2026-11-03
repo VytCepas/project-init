@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-005: GitHub PR and board lifecycle workflow
 
 **Date:** 2026-04-27

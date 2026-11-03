@@ -22,11 +22,12 @@
 #   id          the canonical word: lowercase kebab, a digit never starts a word
 #   class       one or more of family verb domain client abbreviation kind layer concept
 #               system extension subject level mode outcome decision severity priority state
-#               control-type moment function lifecycle share relation modality tier commit-type, comma-separated.
+#               control-type moment function lifecycle share relation modality tier strength commit-type, comma-separated.
 #               family and verb never overlap. level terms form one containment chain by `broader` (D-57).
 #               relation: the typed edges a policy row or a kind's required_relations names (research/15 §3).
 #               modality: duty, prohibition, permission (ODRL). tier: constitutional, policy, standard, repo,
 #               control, highest first; a tier term that shares its id with a family or concept carries the class too.
+#               strength: constitutional, policy, standard, local (harbor#1027): which rule wins, a different axis from where a rule binds.
 #   pref        the preferred term in prose
 #   broader     the parent term's id, or -; gives the hierarchy (lint -> audit -> control-plane)
 #   vsm         viable-system function, shown in the glossary and never in a name (D-27)
@@ -89,12 +90,12 @@ unsafe-action	concept	unsafe control action	control-action	S3	experimental	-	res
 hazard	concept	hazard	constraint	S3	experimental	-	research/02: STPA	risk	-	A system state that, with worst-case conditions, leads to a loss
 loss	concept	loss	hazard	S5	experimental	-	research/02: STPA	incident impact	-	An outcome stakeholders find unacceptable: leaked credential, deleted data, false report
 process-model	concept	process model	regulator	S3	experimental	-	research/02: STPA; CA70	the agent's picture; context	-	A controller's belief about the state of what it controls; the agent's context
-policy	family,kind,tier	policy	policy-function	S5	stable	-	research/02: security; NIST-53 (-1 policy controls); OPA; standard §3 (D-17); standard §4	rules; standing policy; doctrine (misused)	-	A normative statement set saying what must or must not happen, and who decides
+policy	family,kind,tier,strength	policy	policy-function	S5	stable	-	research/02: security; NIST-53 (-1 policy controls); OPA; standard §3 (D-17); standard §4	rules; standing policy; doctrine (misused)	-	A normative statement set saying what must or must not happen, and who decides
 constitution	concept	constitution	policy	S5	experimental	-	research/02: agentic engineering; CAI	policy/constitution.md; ~/.claude/CLAUDE.md (deployed); Helm Constitutional Rules; L0 constitution	-	The top-level policy, deployed into every session's resident context
 invariant	concept	invariant	constitution	S5	experimental	-	research/02: software engineering (invariant)	constitutional rule; the five; constitutional tier; core invariant (prior)	-	A rule no scope may override; there are exactly five
 default-rule	concept	default rule	constitution	S5	experimental	-	research/02: software engineering (defaults)	plain rule	-	A rule a project scope may override
 rationale	concept	rationale	policy	S5	experimental	-	research/02: ISO42010 (rationale); DIATAXIS explanation	doctrine; DOCTRINE/; *-expanded.md; design rationale (prior)	-	Why a rule exists: the incidents and reasoning, read on demand and never resident
-standard	family,kind,tier	standard	policy	S2	stable	-	research/02: software engineering; ISO usage; standard §4; standard D-63	convention; CONTRACTS/naming.md; logging.md; test-contract.md; platforms.md; install standard	-	A normative format or practice every system follows: naming, logging, tests, platforms. Family (D-63): the standard's own subsystem: harbor standard render, harbor standard check, ids standard.*
+standard	family,kind,tier,strength	standard	policy	S2	stable	-	research/02: software engineering; ISO usage; standard §4; standard D-63	convention; CONTRACTS/naming.md; logging.md; test-contract.md; platforms.md; install standard	-	A normative format or practice every system follows: naming, logging, tests, platforms. Family (D-63): the standard's own subsystem: harbor standard render, harbor standard check, ids standard.*
 contract	kind	interface contract	interface	S2	stable	-	research/02: software engineering; CDC; standard §4	seam (CONTRACTS sense); frozen seam; CONTRACTS/*.md	-	A versioned specification of one interface between systems, with a schema and shared fixtures
 schema	extension	schema	contract	S2	stable	-	research/02: software engineering; SEMVER; harbor#950 (standard §6.3)	descriptor.schema.json; schema_version	-	A machine-checkable structure for a contract payload, carrying schema_version
 decision-record	kind	decision record	policy	S5	stable	-	research/02: NYGARD; MADR; standard §4	ADR; ADR; decision brief; decided (operator); M-ticket decision; DEAD-ENDS entry (rejected)	-	A record of one decision: context, options, choice, status, consequences
@@ -144,8 +145,8 @@ memory-route	concept	memory route	memory-store	S2	experimental	-	research/02: RE
 agent-instructions	concept	agent instructions file	context	S5	experimental	-	research/02: AGENTSMD; CC-DOCS	AGENTS.md; CLAUDE.md; .agents/project-init.md	-	The repository file every agent surface reads first
 harness	concept	harness	environment	-	experimental	-	research/02: agentic engineering; CC-DOCS	Claude Code; CC; the CLI	-	The agent runtime that runs the model loop, tools, permissions and hooks
 surface	concept	agent surface	harness	-	experimental	-	research/02: REPO project-init README	IDE integration	-	One harness product a workload is configured for: Claude Code, Codex, Cursor and others
-session	concept,family	session	data-plane	S1	experimental	-	research/02: CC-DOCS	conversation; run	-	One harness run from start to stop, made of turns
-hook	kind	hook	component	S3	stable	-	research/02: CC-HOOKS; GIT githooks; standard §4	engine hook; git hook	-	A handler the harness or git runs at a named event
+session	concept,family,moment	session	data-plane	S1	experimental	-	research/02: CC-DOCS	conversation; run	-	One harness run from start to stop, made of turns
+hook	kind,control-type	hook	component	S3	stable	-	research/02: CC-HOOKS; GIT githooks; standard §4	engine hook; git hook	-	A handler the harness or git runs at a named event
 hook-event	concept	hook event	hook	-	experimental	-	research/02: CC-HOOKS	SessionStart; PreToolUse; PostToolUse; Stop; pre-commit; pre-push	-	A named moment a hook binds to; platform names are kept verbatim
 skill	family,kind	skill	catalog	S1	stable	-	research/02: CC-DOCS (skills); standard §3 (D-17); standard §4	book; pack	-	A packaged instruction set with a description the harness can select or the user can invoke
 model-invocable	concept	model-invocable skill	skill	S1	experimental	-	research/02: CC-DOCS (disable-model-invocation)	ambient skill; model-invoked (prior)	-	A skill listed every session and selectable by the model
@@ -281,7 +282,7 @@ apply	verb	apply	-	-	stable	-	standard §3	-	-	Verb: the last word of a name tha
 prune	verb	prune	-	-	stable	-	standard §3	-	-	Verb: the last word of a name that performs it
 list	verb	list	-	-	stable	-	standard §3	-	-	Verb: the last word of a name that performs it
 pull	verb	pull	-	-	stable	-	standard §3	-	-	Verb: the last word of a name that performs it
-push	verb	push	-	-	stable	-	standard §3	-	-	Verb: the last word of a name that performs it
+push	verb,moment	push	-	-	stable	-	standard §3	-	-	Verb: the last word of a name that performs it; moment: at git push
 wait	verb	wait	-	-	stable	-	standard §3	-	-	Verb: the last word of a name that performs it
 select	verb	select	-	-	stable	-	standard §3	-	-	Verb: the last word of a name that performs it
 posix	subject	posix	lint	-	stable	-	standard §3	-	-	Lint subject family: the first segment of a lint rule id
@@ -318,7 +319,7 @@ id	abbreviation	id	-	-	experimental	-	harbor#950 (D-18 registered list extended)
 env	abbreviation	env	-	-	experimental	-	harbor#950 (D-18 registered list extended)	-	-	Registered abbreviation: environment
 lib	abbreviation	lib	-	-	experimental	-	harbor#950 (D-18 registered list extended)	-	-	Registered abbreviation: library
 src	abbreviation	src	-	-	experimental	-	harbor#950 (D-18 registered list extended)	-	-	Registered abbreviation: source directory
-pr	abbreviation	pr	-	-	experimental	-	harbor#950 (D-18 registered list extended)	-	-	Registered abbreviation: pull request
+pr	abbreviation,moment	pr	-	-	experimental	-	harbor#950 (D-18 registered list extended)	-	-	Registered abbreviation: pull request
 ui	abbreviation	ui	-	-	experimental	-	harbor#950 (D-18 registered list extended)	-	-	Registered abbreviation: user interface
 dir	abbreviation	dir	-	-	experimental	-	harbor#950 (D-18 registered list extended)	-	-	Registered abbreviation: directory
 ref	abbreviation	ref	-	-	experimental	-	harbor#950 (D-18 registered list extended)	-	-	Registered abbreviation: git reference
@@ -430,7 +431,7 @@ owned-by	relation	owned by	-	-	experimental	-	research/15 §3 (09a S2: every con
 duty	modality	duty	-	-	experimental	-	W3C ODRL (research/15 §2-3)	-	-	A clause that obliges: the subject must do the thing
 prohibition	modality	prohibition	-	-	experimental	-	W3C ODRL (research/15 §2-3)	-	-	A clause that forbids: the subject must not do the thing
 permission	modality	permission	-	-	experimental	-	W3C ODRL (research/15 §2-3)	-	-	A clause that allows: the subject may do the thing, and nothing is implied beyond it
-constitutional	tier	constitutional	-	-	experimental	-	research/15 §3 (CLAUDE.md: the five, №1-№5)	-	-	The highest tier: the five constitutional rules and the meta-rules; changes by a person's PR with a named reviewer
+constitutional	tier,strength	constitutional	-	-	experimental	-	research/15 §3 (CLAUDE.md: the five, №1-№5)	-	-	The highest tier: the five constitutional rules and the meta-rules; changes by a person's PR with a named reviewer
 tutorial	kind	tutorial	-	-	stable	-	harbor#949 composition review (2026-10-04); Diataxis (Procida); D-90	-	-	A learning-oriented doc that takes a reader through one lesson to a working result
 how-to	kind	how-to guide	-	-	stable	-	harbor#949 composition review (2026-10-04); Diataxis (Procida); D-90	-	-	A task-oriented doc that gives the steps to reach one goal the reader already has
 reference	kind	reference	-	-	stable	-	harbor#949 composition review (2026-10-04); Diataxis (Procida); D-90	-	-	An information-oriented doc that describes the machinery; generated from the registers where it can be
@@ -444,3 +445,5 @@ build	commit-type	build	-	-	stable	-	Conventional Commits 1.0; standards/naming.
 chore	commit-type	chore	-	-	stable	-	Conventional Commits 1.0; standards/naming.md D-21	-	-	A commit or PR that maintains the repo and changes no behaviour
 revert	commit-type	revert	-	-	stable	-	Conventional Commits 1.0; standards/naming.md D-21	-	-	A commit or PR that undoes an earlier one
 perf	commit-type	perf	-	-	stable	-	Conventional Commits 1.0; standards/naming.md D-21; 12 perf commits on main	-	-	A commit or PR that improves performance and changes no behaviour
+local	strength	local	-	-	experimental	-	harbor#1026, harbor#1027 (strength set)	-	-	The strength of a governed repo's own rules: it wins over a plain rule on workflow, conventions and tooling, and over nothing else
+judgment	moment	judgment	-	-	experimental	-	harbor#1028 (moment set; research/15 section 4)	-	-	No mechanism: a clause that only a reader can apply, counted in the matrix and never hidden

@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Hybrid enforcement — enforced vs overridable
 
 - Status: reference (#251); implements ADR-013, grounded in ADR-007.

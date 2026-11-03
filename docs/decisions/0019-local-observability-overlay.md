@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-019: Local observability overlay — file-based usage report, no Docker, no OTEL
 
 - Status: Accepted

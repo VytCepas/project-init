@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-021: GitHub lifecycle vs. forge-agnostic quality tier — the decomposition boundary
 
 - Status: Accepted (spike — boundary + recommendations only; no production code)

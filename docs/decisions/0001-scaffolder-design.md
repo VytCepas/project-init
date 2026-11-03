@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-001: Scaffolder design — pure file ops, no LLM calls
 
 **Date:** 2026-04-23

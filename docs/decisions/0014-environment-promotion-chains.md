@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: superseded
+---
+
 # ADR-014: Environment promotion-chain branch model (SUPERSEDED)
 
 - Status: **Superseded** by epic #316 (agnostic local↔cloud env/deploy model)

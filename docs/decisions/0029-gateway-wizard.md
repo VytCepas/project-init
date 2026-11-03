@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-029: The gateway wizard — six asks on the default path
 
 Date: 2026-07-24

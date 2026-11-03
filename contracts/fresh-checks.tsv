@@ -1,0 +1,11 @@
+# fresh-checks.tsv (harbor#1434) — the generated files this repo carries, each with the check that proves it current.
+#
+# file <TAB> check (sh, run from the repo root; exit 0 fresh, 1 stale, anything else unchecked) <TAB> fix <TAB> needs
+# `needs` is the path that must exist for the row to apply (default: the file itself). A generated file carries one
+# comment line `generated-by: <command>` in its first 20 lines, and <command> is the `fix` column here: the lint
+# (templates/base/vendor/naming/doc-shape.sh) holds the header and this table equal both ways.
+# Run the checks with `sh templates/base/vendor/naming/doc-fresh-verify.sh --root .`.
+.github/CODEOWNERS	uv run python tools/generate_codeowners.py --check	uv run python tools/generate_codeowners.py --write	
+templates/base/vendor/naming/MANIFEST.tsv	sh templates/base/vendor/naming/standard-vendor.sh --check --offline templates/base	sh <standard checkout>/bin/standard-vendor.sh .	
+.agents/docs/CODE_MAP.md	uv run python .agents/scripts/gen_code_map.py --check	just code-map	
+.claude/docs/CODE_MAP.md	cmp -s .agents/docs/CODE_MAP.md .claude/docs/CODE_MAP.md	just code-map	

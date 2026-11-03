@@ -213,11 +213,11 @@ def is_posix_sh_scaffold_path(rel: str) -> bool:
 
 
 def naming_gate_paths() -> set[str]:
-    """Every scaffolded path the naming gate adds (the gate, its baseline, the vendored package)."""
+    """Every scaffolded path the naming and doc gates add (gates, the vendored package, contracts/)."""
     base = Path(__file__).resolve().parents[1] / "templates" / "base"
     return {
         p.relative_to(base).as_posix()
-        for d in ("gates", "vendor/naming")
+        for d in ("gates", "vendor/naming", "contracts")
         for p in (base / d).rglob("*")
         if p.is_file() and "__pycache__" not in p.parts
     }
