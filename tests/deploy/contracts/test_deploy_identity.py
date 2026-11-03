@@ -168,7 +168,6 @@ class TestWizardCapture:
                 "proj",
                 "desc",
                 "python",
-                "3.11",
                 "bad app!",
                 "billing-api",
                 "europe-west1",
