@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Build Reproducibility
 
 This audit covers the CI and build-environment surfaces used by `project-init`

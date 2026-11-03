@@ -20,12 +20,19 @@ lint:
     uv run python .agents/scripts/check_test_contract.py exit-codes tests
     uv run python .agents/scripts/check_test_contract.py discovery tests
     just naming
+    just docs-check
 
 # the naming standard over this repo's own tree, as a ratchet (harbor#967): the gate and judge every
 # scaffold ships (templates/base), pointed at this root, its naming-exemptions.tsv and gates/naming.baseline.
 [doc("naming standard ratchet over this repo's own tree (the shipped gate, NAMING_ROOT=.)")]
 naming:
     NAMING_ROOT=. sh templates/base/gates/naming-check.sh
+
+# docs front matter and generated headers over this repo's own tree, strict: the shipped gate (templates/base/gates/doc-check.sh),
+# pointed at this root, with contracts/doc-folders.tsv naming the folders that predate the Diataxis ones.
+[doc("docs front matter + generated headers over this repo's own tree (the shipped gate, DOC_ROOT=.)")]
+docs-check:
+    DOC_ROOT=. sh templates/base/gates/doc-check.sh --strict
 
 # auto-format
 format:

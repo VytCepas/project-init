@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-012: Prod-safety guard — deny-table guardrail, credential separation as boundary
 
 - Status: Accepted

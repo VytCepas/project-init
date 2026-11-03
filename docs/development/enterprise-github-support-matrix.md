@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Enterprise GitHub Compatibility — Support Matrix
 
 - Status: **Spike (#254) — complete.** Input to ADR-013 (#246); synthesis of 3 research strands + internal code grounding.

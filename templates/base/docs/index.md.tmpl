@@ -1,4 +1,10 @@
-{{#if want_docs}}# {{project_name}}
+{{#if want_docs}}---
+kind: reference
+{{#if project_owner}}owner: {{project_owner}}
+{{/if project_owner}}status: current
+---
+
+# {{project_name}}
 
 {{project_description}}
 

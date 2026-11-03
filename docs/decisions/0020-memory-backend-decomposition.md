@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-020: Memory backend is à-la-carte — derived from `memory_stack`, declinable as `none`
 
 - Status: Accepted

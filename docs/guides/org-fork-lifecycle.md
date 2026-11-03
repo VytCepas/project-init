@@ -1,3 +1,9 @@
+---
+kind: how-to
+owner: @VytCepas
+status: unreviewed
+---
+
 # Org fork lifecycle runbook
 
 > **Status: validated end-to-end (#257).** Every stage's mechanics now ship; the

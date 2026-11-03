@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-022: Toolchain decomposition — keep the existing `{{#if}}` conditionals, don't add overlays
 
 - Status: Accepted (spike — file→gate map + recommendation; no production code)

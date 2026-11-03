@@ -427,6 +427,16 @@ _ADDED_SINCE_BASELINE = {
 }
 # The naming gate (gates/, vendor/naming/) postdates the captured baseline.
 _ADDED_SINCE_BASELINE |= naming_gate_paths()
+# The code-map generator gained the generated-by header and a --check mode (harbor#1434): a deliberate content edit.
+_ADDED_SINCE_BASELINE |= {".agents/scripts/generate-code-map.py"}
+# The docs index pages gained front matter (kind, owner, status; harbor#1435): a deliberate content edit.
+_ADDED_SINCE_BASELINE |= {
+    "docs/index.md",
+    "docs/tutorials/index.md",
+    "docs/how-to/index.md",
+    "docs/reference/index.md",
+    "docs/explanation/index.md",
+}
 # The naming-standard rename (1.2.3) keeps shims at some old names until 2026-12-01;
 # the renamed paths themselves are re-keyed in the fixtures.
 _ADDED_SINCE_BASELINE |= SHIMMED_OLD_PATHS

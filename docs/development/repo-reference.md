@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Repo reference — CI optimizations, extension points, non-goals
 
 Reference material moved out of the always-loaded CLAUDE.md (PI-657, epic

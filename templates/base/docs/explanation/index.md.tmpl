@@ -1,4 +1,10 @@
-{{#if want_docs}}# Explanation
+{{#if want_docs}}---
+kind: explanation
+{{#if project_owner}}owner: {{project_owner}}
+{{/if project_owner}}status: current
+---
+
+# Explanation
 
 Understanding-oriented discussion: why the system is shaped the way it is,
 trade-offs considered, context that doesn't fit a recipe or a reference

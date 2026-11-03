@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-015: Agnostic local↔cloud environment & deploy model (single-trunk; deploy/IaC opt-in)
 
 - Status: Accepted

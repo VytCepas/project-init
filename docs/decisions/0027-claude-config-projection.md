@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-027: `.claude/` is a scoped, delete-aware, plain-file projection of `.agents/`
 
 - Status: Accepted; Windows rationale superseded by [ADR-030](0030-macos-linux-wsl2-only.md)

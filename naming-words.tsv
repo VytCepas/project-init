@@ -13,7 +13,6 @@ junie	tool: JetBrains' Junie agent, a harness project-init scaffolds for (templa
 mcps	technical: the --mcps CLI flag, the MCP servers a scaffold installs; the module and its test carry the flag's name
 nist	world name: the US standards body whose AI RMF the governance crosswalk maps
 noop	technical: a no-op, here the benchmark's context-loading probe task
-org	technical: GitHub's organization account, the --profile org distribution profile
 rerecorded	English: recorded again
 rustfmt	tool: the Rust formatter, configured by rustfmt.toml
 typecheck	technical: the just typecheck recipe every scaffold ships

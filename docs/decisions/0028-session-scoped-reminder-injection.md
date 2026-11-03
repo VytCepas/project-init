@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-028: Session-scoped injection for the workflow-state reminder
 
 - Status: Accepted (amended 2026-09-17: the dynamic DAG-state re-injection

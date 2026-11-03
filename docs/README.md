@@ -1,3 +1,9 @@
+---
+kind: reference
+owner: @VytCepas
+status: unreviewed
+---
+
 # project-init documentation
 
 **project-init** scaffolds agentic-development infrastructure: one command

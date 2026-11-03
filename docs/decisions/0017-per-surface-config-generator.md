@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-017: Canonical hook/MCP spec → per-surface generator for non-CLI surfaces
 
 - Status: Accepted

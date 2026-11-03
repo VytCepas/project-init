@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-006: Conventional Commits format for commit messages and PR titles
 
 - Status: Accepted

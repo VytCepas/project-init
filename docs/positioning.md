@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Positioning in the ecosystem
 
 **project-init builds an agent a workshop, not a note.** It does not sit *inside* any

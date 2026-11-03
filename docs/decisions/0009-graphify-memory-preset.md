@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-009: Graphify becomes the recommended KG memory preset; LightRAG demoted to legacy
 
 - Status: Accepted (amended 2026-06-12: LightRAG overlay removed — see Consequences)

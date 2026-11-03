@@ -1,0 +1,9 @@
+# fresh-checks.tsv — the generated files this repo carries, each with the check that proves it current.
+#
+# file <TAB> check (sh, run from the repo root; exit 0 fresh, 1 stale, anything else unchecked) <TAB> fix <TAB> needs
+# `needs` is the path that must exist for the row to apply (default: the file itself). A generated file carries one
+# comment line `generated-by: <command>` in its first 20 lines, and <command> is the `fix` column here: the lint
+# (vendor/naming/doc-shape.sh) holds the header and this table equal both ways. Run the checks with
+# `sh vendor/naming/doc-fresh-verify.sh`.
+vendor/naming/MANIFEST.tsv	sh vendor/naming/standard-vendor.sh --check --offline .	sh <standard checkout>/bin/standard-vendor.sh .	
+.agents/docs/code-map.md	uv run python .agents/scripts/generate-code-map.py --check	just code-map	

@@ -21,6 +21,7 @@ lint:
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint-context-budget.sh
     just naming
+    just docs-check
     uv run python .agents/scripts/check-test-contract.py exit-codes
     uv run --with pytest python .agents/scripts/check-test-contract.py discovery
 
@@ -114,6 +115,12 @@ fuzz:
 naming:
     sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
 
+# docs front matter and generated-file headers (kind, owner, status; generated-by equals contracts/fresh-checks.tsv).
+# Born warn: findings print and exit 0; `sh gates/doc-check.sh --strict` makes them red. Guarded like `naming`.
+[doc("docs front matter + generated headers (gates/doc-check.sh)")]
+docs-check:
+    sh -c 'if [ -f gates/doc-check.sh ]; then sh gates/doc-check.sh; else echo "doc gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
+
 # what CI runs (the full gate)
 ci: setup lint typecheck test-cov audit
 
@@ -174,6 +181,7 @@ lint:
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint-context-budget.sh
     just naming
+    just docs-check
 
 # static type check (strict mode per tsconfig.base.json)
 # no-op on a fresh scaffold with no .ts sources yet — tsc errors with TS18003
@@ -242,6 +250,12 @@ scan:
 naming:
     sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
 
+# docs front matter and generated-file headers (kind, owner, status; generated-by equals contracts/fresh-checks.tsv).
+# Born warn: findings print and exit 0; `sh gates/doc-check.sh --strict` makes them red. Guarded like `naming`.
+[doc("docs front matter + generated headers (gates/doc-check.sh)")]
+docs-check:
+    sh -c 'if [ -f gates/doc-check.sh ]; then sh gates/doc-check.sh; else echo "doc gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
+
 # what CI runs (the full gate)
 ci: setup lint typecheck test audit
 
@@ -280,6 +294,7 @@ lint:
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint-context-budget.sh
     just naming
+    just docs-check
 
 # type-only pass. Redundant with `just lint` by design: golangci-lint runs
 # go/analysis, which type-checks. `just typecheck` exists so the command means
@@ -370,6 +385,12 @@ scan:
 naming:
     sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
 
+# docs front matter and generated-file headers (kind, owner, status; generated-by equals contracts/fresh-checks.tsv).
+# Born warn: findings print and exit 0; `sh gates/doc-check.sh --strict` makes them red. Guarded like `naming`.
+[doc("docs front matter + generated headers (gates/doc-check.sh)")]
+docs-check:
+    sh -c 'if [ -f gates/doc-check.sh ]; then sh gates/doc-check.sh; else echo "doc gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
+
 # what CI runs (the full gate)
 ci: lint typecheck test-cov audit
 
@@ -424,6 +445,7 @@ lint:
     sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
     bash .agents/scripts/lint-context-budget.sh
     just naming
+    just docs-check
 
 # type-only compile pass. Redundant with `just lint` by design: clippy already
 # type-checks, but `just typecheck` must mean the same thing in every language,
@@ -504,6 +526,12 @@ scan:
 [doc("naming standard ratchet (gates/naming-check.sh)")]
 naming:
     sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
+
+# docs front matter and generated-file headers (kind, owner, status; generated-by equals contracts/fresh-checks.tsv).
+# Born warn: findings print and exit 0; `sh gates/doc-check.sh --strict` makes them red. Guarded like `naming`.
+[doc("docs front matter + generated headers (gates/doc-check.sh)")]
+docs-check:
+    sh -c 'if [ -f gates/doc-check.sh ]; then sh gates/doc-check.sh; else echo "doc gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
 
 # what CI runs (the full gate)
 ci: lint typecheck test-cov audit

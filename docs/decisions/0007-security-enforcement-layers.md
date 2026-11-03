@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-007: Replace custom safety hooks with maintained plugin; enforce at git/CI level
 
 - Status: Accepted

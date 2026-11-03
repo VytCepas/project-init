@@ -1,3 +1,9 @@
+---
+kind: report
+owner: @VytCepas
+status: unreviewed
+---
+
 # Full-project review — July 2026
 
 Scope: entire repository at commit `a9ecfa1` — `src/project_init/` (engine, wizard, upgrade),

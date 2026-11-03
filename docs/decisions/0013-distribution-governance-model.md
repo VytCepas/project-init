@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-013: Distribution & governance model — three profiles, fork-based orgs, opt-in updates, hybrid enforcement
 
 - Status: Accepted

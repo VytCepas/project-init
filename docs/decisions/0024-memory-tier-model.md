@@ -1,3 +1,9 @@
+---
+kind: decision-record
+owner: @VytCepas
+status: accepted
+---
+
 # ADR-024: Memory tiers — a graded ladder over the à-la-carte backend, with a parked RAG rung
 
 - Status: Accepted

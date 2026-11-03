@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: @VytCepas
+status: unreviewed
+---
+
 # Driving Claude Code from a phone or tablet
 
 How to continue a coding session from a phone/tablet — and, crucially, **which

@@ -1,3 +1,9 @@
+---
+kind: explanation
+owner: project-init#479
+status: unreviewed
+---
+
 # Design note — agentic-OS root layer (#479)
 
 One-page sketch of the cross-project layer that sits *above* `project_init`.

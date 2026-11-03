@@ -1,4 +1,10 @@
-{{#if want_docs}}# Reference
+{{#if want_docs}}---
+kind: reference
+{{#if project_owner}}owner: {{project_owner}}
+{{/if project_owner}}status: current
+---
+
+# Reference
 
 Information-oriented technical description: API signatures, configuration
 keys, CLI flags. Reference states facts — it does not explain or instruct.
