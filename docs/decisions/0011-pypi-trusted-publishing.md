@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-11
+date: 2026-06-12
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-011: Publish to PyPI via trusted publishing; supersedes ADR-008's deferral

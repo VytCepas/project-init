@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-23
+date: 2026-06-25
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-023: Self-explaining wizard — every selectable concern explains its value

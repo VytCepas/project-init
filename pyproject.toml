@@ -57,6 +57,7 @@ dev = [
 
 [project.scripts]
 project-init = "project_init.__main__:main"
+yard = "project_init.__main__:main"
 
 [project.urls]
 Repository = "https://github.com/VytCepas/project-init"

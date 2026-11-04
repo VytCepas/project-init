@@ -76,6 +76,13 @@ class TestInstalledWheel:
         )
         assert version_out.returncode == 0
         assert pkg_version in version_out.stdout
+        # harbor #966: `yard` is the same entry point under the repo's new name, and says so.
+        yard_bin = venv_bin.with_name(venv_bin.name.replace("project-init", "yard"))
+        yard_out = subprocess.run(
+            [str(yard_bin), "--version"], capture_output=True, text=True, timeout=30
+        )
+        assert yard_out.returncode == 0
+        assert yard_out.stdout.startswith(f"yard {pkg_version}")
 
         # Scaffold using the installed binary, with --strict.
         result = subprocess.run(

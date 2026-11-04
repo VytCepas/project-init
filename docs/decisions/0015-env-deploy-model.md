@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-15
+date: 2026-06-19
+supersedes: D-14
+superseded_by: -
 ---
 
 # ADR-015: Agnostic local↔cloud environment & deploy model (single-trunk; deploy/IaC opt-in)

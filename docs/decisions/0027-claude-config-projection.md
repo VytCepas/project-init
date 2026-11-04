@@ -2,6 +2,11 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-27
+date: 2026-07-08
+supersedes: -
+superseded_by: -
+revised_by: D-30
 ---
 
 # ADR-027: `.claude/` is a scoped, delete-aware, plain-file projection of `.agents/`

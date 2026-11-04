@@ -11,7 +11,8 @@ test_wizard_explanations.py can partition every flag into concern-or-mechanical.
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+import sys
+from pathlib import Path, PureWindowsPath
 
 from project_init import __version__
 from project_init.variables import (
@@ -66,9 +67,14 @@ def _reject_conflicting_python_version(
         )
 
 
+def _prog() -> str:
+    """The command typed: `yard` (the repo's name, harbor #966) or `project-init`, kept one minor version."""
+    return "yard" if PureWindowsPath(sys.argv[0]).stem == "yard" else "project-init"
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="project-init",
+        prog=_prog(),
         description="Scaffold agentic-development infrastructure into a project.",
         epilog=(
             "Subcommands:\n"

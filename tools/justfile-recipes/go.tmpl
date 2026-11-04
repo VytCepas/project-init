@@ -1,0 +1,135 @@
+# justfile — the canonical command interface (scaffolded by project-init).
+# `just --list` shows every recipe. Recipes are thin wrappers — logic lives
+# in the tools and their configs, never in this file.
+
+# download module dependencies. Keyed off go.mod, not *.go: `go mod download`
+# syncs the module cache and succeeds with a go.mod and zero .go files, so a
+# dependency-only or generated-code workflow must not be skipped once the module
+# is initialized. Every other go recipe below shells out to the toolchain, which
+# errors on a fresh module — so those guards keep `just ci`/`just fast-ci` and the
+# rest green until the first source appears (parity with typecheck/test-cov).
+[doc("download module dependencies")]
+setup:
+    sh -c 'if [ -f go.mod ]; then go mod download; else echo "No Go module yet — run go mod init <module-path>."; fi'
+
+# lint project code (revive/godoclint/gocognit/cyclop/dupl/errcheck/govet/staticcheck gates per .golangci.yml)
+lint:
+    sh -c 'if find . -name "*.go" | grep -q .; then golangci-lint run; else echo "No Go sources yet — nothing to lint."; fi'
+    sh -c 'if command -v shellcheck >/dev/null 2>&1; then find .agents -name "*.sh" -exec shellcheck -S error -x {} +; else echo "shellcheck not installed — skipping shell lint (CI still runs it). Install: https://github.com/koalaman/shellcheck#installing or run \`mise install\`."; fi'
+    sh -c 'if command -v shfmt >/dev/null 2>&1; then find .agents -name "*.sh" -exec shfmt -d -i 2 {} +; else echo "shfmt not installed — skipping shfmt check (CI still runs it). Install: https://github.com/mvdan/sh#shfmt or run \`mise install\`."; fi'
+    bash .agents/scripts/lint-context-budget.sh
+    just naming
+    just docs-check
+
+# type-only pass. Redundant with `just lint` by design: golangci-lint runs
+# go/analysis, which type-checks. `just typecheck` exists so the command means
+# the same thing in every language, which is what CI and agents call (#725).
+[doc("type-only pass")]
+typecheck:
+    sh -c 'if find . -name "*.go" | grep -q .; then go vet ./...; else echo "No Go sources yet — nothing to type-check."; fi'
+
+# auto-format project code (gofumpt via golangci-lint fmt — no separate binary
+# to provision; golangci-lint is already required for `just lint`)
+[doc("auto-format project code")]
+format:
+    sh -c 'if find . -name "*.go" | grep -q .; then golangci-lint fmt; else echo "No Go sources yet — nothing to format."; fi'
+
+# run the test suite. Skips cleanly before any Go source exists — `go test ./...`
+# errors on a fresh module (no go.mod), so a fresh scaffold's `just test` /
+# pre-push `fast-ci` would fail day-one without this guard (matches typecheck).
+# `-json` feeds the test contract's `<project>: N passed, M failed` line, printed
+# last; the output shown is go's plain form and the exit code is go's (#1054).
+[doc("run the test suite")]
+test:
+    sh -c 'if find . -name "*.go" | grep -q .; then bash .agents/hooks/python-resolve.sh .agents/scripts/contract-line.py {{project_slug}} go -- go test -json ./...; else echo "No Go sources yet — nothing to test."; echo "{{project_slug}}: 0 passed, 0 failed"; fi'
+
+# fail-fast run for the edit-test loop (token-efficiency; PI-641). Same day-one
+# guard as `test`.
+[doc("fail-fast run for the edit-test loop (token-efficiency; PI-641)")]
+test-quick:
+    sh -c 'if find . -name "*.go" | grep -q .; then go test -failfast ./...; else echo "No Go sources yet — nothing to test."; fi'
+
+# tests with the coverage gate (CI always runs this, not `test` — PI-569).
+# tune the "70" threshold to your project's baseline. Skips cleanly before any
+# Go source exists (`go test ./...` errors on a fresh module, like license/
+# fuzz). The awk END gate is fail-closed: a missing/unreadable coverage.out
+# yields zero input lines and fails the recipe instead of silently passing
+# (a bare `... | awk '{...}'` returned awk's 0 exit when the cover tool failed).
+[doc("tests with the coverage gate (CI always runs this, not `test` — PI-569).")]
+test-cov:
+    sh -c 'set -e; if ! find . -name "*.go" | grep -q .; then echo "No Go sources yet — nothing to test."; exit 0; fi; go test -coverprofile=coverage.out ./...; go tool cover -func=coverage.out | awk '\''END { if (NR == 0 || $1 != "total:") { print "Coverage gate: could not read coverage totals"; exit 1 } pct = $3; sub("%", "", pct); if (pct + 0 < 70) { print "Coverage " pct "% is below the 70% gate"; exit 1 } else { print "Coverage " pct "% meets the 70% gate" } }'\'''
+
+# docs: nothing to build — pkg.go.dev renders doc comments
+docs:
+    @echo "pkg.go.dev renders Go doc comments — nothing to build locally"
+
+# dependency vulnerability scan against known CVEs/advisories (PI-568).
+# requires govulncheck: `go install golang.org/x/vuln/cmd/govulncheck@latest`
+# once, on your machine (CI installs it per-run).
+[doc("dependency vulnerability scan against known CVEs/advisories (PI-568).")]
+audit:
+    sh -c 'if find . -name "*.go" | grep -q .; then govulncheck ./...; else echo "No Go sources yet — nothing to audit."; fi'
+
+# generate a CycloneDX SBOM of the module dependency tree (#574). release.yml
+# attaches this to GitHub Releases.
+# requires cyclonedx-gomod: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+[doc("generate a CycloneDX SBOM of the module dependency tree (#574)")]
+sbom:
+    sh -c 'if find . -name "*.go" | grep -q .; then cyclonedx-gomod mod -json -output sbom.cdx.json; else echo "No Go sources yet — nothing to inventory."; fi'
+
+# dependency license compliance scan (#579) — fail on forbidden/restricted
+# (copyleft: GPL/LGPL/AGPL) per go-licenses' classification. Tune
+# --disallowed_types to your policy. Skips cleanly before any Go source exists.
+# requires go-licenses: go install github.com/google/go-licenses@latest
+[doc("dependency license compliance scan (#579)")]
+license:
+    sh -c 'if find . -name "*.go" | grep -q .; then go-licenses check ./... --disallowed_types=forbidden,restricted; else echo "No Go sources yet — skipping license scan."; fi'
+
+# native Go fuzzing (#580) — replay fuzz-test SEED CORPORA deterministically
+# (short, CI-safe; no unbounded input generation). For active fuzzing that
+# generates new inputs, target one function:
+#   go test -run='^$' -fuzz=FuzzMyTarget -fuzztime=30s ./...
+# Built into the toolchain (go 1.18+). Pattern/tooling, NOT a blocking gate: CI
+# runs this in the nightly `fuzz` job, never on a PR (#727). Seed replay is
+# deterministic, so repeating it nightly surfaces no NEW inputs (unlike the other
+# three languages) — it still uses CI minutes; it runs nightly to keep the four
+# languages uniform.
+[doc("native Go fuzzing (#580)")]
+fuzz:
+    sh -c 'if find . -name "*.go" | grep -q .; then go test -run="Fuzz" ./...; else echo "No Go sources yet — nothing to fuzz."; fi'
+
+# scan staged changes for secrets (same scan as the pre-commit git hook)
+scan:
+    gitleaks git --pre-commit --staged --redact --no-banner --verbose
+
+# the naming standard over this repo, as a ratchet: new findings fail, a fixed
+# finding must be deleted from gates/naming.baseline. Judges with the vendored package in
+# vendor/naming/ (no checkout of the standard needed); UNCHECKED exits 3, never a pass. Guarded so
+# an upgrade that declined the `naming-gate` addition group keeps a working `just lint`.
+[doc("naming standard ratchet (gates/naming-check.sh)")]
+naming:
+    sh -c 'if [ -f gates/naming-check.sh ]; then sh gates/naming-check.sh; else echo "naming gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
+
+# docs front matter and generated-file headers (kind, owner, status; generated-by equals contracts/fresh-checks.tsv).
+# Born warn: findings print and exit 0; `sh gates/doc-check.sh --strict` makes them red. Guarded like `naming`.
+[doc("docs front matter + generated headers (gates/doc-check.sh)")]
+docs-check:
+    sh -c 'if [ -f gates/doc-check.sh ]; then sh gates/doc-check.sh; else echo "doc gate not installed here (project-init upgrade --apply --accept-new naming-gate)"; fi'
+
+# what CI runs (the full gate)
+ci: lint typecheck test-cov audit
+
+# fast local gate for the pre-push hook: lint + parallel tests (CI is the full
+# backstop, so pre-push stays fast and doesn't re-run typecheck/coverage/audit)
+[doc("fast local gate for the pre-push hook")]
+fast-ci: lint test
+
+# route CI to a self-hosted runner when Actions minutes run out (PI-666);
+# requires a registered runner — see .agents/docs/guides/self-hosted-ci-runner.md
+[doc("route CI to a self-hosted runner when Actions minutes run out (PI-666)")]
+ci-local-on:
+    gh variable set CI_RUNS_ON --body self-hosted
+
+# back to GitHub-hosted runners
+ci-local-off:
+    gh variable delete CI_RUNS_ON

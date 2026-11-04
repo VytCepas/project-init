@@ -2,6 +2,10 @@
 kind: decision-record
 owner: @VytCepas
 status: accepted
+alias: D-28
+date: 2026-07-08
+supersedes: -
+superseded_by: -
 ---
 
 # ADR-028: Session-scoped injection for the workflow-state reminder
