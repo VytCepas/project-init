@@ -3,6 +3,6 @@
 # the `CI gate` aggregator (its needs: are pinned by docs/development/quality-gates.md) and validate-pr.yml's two
 # jobs. KEEP IN STEP with the branch rules when either changes.
 
-VytCepas/project-init	CI gate
-VytCepas/project-init	Check PR title format
-VytCepas/project-init	Check for Closes keyword in PR body
+VytCepas/yard	CI gate
+VytCepas/yard	Check PR title format
+VytCepas/yard	Check for Closes keyword in PR body
